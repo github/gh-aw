@@ -32,12 +32,30 @@ namespace TokenBroker {
     token_type: "copilot-task" | "github-app";
   }
 
+  @doc("Proposed independent OTLP exchange; provider, endpoint, and caller headers are forbidden.")
+  model OtlpRequest {
+    ...RequestIdentity;
+    token_type: "otlp";
+  }
+
   model InvalidateRequest {
     ...RequestIdentity;
     operation: "invalidate";
   }
 
   model IssuedCredential {
+    token: Credential;
+    expires_at: Expiration;
+  }
+
+  @doc("An approved absolute HTTPS OTLP/HTTP base URL. Format/pattern checks are partial; URL parsing, userinfo rejection, destination policy, and SSRF checks are normative in Section 3.1.")
+  @format("uri")
+  @pattern("^https://[^\\s\\\\#]+$")
+  scalar CollectorEndpoint extends string;
+
+  @doc("Only an otlp exchange returns this exact three-member body; endpoint/token/expiry are one job-local pair.")
+  model IssuedOtlpCredential {
+    endpoint: CollectorEndpoint;
     token: Credential;
     expires_at: Expiration;
   }
@@ -50,7 +68,8 @@ namespace TokenBroker {
     ...ResponseHeaders;
     @statusCode status: 200;
     @header contentType: "application/json";
-    @body body: IssuedCredential;
+    @doc("Select by request token_type: otlp requires IssuedOtlpCredential; all other types require IssuedCredential. Reject additional members; no response discriminator is added.")
+    @body body: IssuedCredential | IssuedOtlpCredential;
   }
 
   model Invalidated {
@@ -68,12 +87,12 @@ namespace TokenBroker {
 
   @post
   @route("/")
-  @doc("An exchange request succeeds with 200; an invalidation request succeeds with 204.")
+  @doc("An exchange request succeeds with 200; an invalidation request succeeds with 204. OTLP is proposed, not implemented. Request-dependent response validation follows Section 4.3.")
   op submit(
     @header contentType: "application/json",
     @header accept: "application/json",
     @header traceparent?: string,
     @header baggage?: string,
-    @body request: CopilotRequest | TaskOrAppRequest | InvalidateRequest,
+    @body request: CopilotRequest | TaskOrAppRequest | OtlpRequest | InvalidateRequest,
   ): Exchanged | Invalidated | Failure;
 }

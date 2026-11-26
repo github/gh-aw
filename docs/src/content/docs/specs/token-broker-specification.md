@@ -8,23 +8,23 @@ sidebar:
 
 # Token Broker Specification
 
-**Version**: 2.0.0<br />
+**Version**: 2.1.0<br />
 **Status**: Experimental draft<br />
-**Date**: 2026-11-19<br />
+**Date**: 2026-11-26<br />
 **Editors**: GitHub Agentic Workflows maintainers<br />
 **Latest version**: [Token Broker Specification](/gh-aw/specs/token-broker-specification/)
 
 ## Abstract
 
-This specification defines a deployment-owned HTTPS service that exchanges a verified GitHub Actions OpenID Connect (OIDC) identity token for a short-lived credential. Independent capabilities authorize GitHub Copilot inference requests, Copilot coding-agent task operations, and GitHub API operations using installation credentials. The specification defines the wire contract, issuer verification, tenant and workflow authorization, credential issuance, renewal, failure handling, and compliance tests. It does not define a public GitHub credential-minting API or supply a server implementation.
+This specification defines a deployment-owned HTTPS service that exchanges a verified GitHub Actions OpenID Connect (OIDC) identity token for a short-lived credential. Independent capabilities authorize GitHub Copilot inference requests, Copilot coding-agent task operations, GitHub API operations using installation credentials, and OpenTelemetry Protocol (OTLP) export to a broker-resolved collector. The specification defines the wire contract, issuer verification, tenant and workflow authorization, credential issuance, renewal, failure handling, and compliance tests. It does not define a public GitHub credential-minting API or supply a server implementation.
 
 ## Status of This Document
 
-Token broker authentication is experimental. The protocol, configuration, and behavior may change without deprecation. Compiling a workflow that enables a broker capability emits an experimental-feature warning.
+Token broker authentication is experimental. The protocol, configuration, and behavior may change without deprecation. Compiling a workflow that enables an implemented broker capability emits an experimental-feature warning.
 
 This is a project specification following W3C-style conventions, not a W3C Recommendation. Repository maintainers govern changes through the normal contribution and review process. Version numbers follow semantic versioning: incompatible contract changes increment the major version, backward-compatible features increment the minor version, and clarifications increment the patch version.
 
-**Implementation status (informative): Partial integration.** The shared client supports all three token types. Coding-agent task creation and issue-assignment integrations obtain credentials at request time and renew them as necessary. GitHub tools and safe outputs can receive a job-local `github-app` credential, without automatic consumer renewal. Brokered Copilot inference is wired for the bounded detection and evals jobs. Main-agent inference remains blocked on a renewable AWF credential provider. The compiler rejects broker-enabled GitHub-backed inference in the main agent job, including applicable fallback models; this is not limited to the engine named `copilot`. A successful standalone `copilot-request` exchange does not establish working cloud inference. Full end-to-end acceptance has not been achieved. Server implementation, deployment, and issuer integrations remain deployment-owned.
+**Implementation status (informative): Partial integration.** The `otlp` capability, configuration, action setup, and lifecycle requirements in this version are proposed and NOT implemented. The shared client supports the three existing token types (`copilot-request`, `copilot-task`, and `github-app`). Coding-agent task creation and issue-assignment integrations obtain credentials at request time and renew them as necessary. GitHub tools and safe outputs can receive a job-local `github-app` credential, without automatic consumer renewal. Brokered Copilot inference is wired for the bounded detection and evals jobs. Main-agent inference remains blocked on a renewable AWF credential provider. The compiler rejects broker-enabled GitHub-backed inference in the main agent job, including applicable fallback models; this is not limited to the engine named `copilot`. A successful standalone `copilot-request` exchange does not establish working cloud inference. Full end-to-end acceptance has not been achieved. Server implementation, deployment, and issuer integrations remain deployment-owned.
 
 ## Table of Contents
 
@@ -43,15 +43,17 @@ This is a project specification following W3C-style conventions, not a W3C Recom
 
 ### 1.1. Purpose and scope
 
-The broker removes the need to distribute long-lived capability credentials to participating workflows. It accepts a GitHub-signed job identity, applies deployment policy, and returns only a credential and its expiration.
+The broker removes the need to distribute long-lived capability credentials to participating workflows. It accepts a GitHub-signed job identity, applies deployment policy, and returns only a credential and its expiration, plus a collector endpoint only for `otlp`.
 
 A **capability** is an operation class identified by `token_type`. A **tenant** is a deployment-enrolled security boundary bound to stable GitHub owner and repository identities. An **execution context** identifies a repository, workflow, run, attempt, and credential-consuming job. An **issuer adapter** is a trusted server component that obtains a credential from an approved backend.
 
-This specification covers broker exchange and its compiler/client integration contract, including explicitly selected GitHub tools and safe-output authentication. It does not cover admission decisions, billing, provider endpoint discovery, deployment provisioning, or a new secret store. The [admission service](/gh-aw/specs/admission-service-specification/) remains independent.
+This specification covers broker exchange and its compiler/client integration contract, including explicitly selected GitHub tools, safe-output authentication, and broker-resolved OTLP configuration. It does not cover admission decisions, billing, inference-provider endpoint discovery, deployment provisioning, or a new secret store. The [admission service](/gh-aw/specs/admission-service-specification/) remains independent.
 
 ### 1.2. Design goals (informative)
 
 The protocol deliberately excludes caller-selected scopes, tenant IDs, resource URLs, and provider endpoints. The server derives authority from verified identity and enrolled policy, not from caller assertions. Capabilities remain independent so that a deployment can enable only the operations it can securely issue.
+
+The server-resolved OTLP collector is the sole policy-bound endpoint exception; caller-selected destinations remain excluded.
 
 ## 2. Conformance
 
@@ -67,7 +69,7 @@ Sections 2–7 and Appendix C are normative except where explicitly marked infor
 | --- | --- |
 | Broker server | Satisfies all server requirements, including rejection and isolation requirements, for its declared capability set. |
 | Compiler and runtime client | Satisfies configuration, transport, response-validation, caching, and credential-handling requirements. |
-| Integrated deployment | Combines conforming components and demonstrates actual downstream use and the capability's lifecycle profile: request-time renewal, or bounded static consumption for `github-app` as defined in Section 6.3. |
+| Integrated deployment | Combines conforming components and demonstrates actual downstream use and the capability's lifecycle profile: request-time renewal, or bounded static consumption for `github-app` (Section 6.3) or `otlp` (Section 6.4). |
 
 A broker MUST declare its supported capability set to operators. The set MAY contain any subset of the defined capabilities. An empty set can conform to the exchange and rejection protocol but cannot claim usable credential issuance. Omission of an optional capability is not partial conformance. An implementation failing a mandatory requirement MUST NOT claim conformance.
 
@@ -79,7 +81,7 @@ Workflow source MUST explicitly select Copilot capabilities using `token-broker.
 
 GitHub API authentication MUST be selected independently using `tools.github.token-broker: true` and/or `safe-outputs.token-broker: true`. Each selects the `github-app` capability for that section; neither requires a top-level Copilot capability. An enabled section-level broker selection MUST NOT be combined with that section's `github-app` or `github-token`, and MUST suppress top-level GitHub App fallback for that section. Omission or `false` MUST preserve existing authentication. Installation selection, repository scope, permissions, and lifetime MUST come from enrolled server policy bound to verified identity, never from caller-selected scope fields.
 
-In these two sections, a present `token-broker:` key with an empty value MUST be equivalent to `token-broker: true`. This shorthand does not select top-level Copilot capabilities.
+In these two sections, a present `token-broker:` key with an empty value MUST be equivalent to `token-broker: true`. This shorthand does not select top-level Copilot or OTLP capabilities.
 
 For GitHub tool consumers, broker policy MUST restrict installation token permissions to read-only. Safe-output consumers MUST receive only the permissions required by their approved effects. Sharing the `github-app` capability name MUST NOT authorize credential reuse between these job contexts.
 
@@ -101,6 +103,22 @@ Credential-consuming jobs MUST have `id-token: write` within the caller's permis
 
 Admission success, admission absence, and admission's `ignore` outage policy MUST NOT authorize broker issuance or make broker failures fail open. Broker authentication MUST NOT replace credentials for unrelated GitHub operations.
 
+### 3.1. Independent OTLP opt-in and action setup
+
+Workflow source MUST select brokered OTLP export independently using the explicit boolean `token-broker.otlp: true`. Omission or `false` MUST preserve existing telemetry authentication; other values MUST be rejected. No Copilot, GitHub tools, safe-output, or admission capability is required. An inherited broker URL or existing exporter configuration MUST NOT enable this capability.
+
+For each consuming job, the compiler MUST pass the explicit action input `token-broker-otlp: true` to trusted action setup and grant only that job the required OIDC permission. The action MUST enable this path only for that explicit input. Before any remote OTLP export, including action-setup telemetry, the action MUST acquire a fresh OIDC identity and exchange it for `token_type: "otlp"` using the same broker URL, audience, and protocol as other capabilities, without `provider`. It MUST NOT reuse an inherited credential or another job's exchange. Acquisition, validation, or configuration failure after opt-in MUST fail setup and the job without exporting or falling back to static credentials. A generic best-effort telemetry error handler MUST NOT swallow these failures.
+
+The broker MUST select a single HTTPS collector endpoint from approved deployment policy bound to the verified tenant and job; neither request fields nor caller exporter settings may select it. Before use, both broker and client MUST validate that the endpoint is absolute HTTPS with a hostname and no user information, fragment, whitespace, controls, or backslashes. Both MUST enforce deployment-owned destination policy, including approved host, port, and path and DNS/resolved-address checks preventing SSRF into unapproved private, loopback, link-local, or metadata services. Repository-controlled text MUST NOT broaden that policy. Collector requests MUST NOT follow redirects or accept caller-selected arbitrary headers.
+
+Before export, the action MUST verify that deployment-controlled egress already permits the returned collector and resulting signal destinations for every intended trusted exporter. Broker opt-in or a broker response MUST NOT automatically widen or bypass workflow or AWF firewall policy. Missing required egress permission MUST fail setup closed; the pair MUST remain confined to trusted exporters, not the agent.
+
+`endpoint` is an OTLP/HTTP base URL, not a signal-specific URL. This profile MUST use `http/protobuf` and append `v1/traces`, `v1/metrics`, or `v1/logs` to the base path with exactly one separating slash, preserving any query without treating it as path text, as specified by OTLP exporter configuration. Each resulting signal destination MUST pass the same destination checks. The action MUST set `OTEL_EXPORTER_OTLP_PROTOCOL` accordingly and remove or replace conflicting signal-specific protocol overrides; every intended exporter, including the `GH_AW_OTLP_ENDPOINTS` consumer, MUST use this same path composition.
+
+The action MUST configure the endpoint and token as one job-local pair, replacing `GH_AW_OTLP_ENDPOINTS` with exactly one broker-resolved destination and setting matching `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_OTLP_HEADERS`. The sole authentication header MUST be named `Authorization` and contain the `Bearer` scheme followed by one ASCII space and the token. The standard OTEL header value MUST use the OpenTelemetry environment-variable header percent-encoding rules, including encoding the bearer-space and token delimiters, and decode to exactly that header. The action MUST mask the token, its encoded/header forms, and any sensitive endpoint before use or handoff. It MUST NOT merge this token through the generic `OTLP_OIDC_TOKEN` multi-destination path or forward it to any other destination.
+
+Before export, the action MUST remove or replace stale/static endpoint and header overrides, including signal-specific `OTEL_EXPORTER_OTLP_*_ENDPOINT` and `OTEL_EXPORTER_OTLP_*_HEADERS`, action inputs, and inherited multi-destination configuration. Every enabled exporter MUST use only the validated pair; an implementation unable to guarantee this MUST fail setup. Exporter handoff MUST be limited to intended same-job consumers. `GITHUB_ENV` MAY be used only for this explicit masked same-job handoff; it MUST NOT expose the pair or OIDC/bootstrap material to an agent or unrelated consumer (Appendix C).
+
 ## 4. Exchange Protocol
 
 The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/token-broker-specification.tsp) describes the service's shared POST endpoint, exchange and invalidation messages, and response statuses. This section defines operation-specific success, strict validation, and credential lifecycle requirements.
@@ -109,7 +127,7 @@ The [companion TypeSpec definition](https://github.com/github/gh-aw/blob/main/do
 
 The configured URL is the complete exchange endpoint; no route suffix or discovery request is appended. The client MUST acquire a GitHub Actions OIDC JWT with that exact audience and send one HTTPS POST with `Content-Type: application/json` and `Accept: application/json`. Redirects MUST NOT be followed during OIDC acquisition or exchange. The broker MUST serve the configured endpoint directly without redirects.
 
-An exchange request MUST be a UTF-8 JSON object containing the two required unique string members for `copilot-task` or `github-app`, or three for `copilot-request`, plus `job_id` whenever the runner provides `GITHUB_JOB`:
+An exchange request MUST be a UTF-8 JSON object containing the two required unique string members for `copilot-task`, `github-app`, or `otlp`, or three for `copilot-request`, plus `job_id` whenever the runner provides `GITHUB_JOB`:
 
 ```json
 {
@@ -120,7 +138,7 @@ An exchange request MUST be a UTF-8 JSON object containing the two required uniq
 }
 ```
 
-For `copilot-task` and `github-app`, the `provider` member is omitted:
+For `copilot-task`, `github-app`, and `otlp`, the `provider` member is omitted:
 
 ```json
 {
@@ -132,12 +150,12 @@ For `copilot-task` and `github-app`, the `provider` member is omitted:
 
 | Member | Contract |
 | --- | --- |
-| `token_type` | Exactly `copilot-request`, `copilot-task`, or `github-app`, case-sensitive. |
+| `token_type` | Exactly `copilot-request`, `copilot-task`, `github-app`, or `otlp`, case-sensitive. |
 | `provider` | Required only for `copilot-request`. A nonempty inference-provider identifier matching gh-aw's provider IDs (for example, `github`). It MUST NOT be a provider endpoint or URL. |
 | `oidc_token` | Nonempty, signed compact JWT issued by the configured trusted GitHub Actions issuer. |
 | `job_id` | The runner's logical `GITHUB_JOB` string, JSON-encoded without percent-encoding. Required when available; callers without job context omit it. Diagnostic metadata only, never proof of a job execution or a credential selector. |
 
-For `copilot-task` and `github-app`, `provider` MUST be absent. The broker MUST reject duplicate members, additional members, invalid UTF-8/JSON, arrays, missing required members, and wrong types. It MUST bound request processing and accept no more than 65,536 request-body bytes. Oversized requests MUST receive HTTP 413; unsupported media types MUST receive HTTP 415. Malformed JSON or schema violations MUST receive HTTP 400. A well-formed unknown token type MUST receive HTTP 422. The broker MUST authorize the requested provider for the verified tenant and capability; it MUST NOT derive an endpoint or backend destination from this caller-supplied identifier. No body member or HTTP authentication header can substitute another credential for the OIDC JWT.
+For `copilot-task`, `github-app`, and `otlp`, `provider` MUST be absent. The broker MUST reject duplicate members, additional members, invalid UTF-8/JSON, arrays, missing required members, and wrong types. It MUST bound request processing and accept no more than 65,536 request-body bytes. Oversized requests MUST receive HTTP 413; unsupported media types MUST receive HTTP 415. Malformed JSON or schema violations MUST receive HTTP 400. A well-formed unknown token type MUST receive HTTP 422. The broker MUST authorize the requested provider for the verified tenant and capability; it MUST NOT derive an endpoint or backend destination from this caller-supplied identifier. No body member or HTTP authentication header can substitute another credential for the OIDC JWT.
 
 ### 4.2. Independent capabilities
 
@@ -146,12 +164,13 @@ For `copilot-task` and `github-app`, `provider` MUST be absent. The broker MUST 
 | `copilot-request` | Authentication for the deployment's approved GitHub Copilot cloud inference consumer. |
 | `copilot-task` | Authentication for the approved Copilot coding-agent task-creation and issue-assignment operations. |
 | `github-app` | A GitHub App installation access token for the selected GitHub tools or safe-output consumer, scoped by enrolled deployment policy. |
+| `otlp` | A job-scoped collector endpoint/token pair permitting only telemetry ingestion at the deployment-approved collector. |
 
 Support for one capability MUST NOT imply support or authorization for another. The broker MUST NOT return a credential for a different capability as a fallback. The client MUST NOT switch capabilities or fall back to a PAT, bootstrap token, or legacy provider credential after failure.
 
 ### 4.3. Success response
 
-Success MUST use HTTP 200, `Content-Type: application/json`, and `Cache-Control: no-store`. The UTF-8 JSON body MUST contain exactly two unique string members, in either order:
+Success MUST use HTTP 200, `Content-Type: application/json`, and `Cache-Control: no-store`. For all token types except `otlp`, the UTF-8 JSON body MUST contain exactly two unique string members, in either order:
 
 ```json
 {
@@ -160,11 +179,13 @@ Success MUST use HTTP 200, `Content-Type: application/json`, and `Cache-Control:
 }
 ```
 
+Only for `otlp`, the response MUST instead contain exactly three unique string members: `endpoint`, `token`, and `expires_at`. `endpoint` MUST satisfy Section 3.1. Response validation MUST select the exact member set by the requested capability, not by guessing from returned fields.
+
 `token` MUST be nonempty and contain only printable ASCII characters U+0021–U+007E, excluding spaces and all control characters. Consumers MUST treat its value as opaque, with no prefix or length assumptions beyond the body limit.
 
 `expires_at` MUST follow this restricted [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) profile: a four-digit year, valid Gregorian calendar date, hour `00`–`23`, minute and second `00`–`59`, and a timezone of `Z`/`z` or a signed numeric offset with hour `00`–`23` and minute `00`–`59`. Fractional seconds and lowercase `t`/`z` are accepted. Leap seconds and hour `24` are not accepted; not every RFC 3339 form is supported. Server generation of ordinary UTC timestamps with uppercase `T` and `Z` is RECOMMENDED. The advertised expiration MUST NOT exceed the actual credential expiration or the deployment's authorized maximum lifetime.
 
-The complete decoded response body MUST NOT exceed 65,536 bytes. Provider endpoints, scopes, tenant identifiers, token types, and other metadata MUST NOT appear as additional response members. The client MUST reject duplicate/additional/missing fields, invalid encoding or JSON, unsafe tokens, invalid dates, and expiration at or before its current time plus 30 seconds. It MUST NOT expose rejected response bodies.
+The complete decoded response body MUST NOT exceed 65,536 bytes. Apart from the required `otlp` collector `endpoint`, provider endpoints, scopes, tenant identifiers, token types, and other metadata MUST NOT appear as additional response members. The client MUST reject duplicate/additional/missing fields, invalid encoding or JSON, unsafe tokens, invalid dates, and expiration at or before its current time plus 30 seconds. It MUST NOT expose rejected response bodies.
 
 ### 4.4. Failure semantics
 
@@ -211,7 +232,7 @@ Exchange and invalidation POSTs MUST propagate W3C `traceparent` when both curre
 
 The client snapshots job and trace context before acquiring OIDC credentials. It MUST NOT forward arbitrary incoming trace headers, baggage, or exporter credentials, send these correlation headers to the GitHub OIDC issuer, or enable telemetry export solely to propagate context. The broker MUST NOT use `job_id`, baggage, or trace identifiers to authorize issuance, select scope, or replace Section 5's verified job evidence. Backend instrumentation must explicitly record extracted baggage as a span attribute if desired; extraction alone does not do so.
 
-**Deployment compatibility:** Version 2 extends the closed request schema with `job_id`; version-1 servers reject that member. Update backend schema validation before deploying clients that send it. Requests without job context remain valid without the member. Success response schemas, credential authorization, and invalidation scope are unchanged.
+**Deployment compatibility:** Version 2 extends the closed request schema with `job_id`; version-1 servers reject that member. Update backend schema validation before deploying clients that send it. Requests without job context remain valid without the member. Version 2.1 adds optional `otlp`; the three existing token types retain their response schemas. Credential authorization and invalidation scope are unchanged.
 
 ## 5. Identity Verification and Authorization
 
@@ -317,7 +338,7 @@ This section is the authoritative list of checks a conforming broker MUST perfor
 | SV-26 | Call only the issuer adapter for the selected capability. Never fall back to another tenant, installation, capability, or wider scope. | 502 or 503 |
 | SV-27 | Validate that the returned token is printable ASCII without spaces, and that `expires_at` is in the future with more than 30 seconds remaining, before responding. | 502 |
 | SV-28 | Record the issued credential against the job execution so invalidation can revoke it, before returning it. Recording MUST atomically check that the job is not closed. If it is closed, revoke the credential and deny. | 500 or 403 (no credential) |
-| SV-29 | Respond with exactly `token` and `expires_at` and `Cache-Control: no-store`. | — |
+| SV-29 | Respond with exactly `token` and `expires_at`, plus required `endpoint` only for `otlp`, and `Cache-Control: no-store`. Validate the OTLP destination against Section 3.1 before returning it; reject unsafe or unapproved issuer results without returning the pair. | 502 for invalid issuer result |
 
 **Invalidation (Section 4.5)**
 
@@ -362,13 +383,19 @@ Replay controls do not make a bearer JWT nontransferable. Theft within its valid
 
 ### 6.3. Client caching and renewal
 
-Client caches MUST remain in memory. Cache and in-flight-exchange keys MUST isolate token type, repository, run ID, run attempt, job, and broker endpoint. Concurrent requests within one key MAY share an exchange. A credential MUST NOT be inherited across keys or persisted between jobs. The compiler MAY transfer a masked `copilot-request` or `github-app` credential through a step output to the intended consumer in the same job; it MUST NOT publish it as a job output or artifact.
+Client caches MUST remain in memory. Cache and in-flight-exchange keys MUST isolate token type, repository, run ID, run attempt, job, and broker endpoint. Concurrent requests within one key MAY share an exchange. A credential MUST NOT be inherited across keys or persisted between jobs. For `otlp`, caches MUST retain endpoint, token, and expiry atomically; cache reuse MUST NOT replace the fresh setup exchange required by Section 3.1. The compiler MAY transfer a masked `copilot-request` or `github-app` credential through a step output to the intended consumer in the same job; it MUST NOT publish it as a job output or artifact.
 
 Renewable consumers MUST check expiry at request time and renew when remaining validity is 30 seconds or less. Renewal uses the same exchange with a newly acquired OIDC token; no refresh-token endpoint exists. Renewal failure MUST NOT reuse an expired/near-expiry credential, switch capability, or fall back to legacy authentication.
 
 The initial `github-app` integration uses a bounded static-consumer profile: it supplies a fixed credential to existing GitHub consumers rather than a request-time authentication provider. It does not implement automatic renewal and MUST NOT claim request-time renewal conformance. Deployments MUST account for operation duration when setting its bounded lifetime and MUST demonstrate that expired credentials fail without legacy authentication fallback. The unconditional job-scoped invalidation requirement still applies.
 
 Long-running inference requires a renewable provider in the running consumer, not a one-time token passed to a sidecar. A deployment MUST NOT claim integrated inference conformance until that provider and downstream renewal are demonstrated.
+
+### 6.4. Bounded static OTLP action profile
+
+The `otlp` action profile uses one fixed endpoint/token pair per consuming job, with no automatic renewal. The action MUST install an export deadline at `expires_at` minus 30 seconds and enforce it for every intended exporter, including queued batches and in-flight requests. It MUST stop exports and cancel outstanding requests by that deadline; no near-expiry or expired credential may be used. Deployments MUST bound job duration and allow time for flushing within this lifetime. If work outlives the deadline, the client MUST fail the job without legacy fallback rather than silently continue without the selected telemetry. An action unable to enforce this bounded lifetime MUST reject setup; it MUST NOT claim renewal conformance.
+
+On success, failure, or cancellation, cleanup MUST stop new telemetry production and attempt a bounded flush while the pair remains valid, before the terminal invalidation in Section 4.5. Flush failure or deadline exhaustion MUST NOT skip invalidation. After flushing or its timeout, cleanup MUST disable exporters and clear the pair from caches and intended consumer configuration, including any `GITHUB_ENV` handoff, even if invalidation fails. No export may occur after terminal invalidation. The collector MUST enforce finite expiry and job-scoped revocation independently of client cleanup. Endpoint and token MUST NOT be updated, retained, or reused separately or across jobs.
 
 ## 7. Compliance Testing
 
@@ -377,24 +404,29 @@ The server author MUST run the server scenarios below with a controlled issuer/J
 | Test ID | Class | Scenario and expected outcome |
 | --- | --- | --- |
 | T-TBR-001 | Client | Omitted capability selection preserves authentication; inherited URL alone does not enable workflow-handler exchange. Only `_token_broker.copilot-task: true` in existing handler-config JSON enables task integration; a selected capability with missing/empty URL fails closed. Explicit low-level exchanges remain marker-independent. Runtime variable/secret resolution works without a compile-time URL. |
-| T-TBR-002 | Server | Exercise empty, single-capability, and combined support sets including `github-app`. Authorized supported types succeed; unsupported known types return 501 (or documented 404/422); no alternate capability is minted. |
+| T-TBR-002 | Server | Exercise empty, single-capability, and combined support sets including `github-app` and `otlp`. Authorized supported types succeed; unsupported known types return 501 (or documented 404/422); no alternate capability is minted. |
 | T-TBR-003 | Server | Wrong issuer/audience/signature, multi-audience JWT, unsigned token, disallowed algorithm, and attacker-controlled key URLs return 401 without attacker-directed discovery. |
 | T-TBR-004 | Server | Missing/non-numeric/expired `exp`, future `nbf`/`iat`, invalid ordering, and excessive age/lifetime return 401 under the configured time policy; test exact boundaries. |
 | T-TBR-005 | Server | Wrong tenant/owner/repository IDs, transfer, workflow revision/ref, environment, fork policy, run/attempt, or job evidence returns 403. Missing required evidence also denies. |
 | T-TBR-006 | Server | Valid identity denied a supported capability returns 403, not unsupported. An unsupported known type with invalid identity returns 401. Neither path invokes issuance. |
 | T-TBR-007 | Server | Extra/duplicate/missing required fields, malformed UTF-8/JSON, arrays, wrong types, or a missing/extra provider field return 400; unknown string type returns 422; oversize/media-type failures return 413/415. |
-| T-TBR-008 | Both | Success is 200 with exactly two fields, safe nonempty ASCII token, no-store, bounded body, and valid expiration. Client accepts lowercase `t`/`z`, fractional seconds, and numeric offsets through `23:59`; rejects extra/duplicate fields, invalid calendar dates, leap seconds, out-of-range time/offset components, and expiry at/below 30 seconds. |
+| T-TBR-008 | Both | Success is 200 with exactly `token` and `expires_at`, plus required `endpoint` only for `otlp`, safe nonempty ASCII token, no-store, bounded body, and valid expiration. Client accepts lowercase `t`/`z`, fractional seconds, and numeric offsets through `23:59`; rejects extra/duplicate fields, invalid calendar dates, leap seconds, out-of-range time/offset components, and expiry at/below 30 seconds. |
 | T-TBR-009 | Server | Concurrent use of one valid JWT for multiple authorized capabilities succeeds. Replay across policy boundaries cannot broaden issuance. Test per-context replay rules, rate limits (429), and bounded cache retention. |
-| T-TBR-010 | Client | Same-key requests coalesce; changed capability/repository/job/run/attempt/endpoint cannot inherit a token. Refresh occurs at the 30-second boundary; failure never reuses a stale token. |
+| T-TBR-010 | Client | Same-key requests coalesce; changed capability/repository/job/run/attempt/endpoint cannot inherit a token. Renewable consumers refresh at the 30-second boundary; failure never reuses a stale token. Static consumers follow their bounded lifetime profiles instead. |
 | T-TBR-011 | Both | Redirects, stalls, oversized responses, upstream failure, and malformed responses fail safely. Client deadline covers OIDC plus exchange and reads; no automatic retry/fallback occurs. |
 | T-TBR-012 | Both | Inspect errors, logs, traces, metrics, outputs, artifacts, and storage under success and failure. No JWT, bootstrap bearer, minted credential, raw body, or secret configuration leaks. |
 | T-TBR-013 | Server | Backend returns wrong capability/scope, unsafe token, excessive/unknown expiration, or incompatible credential. No successful response is emitted. SSRF and cross-tenant backend selection are rejected. |
-| T-TBR-014 | Deployment | For each claimed capability, use an actual GitHub-issued identity and demonstrate authorized downstream operations and request-time renewal. For the `github-app` static-consumer profile, instead demonstrate bounded lifetime, failure after expiration without fallback, and job-scoped invalidation. Broker exchange alone is insufficient. |
+| T-TBR-014 | Deployment | For each claimed capability, use an actual GitHub-issued identity and demonstrate authorized downstream operations and request-time renewal. For the `github-app` or `otlp` static-consumer profiles, instead demonstrate the applicable bounded lifetime (Sections 6.3–6.4), failure without fallback, and job-scoped invalidation. Broker exchange alone is insufficient. |
 | T-TBR-015 | Server | Rotate trusted signing keys; cached valid keys remain usable within policy, unknown keys trigger bounded refresh, and untrusted/unavailable keys fail closed. |
 | T-TBR-016 | Both | An unconditional job post-step obtains a fresh OIDC identity and invalidates only credentials for its verified execution context; repeat invalidation succeeds, unauthorized scopes do not revoke credentials, and non-204 responses fail safely. |
 | T-TBR-017 | Client | GitHub tools and safe-output broker selections work independently and together. Conflicting section credentials fail compilation; top-level App fallback does not override broker selection. Only consuming jobs exchange credentials and receive broker-related OIDC permission. Tokens remain masked and job-local, and failures never select legacy credentials. |
 | T-TBR-018 | Deployment | After job-end invalidation, the downstream service rejects the job's credentials before their original expiry, the broker denies further exchanges for that job, and a sibling job's credential still works. In a separate run without cleanup, verify that the downstream service rejects the credential at `expires_at`. |
 | T-TBR-019 | Both | Exchange and invalidation carry unchanged JSON `job_id`, header-safe percent-encoded job baggage, and valid current trace context. Missing job/context is omitted, arbitrary inherited metadata is not forwarded, OIDC-issuer requests receive no correlation headers, and unsigned job/trace values never replace verified job-execution evidence. |
+| T-TBR-020 | Client | Only explicit boolean `token-broker.otlp: true` selects the proposed action input; omitted/false preserves existing behavior and other values reject. OTLP works without another capability. Each consuming job obtains fresh OIDC and performs its own exchange before any remote export; inherited URL, token, or cached sibling exchange cannot enable or satisfy setup. Failures fail the job, including through best-effort telemetry handlers. |
+| T-TBR-021 | Both | `otlp` requests omit `provider` and reject endpoint/header selection. Responses require exactly `endpoint`, `token`, and `expires_at`; missing, duplicate, non-string, or extra fields reject. An `endpoint` in any existing capability response still rejects (SV-29); existing two-field responses remain valid. |
+| T-TBR-022 | Both | Reject unsafe URL syntax, unapproved destinations, DNS/address-policy bypasses, and redirects without forwarding credentials. Missing preprovisioned egress permission for any intended exporter fails setup; opt-in and broker responses never widen or bypass workflow/AWF firewall policy. Replace multiple `GH_AW_OTLP_ENDPOINTS` destinations and stale global/signal-specific/input overrides with the single validated pair. Verify correctly decoded bearer authorization for tokens containing percent, comma, and equals characters, no generic token merge/fan-out, masking before use, and no agent, bootstrap, output, or artifact leakage. |
+| T-TBR-023 | Both, Deployment | Client tests with a deterministic clock enforce the static deadline at expiry minus 30 seconds across all exporters, queued batches, and in-flight requests. No renewal is claimed, no stale export occurs, and an overlong job fails without fallback. Deployment tests additionally verify finite collector expiry independently when cleanup is lost. |
+| T-TBR-024 | Deployment | For success, failure, and cancellation, bounded flush precedes terminal invalidation; flush errors/timeouts still invalidate. Exporters stop and the complete pair is cleared even on invalidation failure. Closed contexts cannot export or exchange; sibling jobs remain isolated, and downstream revocation is verified before successful invalidation. |
 
 Implementers MUST record pass/fail/not-applicable per class and capability, with non-sensitive evidence and policy settings. Tests SHOULD include skew, calendar, concurrency, and revocation boundary conditions. Optional features marked not applicable MUST NOT hide failed mandatory requirements.
 
@@ -412,6 +444,7 @@ Implementers MUST record pass/fail/not-applicable per class and capability, with
 - **[W3C Trace Context]** [Trace Context Level 2](https://www.w3.org/TR/trace-context-2/).
 - **[W3C Baggage]** [Baggage](https://www.w3.org/TR/baggage/).
 - **[OpenTelemetry CI/CD Attributes]** [CI/CD attribute registry](https://opentelemetry.io/docs/specs/semconv/registry/attributes/cicd/).
+- **[OTLP Exporter Configuration]** [OTLP exporter configuration and header encoding](https://opentelemetry.io/docs/specs/otel/protocol/exporter/).
 
 ### 8.2. Informative references
 
@@ -426,7 +459,7 @@ Implementers MUST record pass/fail/not-applicable per class and capability, with
 
 A request-only deployment can return the Section 4.3 success object for an authorized `copilot-request`, while returning HTTP 501 with an empty body for an otherwise authorized `copilot-task`. A task-only deployment reverses that behavior. Neither behavior permits fallback to the other token type.
 
-For a client clock of `2026-10-30T17:55:00Z`, expiration `2026-10-30T18:00:00Z` is acceptable. Expiration `2026-10-30T17:55:30Z` is rejected at the exact margin. `2026-02-29T18:00:00Z` is an invalid date. The following object is invalid even with a usable token because endpoint selection is not part of the response:
+For a client clock of `2026-10-30T17:55:00Z`, expiration `2026-10-30T18:00:00Z` is acceptable. Expiration `2026-10-30T17:55:30Z` is rejected at the exact margin. `2026-02-29T18:00:00Z` is an invalid date. The following object is invalid for `copilot-request`, `copilot-task`, or `github-app` even with a usable token, because only `otlp` permits an endpoint in the response:
 
 ```json
 {
@@ -435,6 +468,26 @@ For a client clock of `2026-10-30T17:55:00Z`, expiration `2026-10-30T18:00:00Z` 
   "endpoint": "https://provider.example.org"
 }
 ```
+
+For the proposed independent opt-in `token-broker.otlp: true`, an action setup request and response can instead be:
+
+```json
+{
+  "token_type": "otlp",
+  "oidc_token": "<fresh-github-actions-oidc-jwt>",
+  "job_id": "agent"
+}
+```
+
+```json
+{
+  "endpoint": "https://collector.example.org/otlp",
+  "token": "<opaque-collector-credential>",
+  "expires_at": "2026-11-26T16:00:00Z"
+}
+```
+
+The collector must be approved by deployment policy. The endpoint and credential configure only that job's intended exporters; this example does not indicate implemented runtime support.
 
 ### Appendix B: Client error codes (informative)
 
@@ -451,7 +504,7 @@ These are sanitized local client errors, not server response fields:
 
 ### Appendix C: Security and privacy considerations (normative)
 
-OIDC identities, bootstrap bearers, returned credentials, and server signing material MUST NOT enter logs, traces, metric labels, exception causes, artifacts, safe outputs, job outputs, or persisted client configuration. Step outputs MUST NOT contain them except for the masked, same-job credential transfers defined in Section 6.3. Client secret masking MUST be applied before credential use; masking is defense in depth, not permission to log secrets.
+OIDC identities, bootstrap bearers, returned credentials, sensitive collector endpoints, and server signing material MUST NOT enter logs, traces, metric labels, exception causes, artifacts, safe outputs, job outputs, or persisted client configuration. Step outputs MUST NOT contain them except for the masked, same-job credential transfers defined in Section 6.3. The only `GITHUB_ENV` exception is the explicit masked same-job intended exporter handoff in Section 3.1; it MUST NOT carry OIDC identities or bootstrap material. Brokered OTLP credentials and sensitive endpoints MUST NOT enter agent environments, prompts, bootstrap configuration, or unrelated subprocesses. Client secret masking MUST be applied before credential use; masking is defense in depth, not permission to log secrets.
 
 Server HTTP middleware, reverse proxies, APM agents, and issuer adapters MUST disable or redact credential-bearing request/response capture. Server audit records MAY contain access-controlled non-sensitive metadata such as verified stable repository IDs, run/attempt identifiers, capability, policy decision, timestamp, and a server-generated internal event ID. Raw JWTs, full claim dumps, credentials, and sensitive tenant configuration MUST NOT be included. Audit retention and access MUST be bounded by deployment policy.
 
@@ -487,8 +540,9 @@ Before implementation can claim deployment conformance, operators must resolve:
 | Job binding | Available signed claims or trusted GitHub metadata sufficient to authorize the consuming job without treating local cache keys as proof. |
 | Lifecycle and abuse policy | Credential lifetime limits, replay behavior within one capability/context, tenant rate limits, key-refresh bounds, server timeouts, audit retention, and revocation propagation. |
 | Inference integration | Native renewable AWF provider and downstream renewal tests. This remains unresolved in the current repository implementation. |
+| OTLP integration | Proposed action input and opt-in support, approved collector/destination policy and client egress enforcement, bearer compatibility, single-destination configuration, enforceable static export deadline, bounded flush, and collector revocation. Not implemented. |
 
-These choices do not permit extra wire fields, weakened identity verification, or claims that an unimplemented inference path works.
+These choices do not permit extra wire fields, weakened identity verification, or claims that an unimplemented inference or OTLP path works.
 
 ### Appendix E: Threat model (informative)
 
@@ -518,6 +572,12 @@ These choices do not permit extra wire fields, weakened identity verification, o
 | TM-16 | A brokered writer credential opens an agent-authored pull request. Unlike `GITHUB_TOKEN`, App installation tokens trigger workflows. | Agent-authored code runs in the repository's CI with its secrets. | SV-16 and SV-17 deny broker exchanges from that CI. Safe-output pull requests are protected by branch rules and required review before untrusted workflows run. | Repository secrets outside the broker remain reachable from that CI. Require approval for workflows on bot-authored pull requests. |
 
 ## 10. Change Log
+
+### Version 2.1.0 (Draft, 2026-11-26)
+
+- Added the independent optional `token-broker.otlp: true` capability and provider-free `otlp` request, with a collector `endpoint` only in its strict success response (Sections 3–4, SV-29).
+- Specified fresh per-job action-setup exchange, approved destinations, isolated single-destination exporter configuration, masked handoff, and fail-closed behavior.
+- Defined the bounded static OTLP lifecycle, flush-before-invalidation cleanup, and T-TBR-020–024 conformance cases. OTLP support remains proposed, not implemented.
 
 ### Version 2.0.0 (Draft)
 
