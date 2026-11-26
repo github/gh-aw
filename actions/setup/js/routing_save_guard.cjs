@@ -28,15 +28,11 @@ function checkRoutingSaveCoverage({ state, runNumber, defaultBranch, runs, reach
   const reset = state?.reset_after_run ?? 0;
   const floor = Math.max(state?.reconciled_through ?? 0, reset);
   const pending = new Set((state?.unresolved_runs ?? []).filter(n => n > reset && n !== runNumber));
-  /** @type {Map<number, WorkflowRun>} */
-  const listed = new Map();
-  for (const run of runs) {
-    if (!listed.has(run.run_number)) listed.set(run.run_number, run);
-  }
-  const earliest = Math.min(floor, ...pending);
-  const reachesFloor = reachesStart || (earliest === 0 && !state?.last_run) || [...listed.keys()].some(n => n <= earliest);
+  const listed = new Set(runs.map(run => run.run_number));
+  const reachesFloor = reachesStart || (floor === 0 && !state?.last_run) || runs.some(run => run.run_number <= floor);
   const listingIncomplete = !reachesFloor || [...pending].some(n => !listed.has(n));
-  const hasUnsaved = [...listed.values(), ...activeRuns].some(run => {
+  // An overlapping page can show that a run finished after the previous page was fetched.
+  const hasUnsaved = [...runs, ...activeRuns].some(run => {
     const n = run.run_number;
     if (n === runNumber || (n <= floor && !pending.has(n)) || !isEligibleRun(run, defaultBranch)) return false;
     if ((run.run_attempt ?? 1) > 1) return !isSavedConclusion(run.first_attempt_conclusion);

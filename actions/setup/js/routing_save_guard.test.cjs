@@ -19,6 +19,10 @@ describe("live routing save coverage", () => {
     expect(check(through(12, [12]), delayed)).toEqual({ ...clear, hasUnsaved: true });
   });
 
+  it("retains a completion visible on a later page even if the first page still showed it running", () => {
+    expect(check(through(10), [run(12, running), ...delayed])).toEqual({ ...clear, hasUnsaved: true });
+  });
+
   it("requires the tracked run itself, not just an older page boundary", () => {
     const state = through(12, [9]);
     expect(check(state, [run(12), run(8)], { reachesStart: true })).toEqual({ ...clear, listingIncomplete: true });
