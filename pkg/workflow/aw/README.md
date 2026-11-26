@@ -24,6 +24,7 @@ Schema validation, import resolution, and typed workflow configuration remain th
 | `JobDependencyGraph.DependsOn` | Reports whether a job depends directly or transitively on another job; safe to call before cycle validation. |
 | `JobDependencyGraph.IsPreAgentCustomJob` | Reports whether graph edges prove a custom job runs before agent without depending on agent or detection data. |
 | `ExecutionBlock.FieldPath` | Joins a field name to the execution block's source path. |
+| `StepSections` | Lists the authored step-list keys visited by `ExecutionBlocks`: `setup-steps`, `pre-steps`, `steps`, `pre-agent-steps`, and `post-steps`. |
 | `IsStatusOnlyJob` | Reports whether a custom job opts to continue after detection errors. |
 | `HasSuccessfulDetectionCondition` | Reports whether a job condition requires detection success on every branch; an empty condition is considered successful. |
 | `ValidateStatusOnlyJob` | Validates status-only job access to agent data and returns structured violations. |

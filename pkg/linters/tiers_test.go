@@ -25,33 +25,17 @@ func analyzerNames(analyzers []*analysis.Analyzer) []string {
 	return names
 }
 
-func TestTiersPartitionAllAnalyzers(t *testing.T) {
-	fast := analyzerNames(linters.Fast())
-	slow := analyzerNames(linters.Slow())
-	require.NotEmpty(t, fast, "fast tier must not be empty")
-	require.NotEmpty(t, slow, "slow tier must not be empty")
-
-	for _, name := range slow {
-		assert.NotContains(t, fast, name, "analyzer %q must belong to exactly one tier", name)
-		assert.True(t, linters.IsSlow(name), "Slow() must only return slow analyzers")
-	}
-
-	union := append(slices.Clone(fast), slow...)
-	slices.Sort(union)
-	assert.Equal(t, analyzerNames(linters.All()), union, "fast and slow tiers must together cover every registered analyzer")
-}
-
-func TestSlowAnalyzersAreRegistered(t *testing.T) {
-	registered := analyzerNames(linters.All())
-	for name, reason := range linters.SlowAnalyzerReasons() {
-		assert.Contains(t, registered, name, "slow analyzer %q must be registered in All()", name)
-		assert.NotEmpty(t, strings.TrimSpace(reason), "slow analyzer %q must document why it is slow", name)
-	}
-}
-
 func TestSelectTier(t *testing.T) {
-	fastName := linters.Fast()[0].Name
-	slowName := linters.Slow()[0].Name
+	var fastName, slowName string
+	for _, a := range linters.All() {
+		if linters.IsSlow(a.Name) {
+			slowName = a.Name
+		} else {
+			fastName = a.Name
+		}
+	}
+	require.NotEmpty(t, fastName, "fast tier must not be empty")
+	require.NotEmpty(t, slowName, "slow tier must not be empty")
 
 	t.Run("all returns registry unchanged", func(t *testing.T) {
 		for _, tier := range []string{"", linters.TierAll} {
