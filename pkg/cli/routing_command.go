@@ -537,7 +537,7 @@ func runRoutingList(ctx context.Context, api routingAPI, out io.Writer, jsonOutp
 // fields are preserved, clearing only obligations at or below latestRun.
 func resetRoutingState(state routingHistoryState, latestRun int64, at string) routingHistoryState {
 	state.ResetAfterRun = latestRun
-	if state.FirstWriteRun <= latestRun {
+	if state.LastRun <= latestRun {
 		state.FirstWriteRun = 0
 	}
 	if state.ReconciledThrough != nil {

@@ -523,6 +523,46 @@ describe("push_routing_history saves", () => {
     ).toEqual([2]);
   });
 
+  it("keeps first-write protection when a late writer evicts saved rows above its ceiling", async () => {
+    const remote = bareRemote();
+    const retained = [2, ...Array.from({ length: 499 }, (_, i) => i + 4)].map(number => ({ run: String(9000 + number), number }));
+    seedHistory(remote, { ...emptyState("triage"), generation: { hash: GENERATION, since_run: 2 }, first_write_run: 2, last_run: 502, reconciled_through: 0 }, retained);
+    const runs = Array.from({ length: 503 }, (_, i) => paginationRun(503 - i, { head_sha: "original", conclusion: [1, 4].includes(503 - i) ? "failure" : "success" }));
+    const failed = [
+      { name: "agent", started_at: runCreatedAt(1), conclusion: "success" },
+      { name: "push_routing_history", conclusion: "failure" },
+    ];
+    const github = fakeGitHub(remote, { runs, jobs: { 9001: failed, 9004: failed }, contents: { original: `GH_AW_ROUTING_GENERATION: "${GENERATION}"` } });
+    await save(remote, 3, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 3, unexplained: 1 });
+    expect(remoteRuns(remote).some(row => row.number === 4)).toBe(false);
+    await save(remote, 503, "success", { github });
+    expect(remoteState(remote)).toMatchObject({ last_run: 503, reconciled_through: 3, unexplained: 1 });
+    expect(remoteRuns(remote).filter(row => row.note === "unsaved")).toMatchObject([{ number: 1 }]);
+  });
+
+  it.each([true, false])("forgives the same pre-edit failure after a rollback (listed on first write: %s)", async available => {
+    const remote = bareRemote();
+    const failedRun = paginationRun(1, { head_sha: "original", conclusion: "failure" });
+    const github = fakeGitHub(remote, {
+      runs: [paginationRun(2), failedRun],
+      jobs: {
+        9001: [
+          { name: "agent", started_at: runCreatedAt(1), conclusion: "success" },
+          { name: "push_routing_history", conclusion: "failure" },
+        ],
+      },
+      contents: { original: `GH_AW_ROUTING_GENERATION: "${GENERATION}"` },
+    });
+    await save(remote, 2, "success", {
+      generation: `${"c".repeat(64)}:${"d".repeat(64)}`,
+      github: available ? github : fakeGitHub(remote, { runs: [] }),
+    });
+    await save(remote, 3, "success", { github, generation: GENERATION });
+    expect(remoteState(remote)).toMatchObject({ reconciled_through: 3, unexplained: 0 });
+    expect(remoteRuns(remote).filter(row => row.number === 1)).toMatchObject([{ note: "older_definition", counted: false }]);
+  });
+
   it("lands two saves that read the same state, re-applying the later one to the newer file", async () => {
     const remote = bareRemote();
     vi.useFakeTimers({ toFake: ["Date"] });

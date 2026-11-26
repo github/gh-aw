@@ -981,7 +981,7 @@ async function listRuns({ githubClient, owner, repo, workflowFile, workflowPath 
   const fullCatchUp = verified && (runNumber <= floor + 1 || verifiedUpper >= runNumber - 1);
   let reconciliationCeiling = verified ? (fullCatchUp ? runNumber : verifiedUpper) : floor;
   // If catch-up outlives the first writer's row, a failed job may already have committed an evicted row.
-  if (state.generation && floor < firstWrite && !writtenNumbers.has(firstWrite)) reconciliationCeiling = floor;
+  if (state.first_write_run && !writtenNumbers.has(state.first_write_run)) reconciliationCeiling = floor;
   // Before the first known definition, require positive evidence, not a guessed deletion.
   for (let n = floor + 1; n < firstWrite && n <= reconciliationCeiling; n++) {
     if (!writtenNumbers.has(n) && !eligibleByNumber.has(n) && !ineligibleNumbers.has(n)) {

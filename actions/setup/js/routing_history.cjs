@@ -553,7 +553,9 @@ function applyRun(input, runs, run, options = {}) {
       continue;
     }
     if (["success", "skipped", "neutral"].includes(other.conclusion)) continue;
-    if (hasReconciliation && other.generation && other.generation !== state.generation.hash && other.number <= state.generation.since_run) {
+    // A rollback can restore the same hash without undoing the intervening edit's forgiveness.
+    const beforeInterveningEdit = input.first_write_run !== undefined && other.number < input.first_write_run && sinceRun > input.first_write_run;
+    if (hasReconciliation && other.generation && other.number <= sinceRun && (other.generation !== state.generation.hash || beforeInterveningEdit)) {
       lines.push(line("older_definition", { run: other.id, number: other.number, attempt: 1, generation: other.generation }));
       written.add(other.id);
       continue;
@@ -570,7 +572,8 @@ function applyRun(input, runs, run, options = {}) {
   if (hasReconciliation) {
     state.reconciled_through = finalCeiling;
     if (input.generation === null && finalCeiling < number) state.first_write_run = number;
-    if (state.first_write_run !== undefined && finalCeiling >= state.first_write_run) delete state.first_write_run;
+    // A late writer can reach the first write while newer saved rows are still outside coverage.
+    if (state.first_write_run !== undefined && finalCeiling >= Math.max(number, state.last_run)) delete state.first_write_run;
     state.unresolved_runs = finalUnresolved;
     applyUnresolvedIds(finalUnresolved);
   }

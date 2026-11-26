@@ -220,14 +220,14 @@ func TestRoutingResetPreservesReconciliationCoverage(t *testing.T) {
 		assert.Equal(t, json.Number("0"), raw["unexplained"])
 	})
 
-	t.Run("keeps an unfinished first write until the reset covers it", func(t *testing.T) {
+	t.Run("keeps an unfinished first write until the reset covers all saved runs", func(t *testing.T) {
 		var state routingHistoryState
-		require.NoError(t, json.Unmarshal([]byte(`{"first_write_run":12,"reconciled_through":9}`), &state))
-		for _, fence := range []int64{10, 12} {
+		require.NoError(t, json.Unmarshal([]byte(`{"first_write_run":12,"last_run":15,"reconciled_through":9}`), &state))
+		for _, fence := range []int64{10, 12, 15} {
 			content, err := encodeRoutingState(resetRoutingState(state, fence, "2026-11-24T10:00:00Z"))
 			require.NoError(t, err)
 			raw := decodeRaw(t, content)
-			if fence < 12 {
+			if fence < 15 {
 				assert.Equal(t, json.Number("12"), raw["first_write_run"])
 			} else {
 				assert.NotContains(t, raw, "first_write_run")
