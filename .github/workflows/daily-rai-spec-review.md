@@ -13,6 +13,8 @@ permissions:
   issues: read
   pull-requests: read
   copilot-requests: write
+imports:
+  - shared/reporting.md
 engine:
   id: copilot
   copilot-sdk: true
