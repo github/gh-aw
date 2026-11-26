@@ -146,41 +146,62 @@ func packageFunctionAlias(pass *analysis.Pass, obj types.Object, seen map[types.
 		return "", "", false
 	}
 	seen[obj] = true
+	// A local variable can only be initialized, assigned, or have its address
+	// taken inside its declaring scope, so inspect only that region of the
+	// declaring file instead of every file in the package. Scanning the whole
+	// package for every aliased call made this helper quadratic in package size.
+	file := fileContaining(pass, variable.Pos())
+	scope := variable.Parent()
+	if file == nil || scope == nil || !scope.Pos().IsValid() || !scope.End().IsValid() {
+		return "", "", false
+	}
+	scopeStart, scopeEnd := scope.Pos(), scope.End()
 	var initializer ast.Expr
 	mutable := false
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			if mutable {
-				return false
-			}
-			if value := packageFunctionAliasInitializer(pass, node, obj); value != nil {
-				initializer = value
-			}
-			switch node := node.(type) {
-			case *ast.AssignStmt:
-				for _, lhs := range node.Lhs {
-					if ident, ok := UnwrapParenExpr(lhs).(*ast.Ident); ok && pass.TypesInfo.Uses[ident] == obj {
-						mutable = true
-					}
-				}
-			case *ast.RangeStmt:
-				for _, lhs := range []ast.Expr{node.Key, node.Value} {
-					if ident, ok := UnwrapParenExpr(lhs).(*ast.Ident); ok && pass.TypesInfo.Uses[ident] == obj {
-						mutable = true
-					}
-				}
-			case *ast.UnaryExpr:
-				if ident, ok := UnwrapParenExpr(node.X).(*ast.Ident); ok && node.Op == token.AND && pass.TypesInfo.Uses[ident] == obj {
+	ast.Inspect(file, func(node ast.Node) bool {
+		if mutable || node == nil {
+			return false
+		}
+		if node.End() < scopeStart || node.Pos() > scopeEnd {
+			return false
+		}
+		if value := packageFunctionAliasInitializer(pass, node, obj); value != nil {
+			initializer = value
+		}
+		switch node := node.(type) {
+		case *ast.AssignStmt:
+			for _, lhs := range node.Lhs {
+				if ident, ok := UnwrapParenExpr(lhs).(*ast.Ident); ok && pass.TypesInfo.Uses[ident] == obj {
 					mutable = true
 				}
 			}
-			return true
-		})
-	}
+		case *ast.RangeStmt:
+			for _, lhs := range []ast.Expr{node.Key, node.Value} {
+				if ident, ok := UnwrapParenExpr(lhs).(*ast.Ident); ok && pass.TypesInfo.Uses[ident] == obj {
+					mutable = true
+				}
+			}
+		case *ast.UnaryExpr:
+			if ident, ok := UnwrapParenExpr(node.X).(*ast.Ident); ok && node.Op == token.AND && pass.TypesInfo.Uses[ident] == obj {
+				mutable = true
+			}
+		}
+		return true
+	})
 	if mutable || initializer == nil {
 		return "", "", false
 	}
 	return packageFunction(pass, initializer, seen)
+}
+
+// fileContaining returns the file in pass that contains pos, or nil.
+func fileContaining(pass *analysis.Pass, pos token.Pos) *ast.File {
+	for _, file := range pass.Files {
+		if file.FileStart <= pos && pos <= file.FileEnd {
+			return file
+		}
+	}
+	return nil
 }
 
 func packageFunctionAliasInitializer(pass *analysis.Pass, node ast.Node, obj types.Object) ast.Expr {
