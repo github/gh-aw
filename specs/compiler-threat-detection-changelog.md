@@ -121,6 +121,21 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 
 ## Mapping Audits
 
+### Mapping Audit (2026-11-26)
+
+Reviewed 11 commits from the last two days (most recent: #81182, #81171, #81162, #81144, #81142, #81116, #81034, #81033, #80999, #80766, #80582) touching compiler, linter, and runtime security boundaries. Commits #81108, #81167, and #81151 below are context-only references and are not part of that reviewed set.
+
+Findings and disposition:
+
+- Shell AST finding preservation (#81033): already implemented. The CTR-038 visitor in `pkg/workflow/lint/safe_output_credentials.go` latches `found = true`, and the remote-script walker in `remote_script_execution.go` appends diagnostics without overwriting earlier findings as it continues traversing sibling statements and redirects. Existing CTR-038 cases in `safe_output_credentials_test.go` cover protected redirects combined with stderr redirection in both orders; Section 7 already maps CTR-038 to those files. No spec change and no new `CTR-*` rule.
+- Routing-history reconciliation (#81171, #81162, #81144) and `model-routing.learning` configuration (#81142): runtime reconciliation and configuration changes within the Section 7.18 history writer; the reserved namespace, writer permissions, and dry-run guarantees are unchanged. No new `CTR-*` rule.
+- Sandboxed threat detection port to JavaScript (#80582): runtime detector shipped by the setup action; it does not alter the compiler-emitted detection gate or CTR-detection-gate rules. No new `CTR-*` rule.
+- Sensitive public file permission linter (#80766), TrimSpace byte-conversion analyzer (#81116), and coverage staging conflict rejection (#81034): repository development tooling, not checks on compiler-generated workflows. No new `CTR-*` rule.
+- Project status update safe-output defaults (#80999), CLI help (#81108), and documentation/context changes (#81182, #81167, #81151): no compiler-generated security construct changed.
+- The `schema-demos/schema-demo-threat-detection-suppress.md` workflow contains a coverage-only demo annotation; no production `threat-detection-suppress` annotation requires suppression SLA action.
+- Steering issue #81199 had no comments.
+- Go tests could not be executed (the required Go 1.27.4 toolchain download failed offline). Only changelog text changed; no implementation or specification was modified. The GitHub integrity filter withheld pull-request file lists, so dispositions rely on commit messages and local source inspection. Code-scanning alerts were not retrieved separately.
+
 ### Mapping Audit (2026-11-24)
 
 Reviewed the only compiler-relevant commit in the last two days: #80583 (adaptive-routing observe mode).
