@@ -103,7 +103,7 @@ func TestSelectTier(t *testing.T) {
 			})
 			assert.Empty(t, a.Requires, "stub %q must not pull in prerequisites", a.Name)
 			result, runErr := a.Run(nil)
-			assert.NoError(t, runErr)
+			require.NoError(t, runErr)
 			assert.Nil(t, result)
 		}
 	})
@@ -142,7 +142,7 @@ func TestCITierStepsMatchTiers(t *testing.T) {
 		tieredSteps[tier]++
 		for _, match := range linterFlagsRe.FindAllStringSubmatch(step.Run, -1) {
 			_, err := linters.SelectTier(tier, strings.Fields(match[1]))
-			assert.NoErrorf(t, err, "step %q must only enable %s-tier analyzers", step.Name, tier)
+			require.NoErrorf(t, err, "step %q must only enable %s-tier analyzers", step.Name, tier)
 		}
 	}
 	assert.Positive(t, tieredSteps[linters.TierFast], "lint-go-custom must run the fast tier")
