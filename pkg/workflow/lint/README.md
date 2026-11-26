@@ -34,6 +34,7 @@ constructors:
 | Outputs, artifacts, and cache | `SafeOutputShellExpansionRule`, `SafeOutputCredentialsRule`, `ArtifactExecutionRule`, `ArtipackedRule`, `CachePoisoningRule` |
 | Environment-file integrity | `EnvironmentFileInjectionRule`, `InsecureCommandsRule` |
 | Grader I/O | `GraderFileIORule` |
+| Prompt file access | `FileAccessRule` (specified in [`specs/file-access-lint-spec.md`](../../../specs/file-access-lint-spec.md)) |
 
 `ASTTargets` selects the authored AW AST (`AWAST`), native Actions AST
 (`ActionsAST`), or both for a rule. `Severity` uses `Error` and `Warning` values

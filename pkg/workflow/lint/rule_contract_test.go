@@ -357,6 +357,15 @@ func builtInRuleContracts() map[string]ruleContract {
 			safePrompt:   "{{#if condition}}\nSelected\n{{#else}}\nFallback\n{{/if}}",
 			path:         "prompt",
 		},
+		"file-access": {
+			targets:      AWAST,
+			severity:     Warning,
+			unsafe:       "tools:\n  edit: false\n  bash: false\n",
+			safe:         "tools:\n  edit: true\n",
+			unsafePrompt: "Create a file `notes/summary.md` with the results.",
+			safePrompt:   "Create a file `notes/summary.md` with the results.",
+			path:         "prompt",
+		},
 	}
 }
 
