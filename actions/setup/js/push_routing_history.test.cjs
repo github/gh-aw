@@ -567,6 +567,40 @@ describe("push_routing_history saves", () => {
     expect(remoteState(remote)).toMatchObject({ last_run: 4, reconciled_through: 4, unexplained: 1 });
   });
 
+  it.each([1, 2001])("bootstraps beyond the listing budget when the first surviving run is #%i", async first => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(runCreatedAt(10101)));
+    const apiRuns = Array.from({ length: 10001 - first }, (_, i) => paginationRun(10000 - i));
+    apiRuns.at(-2).conclusion = "failure";
+    const failedSave = [
+      { name: "agent", started_at: runCreatedAt(2), conclusion: "success" },
+      { name: "push_routing_history", conclusion: "failure" },
+    ];
+    const github = fakeGitHub(null, { runs: apiRuns, jobs: { [9001 + first]: failedSave, 19001: failedSave } });
+    let state = emptyState("triage");
+    let rows = [];
+    for (let number = 10000; number <= 10100; number++) {
+      if (number === 10001) {
+        apiRuns.unshift(paginationRun(number, { conclusion: "failure" }));
+        continue;
+      }
+      if (number > 10000) apiRuns.unshift(paginationRun(number));
+      const id = String(9000 + number);
+      const coverage = await listRuns({ githubClient: github, owner: "octo", repo: "demo", workflowFile: "triage.lock.yml", defaultBranch: "main", runId: id, runNumber: number, state, runs: rows, generation: GENERATION });
+      const saved = applyRun(state, rows, { workflow: "triage", generation: GENERATION, scope: "copilot/cost/shared", mode: "observe", run: { id, number, attempt: 1 }, at: runCreatedAt(number), observation: null, pair: null, ...coverage });
+      expect(saved.state.reconciled_through).toBeGreaterThan(state.reconciled_through ?? 0);
+      rows = trimRuns([...rows, ...saved.lines]);
+      state = saved.state;
+      if (number === 10000) expect(state.reconciled_through).toBeLessThan(number);
+      if (state.reconciled_through === number) break;
+    }
+    expect(state.reconciled_through).toBe(state.last_run);
+    expect(state).toMatchObject({ unexplained: 2, unresolved_runs: [] });
+    expect(rows.filter(row => row.note === "unsaved").map(row => row.number)).toEqual([first + 1, 10001]);
+    expect(github.calls.jobs).toEqual([9001 + first, 19001]);
+    expect(github.calls.lists.every(call => call.page <= 10)).toBe(true);
+  });
+
   it("does not charge failed or cancelled runs compiled without the history job, such as dry runs", async () => {
     const remote = bareRemote();
     await save(remote, 50, "success");
