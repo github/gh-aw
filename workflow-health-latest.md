@@ -1,37 +1,46 @@
-# Workflow Health Summary - 2026-11-25 (run 45547131214)
+# Workflow Health Summary - 2026-11-26
 
-Timestamp: 2026-11-25T04:45Z
-Scored snapshot: metrics/daily/2026-11-17.json (complete, 24h window 2026-11-16T02:33Z to 2026-11-17T02:33Z). latest.json (2026-11-25, ~6.4h) is partial and not scored. 7d/30d trend unavailable (no consecutive complete snapshots after 11-17).
-Cohort: 368 snapshot records. Inventory: 371 root .md workflows, 371 .lock.yml (0 missing). 6 inventory workflows absent from the 11-17 snapshot; 3 snapshot records no longer in inventory.
-Compile data gap: compile-validate.txt holds only the install log, not gh aw compile output. Compile status rests on the lock-file count.
-Run-log access: HTTP 403 DIFC on `gh run view --log-failed`. Root causes are unverified. Job and step metadata used.
+Timestamp: 2026-11-26T04:38Z
+Scored snapshot: metrics/daily/2026-11-26.json (collection_status partial, but full 24h Actions API pagination, 34 pages; 24h window 2026-11-25T02:56Z to 2026-11-26T02:56Z). Log coverage partial: 7 batches, 21:13Z to 02:52Z.
+Cohort: 371 records = inventory 371 (0 gaps). Lock files 371 (0 unpaired).
+Compile data gap: compile-validate.txt holds only the install log. Compile status rests on the lock-file pairing.
+Run-log access: HTTP 403 DIFC on `gh run view --log-failed`. Root causes are unverified. Job metadata used.
+Trend: 7d/30d unavailable. No consecutive complete snapshots since 11-17 (11-16, 11-18 onward partial).
+Comparison with 11-17: non-comparable (cohort 368 vs 371). Do not describe as regression or recovery.
 
-## Tiers (2026-11-17, sum 368)
-- Healthy 14, Warning 4, Critical 5, Low-sample 186, Inactive 159 (unchanged from 11-22)
-- Critical: daily-go-test-parallelizer (0/8), dependabot-burner (0/3, last success 11-20), ai-moderator (5/17, recent runs succeed), avenger (1/2, recent runs succeed), visual-regression-checker (1/2)
-- Warning: auditor (12/19), auto-triage-issues (4/6), pr-specification-reviewer (27/36, command gating, expected), mattpocock-skills-reviewer (25/33, command gating, expected)
+## Tiers (2026-11-26, sum 371)
+- Healthy 18, Warning 6, Critical 2, Low-sample 214, Inactive 131
+- Critical: code-scanning-dispatcher (0/6, recovered 04:16Z, run 45754141157); daily-credit-limit-test (1/2, intentional failure, `intentional-failure: true`, expected)
+- Warning: daily-go-test-parallelizer (8/12), visual-regression-checker (2/3), ai-moderator (35/47, 63 skipped = trigger gating), smoke-work-queue-dispatcher (3/4), auto-triage-issues (14/18), auditor (19/24)
+- Aggregate: 774/928 executed succeeded (83.4%); skipped 824; action_required 58 (reported separately)
+- Low-sample tier hides daily 1-run workflows that fail every day: daily-action-setup-security-audit, daily-model-inventory. Use the live run check.
 
-## Failing scheduled workflows (live, 11-20 to 11-25)
-- code-scanning-dispatcher: 6 consecutive failures (11-24 08:18 to 11-25 04:16). Failing steps: safe_outputs "Process trusted work queue controls" (runs 45545696023, 45519103947) and activation "Snapshot work queue state" (runs 45478392904, 45434957095, 45392497231, 45354921822). P1 tracker filed this run. Prior P1 #80001 closed NOT_PLANNED 11-23 at expiry.
-- daily-action-setup-security-audit: failed daily 11-20 to 11-25 (conclusion "Handle agent failure"). Open #80926. Earlier #79984 closed NOT_PLANNED.
-- daily-model-inventory: 4 of last 6 failed. Open #80838.
-- daily-go-test-parallelizer: failures 11-25 02:30 and 00:45 (run 45520576298 conclusion; run 45481002959 agent "Execute Codex CLI"). One success 11-24 22:27. Open #80845, #80769, #80760, #80731, #80921 (HTTP 429), #80803, #80952 (WIP).
-- smoke-work-queue-dispatcher: failed 11-24, success 11-25.
-- visual-regression-checker: mixed on 11-25 (successes plus failures and an action_required run). Open #80909, #80854.
-- auditor: mixed on 11-25. Old P1 #79418 closed NOT_PLANNED at expiry.
+## Live findings (run check 11-22 to 11-26)
+- code-scanning-dispatcher: 6 of 7 runs in snapshot window failed. Last run 04:16Z succeeded. Tracker #80956 open. Keep open until 24h green.
+- daily-action-setup-security-audit: conclusion job fails daily 11-22 to 11-26 (5/5). Agent, detection, and safe_outputs succeed. Pattern "Handle agent failure". Prior #80926 closed COMPLETED/NOT_PLANNED. Auto-filed #81205 open (status comment this run; no duplicate P1).
+- daily-model-inventory: failed 11-21, 11-22, 11-24, 11-25; success 11-23. Auto-filed #81181 open. Prior #80838 closed.
+- daily-go-test-parallelizer: failure 11-26 02:30Z (run 45742891197). Open #81201, WIP #81231.
+- visual-regression-checker: failure 11-25 09:54Z (run 45589869817). No open tracker.
+- auditor: hourly, failed run 11-26 02:31Z (run 45742962399). Open auto-filed #81203, #81137, #81113, #81010, #80982. Root cause unverified.
+- smoke-work-queue-dispatcher: failed 11-25 06:35 (run 45561762629). Open #81003.
+- Budget guardrail: 21 "exceeded daily AI credits budget" issues since 11-24. Cascade tracker #80251 open.
 
 ## Tracker and expiry state
-- #80001 (code-scanning-dispatcher P1) closed NOT_PLANNED 11-23 at expiry.
-- #79686 (daily-go-test-parallelizer P1) closed COMPLETED 11-21. Failures continue, so the fix attribution is stale.
-- Cascade tracker #80251 is OPEN (created 11-23, updated 11-25). 233 open issues, 41 labelled cascade-suspected. Large wave of [aw] failure issues on 11-24 and 11-25 (AIC budget exhaustion, engine driver crashes). Shared cause not verified.
+- #80001 closed NOT_PLANNED 11-23 at expiry. #80956 is the current code-scanning tracker.
+- #79686 closed COMPLETED 11-21. Failures continue. Attribution stale.
 - Maintainer decision still needed on expires:1d in workflow-health-manager.md.
+- Dashboard 2026-11-25 (#80958) expires 04:40Z 11-26. Replaced by the 11-26 dashboard.
 
-## Actions this run
-- Filed P1 tracker for code-scanning-dispatcher (untracked, 6 consecutive failures).
-- Filed dashboard "Workflow Health Dashboard - 2026-11-25" (scored 11-17 snapshot, live findings unscored).
+## Actions this run (emitted as safe outputs; not yet verified)
+- Status comment on #81205 for daily-action-setup-security-audit: NOT posted (add_comment target is triggering; schedule run has no target). Pending.
+- Status comment on #80956 for code-scanning-dispatcher recovery: NOT posted (same limit). Pending.
+- Dashboard "Workflow Health Dashboard - 2026-11-26".
 
 ## Corrections to prior notes
+- code-scanning-dispatcher: recovered 11-26 04:16Z (one green run). Not yet stable.
+- daily-credit-limit-test: intentional failure. Do not file as P1.
+- daily-action-setup-security-audit: 5 consecutive daily failures (live), not Low-sample. Prior 11-25 note cited only the 11-20 to 11-25 window.
 - dependabot-burner: last success 11-20; "6 of 6 failed" note is stale.
-- ai-moderator: recent runs succeed; the Critical tier reflects 11-17 history.
+- ai-moderator: recent runs succeed; the Critical tier reflects 11-17 history. 11-26 tier is Warning.
 - #79686 closed COMPLETED 11-21 but failures continue; attribution stale.
 - #20315 is closed; do not cite it as pending.
