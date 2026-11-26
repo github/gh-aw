@@ -65,6 +65,8 @@ describe("failure report structure", () => {
     expect(body).toContain("**Branch:** `copilot/bump-mcp-gateway-v0435`");
     expect(body).toContain("[#69581](https://github.com/github/gh-aw/pull/69581)");
     expect(body).toContain("**report\\_progress**");
+    expect(body).toContain("complete manual review before assigning this issue to a coding agent or using any follow-up automation");
+    expect(body).toContain("After any required manual threat review");
     expect(body.match(/<summary>Copy a debugging prompt<\/summary>/g)).toHaveLength(1);
     expect(body).not.toContain("Manually invoke the agent");
     expect(body).not.toContain("<summary>Runtime evidence");
