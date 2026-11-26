@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.113
+**Version**: 1.0.114
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.113` | Unreleased |
+| `1.0.60`–`1.0.114` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |
@@ -957,6 +957,8 @@ Setting `model-routing.learning` to `observe` adds a post-conclusion `push_routi
 - Emit the routing identity fields (workflow ID, definition hash, mode, engine, and goal) only as fixed, quoted compiler-derived values. Other runtime bindings, including a dynamically selected routing level, token/session-file bindings, and sub-agent declarations, are outside this requirement. The verdict MUST come from the unified session artifact, not from agent-written files.
 - Reject explicit use for the tested ineligible cases: a fixed or non-routed primary model, `workflow_call`, and missing `tools.repo-memory`. A repository default silently skips the fixed/non-routed model and `workflow_call` cases covered by regression tests. Workflows that do not opt in compile unchanged.
 - `gh aw compile --dry-run` is an explicit compiler preview mode. It MUST validate `model-routing.learning` and check workflow eligibility without mutating the parsed `WorkflowData`. The emitted dry-run workflow MUST omit the compiler-managed `push_routing_history` job and its associated `contents: write` and `actions: read` permissions. A dry-run compilation MUST NOT charge the run as unsaved.
+- On every successful history write, including the first successful write, the writer MUST reconcile earlier eligible first attempts whose history saves did not land. Reconciliation MUST NOT charge a run outside verified coverage. An unavailable, failed, or incomplete lookup MUST leave the verified coverage cursor unchanged and preserve the unresolved obligation for a later successful write.
+- Reconciliation MUST use bounded listing and creation-time windows so long histories, including gaps beyond the platform's per-query listing limit, advance in verified chunks rather than by unbounded traversal. Lookup progress MUST be resumable without treating an unavailable lookup as proof that a run was deleted.
 - For a real run, when the agent has started and an existing `push_routing_history` writer concludes with anything other than success, including skipped or cancelled conclusions, the run MUST remain unsaved. The dry-run omission does not weaken this real-run accounting requirement.
 
 | Boundary | Implementation | Regression Evidence |
@@ -965,6 +967,7 @@ Setting `model-routing.learning` to `observe` adds a post-conclusion `push_routi
 | Writer job permissions, ordering, and environment | `addPushRoutingHistoryJob`, `buildPushRoutingHistorySteps` | `TestRoutingLearningObserveAddsOnlyTheWriterJob` |
 | Eligibility and opt-in precedence | `resolveRoutingLearningSetting`, `routingLearningIneligibility`, `applyRoutingLearning` | `TestRoutingLearningSettingPrecedence`, `TestRoutingLearningFromAnImport`, `TestRoutingLearningIneligibleWorkflows` (fixed/non-routed models, `workflow_call`, and missing repo-memory; default skips for fixed/non-routed models and `workflow_call`) |
 | Dry-run validation, omission, and compiler-data isolation | `pkg/workflow/compiler_development.go`, `pkg/workflow/routing_learning.go` | `TestRoutingLearningDryRunOmitsWriterJob` (explicit and repository-default opt-in, compiler reuse without parsed-data mutation, and retained validation) |
+| Reconciliation, verified coverage, unavailable lookup handling, and bounded bootstrap | `actions/setup/js/push_routing_history.cjs`, `actions/setup/js/routing_history.cjs` | `push_routing_history.test.cjs` reconciliation tests for empty/verified/reset state, unavailable lookup, and long-gap/bootstrap cases; reducer reconciliation coverage |
 | Real-run unsaved accounting | `actions/setup/js/push_routing_history.cjs` | PR #80804 tests for failed/cancelled runs with an agent started and non-successful writer conclusions, including skipped/cancelled writers |
 
 This is an existing-behavior mapping. The writer's `contents: write` is a deliberate, job-scoped grant; the history records routing evidence only and does not authorize model selection changes. No new `CTR-*` rule or compliance-test identifier is introduced.
