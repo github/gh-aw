@@ -148,6 +148,9 @@ func configureCodexProxyAuthentication(proxy map[string]any, workflowData *Workf
 
 func codexNativeServerDefaults(workflowData *WorkflowData, mcpTools []string) map[string]any {
 	servers := make(map[string]any)
+	if usesWebFetchMCPForEngine(NewCodexEngine(), workflowData) {
+		mcpTools = append([]string{webFetchMCPServer}, mcpTools...)
+	}
 	for _, name := range mcpTools {
 		switch name {
 		case "safe-outputs":

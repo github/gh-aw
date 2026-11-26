@@ -22,6 +22,18 @@ func TestClaudeRestrictivePermissions(t *testing.T) {
 	assert.Contains(t, step, "mcp__safeoutputs")
 }
 
+func TestClaudeWebFetchOnlyAllowedTools(t *testing.T) {
+	data := &WorkflowData{
+		Tools:         map[string]any{"web-fetch": nil},
+		SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf"}},
+		EngineConfig:  &EngineConfig{ID: "claude", LLMProvider: LLMProviderAnthropic},
+	}
+	_, _, allowed := NewClaudeEngine().buildClaudeCliArgs(data, data.Tools, "/tmp/log")
+	assert.Contains(t, strings.Split(allowed, ","), "WebFetch")
+	assert.Contains(t, strings.Split(allowed, ","), "mcp__web-fetch__web_fetch")
+	assert.NotContains(t, strings.Split(allowed, ","), "")
+}
+
 func TestClaudeScopedMemoryPermissions(t *testing.T) {
 	data := &WorkflowData{
 		Tools:             map[string]any{"edit": false, "cache-memory": true},
