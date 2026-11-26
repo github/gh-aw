@@ -24,6 +24,8 @@ type CreateIssuesConfig struct {
 	TitlePrefix                   string                `yaml:"title-prefix,omitempty"`
 	RequireTemporaryID            bool                  `yaml:"require-temporary-id,omitempty"` // When true, create_issue tool calls must include temporary_id.
 	Labels                        []string              `yaml:"labels,omitempty"`
+	PlanningStatus                any                   `yaml:"planning-status,omitempty"`
+	AllowedStatuses               []any                 `yaml:"allowed-statuses,omitempty"`
 	AllowedFields                 []string              `yaml:"allowed-fields,omitempty"`          // Optional list of allowed issue field names. If omitted or empty, any issue fields are allowed. Use ["*"] to explicitly allow all.
 	MaxIssueArtifacts             *int                  `yaml:"max-issue-artifacts,omitempty"`     // Maximum artifacts per issue; non-positive values disable attachments.
 	MaxIssueArtifactSize          *int                  `yaml:"max-issue-artifact-size,omitempty"` // Maximum UTF-8 bytes per artifact body.

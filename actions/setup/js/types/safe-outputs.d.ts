@@ -77,6 +77,8 @@ interface CreatedIssueArtifact {
  */
 interface CreateIssueItem extends BaseSafeOutputItem {
   type: "create_issue";
+  /** Initial native planning status name or ID (open categories only). */
+  planning_status?: string | number;
   /** Issue title */
   title: string;
   /** Issue body content */
@@ -433,6 +435,13 @@ interface SetIssueTypeItem extends BaseSafeOutputItem, IssueIntentMetadata {
   issue_number?: number | string;
 }
 
+interface SetIssueStatusItem extends BaseSafeOutputItem {
+  type: "set_issue_status";
+  status: string | number;
+  issue_number?: number | string;
+  duplicate_of?: number;
+}
+
 /**
  * JSONL item for setting a custom issue field value
  */
@@ -606,6 +615,7 @@ type SafeOutputItem =
   | UploadAssetItem
   | AssignMilestoneItem
   | SetIssueTypeItem
+  | SetIssueStatusItem
   | SetIssueFieldItem
   | AssignToAgentItem
   | UpdateReleaseItem
@@ -662,6 +672,7 @@ export {
   UploadAssetItem,
   AssignMilestoneItem,
   SetIssueTypeItem,
+  SetIssueStatusItem,
   SetIssueFieldItem,
   AssignToAgentItem,
   UpdateReleaseItem,

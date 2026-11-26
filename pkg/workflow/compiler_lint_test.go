@@ -33,6 +33,40 @@ func TestCompilerLintResolvedMCPShellScripts(t *testing.T) {
 	require.Equal(t, "mcp-scripts.imported.run", diagnostics[0].Path)
 }
 
+func TestCompilerLintResolvedAgentSandbox(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "workflow.md")
+	shared := filepath.Join(dir, "shared.md")
+	require.NoError(t, os.WriteFile(shared, []byte("---\n---\n"), 0o600))
+	for _, tt := range []struct {
+		name    string
+		sandbox string
+		want    bool
+	}{
+		{name: "default with imports", want: true},
+		{name: "explicitly disabled", sandbox: "features: {dangerously-disable-sandbox-agent: true}\nsandbox: {agent: false}\n"},
+		{name: "explicitly enabled", sandbox: "sandbox: awf\n", want: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			content := "---\non: workflow_dispatch\nstrict: false\nimports: [shared.md]\ncheckout: false\ntools: {github: false}\n" + tt.sandbox + "---\nInstall into /usr/local/bin. Run docker build.\n"
+			require.NoError(t, os.WriteFile(source, []byte(content), 0o600))
+			compiler := NewCompiler(WithLint(true), WithNoEmit(true))
+			compiler.gitRoot = dir
+			compiler.SetSkipValidation(true)
+			output := testutil.CaptureStderr(t, func() {
+				require.NoError(t, compiler.CompileWorkflow(source))
+			})
+			for _, fragment := range []string{"mounts read-only", "hides the Docker socket"} {
+				if tt.want {
+					require.Contains(t, output, fragment)
+				} else {
+					require.NotContains(t, output, fragment)
+				}
+			}
+		})
+	}
+}
+
 func TestCompilerLintImportedMCPShellScripts(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "workflow.md")

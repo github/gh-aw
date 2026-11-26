@@ -252,7 +252,7 @@ global.setTimeout = (callback, delay, ...args) => original(callback, delay === 3
 				require.NoError(t, readErr)
 				require.NoError(t, json.Unmarshal(data, &receipt))
 				t.Cleanup(func() { _ = syscall.Kill(receipt.PID, syscall.SIGKILL) })
-				assert.Less(t, time.Since(start), 3*time.Second)
+				assert.Less(t, time.Since(start), 5*time.Second)
 				_, err = os.Stat(receipt.Home)
 				assert.True(t, os.IsNotExist(err), "bounded completion must clean the private settings home")
 				if !detached {

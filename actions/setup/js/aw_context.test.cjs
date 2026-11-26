@@ -43,6 +43,27 @@ describe("buildAwContext PR revision evidence", () => {
     };
     expect(buildAwContext()).not.toHaveProperty("continuation_run_id");
   });
+
+  it.each([
+    ["issues", { action: "opened", issue: { number: 42, status: { id: 1, name: "Backlog", category: "backlog" } } }, { snapshot: { id: 1, name: "Backlog", category: "backlog" } }],
+    [
+      "issues",
+      {
+        action: "status_changed",
+        issue: { number: 42, status: { id: 2, name: "Todo", category: "planned" } },
+        status: { id: 2, name: "Todo", category: "planned" },
+        changes: { status: { from: { id: 1, name: "Backlog", category: "backlog" } } },
+      },
+      {
+        snapshot: { id: 2, name: "Todo", category: "planned" },
+        event: { id: 2, name: "Todo", category: "planned" },
+        previous: { id: 1, name: "Backlog", category: "backlog" },
+      },
+    ],
+  ])("captures issue status context for %s events", (eventName, payload, expected) => {
+    global.context = { repo: { owner: "owner", repo: "repo" }, eventName, payload };
+    expect(buildAwContext().issue_status).toEqual(expected);
+  });
 });
 
 describe("resolveItemContext", () => {

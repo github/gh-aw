@@ -84,6 +84,7 @@ steps:
     run: npm ci --ignore-scripts --no-audit --no-fund
 
 imports:
+  - shared/reporting.md
   - uses: shared/meta-analysis-base.md
     with:
       toolsets: [default, repos, pull_requests]
