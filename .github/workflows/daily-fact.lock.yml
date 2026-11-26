@@ -346,11 +346,10 @@ jobs:
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_EXPERIMENTS_REASONING_DEPTH: ${{ steps.pick-experiment.outputs.reasoning_depth }}
+          GH_AW_EXPR_0FB38B2A: ${{ fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').issue_status || (github.event_name == 'issues' && github.event.action == 'status_changed' && github.event.issue != null && github.event.issue.status != null) }}
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
-          GH_AW_EXPR_8984B5BA: ${{ fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').issue_status }}
-          GH_AW_EXPR_BA9685AD: ${{ toJSON(fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').issue_status) }}
           GH_AW_EXPR_C19C384F: ${{ github.event.discussion.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'discussion' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_CBA23170: ${{ steps.pick-experiment.outputs.reasoning_depth == 'multi_candidate' }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
@@ -371,7 +370,7 @@ jobs:
             Tools: add_comment, report_missing_tool, report_missing_data, report_incomplete, noop(max:2)
           GH_AW_PROMPT_CONTENT_0002: |
             </safe-output-tools>
-          GH_AW_PROMPT_CONTENT_0003: "<github-context>\n{{#if __GH_AW_GITHUB_ACTOR__ }}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if __GH_AW_GITHUB_REPOSITORY__ }}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if __GH_AW_GITHUB_WORKSPACE__ }}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if __GH_AW_EXPR_7C248226__ }}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if __GH_AW_EXPR_8984B5BA__ }}\n- **issue-status** (event = captured change, previous = prior status, snapshot = issue status when delivery was built; none guarantees latest state): __GH_AW_EXPR_BA9685AD__\n- Status events may be repeated, stale, or out of order. Fetch the issue before acting on its latest status; do not infer deduplication from this context.\n- Issue search supports status qualifiers but may omit status details. Hydrate matches with `issue_read` (`get`) when status details are needed; never infer returned status from the search qualifier.\n{{/if}}\n{{#if __GH_AW_EXPR_C19C384F__ }}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if __GH_AW_EXPR_76DF9333__ }}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if __GH_AW_EXPR_77C1A4D2__ }}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if __GH_AW_GITHUB_RUN_ID__ }}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
+          GH_AW_PROMPT_CONTENT_0003: "<github-context>\n{{#if __GH_AW_GITHUB_ACTOR__ }}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if __GH_AW_GITHUB_REPOSITORY__ }}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if __GH_AW_GITHUB_WORKSPACE__ }}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if __GH_AW_EXPR_7C248226__ }}\n- **issue-number**: #__GH_AW_EXPR_7C248226__\n{{/if}}\n{{#if __GH_AW_EXPR_0FB38B2A__ }}\n- Issue planning status context is available from the triggering event or inherited workflow context.\n- Status events may be repeated, stale, or out of order. Fetch the issue before acting on its latest status; do not infer deduplication from this context.\n- Issue search supports status qualifiers but may omit status details. Hydrate matches with `issue_read` (`get`) when status details are needed; never infer returned status from the search qualifier.\n{{/if}}\n{{#if __GH_AW_EXPR_C19C384F__ }}\n- **discussion-number**: #__GH_AW_EXPR_C19C384F__\n{{/if}}\n{{#if __GH_AW_EXPR_76DF9333__ }}\n- **pull-request-number**: #__GH_AW_EXPR_76DF9333__\n{{/if}}\n{{#if __GH_AW_EXPR_77C1A4D2__ }}\n- **comment-id**: __GH_AW_EXPR_77C1A4D2__\n{{/if}}\n{{#if __GH_AW_GITHUB_RUN_ID__ }}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
           GH_AW_PROMPT_CONTENT_0004: |
             </system>
           GH_AW_PROMPT_CONTENT_0005: "\n"
@@ -392,7 +391,7 @@ jobs:
 
             ## end skill: `reporting`
           GH_AW_PROMPT_CONTENT_0007: "{{#runtime-import? .github/shared-instructions.md}}\n\n### Daily Fact About gh-aw\n\nYour task is to post a poetic, whimsical fact about the __GH_AW_GITHUB_REPOSITORY__ project to discussion #4750.\n\n#### Data Sources\n\nMine recent activity from the repository to find interesting facts. Focus on:\n\n1. **Recent PRs** (merged in the last 1-2 weeks)\n   - New features added\n   - Bug fixes\n   - Refactoring efforts\n   - Performance improvements\n\n2. **Recent Releases** (if any)\n   - New version highlights\n   - Breaking changes\n   - Notable improvements\n\n3. **Recent Closed Issues** (resolved in the last 1-2 weeks)\n   - Bugs that were fixed\n   - Feature requests implemented\n   - Community contributions\n\n#### Guidelines\n\n{{#if __GH_AW_EXPR_CBA23170__ }}\n- **Multi-candidate deliberation**: Before writing, identify exactly **3 distinct candidate facts** (one PR, one issue or release, one contributor or pattern). For each candidate write one sentence on why it is interesting today. Then score each candidate 1–5 on: (a) timeliness, (b) intrinsic poetic potential. Select the highest-scoring candidate and write the verse for that one only.\n{{#else}}\n- **Favor recent updates** but include variety - pick something interesting, not just the most recent\n{{/if}}\n- **Be specific**: Include PR numbers, issue references, or release tags when relevant\n- **Keep it short**: One or two poetic sentences for the main fact, optionally with a brief context\n- **Be poetic**: Use lyrical, whimsical language that celebrates the beauty of code and collaboration\n- **Add variety**: Don't repeat the same type of fact every day (e.g., alternate between PRs, issues, releases, contributors, code patterns)\n\n#### Output Format\n\nCreate a single comment with this structure:\n\n```\n🌅 **A Verse from the gh-aw Chronicles**\n\n[Your poetic fact here, referencing specific PRs, issues, or releases with links]\n\n---\n*Whispered to you by the Poet of Workflows 🪶*\n```\n\n#### Examples\n\nGood facts (poetic tone):\n- \"In the garden of code, PR #1234 bloomed — the `playwright` tool now dances upon the stage, orchestrating browsers in graceful automation! 🎭\"\n- \"Like five stars falling into place, issues of MCP woes were caught and mended this week — the path to custom tools grows ever clearer.\"\n- \"From the forge of v0.45.0 emerges `cache-memory`, a keeper of thoughts that transcends the fleeting runs of workflows! 💾\"\n- \"A tireless artisan toiled this week, mending three fractures in the YAML tapestry. Gratitude flows to @contributor! 🙌\"\n\nBad facts:\n- \"The repository was updated today.\" (too vague, lacks poetry)\n- \"There were some changes.\" (not specific, uninspired)\n- Long paragraphs (keep it brief and lyrical)\n\nNow, analyze the recent activity and compose one poetic fact to share in discussion #4750.\n\n"
-          GH_AW_PROMPT_ENV: "[\"GH_AW_ACTIONS_DIR\",\"GH_AW_EXPERIMENTS_REASONING_DEPTH\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_8984B5BA\",\"GH_AW_EXPR_BA9685AD\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_EXPR_CBA23170\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_PROMPT\",\"GH_AW_PROMPT_CONFIG\",\"GH_AW_PROMPT_CONTENT_0000\",\"GH_AW_PROMPT_CONTENT_0001\",\"GH_AW_PROMPT_CONTENT_0002\",\"GH_AW_PROMPT_CONTENT_0003\",\"GH_AW_PROMPT_CONTENT_0004\",\"GH_AW_PROMPT_CONTENT_0005\",\"GH_AW_PROMPT_CONTENT_0006\",\"GH_AW_PROMPT_CONTENT_0007\",\"GH_AW_SAFE_OUTPUTS\"]"
+          GH_AW_PROMPT_ENV: "[\"GH_AW_ACTIONS_DIR\",\"GH_AW_EXPERIMENTS_REASONING_DEPTH\",\"GH_AW_EXPR_0FB38B2A\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_EXPR_CBA23170\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_PROMPT\",\"GH_AW_PROMPT_CONFIG\",\"GH_AW_PROMPT_CONTENT_0000\",\"GH_AW_PROMPT_CONTENT_0001\",\"GH_AW_PROMPT_CONTENT_0002\",\"GH_AW_PROMPT_CONTENT_0003\",\"GH_AW_PROMPT_CONTENT_0004\",\"GH_AW_PROMPT_CONTENT_0005\",\"GH_AW_PROMPT_CONTENT_0006\",\"GH_AW_PROMPT_CONTENT_0007\",\"GH_AW_SAFE_OUTPUTS\"]"
           GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
@@ -412,11 +411,10 @@ jobs:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_ENGINE_ID: codex
           GH_AW_EXPERIMENTS_REASONING_DEPTH: ${{ steps.pick-experiment.outputs.reasoning_depth }}
+          GH_AW_EXPR_0FB38B2A: ${{ fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').issue_status || (github.event_name == 'issues' && github.event.action == 'status_changed' && github.event.issue != null && github.event.issue.status != null) }}
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
-          GH_AW_EXPR_8984B5BA: ${{ fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').issue_status }}
-          GH_AW_EXPR_BA9685AD: ${{ toJSON(fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').issue_status) }}
           GH_AW_EXPR_C19C384F: ${{ github.event.discussion.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'discussion' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_CBA23170: ${{ steps.pick-experiment.outputs.reasoning_depth == 'multi_candidate' }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
@@ -432,7 +430,7 @@ jobs:
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_ENV: "[\"GH_AW_ENGINE_ID\",\"GH_AW_EXPERIMENTS_REASONING_DEPTH\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_8984B5BA\",\"GH_AW_EXPR_BA9685AD\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_EXPR_CBA23170\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_PROMPT\",\"GH_AW_SKILL_DIR\",\"GH_AW_SKILL_EXT\",\"GH_AW_SUB_AGENT_DIR\",\"GH_AW_SUB_AGENT_EXT\"]"
+          GH_AW_PROMPT_ENV: "[\"GH_AW_ENGINE_ID\",\"GH_AW_EXPERIMENTS_REASONING_DEPTH\",\"GH_AW_EXPR_0FB38B2A\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_EXPR_CBA23170\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_PROMPT\",\"GH_AW_SKILL_DIR\",\"GH_AW_SKILL_EXT\",\"GH_AW_SUB_AGENT_DIR\",\"GH_AW_SUB_AGENT_EXT\"]"
           GH_AW_SKILL_DIR: .codex/skills
           GH_AW_SKILL_EXT: /SKILL.md
           GH_AW_SUB_AGENT_DIR: .codex/agents
@@ -457,11 +455,10 @@ jobs:
               file: process.env.GH_AW_PROMPT,
               substitutions: {
                 GH_AW_EXPERIMENTS_REASONING_DEPTH: process.env.GH_AW_EXPERIMENTS_REASONING_DEPTH,
+                GH_AW_EXPR_0FB38B2A: process.env.GH_AW_EXPR_0FB38B2A,
                 GH_AW_EXPR_76DF9333: process.env.GH_AW_EXPR_76DF9333,
                 GH_AW_EXPR_77C1A4D2: process.env.GH_AW_EXPR_77C1A4D2,
                 GH_AW_EXPR_7C248226: process.env.GH_AW_EXPR_7C248226,
-                GH_AW_EXPR_8984B5BA: process.env.GH_AW_EXPR_8984B5BA,
-                GH_AW_EXPR_BA9685AD: process.env.GH_AW_EXPR_BA9685AD,
                 GH_AW_EXPR_C19C384F: process.env.GH_AW_EXPR_C19C384F,
                 GH_AW_EXPR_CBA23170: process.env.GH_AW_EXPR_CBA23170,
                 GH_AW_GITHUB_ACTOR: process.env.GH_AW_GITHUB_ACTOR,
@@ -474,11 +471,10 @@ jobs:
         env:
           GH_AW_ACTIONS_DIR: ${{ runner.temp }}/gh-aw/actions
           GH_AW_EXPERIMENTS_REASONING_DEPTH: ${{ steps.pick-experiment.outputs.reasoning_depth }}
+          GH_AW_EXPR_0FB38B2A: ${{ fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').issue_status || (github.event_name == 'issues' && github.event.action == 'status_changed' && github.event.issue != null && github.event.issue.status != null) }}
           GH_AW_EXPR_76DF9333: ${{ github.event.pull_request.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'pull_request' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_77C1A4D2: ${{ github.event.comment.id || fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').comment_id }}
           GH_AW_EXPR_7C248226: ${{ github.event.issue.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'issue' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
-          GH_AW_EXPR_8984B5BA: ${{ fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').issue_status }}
-          GH_AW_EXPR_BA9685AD: ${{ toJSON(fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').issue_status) }}
           GH_AW_EXPR_C19C384F: ${{ github.event.discussion.number || (fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_type == 'discussion' && fromJSON(steps.generate_aw_info.outputs.aw_context || '{}').item_number) }}
           GH_AW_EXPR_CBA23170: ${{ steps.pick-experiment.outputs.reasoning_depth == 'multi_candidate' }}
           GH_AW_GITHUB_ACTOR: ${{ github.actor }}
@@ -494,7 +490,7 @@ jobs:
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_ENV: "[\"GH_AW_EXPERIMENTS_REASONING_DEPTH\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_8984B5BA\",\"GH_AW_EXPR_BA9685AD\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_EXPR_CBA23170\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_PROMPT\"]"
+          GH_AW_PROMPT_ENV: "[\"GH_AW_EXPERIMENTS_REASONING_DEPTH\",\"GH_AW_EXPR_0FB38B2A\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_EXPR_CBA23170\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_MCP_CLI_SERVERS_LIST\",\"GH_AW_PROMPT\"]"
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
           OTEL_EXPORTER_OTLP_PROTOCOL: ""

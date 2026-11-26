@@ -54,6 +54,15 @@ beforeEach(() => {
   vi.stubEnv("GH_AW_SAFE_OUTPUTS_STAGED", "");
 });
 
+it("releases the max slot when a temporary target is deferred", async () => {
+  const handler = await main({ max: 1, target: "*" });
+  const deferred = await handler({ status: "Todo", issue_number: "aw_target" }, {});
+  expect(deferred).toMatchObject({ success: false, deferred: true });
+  const retried = await handler({ status: "Todo", issue_number: "aw_target" }, { aw_target: { repo: "owner/repo", number: 42 } });
+  expect(retried.success).toBe(true);
+  expect(patches()).toHaveLength(1);
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -211,6 +220,8 @@ describe("set_issue_status", () => {
       .mockResolvedValueOnce({ repository: { issue: { number: 42, duplicateOf: { fullDatabaseId: "201", number: 10, repository: { nameWithOwner: "owner/repo" } } } } });
     const result = await handle({ status: "Duplicate", duplicate_of: 9 }, { allow_close: true });
     expect(result).toMatchObject({ success: false, issue_number: 42, url: current.html_url });
+    expect(result.error).toContain("PATCH was sent to owner/repo#42");
+    expect(result.error).toContain("may have been applied");
     expect(result.error).toContain("canonical duplicate");
     expect(extractCreatedItemFromResult("set_issue_status", result)).toBeNull();
     expect(patches()).toHaveLength(1);
@@ -218,6 +229,14 @@ describe("set_issue_status", () => {
 
   it.each([undefined, null, 0, -1, 42, 1.1, "9"])("rejects invalid duplicate reference %j", async duplicate_of => {
     expect((await handle({ status: "Duplicate", duplicate_of }, { allow_close: true })).error).toContain("duplicate_of");
+    expect(patches()).toHaveLength(0);
+  });
+
+  it("fails closed when the current issue response omits status", async () => {
+    delete current.status;
+    const result = await handle();
+    expect(result).toMatchObject({ success: false });
+    expect(result.error).toContain("response omitted status");
     expect(patches()).toHaveLength(0);
   });
 
@@ -292,6 +311,28 @@ describe("set_issue_status", () => {
     expect(patches()).toHaveLength(0);
     expect(extractCreatedItemFromResult("set_issue_status", result)).toBeNull();
     expect(buildSafeOutputExecutions([{ type: "set_issue_status", result }])[0].status).toBe("staged");
+  });
+
+  it.each([
+    ["invalid status", "unknown", statuses[0], "Unknown"],
+    ["forbidden close transition", "Done", statuses[0], "allow-close"],
+  ])("validates protected previews read-only for %s", async (_name, requestedStatus, initialStatus, expectedError) => {
+    current = { ...current, status: initialStatus };
+    const handler = await main({ allowed: statuses.map(status => status.name) });
+    const result = await handler.validatePreview({ type: "set_issue_status", status: requestedStatus }, {}, new Map());
+    expect(result.success).toBe(false);
+    expect(result.error).toContain(expectedError);
+    expect(patches()).toHaveLength(0);
+    expect(client.rest.issues.update).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on unavailable status preview support in a read-only preview", async () => {
+    client.request.mockRejectedValue(Object.assign(new Error("Not Found"), { status: 404 }));
+    const handler = await main({});
+    const result = await handler.validatePreview({ type: "set_issue_status", status: "Todo" }, {}, new Map());
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("unavailable");
+    expect(patches()).toHaveLength(0);
   });
 
   it("enforces configured max", async () => {

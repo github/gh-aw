@@ -176,6 +176,14 @@ describe("create_issue", () => {
       expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
     });
 
+    it("validates protected initial-status previews without creating an issue", async () => {
+      const handler = await main({ planning_status: "Unknown" });
+      const result = await handler.validatePreview(message, {}, new Map());
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Unknown");
+      expect(mockGithub.rest.issues.create).not.toHaveBeenCalled();
+    });
+
     it.each([undefined, null, statuses[0], { ...statuses[1], category: "future" }])("reports truthful partial failure when status is ignored (%j)", async status => {
       mockGithub.rest.issues.create.mockResolvedValue({ data: { id: 100, number: 42, html_url: "https://github.com/test-owner/test-repo/issues/42", state: "open", status } });
       const handler = await main({ planning_status: "Todo" });
@@ -184,6 +192,25 @@ describe("create_issue", () => {
       expect(result.error).toContain("was created");
       expect(mockGithub.rest.issues.create).toHaveBeenCalledTimes(1);
       expect(mockGithub.rest.issues.createComment).not.toHaveBeenCalled();
+    });
+
+    it("records a created issue before returning a failed status verification", async () => {
+      mockGithub.rest.issues.get = vi.fn().mockResolvedValue({ data: { id: 700, number: 42 } });
+      mockGithub.rest.issues.create.mockResolvedValueOnce({
+        data: { id: 100, number: 42, html_url: "https://github.com/test-owner/test-repo/issues/42", title: message.title, state: "open", status: null },
+      });
+      const handler = await main({ planning_status: "Todo", deduplicate_by_title: true });
+
+      const first = await handler({ ...message, title: "Partial status issue", temporary_id: "aw_created" });
+      const duplicate = await handler({ ...message, title: "Partial status issue", temporary_id: "aw_duplicate" });
+      const dependent = await handler({ ...message, title: "Dependent issue", temporary_id: "aw_dependent", blocked_by: "aw_created" });
+
+      expect(first).toMatchObject({ success: false, number: 42, id: 100 });
+      expect(first.error).toContain("planning status was not applied");
+      expect(duplicate).toMatchObject({ success: true, dropped_duplicate: true, dedup_source: "within-run" });
+      expect(mockGithub.rest.issues.create).toHaveBeenCalledTimes(2);
+      expect(mockGithub.request).toHaveBeenCalledWith("POST /repos/{owner}/{repo}/issues/{issue_number}/dependencies/blocked_by", expect.objectContaining({ issue_number: 42, issue_id: 700 }));
+      expect(dependent.success).toBe(true);
     });
 
     it("does not discover or send planning status when unconfigured", async () => {

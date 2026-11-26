@@ -20,7 +20,7 @@ async function main(config = {}) {
   const staged = isStagedMode(config);
   let processedCount = 0;
 
-  return async function handleSetIssueStatus(message, resolvedTemporaryIds) {
+  const handleSetIssueStatus = async function (message, resolvedTemporaryIds, _temporaryIdMap, forcePreview = false) {
     if (processedCount >= maxCount) return { success: false, error: `Max count of ${maxCount} reached` };
     processedCount++;
     const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "issue");
@@ -31,7 +31,10 @@ async function main(config = {}) {
       const bound = resolveRepoIssueTarget(message.issue_number, loadTemporaryIdMapFromResolved(resolvedTemporaryIds), repoParts.owner, repoParts.repo);
       if (bound.wasTemporaryId && bound.resolved && `${bound.resolved.owner}/${bound.resolved.repo}`.toLowerCase() !== itemRepo.toLowerCase()) return { success: false, error: "Temporary issue target belongs to another repository" };
       const explicit = resolveSafeOutputIssueTarget({ message, resolvedTemporaryIds, repoParts, handlerType: HANDLER_TYPE, aliases: ["issue_number"] });
-      if (!explicit.success) return explicit;
+      if (!explicit.success) {
+        if (explicit.deferred) processedCount--;
+        return explicit;
+      }
       if (explicit.number !== null) item = { ...message, issue_number: explicit.number };
     }
     const target = resolveTarget({ targetConfig, item, context, itemType: HANDLER_TYPE, supportsIssue: true });
@@ -55,6 +58,7 @@ async function main(config = {}) {
       if (!isBoundIssue(current, issueNumber)) throw new Error("Current issue does not match the authorized repository and issue number");
       if (current.pull_request) throw new Error("Native planning statuses only apply to issues, not pull requests");
       if (!["open", "closed"].includes(current.state)) throw new Error("Cannot determine the current issue state");
+      if (!Object.hasOwn(current, "status")) throw new Error("Cannot verify the current planning status because the issue response omitted status");
       if (current.status && !["backlog", "planned", "started", "completed", "not_planned", "duplicate"].includes(current.status.category)) throw new Error("Unsupported current planning status category");
       const expected = planningStatusState(status);
       if (expected.state === "closed" && (current.state === "open" || current.state_reason !== expected.state_reason) && config.allow_close !== true)
@@ -79,7 +83,7 @@ async function main(config = {}) {
       if (current.status?.id === status.id && current.status?.category === status.category && current.state === expected.state && (expected.state === "open" || current.state_reason === expected.state_reason) && sameDuplicate) {
         return { success: true, skipped: true, reason: "Issue already has the requested planning status", issue_number: issueNumber, repo: itemRepo };
       }
-      if (staged) {
+      if (staged || forcePreview) {
         logStagedPreviewInfo(`Would set planning status to ${JSON.stringify(status.name)} on ${itemRepo}#${issueNumber}`);
         return { success: true, staged: true, previewInfo: { repo: itemRepo, issue_number: issueNumber, planning_status: status, ...(message.duplicate_of ? { duplicate_of: message.duplicate_of } : {}) } };
       }
@@ -101,7 +105,13 @@ async function main(config = {}) {
         }
         if (duplicateId === undefined && updatedDuplicate) throw new Error("GitHub did not clear the previous duplicate issue relationship");
       } catch (error) {
-        return { success: false, error: getErrorMessage(error), issue_number: issueNumber, repo: itemRepo, url: updated?.html_url };
+        return {
+          success: false,
+          error: `PATCH was sent to ${itemRepo}#${issueNumber} (${issueUrlPrefix}${issueNumber}); the requested status may have been applied, but verification failed: ${getErrorMessage(error)}`,
+          issue_number: issueNumber,
+          repo: itemRepo,
+          url: `${issueUrlPrefix}${issueNumber}`,
+        };
       }
       return {
         success: true,
@@ -118,6 +128,8 @@ async function main(config = {}) {
       return { success: false, error: errorMessage };
     }
   };
+  handleSetIssueStatus.validatePreview = (message, resolvedTemporaryIds, temporaryIdMap) => handleSetIssueStatus(message, resolvedTemporaryIds, temporaryIdMap, true);
+  return handleSetIssueStatus;
 }
 
 module.exports = { main };

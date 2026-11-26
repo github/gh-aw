@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -121,7 +122,15 @@ func nativeIssueStatusState(snapshot map[string]any, allowAbsent bool) (map[stri
 }
 
 func nativeStatusID(raw any) (string, bool) {
-	id, err := strconv.ParseInt(mutableString(raw), 10, 64)
+	value := mutableString(raw)
+	if number, ok := raw.(float64); ok {
+		const maxSafeInteger = 9007199254740991
+		if math.IsNaN(number) || math.IsInf(number, 0) || math.Trunc(number) != number || number <= 0 || number > maxSafeInteger {
+			return "", false
+		}
+		value = strconv.FormatFloat(number, 'f', 0, 64)
+	}
+	id, err := strconv.ParseInt(value, 10, 64)
 	if err != nil || id <= 0 || id > 9007199254740991 {
 		return "", false
 	}

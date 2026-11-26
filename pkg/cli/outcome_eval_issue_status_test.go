@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -94,6 +95,7 @@ func TestRetainedLifecycleIssueStatusSnapshots(t *testing.T) {
 			"state":           "closed", "state_reason": "duplicate", "duplicate_issue_id": 900,
 		},
 	}
+
 	execution := retainedLifecycleExecution(item)
 	restored := retainedLifecycleItem(lifecycle.Record{
 		Identity:  lifecycle.Identity{Type: item.Type, Host: "github.com", TargetRepository: item.Repo},
@@ -105,4 +107,12 @@ func TestRetainedLifecycleIssueStatusSnapshots(t *testing.T) {
 	assert.True(t, ok)
 	_, ok = nativeIssueStatusState(restored.AfterState, false)
 	assert.True(t, ok)
+}
+
+func TestNativeStatusIDJSONRoundTripLargeInteger(t *testing.T) {
+	var raw any
+	assert.NoError(t, json.Unmarshal([]byte("1234567890"), &raw))
+	id, ok := nativeStatusID(raw)
+	assert.True(t, ok)
+	assert.Equal(t, "1234567890", id)
 }

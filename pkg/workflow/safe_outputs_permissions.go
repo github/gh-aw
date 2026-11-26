@@ -251,7 +251,7 @@ func computeSafeOutputHandlerPermissions(safeOutputs *SafeOutputsConfig, handler
 
 	permissions = NewPermissions()
 	switch handler.Key {
-	case "close-issue", "link-sub-issue", "replace-label", "assign-milestone", "set-issue-status":
+	case "close-issue", "create-issue", "link-sub-issue", "replace-label", "assign-milestone", "set-issue-status":
 		permissions.Set(PermissionIssues, PermissionRead)
 	case "close-pull-request", "resolve-pull-request-review-thread", "mark-pull-request-as-ready-for-review",
 		"create-pull-request-review-comment", "submit-pull-request-review":

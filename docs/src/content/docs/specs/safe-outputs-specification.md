@@ -8,9 +8,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.33.0<br>
+**Version**: 1.34.0<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-25<br>
+**Publication Date**: 2026-11-26<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -8586,6 +8586,12 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.34.0** (2026-11-26):
+
+- **Specified**: `set_issue_status` target authorization, allowed planning statuses, current-state evidence, lifecycle permissions, duplicate relationship verification, and read-only staged previews.
+- **Specified**: Initial native planning status validation and verification for `create_issue`.
+- **Updated**: Publication metadata to 1.34.0.
 
 **Version 1.33.0** (2026-11-25):
 

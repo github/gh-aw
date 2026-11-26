@@ -11,8 +11,8 @@
 {{#if ${{ github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number) }} }}
 - **issue-number**: #${{ github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number) }}
 {{/if}}
-{{#if ${{ github.aw.context.issue_status }} }}
-- **issue-status** (event = captured change, previous = prior status, snapshot = issue status when delivery was built; none guarantees latest state): ${{ toJSON(github.aw.context.issue_status) }}
+{{#if ${{ github.aw.context.issue_status || (github.event_name == 'issues' && github.event.action == 'status_changed' && github.event.issue != null && github.event.issue.status != null) }} }}
+- Issue planning status context is available from the triggering event or inherited workflow context.
 - Status events may be repeated, stale, or out of order. Fetch the issue before acting on its latest status; do not infer deduplication from this context.
 - Issue search supports status qualifiers but may omit status details. Hydrate matches with `issue_read` (`get`) when status details are needed; never infer returned status from the search qualifier.
 {{/if}}

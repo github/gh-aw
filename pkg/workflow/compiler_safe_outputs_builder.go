@@ -93,6 +93,20 @@ func (b *handlerConfigBuilder) AddIfNotEmpty(key string, value string) *handlerC
 	return b
 }
 
+// AddTemplatableString adds a string field that may contain a GitHub Actions expression.
+// Expressions are serialized through toJSON so runtime values remain a single JSON value.
+func (b *handlerConfigBuilder) AddTemplatableString(key string, value string) *handlerConfigBuilder {
+	if value == "" {
+		return b
+	}
+	if isExpression(value) {
+		b.config[key] = newTemplatableJSONExpression(wrapExpressionWithToJSON(value))
+		return b
+	}
+	b.config[key] = value
+	return b
+}
+
 // AddStringSlice adds a string slice field only if the slice is not empty
 func (b *handlerConfigBuilder) AddStringSlice(key string, value []string) *handlerConfigBuilder {
 	if len(value) > 0 {

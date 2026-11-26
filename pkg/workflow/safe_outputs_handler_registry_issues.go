@@ -120,7 +120,7 @@ var issueHandlerRegistry = map[string]handlerBuilder{
 			AddTemplatableInt("max", c.Max).
 			AddDefault("allow_close", c.AllowClose).
 			AddDefault("allow_reopen", c.AllowReopen).
-			AddIfNotEmpty("target", c.Target).
+			AddTemplatableString("target", c.Target).
 			AddStringSlice("required_labels", c.RequiredLabels).
 			AddIfNotEmpty("required_title_prefix", c.RequiredTitlePrefix).
 			AddIfNotEmpty("target-repo", c.TargetRepoSlug).
