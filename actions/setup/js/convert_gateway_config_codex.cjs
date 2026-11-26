@@ -159,19 +159,16 @@ function main() {
     },
     transformServer: (_name, entry) => entry,
     serialize: (servers, _context, urlPrefix) => {
-      const config = buildConfig(servers, urlPrefix);
-      if (!isTable(config.mcp_servers)) throw new Error("Invalid Codex MCP servers");
       /** @type {Record<string, Record<string, unknown>>} */
-      const mcpServers = {};
-      for (const [name, value] of Object.entries(config.mcp_servers)) {
-        if (!isTable(value)) throw new Error("Invalid Codex MCP server");
-        mcpServers[name] = value;
+      const localServers = {};
+      if (process.env.GH_AW_WEB_FETCH_MCP === "1" && Object.hasOwn(servers, "web-fetch")) {
+        throw new Error("The web-fetch MCP server name is reserved when tools.web-fetch is enabled");
       }
-      addWebFetchMCPServer(mcpServers, entry => ({
+      addWebFetchMCPServer(localServers, entry => ({
         ...entry,
         env_vars: ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "SSL_CERT_FILE", "SSL_CERT_DIR", "CURL_CA_BUNDLE"],
       }));
-      config.mcp_servers = mcpServers;
+      const config = buildConfig(servers, urlPrefix, localServers);
       return serializeConfig(config);
     },
   });

@@ -119,7 +119,11 @@ func (e *CodexEngine) buildNativeConfig(workflowData *WorkflowData, mcpTools []s
 			codexOpenAIProxyProviderID: proxy,
 		}
 	}
-	config.Defaults["mcp_servers"] = codexNativeServerDefaults(workflowData, mcpTools)
+	servers := codexNativeServerDefaults(workflowData, mcpTools)
+	if usesWebFetchMCPForEngine(e, workflowData) {
+		servers["web-fetch"] = codexNativeServerDefaults(workflowData, []string{"web-fetch"})["web-fetch"]
+	}
+	config.Defaults["mcp_servers"] = servers
 	if workflowData != nil && workflowData.EngineConfig != nil {
 		var err error
 		config.Overrides, err = parseCodexConfig(workflowData.EngineConfig.Config)
