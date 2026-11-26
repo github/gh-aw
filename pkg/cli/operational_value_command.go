@@ -97,7 +97,7 @@ func NewValueCommand() *cobra.Command {
 	cmd.Flags().StringVar(&config.Evidence, "evidence", "", "Versioned typed observation bundle for evidence-number-v1 (not native adoption proof)")
 	cmd.Flags().BoolVar(&config.Daily, "daily", false, "Show daily Git measurements and retained human acceptance evidence at noon UTC")
 	cmd.Flags().StringVarP(&config.Repo, "repo", "r", "", repoHostUsage+". Defaults to current repository")
-	cmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Maximum report collection duration")
+	cmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Maximum report collection duration (e.g., 30s or 5m)")
 	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output results in JSON format")
 	cmd.SetOut(os.Stdout)
 	return cmd

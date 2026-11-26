@@ -96,6 +96,13 @@ func TestConnectorsSchemaCommand(t *testing.T) {
 	require.Error(t, cmd.Execute())
 }
 
+func TestConnectorPlanHelpUsesPlanDigest(t *testing.T) {
+	t.Parallel()
+	cmd := newConnectorPlanCommand()
+	require.Contains(t, cmd.Short, "plan digest")
+	require.Contains(t, cmd.Long, "plan digest")
+}
+
 func TestConnectorsPlanCommand(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

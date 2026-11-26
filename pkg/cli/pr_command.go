@@ -90,6 +90,7 @@ This command fetches the pull request details, applies the changes as a single c
 and creates a new pull request in the target repository with the same title and body.
 
 The target repository defaults to the current repository unless --repo is specified.
+Transfer always creates a pull request; --create-pull-request is required to opt in to --auto-merge.
 
 The command will:
 1. Fetch the PR details (title, body, changes)
@@ -120,7 +121,7 @@ The command will:
 
 	addRepoFlag(cmd)
 	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --create-pull-request)")
-	cmd.Flags().Bool("create-pull-request", false, "Create a pull request (always enabled for transfer)")
+	cmd.Flags().Bool("create-pull-request", false, "Explicitly opt in to pull request creation for --auto-merge (transfer always creates a pull request)")
 	addPRMessageFlag(cmd)
 	cmd.Flags().Bool("pr", false, "Alias for --create-pull-request")
 	_ = cmd.Flags().MarkHidden("pr")
