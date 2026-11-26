@@ -299,9 +299,10 @@ Create or update a repository secret (from stdin, flag, or environment variable)
 ```bash wrap
 gh aw secrets set MY_SECRET                                    # From stdin (current repo)
 gh aw secrets set MY_SECRET --repo myorg/myrepo                # Specify target repo
-gh aw secrets set MY_SECRET --value "secret123"                # From flag
 gh aw secrets set MY_SECRET --value-from-env MY_TOKEN          # From env var
 ```
+
+Avoid passing secret values with `--value`: command-line arguments can appear in shell history and process listings. Omit the flag to prompt securely or read from stdin.
 
 **Options:** `--repo/-r`, `--value`, `--value-from-env`, `--api-url`
 

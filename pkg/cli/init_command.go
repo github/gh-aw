@@ -61,7 +61,7 @@ With --completions flag:
 - Provides instructions for enabling completions in your shell
 
 After running this command, you can:
-- Add workflows from the catalog with: ` + string(constants.CLIExtensionPrefix) + ` add <workflow-name>
+- Add workflows from the catalog with: ` + string(constants.CLIExtensionPrefix) + ` add githubnext/agentics/ci-doctor
 - Create new workflows from scratch with: ` + string(constants.CLIExtensionPrefix) + ` new <workflow-name>`,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` init                                # Initialize repository with defaults
   ` + string(constants.CLIExtensionPrefix) + ` init -v                             # Initialize with verbose output

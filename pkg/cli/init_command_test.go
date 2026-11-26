@@ -281,6 +281,10 @@ func TestInitCommandHelp(t *testing.T) {
 		t.Error("Expected help text to mention non-interactive setup")
 	}
 
+	assert.Contains(t, helpText, "gh aw add githubnext/agentics/ci-doctor")
+	_, err := parseWorkflowSpec("githubnext/agentics/ci-doctor")
+	require.NoError(t, err)
+
 	if strings.Contains(helpText, "Usage:") {
 		t.Error("Expected init long help text to not embed a Usage section")
 	}
