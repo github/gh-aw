@@ -75,9 +75,17 @@ describe("action_setup_otlp.cjs", () => {
       INPUT_PARENT_SPAN_ID: process.env.INPUT_PARENT_SPAN_ID,
       "INPUT_PARENT-SPAN-ID": process.env["INPUT_PARENT-SPAN-ID"],
       INPUT_OTLP_OIDC_TOKEN: process.env.INPUT_OTLP_OIDC_TOKEN,
+      INPUT_TOKEN_BROKER_OTLP: process.env.INPUT_TOKEN_BROKER_OTLP,
+      GH_AW_TOKEN_BROKER_URL: process.env.GH_AW_TOKEN_BROKER_URL,
+      GH_AW_OTLP_JOB_DEADLINE_MS: process.env.GH_AW_OTLP_JOB_DEADLINE_MS,
+      ACTIONS_ID_TOKEN_REQUEST_URL: process.env.ACTIONS_ID_TOKEN_REQUEST_URL,
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN,
+      GITHUB_JOB: process.env.GITHUB_JOB,
       GH_AW_OTLP_ENDPOINTS: process.env.GH_AW_OTLP_ENDPOINTS,
       OTEL_EXPORTER_OTLP_HEADERS: process.env.OTEL_EXPORTER_OTLP_HEADERS,
       GH_AW_OTLP_ALL_HEADERS: process.env.GH_AW_OTLP_ALL_HEADERS,
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+      OTEL_EXPORTER_OTLP_METRICS_HEADERS: process.env.OTEL_EXPORTER_OTLP_METRICS_HEADERS,
     };
 
     delete process.env.GH_AW_OTLP_ENDPOINTS;
@@ -90,8 +98,16 @@ describe("action_setup_otlp.cjs", () => {
     delete process.env["INPUT_PARENT-SPAN-ID"];
     delete process.env.INPUT_OTLP_OIDC_TOKEN;
     delete process.env["INPUT_OTLP_OIDC_TOKEN"];
+    delete process.env.INPUT_TOKEN_BROKER_OTLP;
+    delete process.env.GH_AW_TOKEN_BROKER_URL;
+    delete process.env.GH_AW_OTLP_JOB_DEADLINE_MS;
+    delete process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+    delete process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+    delete process.env.GITHUB_JOB;
     delete process.env.OTEL_EXPORTER_OTLP_HEADERS;
     delete process.env.GH_AW_OTLP_ALL_HEADERS;
+    delete process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT;
+    delete process.env.OTEL_EXPORTER_OTLP_METRICS_HEADERS;
     process.env.GITHUB_OUTPUT = outputFile;
     process.env.GITHUB_ENV = envFile;
   });
@@ -112,6 +128,45 @@ describe("action_setup_otlp.cjs", () => {
 
   it("should export run as a function", () => {
     expect(typeof run).toBe("function");
+  });
+
+  it("uses a fresh brokered OTLP pair and replaces all configured destinations", async () => {
+    const oidc = [JSON.stringify({ alg: "synthetic" }), JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 600 }), "signature"].map(value => Buffer.from(value).toString("base64url")).join(".");
+    const token = "broker+/token==";
+    const expiresAt = new Date(Date.now() + 300_000).toISOString();
+    process.env.INPUT_TOKEN_BROKER_OTLP = "true";
+    process.env.GH_AW_TOKEN_BROKER_URL = "https://broker.example.test/token";
+    process.env.GH_AW_OTLP_JOB_DEADLINE_MS = String(Date.now() + 60_000);
+    process.env.ACTIONS_ID_TOKEN_REQUEST_URL = "https://oidc.example.test/token";
+    process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN = "synthetic-bootstrap";
+    process.env.GITHUB_JOB = "agent";
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://old.example.test", headers: "Authorization=old-token" }, { url: "https://other.example.test" }]);
+    process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = "https://stale.example.test/v1/traces";
+    process.env.OTEL_EXPORTER_OTLP_METRICS_HEADERS = "Authorization=stale";
+
+    const fetchSpy = vi.spyOn(global, "fetch").mockImplementation((_url, options) => {
+      if (options?.method === "POST") {
+        expect(JSON.parse(options.body)).toEqual({ token_type: "otlp", oidc_token: oidc, job_id: "agent" });
+        return Promise.resolve(new Response(JSON.stringify({ endpoint: "https://collector.example.test/otlp?tenant=1", token, expires_at: expiresAt }), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ value: oidc }), { status: 200 }));
+    });
+
+    await run();
+
+    const expectedHeaders = `Authorization=${encodeURIComponent("Bearer " + token)}`;
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(process.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("https://collector.example.test/otlp?tenant=1");
+    expect(process.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(expectedHeaders);
+    expect(process.env.OTEL_EXPORTER_OTLP_PROTOCOL).toBe("http/protobuf");
+    expect(process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT).toBe("");
+    expect(process.env.OTEL_EXPORTER_OTLP_METRICS_HEADERS).toBe("");
+    expect(JSON.parse(process.env.GH_AW_OTLP_ENDPOINTS)).toEqual([{ url: "https://collector.example.test/otlp?tenant=1", headers: expectedHeaders }]);
+    expect(process.env.GH_AW_OTLP_EXPORT_DEADLINE_MS).toBe(String(Date.parse(expiresAt) - 30_000));
+    expect(mockCore.setSecret).toHaveBeenCalledWith(token);
+    expect(mockCore.setSecret).toHaveBeenCalledWith("https://collector.example.test/otlp?tenant=1");
+    expect(readFileSync(envFile, "utf8")).toContain(`OTEL_EXPORTER_OTLP_HEADERS=${expectedHeaders}`);
+    expect(readFileSync(envFile, "utf8")).toContain(`GH_AW_OTLP_ENDPOINTS=${JSON.stringify([{ url: "https://collector.example.test/otlp?tenant=1", headers: expectedHeaders }])}`);
   });
 
   describe("writeEnvLine", () => {

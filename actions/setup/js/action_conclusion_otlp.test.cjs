@@ -21,6 +21,10 @@ global.core = mockCore;
 const sendOtlpModule = req("./send_otlp_span.cjs");
 const originalSendJobConclusionSpan = sendOtlpModule.sendJobConclusionSpan;
 const sessionLogs = req("./send_otlp_session_logs.cjs");
+const tokenBroker = req("./token_broker.cjs");
+const originalInvalidateBrokerTokens = tokenBroker.invalidateBrokerTokens;
+const otlpMetrics = req("./otlp_metrics.cjs");
+const originalFlushCustomMetrics = otlpMetrics.flushCustomMetrics;
 
 // Load the module under test — it holds a reference to the same sendOtlpModule object
 const { run, buildSpanName, parseJobStartMs } = req("./action_conclusion_otlp.cjs");
@@ -29,7 +33,29 @@ const { run, buildSpanName, parseJobStartMs } = req("./action_conclusion_otlp.cj
 const mockSendJobConclusionSpan = vi.fn();
 
 /** Env vars read by this module — cleared before each test */
-const MANAGED_ENV_VARS = ["GH_AW_OTLP_ENDPOINTS", "GH_AW_JOB_RESULT", "GH_AW_OTEL_CONCLUSION_PREUPLOAD", "INPUT_JOB_NAME", "INPUT_JOB-NAME", "GITHUB_AW_OTEL_JOB_START_MS"];
+const MANAGED_ENV_VARS = [
+  "GH_AW_OTLP_ENDPOINTS",
+  "GH_AW_OTLP_ALL_HEADERS",
+  "GH_AW_OTLP_EXPORT_DEADLINE_MS",
+  "OTEL_EXPORTER_OTLP_ENDPOINT",
+  "OTEL_EXPORTER_OTLP_HEADERS",
+  "OTEL_EXPORTER_OTLP_PROTOCOL",
+  "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+  "OTEL_EXPORTER_OTLP_TRACES_HEADERS",
+  "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
+  "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+  "OTEL_EXPORTER_OTLP_METRICS_HEADERS",
+  "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL",
+  "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+  "OTEL_EXPORTER_OTLP_LOGS_HEADERS",
+  "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL",
+  "GH_AW_JOB_RESULT",
+  "GH_AW_OTEL_CONCLUSION_PREUPLOAD",
+  "INPUT_JOB_NAME",
+  "INPUT_JOB-NAME",
+  "INPUT_TOKEN_BROKER_OTLP",
+  "GITHUB_AW_OTEL_JOB_START_MS",
+];
 
 describe("action_conclusion_otlp.cjs", () => {
   /** @type {Record<string, string | undefined>} */
@@ -38,6 +64,8 @@ describe("action_conclusion_otlp.cjs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(sessionLogs, "sendSessionLogs").mockResolvedValue(undefined);
+    vi.spyOn(tokenBroker, "invalidateBrokerTokens").mockResolvedValue(undefined);
+    vi.spyOn(otlpMetrics, "flushCustomMetrics").mockResolvedValue(undefined);
     mockSendJobConclusionSpan.mockResolvedValue(undefined);
     // Patch the shared CJS exports object — run() accesses this at call time
     sendOtlpModule.sendJobConclusionSpan = mockSendJobConclusionSpan;
@@ -48,6 +76,8 @@ describe("action_conclusion_otlp.cjs", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     sendOtlpModule.sendJobConclusionSpan = originalSendJobConclusionSpan;
+    tokenBroker.invalidateBrokerTokens = originalInvalidateBrokerTokens;
+    otlpMetrics.flushCustomMetrics = originalFlushCustomMetrics;
     MANAGED_ENV_VARS.forEach(key => {
       const value = originalEnv[key];
       if (value === undefined) {
@@ -70,6 +100,25 @@ describe("action_conclusion_otlp.cjs", () => {
     await run();
     expect(sessionLogs.sendSessionLogs).toHaveBeenCalledOnce();
     expect(mockSendJobConclusionSpan.mock.invocationCallOrder[1]).toBeLessThan(sessionLogs.sendSessionLogs.mock.invocationCallOrder[0]);
+  });
+
+  it("flushes telemetry before broker invalidation and clears the job-wide OTLP pair", async () => {
+    process.env.INPUT_TOKEN_BROKER_OTLP = "true";
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://collector.example.test", headers: "Authorization=Bearer%20secret" }]);
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT = "https://collector.example.test";
+    process.env.OTEL_EXPORTER_OTLP_HEADERS = "Authorization=Bearer%20secret";
+    process.env.GH_AW_OTLP_EXPORT_DEADLINE_MS = "2000000000000";
+
+    await run();
+
+    expect(mockSendJobConclusionSpan).toHaveBeenCalledOnce();
+    expect(otlpMetrics.flushCustomMetrics).toHaveBeenCalledOnce();
+    expect(tokenBroker.invalidateBrokerTokens).toHaveBeenCalledOnce();
+    expect(mockSendJobConclusionSpan.mock.invocationCallOrder[0]).toBeLessThan(otlpMetrics.flushCustomMetrics.mock.invocationCallOrder[0]);
+    expect(otlpMetrics.flushCustomMetrics.mock.invocationCallOrder[0]).toBeLessThan(tokenBroker.invalidateBrokerTokens.mock.invocationCallOrder[0]);
+    for (const key of ["GH_AW_OTLP_ENDPOINTS", "OTEL_EXPORTER_OTLP_ENDPOINT", "OTEL_EXPORTER_OTLP_HEADERS", "GH_AW_OTLP_EXPORT_DEADLINE_MS"]) {
+      expect(process.env[key]).toBe("");
+    }
   });
 
   describe("when GH_AW_OTLP_ENDPOINTS is not set", () => {

@@ -893,6 +893,32 @@ describe("sendOTLPSpan", () => {
     expect(JSON.parse(init.body)).toEqual(payload);
   });
 
+  it("does not export brokered telemetry after its deadline and fails the current step", async () => {
+    const originalExitCode = process.exitCode;
+    vi.stubEnv("GH_AW_OTLP_EXPORT_DEADLINE_MS", String(Date.now() - 1));
+    const mockFetch = vi.fn();
+    vi.stubGlobal("fetch", mockFetch);
+
+    try {
+      await expect(sendOTLPSpan("https://collector.example.test", {}, { maxRetries: 0 })).resolves.toBe(false);
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(process.exitCode).toBe(1);
+    } finally {
+      process.exitCode = originalExitCode;
+    }
+  });
+
+  it("does not follow redirects when exporting with a brokered credential", async () => {
+    vi.stubEnv("GH_AW_OTLP_EXPORT_DEADLINE_MS", String(Date.now() + 60_000));
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 302, statusText: "Found" });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await sendOTLPSpan("https://collector.example.test", {}, { maxRetries: 0 });
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    expect(mockFetch.mock.calls[0][1].redirect).toBe("manual");
+  });
+
   it.each([Number.MAX_SAFE_INTEGER + 10_000, Number.MIN_SAFE_INTEGER - 10_000])("exports unsafe numeric attribute %s as protobuf double while preserving exact int64 strings", async value => {
     for (const key of ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"]) {
       vi.stubEnv(key, "");

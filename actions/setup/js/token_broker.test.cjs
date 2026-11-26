@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-const { createTokenBrokerClient, getBrokerToken, isTokenBrokerEnabled } = require("./token_broker.cjs");
+const { createTokenBrokerClient, getBrokerOTLPCredentials, getBrokerToken, isTokenBrokerEnabled } = require("./token_broker.cjs");
 
 const START = Date.parse("2026-10-30T12:00:00Z");
 const jwt = exp => [JSON.stringify({ alg: "synthetic" }), JSON.stringify({ exp }), "synthetic-signature"].map(value => Buffer.from(value).toString("base64url")).join(".");
@@ -105,6 +105,50 @@ describe("token broker", () => {
     await fails(setup({ env: {} }).client.getToken("copilot-request"), "CONFIGURATION");
   });
 
+  it("requests a fresh OTLP pair with no provider and checks the enforced job deadline", async () => {
+    const env = { ...makeEnv(), GH_AW_OTLP_JOB_DEADLINE_MS: String(START + 240000) };
+    const fixture = setup({
+      env,
+      fetchImpl: vi.fn(async (_url, init) => {
+        if (init.method !== "POST") return json({ value: OIDC });
+        return json(JSON.parse(init.body).operation === "invalidate" ? null : { endpoint: "https://collector.example.test/otlp", token: "otlp+/token==", expires_at: "2026-10-30T12:05:00Z" });
+      }),
+    });
+
+    expect(await fixture.client.getOTLPCredentials()).toEqual({
+      endpoint: "https://collector.example.test/otlp",
+      token: "otlp+/token==",
+      expiresAt: Date.parse("2026-10-30T12:05:00Z"),
+    });
+    expect(JSON.parse(fixture.fetchImpl.mock.calls[1][1].body)).toEqual({ token_type: "otlp", oidc_token: OIDC, job_id: "agent" });
+    expect(fixture.mask.mock.calls).toEqual([[OIDC], ["https://collector.example.test/otlp"], ["otlp+/token=="]]);
+    expect(await fixture.client.getOTLPCredentials()).toEqual(expect.objectContaining({ token: "otlp+/token==" }));
+    expect(fixture.fetchImpl).toHaveBeenCalledTimes(4);
+    await getBrokerOTLPCredentials(fixture.options);
+    expect(fixture.fetchImpl).toHaveBeenCalledTimes(6);
+  });
+
+  it("requires a trusted job deadline before an OTLP exchange", async () => {
+    const fixture = setup();
+    await fails(fixture.client.getOTLPCredentials(), "CONFIGURATION");
+    expect(fixture.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { endpoint: "http://collector.example.test", token: "valid-token", expires_at: "2026-10-30T12:05:00Z" },
+    { endpoint: "https://user@collector.example.test", token: "valid-token", expires_at: "2026-10-30T12:05:00Z" },
+    { endpoint: "https://collector.example.test/#fragment", token: "valid-token", expires_at: "2026-10-30T12:05:00Z" },
+    { endpoint: "https://collector.example.test", token: "bad,token", expires_at: "2026-10-30T12:05:00Z" },
+    { endpoint: "https://collector.example.test", token: "valid-token", expires_at: "2026-10-30T12:03:00Z" },
+    { endpoint: "https://collector.example.test", token: "valid-token", expires_at: "2026-10-30T12:05:00Z", extra: "field" },
+  ])("rejects unsafe OTLP responses", async response => {
+    const fixture = setup({
+      env: { ...makeEnv(), GH_AW_OTLP_JOB_DEADLINE_MS: String(START + 240000) },
+      fetchImpl: vi.fn(async (_url, init) => (init.method === "POST" ? json(response) : json({ value: OIDC }))),
+    });
+    await fails(fixture.client.getOTLPCredentials(), "MALFORMED_RESPONSE");
+  });
+
   it.each(["copilot-request", "copilot-task", "github-app"])("exchanges and masks %s without logging or exporting credentials", async tokenType => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     const fixture = setup();
@@ -121,7 +165,7 @@ describe("token broker", () => {
     expect(fixture.mask.mock.calls).toEqual([[OIDC], ["synthetic-credential"]]);
     expect(log).not.toHaveBeenCalled();
     expect(fixture.env).toEqual(before);
-    expect(Object.keys(fixture.client)).toEqual(["getToken", "invalidateTokens"]);
+    expect(Object.keys(fixture.client)).toEqual(["getToken", "getOTLPCredentials", "invalidateTokens"]);
   });
 
   it("deduplicates concurrent requests, caches per capability, and renews at the skew boundary", async () => {

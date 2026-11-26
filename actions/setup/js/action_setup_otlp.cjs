@@ -45,15 +45,85 @@ const { maskSecret, getOTLPRunnerMaskValues } = require("./actions_secret_maskin
 function writeEnvLine(filePath, key, value, logLabel, fileLabel) {
   if (/[\r\n]/.test(key) || /[\r\n]/.test(value)) {
     core.warning("[otlp] refusing to write a key or value containing line breaks");
-    return;
+    return false;
   }
-  if (!filePath) return;
+  if (!filePath) return false;
   try {
     appendFileSync(filePath, `${key}=${value}\n`);
     core.info(`[otlp] ${logLabel} written to ${fileLabel}`);
+    return true;
   } catch {
-    /* ignore */
+    return false;
   }
+}
+
+const BROKERED_OTLP_ENV_KEYS = [
+  "GH_AW_OTLP_ENDPOINTS",
+  "GH_AW_OTLP_ALL_HEADERS",
+  "GH_AW_OTLP_EXPORT_DEADLINE_MS",
+  "OTEL_EXPORTER_OTLP_ENDPOINT",
+  "OTEL_EXPORTER_OTLP_HEADERS",
+  "OTEL_EXPORTER_OTLP_PROTOCOL",
+  "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+  "OTEL_EXPORTER_OTLP_TRACES_HEADERS",
+  "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
+  "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+  "OTEL_EXPORTER_OTLP_METRICS_HEADERS",
+  "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL",
+  "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+  "OTEL_EXPORTER_OTLP_LOGS_HEADERS",
+  "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL",
+];
+
+function getBrokeredSignalEndpoints(endpoint) {
+  try {
+    const url = new URL(endpoint);
+    return ["traces", "metrics", "logs"].map(signal => {
+      const signalUrl = new URL(url.href);
+      signalUrl.pathname = `${signalUrl.pathname.replace(/\/+$/, "")}/v1/${signal}`;
+      return signalUrl.href;
+    });
+  } catch {
+    throw new Error("Token broker response is invalid.");
+  }
+}
+
+/**
+ * Replace all exporter destinations and credentials with the single validated
+ * broker pair before any OTLP export can run.
+ */
+async function configureBrokeredOTLP() {
+  const { getBrokerOTLPCredentials } = require("./token_broker.cjs");
+  const credentials = await getBrokerOTLPCredentials({ mask: maskSecret });
+  const bearer = "Bearer " + credentials.token;
+  const headers = `Authorization=${encodeURIComponent(bearer)}`;
+  const plainHeaders = `Authorization=${bearer}`;
+  const exportDeadline = credentials.expiresAt - 30000;
+  if (!process.env.GITHUB_ENV) throw new Error("Token broker configuration is invalid.");
+
+  const signalEndpoints = getBrokeredSignalEndpoints(credentials.endpoint);
+  for (const secret of [credentials.endpoint, ...signalEndpoints, credentials.token, bearer, plainHeaders, headers, encodeURIComponent(credentials.token), encodeURIComponent(bearer)]) {
+    maskSecret(secret);
+  }
+
+  for (const key of BROKERED_OTLP_ENV_KEYS) {
+    process.env[key] = "";
+    if (!writeEnvLine(process.env.GITHUB_ENV, key, "", key, "GITHUB_ENV")) throw new Error("Token broker configuration is invalid.");
+  }
+
+  const endpointList = JSON.stringify([{ url: credentials.endpoint, headers }]);
+  const values = {
+    GH_AW_OTLP_ENDPOINTS: endpointList,
+    GH_AW_OTLP_EXPORT_DEADLINE_MS: String(exportDeadline),
+    OTEL_EXPORTER_OTLP_ENDPOINT: credentials.endpoint,
+    OTEL_EXPORTER_OTLP_HEADERS: headers,
+    OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
+  };
+  for (const [key, value] of Object.entries(values)) {
+    process.env[key] = value;
+    if (!writeEnvLine(process.env.GITHUB_ENV, key, value, key, "GITHUB_ENV")) throw new Error("Token broker configuration is invalid.");
+  }
+  delete process.env.INPUT_OTLP_OIDC_TOKEN;
 }
 
 /**
@@ -152,8 +222,13 @@ async function run() {
     process.env.INPUT_PARENT_SPAN_ID = inputParentSpanId;
   }
 
+  const brokeredOTLP = getActionInput("TOKEN_BROKER_OTLP") === "true";
+  if (brokeredOTLP) await configureBrokeredOTLP();
+
   const inputOTLPOIDCToken = getActionInput("OTLP_OIDC_TOKEN");
-  if (/[\r\n]/.test(inputOTLPOIDCToken)) {
+  if (brokeredOTLP) {
+    // The brokered profile replaces, rather than merges with, inherited OTLP credentials.
+  } else if (/[\r\n]/.test(inputOTLPOIDCToken)) {
     core.warning("[otlp] ignoring OTLP OIDC token containing line breaks");
   } else if (inputOTLPOIDCToken) {
     maskSecret(inputOTLPOIDCToken);
@@ -234,10 +309,15 @@ async function run() {
   }
 }
 
-module.exports = { run, writeEnvLine };
+module.exports = { run, writeEnvLine, configureBrokeredOTLP };
 
 // When invoked directly (node action_setup_otlp.cjs) from setup.sh,
 // run immediately.  Non-fatal: errors are silently swallowed.
 if (require.main === module) {
-  run().catch(() => {});
+  run().catch(() => {
+    if (getActionInput("TOKEN_BROKER_OTLP") === "true") {
+      console.error("Token broker OTLP setup failed.");
+      process.exitCode = 1;
+    }
+  });
 }

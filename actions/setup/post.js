@@ -5,6 +5,7 @@
 const path = require("path");
 const fs = require("fs");
 const { spawnSync } = require("child_process");
+const { getActionInput } = require("./js/action_input_utils.cjs");
 
 function cleanupRuntimeTmp() {
   if (!process.env.GH_AW_RUNTIME_TMP_DIR) return;
@@ -113,7 +114,10 @@ function stopMcpScriptsServer() {
       const { run } = require(path.join(__dirname, "js", "action_conclusion_otlp.cjs"));
       await run();
     } catch {
-      // Non-fatal: silently ignore any OTLP export errors in the post step.
+      if (getActionInput("TOKEN_BROKER_OTLP") === "true") {
+        console.error("Token broker OTLP cleanup failed.");
+        process.exitCode = 1;
+      }
     }
   }
 
