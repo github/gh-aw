@@ -168,36 +168,75 @@ function createSessionLookups(session) {
     }
   }
 
-  const nativeCallIds = new Set(
-    toolCalls
-      .filter(call => call.toolCallId !== undefined && call.toolCallId !== null)
-      .map(call => JSON.stringify([String(call.toolCallId), ...(call.attemptId ? [resolvedAttempt(call.attemptId, call.startupAttemptId, call.sessionId)] : [])]))
-  );
+  const callAttemptScope = call => (call.attemptId ? [resolvedAttempt(call.attemptId, call.startupAttemptId, call.sessionId)] : []);
+  const nativeCallIds = new Map();
+  const nativeCallsByName = new Map();
+  for (const call of toolCalls) {
+    if (call.toolCallId !== undefined && call.toolCallId !== null) {
+      const key = JSON.stringify([String(call.toolCallId), ...callAttemptScope(call)]);
+      const calls = nativeCallIds.get(key) ?? [];
+      calls.push(call);
+      nativeCallIds.set(key, calls);
+    }
+    if (typeof call.mcpServerName === "string" && call.mcpServerName && call.name) {
+      const key = JSON.stringify([call.mcpServerName, call.name, ...callAttemptScope(call)]);
+      const calls = nativeCallsByName.get(key) ?? [];
+      calls.push(call);
+      nativeCallsByName.set(key, calls);
+    }
+  }
   const gatewayCalls = new Map();
+  const gatewayCallIds = new Map();
+  /** @type {Map<string, {keys: string[], next: number}>} */
+  const anonymousRequests = new Map();
   for (const event of agentEvents) {
     if (!["mcp.tool_call", "mcp.rpc.request", "mcp.rpc.response"].includes(event.type)) continue;
     const data = event.data;
     if (data.method && data.method !== "tools/call") continue;
     const id = data.toolCallId ?? data.rpcId ?? data.requestId;
-    if (!data.toolName && id === undefined) continue;
-    const key = JSON.stringify([data.serverName, id ?? eventIndices.get(event), ...attemptScope(event), ...(event.provenance.attemptId ? [data.sessionId ?? "", data.agentId ?? ""] : [])]);
-    if (!data.toolName && !gatewayCalls.has(key)) continue;
-    const call = gatewayCalls.get(key) ?? {
+    const pendingKey = JSON.stringify([data.serverName, ...attemptScope(event)]);
+    let key = JSON.stringify([data.serverName, id ?? { eventIndex: eventIndices.get(event) }, ...attemptScope(event), ...(event.provenance.attemptId ? [data.sessionId ?? "", data.agentId ?? ""] : [])]);
+    let call = gatewayCalls.get(key);
+    if (event.type === "mcp.rpc.response" && (!call || call.completed)) {
+      const pending = anonymousRequests.get(pendingKey);
+      while (pending && pending.next < pending.keys.length && gatewayCalls.get(pending.keys[pending.next])?.completed) pending.next++;
+      if (pending && pending.next < pending.keys.length) {
+        key = pending.keys[pending.next++];
+        call = gatewayCalls.get(key);
+      } else {
+        continue;
+      }
+    }
+    if (!call && !data.toolName) continue;
+    call ??= {
       name: data.toolName ?? "",
+      serverName: data.serverName,
       completed: false,
       eventIndex: eventIndices.get(event),
       attemptId: event.provenance.attemptId,
       startupAttemptId: event.provenance.startupAttemptId,
       sessionId: data.sessionId,
     };
+    if (event.type !== "mcp.rpc.response" && id != null) gatewayCallIds.set(call, id);
     if (data.toolName) call.name = data.toolName;
     if (event.type !== "mcp.rpc.request") Object.assign(call, data, { completed: true });
     gatewayCalls.set(key, call);
+    if (event.type === "mcp.rpc.request" && id == null) {
+      const pending = anonymousRequests.get(pendingKey) ?? { keys: [], next: 0 };
+      pending.keys.push(key);
+      anonymousRequests.set(pendingKey, pending);
+    }
   }
+  const matchedNativeCalls = new Set();
   toolCalls.push(
     ...[...gatewayCalls.values()].filter(call => {
-      const id = call.toolCallId ?? call.rpcId ?? call.requestId;
-      return id === undefined || id === null || !nativeCallIds.has(JSON.stringify([String(id), ...(call.attemptId ? [resolvedAttempt(call.attemptId, call.startupAttemptId, call.sessionId)] : [])]));
+      const id = gatewayCallIds.get(call);
+      const byId = id == null ? [] : (nativeCallIds.get(JSON.stringify([String(id), ...callAttemptScope(call)])) ?? []);
+      const byName = nativeCallsByName.get(JSON.stringify([call.serverName, `${call.serverName}-${call.name}`, ...callAttemptScope(call)])) ?? [];
+      const native = [...byId, ...byName].find(candidate => !matchedNativeCalls.has(candidate));
+      if (!native) return true;
+      matchedNativeCalls.add(native);
+      return false;
     })
   );
 

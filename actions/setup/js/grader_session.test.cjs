@@ -1,9 +1,76 @@
 const { createSessionLookups } = require("./grader_session.cjs");
 const { runCustomGraders } = require("./custom_graders.cjs");
+const { computeGraders } = require("./trace_graders.cjs");
 
 const event = (type, data, extra = {}) => ({ type, data, provenance: { component: "harness", phase: "agent", path: "retry.json", index: 0, ...extra } });
 const attempt = (number, extra = {}, provenance = {}) => event("harness.attempt", { attempt: number, layer: "harness", exitCode: 0, failureClasses: [], ...extra }, provenance);
 const tool = (type, attemptId, data = {}) => event(type, { toolCallId: "same", toolName: "view", ...data }, { component: "agent", attemptId });
+
+describe("gateway tool calls", () => {
+  const gateway = (type, data, attemptId) => event(type, { serverName: "field-guide", ...data }, { component: "mcp", attemptId });
+  const native = (type, id, name, data = {}, attemptId) => event(type, { toolCallId: id, toolName: name, ...data }, { component: "agent", attemptId });
+
+  it("counts native and gateway observations once per call and preserves grader metrics", () => {
+    const session = [
+      ...[1, 2].flatMap(id => [
+        native("tool.execution_start", String(id), "field-guide-search_cards", { mcpServerName: "field-guide", input: { query: id } }),
+        native("tool.execution_complete", String(id), "field-guide-search_cards", { success: true }),
+      ]),
+      native("tool.execution_start", "3", "safeoutputs-noop", { mcpServerName: "safeoutputs" }),
+      native("tool.execution_complete", "3", "safeoutputs-noop", { success: true }),
+      ...[1, 2].flatMap(() => [gateway("mcp.rpc.request", { method: "tools/call", toolName: "search_cards" }), gateway("mcp.rpc.response", { rpcId: 1 })]),
+      gateway("mcp.rpc.request", { serverName: "safeoutputs", method: "tools/call", toolName: "noop" }),
+      gateway("mcp.rpc.response", { serverName: "safeoutputs", rpcId: 1 }),
+    ];
+    const lookups = createSessionLookups(session);
+    expect(lookups.stats).toMatchObject({ toolCallCount: 3, failedToolCalls: 0 });
+    const values = Object.fromEntries(computeGraders(session).output.results.map(result => [result.id, result.value]));
+    expect(values).toMatchObject({ "tool-success-rate": 1, "tool-failure-count": 0, loops: 0, "trajectory-efficiency": 2 / 3 });
+  });
+
+  it("pairs anonymous requests in order per server and attempt without colliding with numeric IDs", () => {
+    const session = [
+      event("session.start", {}),
+      gateway("mcp.rpc.request", { toolName: "first" }, "a"),
+      gateway("mcp.rpc.request", { rpcId: 1, toolName: "identified" }, "a"),
+      gateway("mcp.rpc.request", { toolName: "second" }, "a"),
+      gateway("mcp.rpc.request", { toolName: "other-attempt" }, "b"),
+      gateway("mcp.rpc.response", { rpcId: 1 }, "a"),
+      gateway("mcp.rpc.response", { rpcId: 9, error: { code: -1 } }, "b"),
+      gateway("mcp.rpc.response", { rpcId: 9 }, "a"),
+      gateway("mcp.rpc.response", { rpcId: 9, error: { code: -1 } }, "a"),
+    ];
+    const lookups = createSessionLookups(session);
+    expect(lookups.toolCalls.map(call => [call.name, call.completed, !!call.error])).toEqual([
+      ["first", true, false],
+      ["identified", true, false],
+      ["second", true, true],
+      ["other-attempt", true, true],
+    ]);
+    expect(lookups.stats).toMatchObject({ toolCallCount: 4, failedToolCalls: 2 });
+  });
+
+  it("keeps a failed native call as one failure and matches only one gateway call per native call", () => {
+    const session = [
+      native("tool.execution_start", "native", "field-guide-search_cards", { mcpServerName: "field-guide" }, "a"),
+      native("tool.execution_complete", "native", "field-guide-search_cards", { success: false }, "a"),
+      gateway("mcp.rpc.request", { toolName: "search_cards" }, "a"),
+      gateway("mcp.rpc.response", { rpcId: 1 }, "a"),
+      gateway("mcp.rpc.request", { toolName: "search_cards" }, "a"),
+      gateway("mcp.rpc.response", { rpcId: 1 }, "a"),
+      gateway("mcp.rpc.request", { toolName: "search_cards" }, "b"),
+      gateway("mcp.rpc.response", { rpcId: 1 }, "b"),
+    ];
+    const lookups = createSessionLookups(session);
+    expect(lookups.toolCalls.map(call => call.name)).toEqual(["field-guide-search_cards", "search_cards", "search_cards"]);
+    expect(lookups.stats).toMatchObject({ toolCallCount: 3, failedToolCalls: 1 });
+  });
+
+  it("does not deduplicate an anonymous request using its response's unrelated RPC ID", () => {
+    const session = [native("tool.execution_start", "1", "bash"), native("tool.execution_complete", "1", "bash", { success: true }), gateway("mcp.rpc.request", { toolName: "search_cards" }), gateway("mcp.rpc.response", { rpcId: 1 })];
+    expect(createSessionLookups(session).stats).toMatchObject({ toolCallCount: 2, failedToolCalls: 0 });
+  });
+});
 
 describe("retry session consumers", () => {
   it("counts retry attempts, not first attempts, summaries, continuations, or detection", () => {
