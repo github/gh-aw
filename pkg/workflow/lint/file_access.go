@@ -87,8 +87,15 @@ func buildFileAccessModel(ctx context.Context, input Input) (*fileAccessModel, e
 	model := &fileAccessModel{engine: fileAccessEngine(frontmatter)}
 
 	// FAL-M1: sandbox state.
-	if model.sandbox, err = authoredSandboxState(frontmatter, pending); err != nil {
-		return nil, err
+	if input.ResolvedAgentSandbox != nil {
+		model.sandbox = stateDisabled
+		if *input.ResolvedAgentSandbox {
+			model.sandbox = stateEnabled
+		}
+	} else {
+		if model.sandbox, err = authoredSandboxState(frontmatter, pending); err != nil {
+			return nil, err
+		}
 	}
 
 	safeOutputs, err := policyMapping(frontmatter["safe-outputs"], "safe-outputs")

@@ -22,6 +22,7 @@ type fileAccessCase struct {
 	fields   string
 	prompt   string
 	resolved map[string]any
+	sandbox  *bool
 	// want lists expected finding kinds by message fragment, in order.
 	want  []string
 	lines []int
@@ -40,7 +41,7 @@ func runFileAccess(t *testing.T, tt fileAccessCase) []Diagnostic {
 	t.Helper()
 	document, err := aw.Parse("---\n" + tt.fields + "---\n" + tt.prompt)
 	require.NoError(t, err)
-	diagnostics, err := checkFileAccess(context.Background(), Input{Document: document, ResolvedTools: tt.resolved})
+	diagnostics, err := checkFileAccess(context.Background(), Input{Document: document, ResolvedTools: tt.resolved, ResolvedAgentSandbox: tt.sandbox})
 	require.NoError(t, err)
 	return diagnostics
 }
@@ -97,9 +98,14 @@ func TestFileAccessConformance(t *testing.T) {
 
 func TestFileAccessCapabilityModel(t *testing.T) {
 	createNotes := "Create a file `notes/summary.md`."
+	enabled, disabled := true, false
 	runFileAccessCases(t, []fileAccessCase{
 		{name: "FAL-M1 sandbox string stays enabled", fields: "sandbox: awf\n", prompt: "Run docker compose up.", want: []string{findingDocker}},
 		{name: "FAL-M1 sandbox agent object stays enabled", fields: "sandbox:\n  agent:\n    id: awf\n", prompt: "Run docker compose up.", want: []string{findingDocker}},
+		{name: "FAL-M1 resolved enabled overrides pending imports", fields: "imports: [shared/tools.md]\n", prompt: "Install into /usr/local/bin. Run docker build.", sandbox: &enabled, want: []string{findingReadOnly, findingDocker}},
+		{name: "FAL-M1 resolved disabled overrides authored enabled", fields: "sandbox: awf\n", prompt: "Install into /usr/local/bin. Run docker build.", sandbox: &disabled, want: []string{findingWrite}},
+		{name: "FAL-M1 resolved enabled overrides authored disabled", fields: "sandbox:\n  agent: false\n", prompt: "Run docker build.", sandbox: &enabled, want: []string{findingDocker}},
+		{name: "FAL-M1 resolved sandbox drives authored tool defaults", fields: "imports: [shared/tools.md]\n", prompt: createNotes, sandbox: &enabled},
 		{name: "FAL-M2 explicit edit with disabled sandbox", fields: "sandbox:\n  agent: false\ntools:\n  edit:\n", prompt: createNotes},
 		{name: "FAL-M2 pull-request output enables edit", fields: "sandbox:\n  agent: false\nsafe-outputs:\n  create-pull-request:\n", prompt: createNotes},
 		{name: "FAL-M3 bash true writes", fields: "tools:\n  edit: false\n  bash: true\n", prompt: createNotes},

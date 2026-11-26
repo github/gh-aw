@@ -30,7 +30,7 @@ The key words MUST, MUST NOT, SHOULD and MAY are used as described in RFC 2119.
 The rule is registered as built-in rule `file-access` in `pkg/workflow/lint`. It targets the AW AST only, and runs in:
 
 - `gh aw lint` (standalone; uses authored frontmatter), and
-- `gh aw compile` (uses compiler-resolved tools, which include imports).
+- `gh aw compile` (uses the compiler-resolved sandbox and tools, which include imports).
 
 It does not cover:
 
@@ -43,13 +43,13 @@ The model is computed once per workflow. Each capability is *enabled*, *disabled
 
 | ID | Capability | Derivation |
 |---|---|---|
-| FAL-M1 | Agent sandbox | Disabled only when `sandbox.agent: false`. Any other authored `sandbox` value, or an absent `sandbox`, means enabled. When `sandbox` is absent and imports are pending, the state is unknown. |
+| FAL-M1 | Agent sandbox | During compilation, use the compiler-resolved agent sandbox state. In standalone lint, the sandbox is disabled only when `sandbox.agent: false`; any other authored `sandbox` value, or an absent `sandbox`, means enabled. When `sandbox` is absent and imports are pending, the standalone state is unknown. |
 | FAL-M2 | Edit tool | When `tools.edit` is declared with any value other than `false`, edit is enabled. When it is absent, edit is enabled if the sandbox is enabled or a pull-request safe output (`create-pull-request` or `push-to-pull-request-branch`) is configured. This mirrors `applyDefaultTools`. |
 | FAL-M3 | Bash tool defaults | When `tools.bash` is absent and the sandbox is enabled, bash allows all commands. `bash: true` allows all commands. `bash: null` keeps the default safe commands. `bash: false` removes bash. A list adds its commands to the defaults. |
 | FAL-M4 | Write-capable shell | A bash allowlist can write files when it contains `*`, `:*`, a bare or wildcard `git` entry, `git apply`, or a command whose stem is one of: `tee`, `cp`, `mv`, `touch`, `mkdir`, `sed`, `awk`, `dd`, `install`, `ln`, `truncate`, `patch`, `python`, `python3`, `node`, `perl`, `ruby`, `sh`, `bash`, `zsh`, `go`, `make`, `npm`, `npx`. The default safe commands cannot write. Shell redirection is not modeled. |
 | FAL-M5 | Memory mounts | `tools.cache-memory` mounts `/tmp/gh-aw/cache-memory/` for ID `default`, and `/tmp/gh-aw/cache-memory-<id>/` for any other ID. The configuration may be `true`, a mapping or a list of `{id}` entries. `tools.repo-memory` mounts paths under `/tmp/gh-aw/repo-memory`. |
 | FAL-M6 | Protected files | Protected files are blocked only when every configured pull-request safe output sets `protected-files` to `blocked`, either as a string or as `{policy: blocked}`. Paths in `exclude` remain writable. The protected set mirrors the compiler defaults: dependency manifests, `CODEOWNERS`, `DESIGN.md`, top-level `README.md`, `CONTRIBUTING.md`, `SECURITY.md` and `CODE_OF_CONDUCT.md`, any path under a top-level dot-folder, and the engine's instruction file (`AGENTS.md` for Copilot and Codex, `CLAUDE.md` for Claude). |
-| FAL-M7 | Import deferral | In standalone lint, authored imports may supply `tools`, `sandbox` or `safe-outputs`. While imports are pending, capabilities that imports could change are unknown, unless the authored configuration already fixes them. Compiler-resolved tools (`Input.ResolvedTools`) are authoritative for FAL-M2 to FAL-M5. |
+| FAL-M7 | Import deferral | In standalone lint, authored imports may supply `tools`, `sandbox` or `safe-outputs`. While imports are pending, capabilities that imports could change are unknown, unless the authored configuration already fixes them. The compiler-resolved sandbox (`Input.ResolvedAgentSandbox`) is authoritative for FAL-M1 and compiler-resolved tools (`Input.ResolvedTools`) are authoritative for FAL-M2 to FAL-M5. |
 
 The effective write capability is enabled when FAL-M2 enables edit, or when FAL-M3 and FAL-M4 give a bash allowlist that can write.
 
