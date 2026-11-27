@@ -69,15 +69,36 @@ func renderMarkdownModelRoutingToWriter(w io.Writer, routing *ModelRoutingLogsSu
 	if len(routing.Routes) == 0 {
 		return
 	}
-	writeModelRoutingReportLine(w, "| Labels (type / scope / complexity) | Mode | Selected | Router | Runs | Total AIC | Average AIC |\n")
+	writeModelRoutingReportLine(w, "| Labels (type / scope / complexity) | Mode | Selected | Router / Fallback | Runs | Total AIC | Average AIC |\n")
 	writeModelRoutingReportLine(w, "|---|---|---|---|---:|---:|---:|\n")
 	for _, route := range routing.Routes {
 		writeModelRoutingReportLine(w, "| %s / %s / %s | %s | %s:%s | %s | %d | %.3f | %.3f |\n",
 			modelRoutingMarkdownCell(route.TaskType), modelRoutingMarkdownCell(route.Scope), modelRoutingMarkdownCell(route.Complexity),
 			modelRoutingMarkdownCell(route.Mode), modelRoutingMarkdownCell(route.Model), modelRoutingMarkdownCell(route.Effort),
-			modelRoutingMarkdownCell(route.RouterVersion), route.RunCount, route.TotalAIC, route.AverageAIC)
+			modelRoutingMarkdownCell(formatModelRoutingRouteSource(route)), route.RunCount, route.TotalAIC, route.AverageAIC)
 	}
 	writeModelRoutingReportLine(w, "\n")
+}
+
+func formatModelRoutingRouteSource(route ModelRoutingRouteSummary) string {
+	if route.SelectionSource != "fallback" {
+		return route.RouterVersion
+	}
+	details := make([]string, 0, 2)
+	if route.FallbackReason != "" {
+		details = append(details, route.FallbackReason)
+	}
+	if route.FallbackTier != "" {
+		details = append(details, route.FallbackTier)
+	}
+	label := "fallback"
+	if len(details) > 0 {
+		label += " (" + strings.Join(details, ", ") + ")"
+	}
+	if route.RouterVersion != "" {
+		return route.RouterVersion + " (" + label + ")"
+	}
+	return label
 }
 
 func writeModelRoutingReportLine(w io.Writer, format string, values ...any) {
@@ -283,10 +304,20 @@ func renderPrettyModelRouting(routing *ModelRoutingLogsSummary) {
 	writeModelRoutingReportLine(os.Stderr, "  classifier_aic=%.3f deviated_requests=%d/%d (%.1f%%)\n",
 		routing.ClassifierAIC, routing.DeviatedRequests, routing.TotalRequests, routing.DeviatedTrafficShare*100)
 	for _, route := range routing.Routes {
-		writeModelRoutingReportLine(os.Stderr, "  %s/%s/%s mode=%s selected=%s:%s router=%s runs=%d aic_total=%.3f aic_avg=%.3f\n",
+		extra := ""
+		if route.SelectionSource == "fallback" {
+			extra = " selection_source=fallback"
+			if route.FallbackReason != "" {
+				extra += " fallback_reason=" + safeModelRoutingText(route.FallbackReason)
+			}
+			if route.FallbackTier != "" {
+				extra += " fallback_tier=" + safeModelRoutingText(route.FallbackTier)
+			}
+		}
+		writeModelRoutingReportLine(os.Stderr, "  %s/%s/%s mode=%s selected=%s:%s router=%s%s runs=%d aic_total=%.3f aic_avg=%.3f\n",
 			safeModelRoutingText(route.TaskType), safeModelRoutingText(route.Scope), safeModelRoutingText(route.Complexity),
 			safeModelRoutingText(route.Mode), safeModelRoutingText(route.Model), safeModelRoutingText(route.Effort),
-			safeModelRoutingText(route.RouterVersion), route.RunCount, route.TotalAIC, route.AverageAIC)
+			safeModelRoutingText(route.RouterVersion), extra, route.RunCount, route.TotalAIC, route.AverageAIC)
 	}
 	writeModelRoutingReportLine(os.Stderr, "\n")
 }

@@ -75,6 +75,9 @@ type ModelRoutingRouteSummary struct {
 	Model             string  `json:"model,omitempty" console:"header:Model"`
 	Effort            string  `json:"effort,omitempty" console:"header:Effort"`
 	RouterVersion     string  `json:"router_version,omitempty" console:"header:Router"`
+	SelectionSource   string  `json:"selection_source,omitempty" console:"header:Source,omitempty"`
+	FallbackReason    string  `json:"fallback_reason,omitempty" console:"header:Fallback Reason,omitempty"`
+	FallbackTier      string  `json:"fallback_tier,omitempty" console:"header:Fallback Tier,omitempty"`
 	Endpoint          string  `json:"endpoint,omitempty" console:"header:Endpoint"`
 	EffectiveEndpoint string  `json:"effective_endpoint,omitempty" console:"header:Effective Endpoint"`
 	SelectedEndpoint  string  `json:"selected_endpoint,omitempty" console:"header:Selected Endpoint"`

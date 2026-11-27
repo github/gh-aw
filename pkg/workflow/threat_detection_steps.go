@@ -25,6 +25,10 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData, precedingSteps ...
 
 	// Comment separator
 	steps = append(steps, "      # --- Threat Detection ---\n")
+	usingExternalDetector := isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data)
+	if usingExternalDetector {
+		steps = append(steps, buildResetDetectionResultsStep(data)...)
+	}
 	steps = append(steps, generateComponentExecutionEvidenceStep("detection", "not_started", detectionExecutionEvidencePath, "")...)
 
 	// Step 0: Remove agent state that must not be attributed to detection.
@@ -43,7 +47,6 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData, precedingSteps ...
 	// to avoid duplicate step names in the detection job.
 	// For the external detector path (gh-aw-detection: true), MCP setup is not called for
 	// the detection job, so the download step must be emitted here unconditionally.
-	usingExternalDetector := isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data)
 	if c.getThreatDetectionEngineID(data) != "codex" || usingExternalDetector {
 		steps = append(steps, c.buildPullAWFContainersStep(data)...)
 	}
@@ -54,10 +57,6 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData, precedingSteps ...
 	// Step 3: Clear MCP configuration files so the detection engine runs without MCP servers
 	steps = append(steps, c.buildClearMCPConfigStep()...)
 
-	if usingExternalDetector {
-		steps = append(steps, buildResetArcDindDetectionResultsStep(data)...)
-	}
-
 	// Step 4: Prepare files - copies agent output files to expected paths
 	steps = append(steps, c.buildPrepareDetectionFilesStep()...)
 
@@ -66,17 +65,7 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData, precedingSteps ...
 		steps = append(steps, c.buildCustomThreatDetectionSteps(data.SafeOutputs.ThreatDetection.Steps)...)
 	}
 
-	// Step 6: Setup threat detection (github-script)
-	//
-	// On the external detector path this step is still emitted because it exports GH_AW_PROMPT,
-	// GH_AW_DETECTION_CONTINUE_ON_ERROR, HAS_PATCH and the workflow-context vars, and performs
-	// artifact validation. Its prompt is unused by threat-detect, so only its step-summary write
-	// is suppressed (see GH_AW_DETECTION_SKIP_PROMPT_SUMMARY in buildThreatDetectionAnalysisStep).
-	// Decision: retiring the step entirely on the external path is deferred until the remaining
-	// responsibilities move to the execution step and the detector's own validation.
-	steps = append(steps, c.buildThreatDetectionAnalysisStep(data)...)
-
-	if isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data) {
+	if usingExternalDetector {
 		// External detector path (features: gh-aw-detection: true)
 
 		// Step 7: Install AWF binary (required for the detection AWF invocation)
@@ -88,16 +77,14 @@ func (c *Compiler) buildDetectionJobSteps(data *WorkflowData, precedingSteps ...
 		// Step 9: Prepare any engine-specific config files needed by threat-detect.
 		steps = append(steps, c.buildPrepareDetectionEngineConfigForExternalDetectorStep(data)...)
 
-		// Step 10: Install the threat-detect binary from GitHub Releases
-		steps = append(steps, c.buildInstallThreatDetectStep(data)...)
-
 		// Step 11: Run threat-detect under AWF with a read-write mount for the result file
 		steps = append(steps, c.buildExternalDetectorExecutionStep(data)...)
 
 		// Collect staged results before post-steps, accounting, upload, and conclusion.
 		steps = append(steps, buildCollectArcDindDetectionResultsStep(data)...)
 	} else {
-		// Inline engine path (default)
+		// The legacy inline engine consumes a host-generated prompt.
+		steps = append(steps, c.buildThreatDetectionAnalysisStep(data)...)
 
 		// Step 7: Engine execution (AWF, no network)
 		steps = append(steps, c.buildDetectionEngineExecutionStep(data)...)
@@ -276,6 +263,7 @@ func (c *Compiler) buildCopyDetectionFirewallLogsStep(data *WorkflowData) []stri
 func (c *Compiler) buildPrepareDetectionFilesStep() []string {
 	return []string{
 		"      - name: Prepare threat detection files\n",
+		"        id: detection_prepare\n",
 		fmt.Sprintf("        if: %s\n", detectionStepCondition),
 		"        run: |\n",
 		"          bash \"${RUNNER_TEMP}/gh-aw/actions/prepare_threat_detection_files.sh\"\n",
@@ -393,13 +381,6 @@ func (c *Compiler) buildThreatDetectionAnalysisStep(data *WorkflowData) []string
 	}...)
 	steps = append(steps, c.buildThreatDetectionContextEnvVars(data, continueOnError, continueOnErrorExpr)...)
 
-	// On the external detector path the prompt rendered by this step is never used: threat-detect
-	// renders its own embedded template and appends it to the step summary. Suppress the setup
-	// step's summary write so a single detection run does not display two different prompts.
-	if isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data) {
-		steps = append(steps, "          GH_AW_DETECTION_SKIP_PROMPT_SUMMARY: \"true\"\n")
-	}
-
 	steps = append(steps, []string{
 		"        with:\n",
 		"          script: |\n",
@@ -410,24 +391,15 @@ func (c *Compiler) buildThreatDetectionAnalysisStep(data *WorkflowData) []string
 	formattedSetupScript := FormatJavaScriptForYAML(setupScript)
 	steps = append(steps, formattedSetupScript...)
 
-	// Add a small shell step in YAML to ensure the output directory and log file exist.
-	// The step-summary reset/touch is only needed on the inline path: the inline engine
-	// execution step overrides GITHUB_STEP_SUMMARY to this path so the AWF sandbox can
-	// write to it. The external threat-detect binary (v0.4.5+) no longer writes any
-	// step-summary output (github/gh-aw-threat-detection#792), so resetting the file
-	// there would be dead code.
+	// Only the legacy inline engine writes a sandboxed step summary.
 	ensureSteps := []string{
 		"      - name: Ensure threat-detection directory and log\n",
 		fmt.Sprintf("        if: %s\n", detectionStepCondition),
 		"        run: |\n",
 		"          mkdir -p /tmp/gh-aw/threat-detection\n",
 		"          touch /tmp/gh-aw/threat-detection/detection.log\n",
-	}
-	if !isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data) {
-		ensureSteps = append(ensureSteps,
-			fmt.Sprintf("          rm -f %s\n", constants.ThreatDetectionStepSummaryPath),
-			fmt.Sprintf("          touch %s\n", constants.ThreatDetectionStepSummaryPath),
-		)
+		fmt.Sprintf("          rm -f %s\n", constants.ThreatDetectionStepSummaryPath),
+		fmt.Sprintf("          touch %s\n", constants.ThreatDetectionStepSummaryPath),
 	}
 	steps = append(steps, ensureSteps...)
 
@@ -626,59 +598,5 @@ func (c *Compiler) buildRenderDetectionLogStep(data *WorkflowData) []string {
 		"            const { main } = require('" + SetupActionDestination + "/render_detection_log.cjs');\n",
 		"            await main();\n",
 	}
-	return steps
-}
-
-// buildInstallThreatDetectStep creates a step that installs the threat-detect binary
-// from GitHub Releases at the pinned version. This is used when the gh-aw-detection
-// feature flag is set, replacing the inline engine installation steps.
-//
-// The detection job already tolerates a missing threat-detect binary when continue-on-error
-// (warn mode) is in effect: buildDetectionConclusionStep and buildThreatDetectionAnalysisStep
-// treat a failed/absent binary as a non-fatal detection failure via
-// GH_AW_DETECTION_CONTINUE_ON_ERROR. Without continue-on-error on this install step, a
-// transient download failure (e.g. a GitHub Releases CDN blip) would still mark this step —
-// and therefore the whole detection job — as `failure`, even though the workflow logic
-// already treats a missing binary as non-fatal. Marking the step itself continue-on-error
-// in warn mode keeps the job conclusion consistent with that tolerance.
-func (c *Compiler) buildInstallThreatDetectStep(data *WorkflowData) []string {
-	version := string(constants.DefaultThreatDetectVersion)
-	artifactBaseURL := constants.DefaultThreatDetectArtifactBaseURL
-	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil &&
-		data.SafeOutputs.ThreatDetection.ArtifactBaseURL != "" {
-		artifactBaseURL = data.SafeOutputs.ThreatDetection.ArtifactBaseURL
-	}
-	amd64Digest := constants.DefaultThreatDetectSHA256["threat-detect-linux-amd64"]
-	arm64Digest := constants.DefaultThreatDetectSHA256["threat-detect-linux-arm64"]
-	installFlags := ""
-	if useRootlessCLIInstallation(data) {
-		installFlags = " --rootless"
-	}
-
-	// Determine continue-on-error mode (same logic as buildDetectionConclusionStep).
-	continueOnError, continueOnErrorExpr := resolveThreatDetectionContinueOnError(data)
-	threatLog.Printf("Installing threat-detect binary: version=%s, continueOnError=%t", version, continueOnError)
-
-	steps := []string{
-		"      - name: Install threat-detect binary\n",
-		"        id: threat_detect_install\n",
-		fmt.Sprintf("        if: %s\n", detectionStepCondition),
-	}
-	if continueOnErrorExpr != nil {
-		steps = append(steps, fmt.Sprintf("        continue-on-error: %s\n", *continueOnErrorExpr))
-	} else if continueOnError {
-		steps = append(steps, "        continue-on-error: true\n")
-	}
-	steps = append(steps,
-		"        run: |\n",
-		fmt.Sprintf(
-			"          bash \"${RUNNER_TEMP}/gh-aw/actions/install_threat_detect_binary.sh\" %s --artifact-base-url %s --sha256-amd64 %s --sha256-arm64 %s%s\n",
-			shellEscapeArg(version),
-			shellEscapeArg(artifactBaseURL),
-			shellEscapeArg(amd64Digest),
-			shellEscapeArg(arm64Digest),
-			installFlags,
-		),
-	)
 	return steps
 }

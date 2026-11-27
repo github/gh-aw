@@ -1243,7 +1243,14 @@
         "phase": { "$ref": "#/definitions/JsonValue", "description": "AWF failure phase, such as `primary` or `bootstrap`; not the collection provenance phase." },
         "errorCode": { "type": "string", "description": "Identifier-only provider or AWF error code on failed request records; absent means unknown." },
         "errorType": { "type": "string", "description": "Identifier-only provider or AWF error type on failed request records; absent means unknown." },
-        "errorSource": { "type": "string", "enum": ["upstream", "awf"], "description": "Whether a failed request was rejected by the upstream provider or by AWF; absent means unknown." }
+        "errorSource": { "type": "string", "enum": ["upstream", "awf"], "description": "Whether a failed request was rejected by the upstream provider or by AWF; absent means unknown." },
+        "selectionSource": { "type": "string", "enum": ["router", "fallback"], "description": "Whether AWF selected the model via the router or the fallback walk; absent on older AWF releases." },
+        "fallbackReason": { "type": ["string", "null"], "description": "Routing failure code that triggered fallback, or null on a router pick; absent on older AWF releases." },
+        "fallbackTier": {
+          "type": ["string", "null"],
+          "enum": ["standard", "premium", "unclassified", "lightweight", "none", null],
+          "description": "Coding tier chosen by the fallback walk, or null on a router pick; absent on older AWF releases."
+        }
       },
       "additionalProperties": false
     },
@@ -1490,6 +1497,13 @@
         "mode": { "$ref": "#/definitions/JsonValue" },
         "selectedId": { "$ref": "#/definitions/JsonValue" },
         "routerVersion": { "$ref": "#/definitions/JsonValue" },
+        "selectionSource": { "type": "string", "enum": ["router", "fallback"], "description": "Whether AWF selected the model via the router or the fallback walk; absent on older AWF releases." },
+        "fallbackReason": { "type": ["string", "null"], "description": "Routing failure code that triggered fallback, or null on a router pick; absent on older AWF releases." },
+        "fallbackTier": {
+          "type": ["string", "null"],
+          "enum": ["standard", "premium", "unclassified", "lightweight", "none", null],
+          "description": "Coding tier chosen by the fallback walk, or null on a router pick; absent on older AWF releases."
+        },
         "failureCode": { "$ref": "#/definitions/JsonValue" }
       },
       "additionalProperties": false

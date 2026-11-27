@@ -2280,6 +2280,56 @@ func TestValidateAWFConfigJSON_AllowsFilesystemAllowWrite(t *testing.T) {
 	require.NoError(t, err, "filesystem.allowWrite should pass AWF config schema validation")
 }
 
+func TestValidateAWFConfigJSON_PrivateHostSocketDirs(t *testing.T) {
+	require.NoError(t, validateAWFConfigJSON(`{"filesystem":{"privateHostSocketDirs":["/run/awf-sockets"]}}`))
+	require.NoError(t, validateAWFConfigJSON(`{"filesystem":{"privateHostSocketDirs":[]}}`))
+	require.Error(t, validateAWFConfigJSON(`{"filesystem":{"privateHostSocketDirs":["relative/path"]}}`))
+	require.Error(t, validateAWFConfigJSON(`{"filesystem":{"privateHostSocketDirs":["/run/awf-sockets","/run/awf-sockets"]}}`))
+}
+
+func TestValidateAWFConfigJSON_DatabricksAuth(t *testing.T) {
+	for _, host := range []string{"https://dbc-1234.cloud.databricks.com", "https://dbc-1234.cloud.databricks.com:443/", "https://dbc-1234.cloud.databricks.com:65535"} {
+		t.Run(host, func(t *testing.T) {
+			auth := `"type":"github-oidc","provider":"databricks","databricksHost":"` + host + `","oidcAudience":"account-id"`
+			require.NoError(t, validateAWFConfigJSON(`{"apiProxy":{"auth":{`+auth+`}}}`))
+			require.NoError(t, validateAWFConfigJSON(`{"apiProxy":{"auth":{`+auth+`,"databricksClientId":"client-id"}}}`))
+		})
+	}
+	for _, auth := range []string{
+		`"databricksHost":"https://dbc-1234.cloud.databricks.com"`,
+		`"oidcAudience":"account-id"`,
+		`"databricksHost":"https://dbc-1234.cloud.databricks.com","oidcAudience":" "`,
+		`"databricksHost":"https://dbc-1234.cloud.databricks.com","oidcAudience":"\u00a0\u2003"`,
+		`"databricksHost":"http://dbc-1234.cloud.databricks.com","oidcAudience":"account-id"`,
+		`"databricksHost":"https://user@dbc-1234.cloud.databricks.com","oidcAudience":"account-id"`,
+		`"databricksHost":"https://dbc-1234.cloud.databricks.com/path","oidcAudience":"account-id"`,
+		`"databricksHost":"https://dbc-1234.cloud.databricks.com?query","oidcAudience":"account-id"`,
+		`"databricksHost":"https://dbc-1234.cloud.databricks.com#fragment","oidcAudience":"account-id"`,
+		`"databricksHost":"https://dbc-1234.cloud.databricks.com:0","oidcAudience":"account-id"`,
+		`"databricksHost":"https://dbc-1234.cloud.databricks.com:00000/","oidcAudience":"account-id"`,
+		`"databricksHost":"https://dbc-1234.cloud.databricks.com:65536","oidcAudience":"account-id"`,
+		`"databricksHost":"https://dbc-1234.cloud.databricks.com\n","oidcAudience":"account-id"`,
+	} {
+		t.Run(auth, func(t *testing.T) {
+			require.Error(t, validateAWFConfigJSON(`{"apiProxy":{"auth":{"type":"github-oidc","provider":"databricks",`+auth+`}}}`))
+		})
+	}
+	require.NoError(t, validateAWFConfigJSON(`{"apiProxy":{"auth":{"type":"github-oidc","azureTenantId":"tenant-id","azureClientId":"client-id"}}}`))
+	require.Error(t, validateAWFConfigJSON(`{"apiProxy":{"auth":{"type":"github-oidc","provider":"azure"}}}`))
+}
+
+func TestValidateAWFConfigJSON_StaticAuthScheme(t *testing.T) {
+	for _, provider := range []string{"openai", "anthropic"} {
+		t.Run(provider, func(t *testing.T) {
+			require.NoError(t, validateAWFConfigJSON(`{"apiProxy":{"targets":{"`+provider+`":{"authHeader":"Authorization","authScheme":"Bearer"}}}}`))
+			for _, scheme := range []string{"", "invalid scheme", "Bearer\\n", "Bearer\\r\\nInjected: value"} {
+				require.Error(t, validateAWFConfigJSON(`{"apiProxy":{"targets":{"`+provider+`":{"authScheme":"`+scheme+`"}}}}`))
+			}
+		})
+	}
+	require.Error(t, validateAWFConfigJSON(`{"apiProxy":{"targets":{"gemini":{"authScheme":"Bearer"}}}}`))
+}
+
 func TestValidateAWFConfigJSON_CloudHypervisorScratchMiB(t *testing.T) {
 	require.NoError(t, validateAWFConfigJSON(`{"cloudHypervisor":{"scratchMib":512}}`))
 	require.Error(t, validateAWFConfigJSON(`{"cloudHypervisor":{"scratchMib":0}}`))
@@ -2339,6 +2389,21 @@ func TestValidateAWFConfigJSON_ModelRoutingGate(t *testing.T) {
 	err = validateAWFConfigJSON(`{"experimental":{"modelRouting":false},` + routing + `}`)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "modelRouting")
+}
+
+func TestValidateAWFConfigJSON_RoutingEndpointsAndAdaptiveSummary(t *testing.T) {
+	base := `{"experimental":{"modelRouting":true},"apiProxy":{"routing":{"objective":{"goal":"cost","mode":"balanced"},"task":{"conversationFile":"/tmp/gh-aw/routing-conversation.json"},`
+	require.NoError(t, validateAWFConfigJSON(base+`"endpoints":["/responses","/chat/completions","/v1/messages"],"adaptiveSummaryFile":"/tmp/gh-aw/routing-summary.json"}}}`))
+	for _, fields := range []string{
+		`"endpoints":[]`,
+		`"endpoints":["/embeddings"]`,
+		`"endpoints":["/responses","/responses"]`,
+		`"adaptiveSummaryFile":""`,
+	} {
+		t.Run(fields, func(t *testing.T) {
+			require.Error(t, validateAWFConfigJSON(base+fields+`}}}`))
+		})
+	}
 }
 
 // TestBuildAWFConfigJSON_ValidateFlag verifies that schema validation runs when

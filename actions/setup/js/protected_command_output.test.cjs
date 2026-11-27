@@ -145,6 +145,33 @@ describe("native protected command output", () => {
     expect(fs.existsSync(path.join(directory, "agent-errors.jsonl.tmp"))).toBe(false);
   });
 
+  it("refuses to traverse a symlinked agent directory when discarding nested refusal artifacts", () => {
+    const outside = fs.mkdtempSync(path.join(root, "test-native-outside-"));
+    try {
+      const target = path.join(outside, "routing-refusal.json");
+      fs.writeFileSync(target, '{"refused":true}\n');
+      fs.symlinkSync(outside, path.join(directory, "agent"));
+      expect(() => discardUntrustedSessionArtifacts(directory)).toThrow("Failed to discard sandbox-written session artifacts");
+      expect(fs.readFileSync(target, "utf8")).toBe('{"refused":true}\n');
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("removes directories planted at nested fallback artifact paths", () => {
+    const plantedRefusalDir = path.join(directory, "agent", "routing-refusal.json");
+    const plantedUpstreamFile = path.join(directory, "agent", "upstream-errors-fallback.jsonl");
+    const plantedUpstreamTmp = path.join(directory, "agent", "upstream-errors-fallback.jsonl.tmp");
+    fs.mkdirSync(plantedRefusalDir, { recursive: true });
+    fs.writeFileSync(path.join(plantedRefusalDir, "extra.txt"), "untrusted");
+    fs.writeFileSync(plantedUpstreamFile, '{"event":"UPSTREAM_ERROR_RESPONSE","request_id":"req-1","status":503}\n');
+    fs.writeFileSync(plantedUpstreamTmp, "tmp");
+    discardUntrustedSessionArtifacts(directory);
+    expect(fs.existsSync(plantedRefusalDir)).toBe(false);
+    expect(fs.existsSync(plantedUpstreamFile)).toBe(false);
+    expect(fs.existsSync(plantedUpstreamTmp)).toBe(false);
+  });
+
   it("atomically replaces a sidecar symlink with the verified exit code", () => {
     const target = path.join(directory, "outside");
     const sidecar = path.join(directory, "agent_execution_exit_code.txt");

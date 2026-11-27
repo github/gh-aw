@@ -28,7 +28,9 @@ func TestCLIHelpClarifiesToolsAndFilters(t *testing.T) {
 
 	assert.Contains(t, NewMCPServerCommand().Long, "  - audit-diff  - Compare workflow runs")
 	assert.Contains(t, NewCompletionCommand().Long, "Engine name completion for --engine flag ("+engineFlagHelpList+")")
-	assert.Contains(t, NewLogsCommand().Flags().Lookup("dry-run").Usage, "does not preview this command")
+	logsCmd := NewLogsCommand()
+	assert.Contains(t, logsCmd.Flags().Lookup("only-dry-run").Usage, "does not preview log collection")
+	assert.Equal(t, "use --only-dry-run to filter workflow runs", logsCmd.Flags().Lookup("dry-run").Deprecated)
 	assert.Contains(t, NewDeployCommand(validateEngineStub).Long, "hidden --pr alias")
 	assert.Contains(t, NewEditCommand().Long, "typed bindings")
 
@@ -274,6 +276,8 @@ func TestCLIDocsDocumentCommandSideEffectsAndDefaults(t *testing.T) {
 	assert.Contains(t, logsDocs, "`--artifacts agent`")
 	assert.Contains(t, logsDocs, "`--artifacts firewall`")
 	assert.Contains(t, logsDocs, "`--artifacts usage,agent`")
+	assert.Contains(t, logsDocs, "`--only-dry-run`")
+	assert.Contains(t, logsDocs, "deprecated alias for `--only-dry-run`")
 	assert.Contains(t, logsDocs, "downloads only agent data")
 }
 
@@ -333,7 +337,10 @@ func TestHelpTextUsesConsistentFlagDescriptions(t *testing.T) {
 	add := NewAddCommand(func(string) error { return nil })
 	assert.Contains(t, add.Long, "default: $GH_AW_WORKFLOWS_DIR or .github/workflows")
 
+	assert.NotContains(t, NewValueCommand().Long, "slides")
+
 	value := NewValueCommand()
+	assert.Contains(t, value.Long, "Imported evidence never substitutes for native adoption or survival proof.\n\nOne shared pipeline")
 	jsonFlag := value.Flags().Lookup("json")
 	require.NotNil(t, jsonFlag)
 	assert.Equal(t, "Output results in JSON format", jsonFlag.Usage)

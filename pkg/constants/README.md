@@ -163,8 +163,7 @@ and workspace mounts:
 `DefaultPiVersion`, `DefaultPlaywrightCLIVersion`, `DefaultPythonAlpineLTSImage`,
 `DefaultPythonVersion`, `DefaultRateLimitMax`, `DefaultRateLimitWindow`,
 `DefaultRouterRegistry`, `DefaultRouterVersion`, `DefaultRubyVersion`,
-`DefaultSafeOutputsMount`, `DefaultThreatDetectArtifactBaseURL`,
-`DefaultThreatDetectVersion`, `DefaultTmpGhAwMount`, `DefaultToolTimeout`,
+`DefaultSafeOutputsMount`, `DefaultTmpGhAwMount`, `DefaultToolTimeout`,
 and `DefaultWorkspaceMount`.
 
 The `EnvVar*` constants name runtime settings and model selections; the
@@ -260,7 +259,7 @@ read-only as described in [Thread Safety](#thread-safety):
 `AllowedExpressionsSet`, `CopilotBotNames`, `DangerousPropertyNames`,
 `DangerousPropertyNamesSet`, `DefaultAllowedDomains`,
 `DefaultAllowedMemoryExtensions`, `DefaultBashTools`, `DefaultGitHubToolsRemote`,
-`DefaultThreatDetectSHA256`, `IgnoredFrontmatterFields`, `KnownBuiltInJobNames`,
+`IgnoredFrontmatterFields`, `KnownBuiltInJobNames`,
 `MaintenanceJobDependencies`, `PriorityJobFields`, `PriorityStepFields`,
 `PriorityWorkflowFields`, `SafeWorkflowEvents`, and `SharedWorkflowForbiddenFields`.
 

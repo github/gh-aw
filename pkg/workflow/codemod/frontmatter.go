@@ -12,7 +12,7 @@ import (
 	"github.com/github/gh-aw/pkg/workflow/actions"
 	"github.com/github/gh-aw/pkg/workflow/aw"
 	"github.com/goccy/go-yaml"
-	yamlv3 "gopkg.in/yaml.v3"
+	yamlv3 "go.yaml.in/yaml/v3"
 )
 
 // Frontmatter keeps the authored document and its source in sync after each edit.

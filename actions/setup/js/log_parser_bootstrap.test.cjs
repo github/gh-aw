@@ -1134,4 +1134,56 @@ describe("log_parser_bootstrap.cjs", () => {
       }
     });
   });
+
+  describe("routing refusal fallback indicator", () => {
+    let root;
+    beforeEach(() => {
+      root = fs.mkdtempSync(path.join(__dirname, "test-routing-refusal-"));
+      delete process.env.GH_AW_SAFE_OUTPUTS;
+    });
+    afterEach(() => {
+      fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    async function runWithEntries(logEntries) {
+      const logFile = path.join(root, "agent.log");
+      fs.writeFileSync(logFile, "content");
+      process.env.GH_AW_AGENT_OUTPUT = logFile;
+      await runLogParser({
+        parseLog: () => ({ markdown: "Parsed log", logEntries }),
+        parserName: "Copilot",
+        rootDir: root,
+      });
+    }
+
+    it("writes a content-free indicator when the main agent records a top-level refusal", async () => {
+      await runWithEntries([{ type: "assistant.refusal", data: { reason: "content_filter", content: "Private refusal prose that must not be copied" } }]);
+      const indicatorPath = path.join(root, "agent/routing-refusal.json");
+      const raw = fs.readFileSync(indicatorPath, "utf8");
+      expect(JSON.parse(raw)).toEqual({ refused: true });
+      expect(raw).not.toContain("Private refusal prose");
+    });
+
+    it("ignores nested subagent refusals and removes any stale indicator", async () => {
+      const indicatorPath = path.join(root, "agent/routing-refusal.json");
+      fs.mkdirSync(path.dirname(indicatorPath), { recursive: true });
+      fs.writeFileSync(indicatorPath, '{"refused":true}\n');
+      await runWithEntries([{ type: "assistant.refusal", data: { reason: "refusal", agentId: "sub-1", content: "Subagent refused" } }]);
+      expect(fs.existsSync(indicatorPath)).toBe(false);
+    });
+
+    it("removes or replaces a directory planted at agent/routing-refusal.json", async () => {
+      const indicatorDir = path.join(root, "agent/routing-refusal.json");
+      fs.mkdirSync(indicatorDir, { recursive: true });
+      fs.writeFileSync(path.join(indicatorDir, "extra.txt"), "untrusted");
+      await runWithEntries([{ type: "assistant.message", data: { content: "ok" } }]);
+      expect(fs.existsSync(indicatorDir)).toBe(false);
+
+      fs.mkdirSync(indicatorDir, { recursive: true });
+      fs.writeFileSync(path.join(indicatorDir, "extra.txt"), "untrusted");
+      await runWithEntries([{ type: "assistant.refusal", data: { reason: "content_filter" } }]);
+      expect(fs.lstatSync(indicatorDir).isFile()).toBe(true);
+      expect(JSON.parse(fs.readFileSync(indicatorDir, "utf8"))).toEqual({ refused: true });
+    });
+  });
 });

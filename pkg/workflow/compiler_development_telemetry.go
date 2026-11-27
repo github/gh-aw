@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	goyaml "github.com/goccy/go-yaml"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 type dryRunEnvEdit struct {

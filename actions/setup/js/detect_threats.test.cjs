@@ -75,6 +75,51 @@ describe.each(producers)("%s sandbox producer to host conclusion", producer => {
   });
 });
 
+describe("eligibility after runner staging", () => {
+  it.each([
+    ["copilot", "empty output", [false, false, false]],
+    ["claude", "comment memory", [true, true, false]],
+    ["codex", "unstaged patch", [false, true, true]],
+  ])("%s: %s", (convention, scenario, eligible) => {
+    const root = fixture();
+    const source = path.join(root, "artifacts");
+    fs.writeFileSync(path.join(source, "agent_output.json"), "");
+    fs.writeFileSync(path.join(source, "aw-prompts/prompt-import-tree.json"), "{}");
+    if (scenario === "comment memory") {
+      fs.mkdirSync(path.join(source, "comment-memory"));
+      fs.writeFileSync(path.join(source, "comment-memory/prior.md"), "prior comment");
+    }
+    const env = { ...process.env, HAS_PATCH: String(scenario === "unstaged patch"), GH_AW_DETECTION_CONTINUE_ON_WARNING: "true", GH_AW_DETECTION_CONTINUE_ON_ERROR: "true" };
+    const stage = run(root, "bash", [path.join(__dirname, "../sh/prepare_threat_detection_files.sh"), source], env);
+    expect(stage.status, stage.stderr).toBe(0);
+    const command = path.join(root, "fixture-reviewer");
+    fs.writeFileSync(
+      command,
+      `#!/bin/sh
+set -eu
+cat >/dev/null
+printf '%s\\n' "$THREAT_DETECTION_ELIGIBLE_PROMPT_INJECTION" "$THREAT_DETECTION_ELIGIBLE_SECRET_LEAK" "$THREAT_DETECTION_ELIGIBLE_MALICIOUS_PATCH" > "$FIXTURE_ELIGIBILITY"
+exec threat_detection_result --prompt-injection=false --secret-leak=false --malicious-patch=false
+`
+    );
+    fs.writeFileSync(path.join(root, "launch.json"), JSON.stringify({ command, convention, mode: "direct" }));
+    const verdict = path.join(source, "threat-detection/detection_result.json");
+    const detect = run(root, process.execPath, [path.join(__dirname, "detect_threats.cjs"), "--launch-config", "launch.json", "--output", verdict, path.join(source, "threat-detection-inputs")], {
+      ...env,
+      FIXTURE_ELIGIBILITY: path.join(root, "eligibility"),
+    });
+    expect(detect.status, detect.stderr).toBe(0);
+    expect(fs.readFileSync(path.join(root, "eligibility"), "utf8").trim().split("\n")).toEqual(eligible.map(String));
+    const warnings = JSON.parse(fs.readFileSync(verdict, "utf8")).warnings;
+    if (scenario === "unstaged patch") expect(warnings).toContainEqual(expect.objectContaining({ field: "patch", message: expect.stringContaining("HAS_PATCH=true") }));
+    expect(warnings.map(warning => warning.field)).toEqual(scenario === "unstaged patch" ? ["agent_output", "patch"] : ["agent_output"]);
+    const output = path.join(root, "github-output");
+    const host = run(root, process.execPath, [path.join(__dirname, "conclude_threat_detection.cjs"), verdict], { ...env, RUN_DETECTION: "true", GITHUB_OUTPUT: output });
+    expect(host.status, host.stderr).toBe(0);
+    expect(fs.readFileSync(output, "utf8").split("\n")).toEqual(expect.arrayContaining(["success=true", "conclusion=success"]));
+  });
+});
+
 describe("result destinations", () => {
   it("does not leave a stale conventional sidecar when full output is disabled", () => {
     const root = fixture();

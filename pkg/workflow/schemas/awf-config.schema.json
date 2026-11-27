@@ -93,6 +93,16 @@
       "description": "Host filesystem write-boundary configuration for the agent sandbox.",
       "additionalProperties": false,
       "properties": {
+        "privateHostSocketDirs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^/"
+          },
+          "description": "Existing trusted host socket directories that must not overlap any final agent mount, including read-only binds and aliases. Maps to repeated --private-host-socket-dir. Supported only by local Linux Docker/runc without Docker-in-Docker or host-path translation; other topologies fail closed. Protects the AWF agent boundary, not other same-UID host processes."
+        },
         "allowWrite": {
           "type": "array",
           "items": {
@@ -108,7 +118,7 @@
               }
             ]
           },
-          "description": "Guest-visible absolute paths that may be writable. When present, existing writable host bind mounts are made read-only outside these paths. An empty array makes all non-internal host bind mounts read-only. Paths must exist and cannot use glob patterns. This option is supported by the Docker and Cloud Hypervisor runtimes; it is rejected with Docker-in-Docker agent execution."
+          "description": "Guest-visible absolute paths that may be writable. When present, existing writable host bind mounts are made read-only outside these paths. An empty array makes all non-internal host bind mounts read-only. Paths must exist and cannot use glob patterns. This option is supported by the Docker, gVisor, Cloud Hypervisor, and NVX runtimes; it is rejected with Docker-in-Docker agent execution."
         }
       }
     },
@@ -395,6 +405,21 @@
               "items": { "type": "string" },
               "minItems": 1
             },
+            "endpoints": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "enum": ["/responses", "/chat/completions", "/v1/messages"]
+              },
+              "description": "Optional unordered list of inference endpoints the workflow's engine speaks. When set, AWF keeps only choices served on one of these endpoints in the candidate pool and chooses each candidate's protocol from this list. Omit to keep the default provider protocol behavior."
+            },
+            "adaptiveSummaryFile": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Host path to gh-aw's evidence summary for adaptive selection, read once before the agent starts. It must not be in an agent-visible path. Omit to route ordinarily without a selection receipt."
+            },
             "objective": {
               "type": "object",
               "additionalProperties": false,
@@ -433,7 +458,7 @@
               "description": "OpenAI API target override."
             },
             "anthropic": {
-              "$ref": "#/$defs/providerTarget",
+              "$ref": "#/$defs/anthropicTarget",
               "description": "Anthropic API target override."
             },
             "copilot": {
@@ -480,7 +505,7 @@
         },
         "auth": {
           "type": "object",
-          "description": "Authentication configuration for the API proxy sidecar. Enables OIDC-based credential exchange (e.g., GitHub OIDC \u2192 Azure AD, AWS STS, GCP Workload Identity, or Anthropic Workload Identity Federation). See docs/awf-config-spec.md \u00a79.5.",
+          "description": "Authentication configuration for the API proxy sidecar. Enables OIDC-based credential exchange (e.g., GitHub OIDC \u2192 Azure AD, AWS STS, GCP Workload Identity, Anthropic Workload Identity Federation, or Databricks). See docs/awf-config-spec.md \u00a79.5.",
           "additionalProperties": false,
           "properties": {
             "type": {
@@ -490,13 +515,13 @@
             },
             "provider": {
               "type": "string",
-              "enum": ["azure", "aws", "gcp", "anthropic"],
+              "enum": ["azure", "aws", "gcp", "anthropic", "databricks"],
               "description": "Cloud provider for OIDC token exchange. Determines which token exchange protocol is used. Maps to AWF_AUTH_PROVIDER.",
               "default": "azure"
             },
             "oidcAudience": {
               "type": "string",
-              "description": "Audience claim for the GitHub OIDC token. Provider-specific defaults apply when omitted: Azure='api://AzureADTokenExchange', AWS='sts.amazonaws.com', GCP=workloadIdentityProvider value, Anthropic='https://api.anthropic.com'. Maps to AWF_AUTH_OIDC_AUDIENCE."
+              "description": "Audience claim for the GitHub OIDC token. Provider-specific defaults apply when omitted: Azure='api://AzureADTokenExchange', AWS='sts.amazonaws.com', GCP='https://iam.googleapis.com/' followed by the workloadIdentityProvider value, Anthropic='https://api.anthropic.com'. Required explicitly for Databricks. Maps to AWF_AUTH_OIDC_AUDIENCE."
             },
             "azureTenantId": {
               "type": "string",
@@ -542,6 +567,24 @@
               "type": "string",
               "description": "OAuth2 scope for GCP token. Maps to AWF_AUTH_GCP_SCOPE.",
               "default": "https://www.googleapis.com/auth/cloud-platform"
+            },
+            "databricksHost": {
+              "type": "string",
+              "allOf": [
+                {
+                  "pattern": "^https://[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*(?::(?:[0-5]?[0-9]{1,4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5]))?/?$"
+                },
+                {
+                  "not": {
+                    "pattern": ":0{1,5}/?$"
+                  }
+                }
+              ],
+              "description": "HTTPS Databricks workspace origin without credentials, path, query or fragment. Required for Databricks OIDC. Maps to AWF_AUTH_DATABRICKS_HOST."
+            },
+            "databricksClientId": {
+              "type": "string",
+              "description": "Optional Databricks service principal client ID. Maps to AWF_AUTH_DATABRICKS_CLIENT_ID."
             },
             "anthropicFederationRuleId": {
               "type": "string",
@@ -602,7 +645,26 @@
                 "required": ["anthropicFederationRuleId", "anthropicOrganizationId", "anthropicServiceAccountId"]
               },
               "else": {
-                "required": ["azureTenantId", "azureClientId"]
+                "if": {
+                  "properties": {
+                    "provider": {
+                      "const": "databricks"
+                    }
+                  },
+                  "required": ["provider"]
+                },
+                "then": {
+                  "required": ["databricksHost", "oidcAudience"],
+                  "properties": {
+                    "oidcAudience": {
+                      "type": "string",
+                      "pattern": "[^\\s\u000b\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]"
+                    }
+                  }
+                },
+                "else": {
+                  "required": ["azureTenantId", "azureClientId"]
+                }
               }
             }
           }
@@ -1759,12 +1821,39 @@
           "type": "string",
           "description": "Override the auth header name used for API requests. Replaces 'Authorization: ******' with '<authHeader>: <key>'."
         },
+        "authScheme": {
+          "$ref": "#/$defs/httpAuthScheme"
+        },
         "baseUrlEnv": {
           "type": "string",
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
           "description": "Name of a runner environment variable (typically bound to a secret) holding the OpenAI-compatible base URL. AWF resolves and validates it before containers start, derives the host for network policy, keeps it out of the agent environment, and redacts it from logs and artifacts. Takes precedence over host/basePath."
         }
       }
+    },
+    "anthropicTarget": {
+      "type": "object",
+      "description": "Anthropic API target override.",
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "basePath": {
+          "type": "string"
+        },
+        "authHeader": {
+          "type": "string"
+        },
+        "authScheme": {
+          "$ref": "#/$defs/httpAuthScheme"
+        }
+      }
+    },
+    "httpAuthScheme": {
+      "type": "string",
+      "pattern": "^[!#$%&'*+.^_`|~A-Za-z0-9-]+$",
+      "description": "Optional HTTP authentication scheme token, e.g. Bearer, prepended to the credential. Omission preserves the adapter's existing header behavior."
     },
     "providerHostOnlyTarget": {
       "type": "object",

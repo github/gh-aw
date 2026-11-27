@@ -72,6 +72,12 @@ func parseAwInfo(infoFilePath string, verbose bool) (*AwInfo, error) {
 		}
 		return nil, err
 	}
+	if info.ModelRouting != nil {
+		// Fallback selection provenance is read solely from usage/aw_session.jsonl.
+		info.ModelRouting.SelectionSource = ""
+		info.ModelRouting.FallbackReason = ""
+		info.ModelRouting.FallbackTier = ""
+	}
 
 	logsParsingCoreLog.Printf("Successfully parsed aw_info.json with engine_id: %s", info.EngineID)
 	return &info, nil

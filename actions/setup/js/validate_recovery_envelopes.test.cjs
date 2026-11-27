@@ -3,7 +3,7 @@ import childProcess from "child_process";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { main, validateEnvelope } from "./validate_recovery_envelopes.cjs";
+import { main, readBoundedRegularFile, validateEnvelope } from "./validate_recovery_envelopes.cjs";
 import { main as redactSecrets, processFile } from "./redact_secrets.cjs";
 
 const MAGIC = Buffer.from("GH-AW-OBJECT-PACK 1\n");
@@ -351,5 +351,94 @@ describe("final recovery envelope upload boundary", () => {
       throw new Error("unreadable directory");
     });
     expect(() => main({ roots: [root] })).toThrow("unreadable directory");
+  });
+
+  it("preserves valid allowlisted fallback routing evidence files", () => {
+    const agentDir = path.join(root, "agent");
+    fs.mkdirSync(agentDir, { recursive: true });
+    const agentErrors = path.join(root, "agent-errors.jsonl");
+    const refusal = path.join(agentDir, "routing-refusal.json");
+    const errors = path.join(agentDir, "upstream-errors-fallback.jsonl");
+    fs.writeFileSync(agentErrors, '{"type":"agent.execution","data":{"categories":["agentic_engine_timeout"],"errorCodes":[429],"errorTypes":["Too Many Requests"],"exitCode":124}}\n');
+    fs.writeFileSync(refusal, '{"refused":true}\n');
+    fs.writeFileSync(errors, '{"event":"UPSTREAM_ERROR_RESPONSE","request_id":"req-1","status":429}\n');
+    expect(main({ roots: [root] })).toEqual({ removed: 0 });
+    expect(JSON.parse(fs.readFileSync(agentErrors, "utf8").trim())).toEqual({
+      type: "agent.execution",
+      data: { categories: ["agentic_engine_timeout"], errorCodes: [429], errorTypes: ["Too Many Requests"], exitCode: 124 },
+    });
+    expect(JSON.parse(fs.readFileSync(refusal, "utf8"))).toEqual({ refused: true });
+    expect(JSON.parse(fs.readFileSync(errors, "utf8").trim())).toEqual({ event: "UPSTREAM_ERROR_RESPONSE", request_id: "req-1", status: 429 });
+  });
+
+  it("removes directories, symlinks, duplicate-key payloads, and noncanonical files planted at fallback routing evidence paths", () => {
+    const agentDir = path.join(root, "agent");
+    const agentErrorsPath = path.join(root, "agent-errors.jsonl");
+    const refusalDir = path.join(agentDir, "routing-refusal.json");
+    const errorsDir = path.join(agentDir, "upstream-errors-fallback.jsonl");
+    fs.mkdirSync(agentErrorsPath, { recursive: true });
+    fs.mkdirSync(refusalDir, { recursive: true });
+    fs.mkdirSync(errorsDir, { recursive: true });
+    fs.writeFileSync(path.join(agentErrorsPath, "leak.txt"), secret);
+    fs.writeFileSync(path.join(refusalDir, "leak.txt"), secret);
+    fs.writeFileSync(path.join(errorsDir, "leak.txt"), secret);
+
+    expect(main({ roots: [root] })).toEqual({ removed: 0 });
+    expect(fs.existsSync(agentErrorsPath)).toBe(false);
+    expect(fs.existsSync(refusalDir)).toBe(false);
+    expect(fs.existsSync(errorsDir)).toBe(false);
+
+    // Duplicate-key smuggling, false refusal, arbitrary request_id text, and extra keys are removed.
+    for (const badRefusal of ['{"refused":true,"content":"leaked"}\n', '{"refused":"leaked","refused":true}\n', '{"refused":false}\n', ' { "refused" : true }\n']) {
+      fs.writeFileSync(refusalDir, badRefusal);
+      expect(main({ roots: [root] })).toEqual({ removed: 0 });
+      expect(fs.existsSync(refusalDir)).toBe(false);
+    }
+    for (const badUpstream of [
+      '{"event":"UPSTREAM_ERROR_RESPONSE","request_id":"req-1","status":429,"response_body":"leaked"}\n',
+      '{"event":"UPSTREAM_ERROR_RESPONSE","request_id":"leaked","request_id":"req-1","status":429}\n',
+      '{"event":"UPSTREAM_ERROR_RESPONSE","request_id":"free form secret text","status":429}\n',
+      `{"event":"UPSTREAM_ERROR_RESPONSE","request_id":"${"a".repeat(65)}","status":429}\n`,
+      '{"status":429,"event":"UPSTREAM_ERROR_RESPONSE","request_id":"req-1"}\n',
+    ]) {
+      fs.writeFileSync(errorsDir, badUpstream);
+      expect(main({ roots: [root] })).toEqual({ removed: 0 });
+      expect(fs.existsSync(errorsDir)).toBe(false);
+    }
+    for (const badAgentErrors of [
+      '{"type":"agent.execution","data":{"categories":["free form secret"],"errorCodes":[],"errorTypes":[]}}\n',
+      '{"type":"agent.execution","data":{"categories":["leaked"],"categories":["agentic_engine_timeout"],"errorCodes":[],"errorTypes":[]}}\n',
+      '{"type":"assistant.message","data":{"content":"leaked"}}\n',
+    ]) {
+      fs.writeFileSync(agentErrorsPath, badAgentErrors);
+      expect(main({ roots: [root] })).toEqual({ removed: 0 });
+      expect(fs.existsSync(agentErrorsPath)).toBe(false);
+    }
+
+    // In-root symlinks at the fallback file paths are unlinked without touching their targets.
+    const internalTarget = path.join(root, "keep.txt");
+    fs.writeFileSync(internalTarget, "keep");
+    fs.symlinkSync(internalTarget, refusalDir);
+    expect(main({ roots: [root] })).toEqual({ removed: 0 });
+    expect(fs.existsSync(refusalDir)).toBe(false);
+    expect(fs.readFileSync(internalTarget, "utf8")).toBe("keep");
+  });
+
+  it("fails closed when the agent directory itself is a symlink", () => {
+    const targetDir = path.join(root, "real-agent");
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.symlinkSync(targetDir, path.join(root, "agent"));
+    expect(() => main({ roots: [root] })).toThrow("Fallback routing recovery directory must not be a symbolic link");
+  });
+
+  it("fails closed on POSIX when O_NOFOLLOW is unavailable, and uses open-and-verify on win32", () => {
+    const agentErrors = path.join(root, "agent-errors.jsonl");
+    const content = '{"type":"agent.execution","data":{"categories":["agentic_engine_timeout"],"errorCodes":[],"errorTypes":[],"exitCode":124}}\n';
+    fs.writeFileSync(agentErrors, content);
+    expect(() => readBoundedRegularFile(agentErrors, 64 * 1024, { platform: "linux", noFollowFlag: undefined })).toThrow("O_NOFOLLOW is required for recovery artifact validation");
+    expect(readBoundedRegularFile(agentErrors, 64 * 1024, { platform: "win32", noFollowFlag: undefined })).toBe(content);
+    const link = path.join(root, "agent-errors-link.jsonl");
+    fs.symlinkSync(agentErrors, link);
+    expect(readBoundedRegularFile(link, 64 * 1024, { platform: "win32", noFollowFlag: undefined })).toBeNull();
   });
 });

@@ -21,6 +21,8 @@ const {
   TOKEN_USAGE_AWF_AUDIT_PATH,
   TOKEN_USAGE_PATHS,
   persistAgentAwInfoCopy,
+  persistUpstreamErrorFallback,
+  UPSTREAM_ERROR_FALLBACK_RELATIVE_PATH,
   AGENT_USAGE_PATH,
   AGENT_USAGE_JSONL_PATH,
   COPILOT_SESSION_STATE_DIR,
@@ -952,6 +954,45 @@ describe("parse_token_usage", () => {
           router_version: selection.router.version,
         });
         expect(mockCore.setOutput).toHaveBeenCalledWith("model_routing_status", "failed");
+      });
+
+      test("propagates fallback selection provenance and handles null router and ranked_choices", async () => {
+        const fallbackSelection = {
+          _schema: "model-routing/v0.29.21",
+          stage: "selection",
+          provider: "copilot",
+          selected_provider: "copilot",
+          selected_model: "github-copilot/gpt-5.3-codex",
+          wire_model: "gpt-5.3-codex",
+          selected_effort: "medium",
+          endpoint: "/responses",
+          selection_source: "fallback",
+          fallback_reason: "no_route",
+          fallback_tier: "standard",
+          router: null,
+          ranked_choices: null,
+          selected_id: "choice-fallback-0001",
+        };
+        setupRoutingRun({ records: [fallbackSelection] });
+
+        await main();
+
+        const recorded = readRecordedRouting();
+        expect(recorded).toMatchObject({
+          status: "selected",
+          source: "awf-routing",
+          provider: "copilot",
+          wire_model: "gpt-5.3-codex",
+          model: "github-copilot/gpt-5.3-codex",
+          effort: "medium",
+          endpoint: "/responses",
+          selected_id: "choice-fallback-0001",
+          selection_source: "fallback",
+          fallback_reason: "no_route",
+          fallback_tier: "standard",
+        });
+        expect(recorded).not.toHaveProperty("router_version");
+        expect(mockCore.setOutput).toHaveBeenCalledWith("model_routing_status", "selected");
       });
     });
 
@@ -1955,6 +1996,121 @@ describe("parse_token_usage", () => {
     test("renderTokenTableAsPlainText prefixes output with title", () => {
       const result = renderTokenTableAsPlainText("My Token Usage", "| A |\n|---|\n| 1 |");
       expect(result.startsWith("My Token Usage")).toBe(true);
+    });
+  });
+
+  describe("persistUpstreamErrorFallback", () => {
+    let dir;
+    const savedEnv = {};
+
+    beforeEach(() => {
+      dir = fs.mkdtempSync(path.join(os.tmpdir(), "upstream-error-fallback-"));
+      savedEnv.GH_AW_TMP_DIR = process.env.GH_AW_TMP_DIR;
+      savedEnv.GH_AW_PHASE = process.env.GH_AW_PHASE;
+      global.core = {
+        info: vi.fn(),
+        warning: vi.fn(),
+        error: vi.fn(),
+        setFailed: vi.fn(),
+        setOutput: vi.fn(),
+        exportVariable: vi.fn(),
+        summary: { addDetails: vi.fn().mockReturnThis(), addRaw: vi.fn().mockReturnThis(), write: vi.fn().mockResolvedValue() },
+      };
+    });
+
+    afterEach(() => {
+      if (savedEnv.GH_AW_TMP_DIR === undefined) delete process.env.GH_AW_TMP_DIR;
+      else process.env.GH_AW_TMP_DIR = savedEnv.GH_AW_TMP_DIR;
+      if (savedEnv.GH_AW_PHASE === undefined) delete process.env.GH_AW_PHASE;
+      else process.env.GH_AW_PHASE = savedEnv.GH_AW_PHASE;
+      delete global.core;
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    test.each(["sandbox/firewall/logs/api-proxy-logs/upstream-errors.jsonl", "sandbox/firewall/audit/api-proxy-logs/upstream-errors.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/upstream-errors.jsonl"])(
+      "extracts only event, request_id, and status from %s",
+      relativeLayout => {
+        const sourcePath = path.join(dir, relativeLayout);
+        fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+        fs.writeFileSync(
+          sourcePath,
+          [
+            JSON.stringify({
+              ts: 1700000000000,
+              event: "UPSTREAM_ERROR_RESPONSE",
+              request_id: "req-429",
+              status: 429,
+              provider: "copilot",
+              model: "gpt-5.6-luna",
+              response_headers: { "x-secret": "should-never-appear" },
+              response_body: "sanitized error body text",
+            }),
+            JSON.stringify({ event: "OTHER_EVENT", request_id: "req-other", status: 500 }),
+            JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: "a".repeat(65), status: 429 }),
+            JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: "req-bad-status", status: 99 }),
+            JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", status: 503 }),
+            "{not json",
+          ].join("\n") + "\n"
+        );
+
+        expect(persistUpstreamErrorFallback(dir)).toBe(1);
+        const outPath = path.join(dir, UPSTREAM_ERROR_FALLBACK_RELATIVE_PATH);
+        const raw = fs.readFileSync(outPath, "utf8");
+        expect(raw).not.toContain("should-never-appear");
+        expect(raw).not.toContain("sanitized error body text");
+        expect(raw).not.toContain("response_headers");
+        expect(raw).not.toContain("response_body");
+        expect(raw.trim().split("\n").map(JSON.parse)).toEqual([{ event: "UPSTREAM_ERROR_RESPONSE", request_id: "req-429", status: 429 }]);
+      }
+    );
+
+    test("follows logs > audit > legacy precedence including an empty higher-precedence file", () => {
+      const logsPath = path.join(dir, "sandbox/firewall/logs/api-proxy-logs/upstream-errors.jsonl");
+      const auditPath = path.join(dir, "sandbox/firewall/audit/api-proxy-logs/upstream-errors.jsonl");
+      fs.mkdirSync(path.dirname(logsPath), { recursive: true });
+      fs.mkdirSync(path.dirname(auditPath), { recursive: true });
+      fs.writeFileSync(auditPath, JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: "req-audit", status: 503 }) + "\n");
+      fs.writeFileSync(logsPath, "");
+
+      const outPath = path.join(dir, UPSTREAM_ERROR_FALLBACK_RELATIVE_PATH);
+      fs.mkdirSync(path.dirname(outPath), { recursive: true });
+      fs.writeFileSync(outPath, JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: "stale", status: 502 }) + "\n");
+
+      expect(persistUpstreamErrorFallback(dir)).toBe(0);
+      expect(fs.existsSync(outPath)).toBe(false);
+    });
+
+    test("runs from main() even when token-usage.jsonl is absent, and skips during detection phase", async () => {
+      const sourcePath = path.join(dir, "sandbox/firewall/logs/api-proxy-logs/upstream-errors.jsonl");
+      fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+      fs.writeFileSync(sourcePath, JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: "req-503", status: 503 }) + "\n");
+      process.env.GH_AW_TMP_DIR = dir;
+      process.env.GH_AW_PHASE = "detection";
+
+      await main(path.join(dir, "no-copilot-state"));
+      expect(fs.existsSync(path.join(dir, UPSTREAM_ERROR_FALLBACK_RELATIVE_PATH))).toBe(false);
+
+      delete process.env.GH_AW_PHASE;
+      await main(path.join(dir, "no-copilot-state"));
+      const written = fs.readFileSync(path.join(dir, UPSTREAM_ERROR_FALLBACK_RELATIVE_PATH), "utf8").trim().split("\n").map(JSON.parse);
+      expect(written).toEqual([{ event: "UPSTREAM_ERROR_RESPONSE", request_id: "req-503", status: 503 }]);
+    });
+
+    test("removes or replaces a directory planted at agent/upstream-errors-fallback.jsonl", () => {
+      const plantedDir = path.join(dir, UPSTREAM_ERROR_FALLBACK_RELATIVE_PATH);
+      fs.mkdirSync(plantedDir, { recursive: true });
+      fs.writeFileSync(path.join(plantedDir, "extra.txt"), "untrusted");
+      expect(persistUpstreamErrorFallback(dir)).toBe(0);
+      expect(fs.existsSync(plantedDir)).toBe(false);
+
+      const sourcePath = path.join(dir, "sandbox/firewall/logs/api-proxy-logs/upstream-errors.jsonl");
+      fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+      fs.writeFileSync(sourcePath, JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: "req-429", status: 429 }) + "\n");
+      fs.mkdirSync(plantedDir, { recursive: true });
+      fs.writeFileSync(path.join(plantedDir, "extra.txt"), "untrusted");
+      expect(persistUpstreamErrorFallback(dir)).toBe(1);
+      expect(fs.lstatSync(plantedDir).isFile()).toBe(true);
+      expect(JSON.parse(fs.readFileSync(plantedDir, "utf8").trim())).toEqual({ event: "UPSTREAM_ERROR_RESPONSE", request_id: "req-429", status: 429 });
     });
   });
 });

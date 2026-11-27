@@ -763,7 +763,7 @@
         },
         "installation": {
           "type": "string",
-          "desc": "Installation privilege for Copilot CLI and threat-detect in the agent and detection jobs.",
+          "desc": "Installation privilege for Copilot CLI in the agent and detection jobs.",
           "enum": ["rootless", "privileged"],
           "leaf": true
         }

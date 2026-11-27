@@ -196,7 +196,27 @@ These attributes are emitted at most once per run, on the agent job's conclusion
   </tbody>
 </table>
 
-Routing spans do not include ranked choices, selected IDs, conversation hashes, classifier rationale or degraded-reason text, or per-request details. Non-routed runs and non-agent conclusion spans do not include <code>gh-aw.model_routing.*</code> attributes. Classifier AI credits are not added to or subtracted from <code>gh-aw.aic</code>.
+Routing spans do not include ranked choices, selected IDs, conversation hashes, classifier rationale or degraded-reason text, or per-request details. Non-routed runs do not include <code>gh-aw.model_routing.*</code> attributes. The eleven attributes above appear only on the agent job's conclusion span (<code>gh-aw.agent.conclusion</code>); non-agent conclusion spans omit them. Classifier AI credits are not added to or subtracted from <code>gh-aw.aic</code>.
+
+### Routing observation attributes
+
+These attributes are emitted on the conclusion job's span (<code>gh-aw.conclusion.conclusion</code>) whenever <code>usage/aw_session.jsonl</code> contains a valid <code>routing.observation</code> event with <code>provenance.component === "collector"</code> and <code>provenance.phase === "conclusion"</code>.
+
+<table>
+  <thead>
+    <tr>
+      <th>Attribute</th>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><code>gh-aw.model_routing.observation.outcome</code></td><td>string</td><td>Collector-emitted routing verdict: <code>success</code>, <code>failure</code>, or <code>skip</code>.</td></tr>
+    <tr><td><code>gh-aw.model_routing.observation.skip_reason</code></td><td>string</td><td>Skip reason when <code>outcome</code> is <code>skip</code>: <code>cancelled</code>, <code>infrastructure</code>, <code>rate_limited</code>, <code>pair_mismatch</code>, or <code>unknown_evidence</code>. Omitted for <code>success</code> and <code>failure</code>.</td></tr>
+  </tbody>
+</table>
+
+Both attributes are omitted when no valid collector-emitted <code>routing.observation</code> is present (non-routed runs, runs where the agent made no requests, untrusted provenance, or missing, unreadable, or malformed session files), and <code>skip</code> is never synthesized. The reader validates <code>usage/aw_session.jsonl</code> strictly across the whole file, so a single malformed line anywhere in the file (invalid UTF-8, non-JSON whitespace, corrupt or truncated JSONL, or a non-event JSON record) omits both attributes. Non-conclusion job spans omit these attributes. These attributes report the collector verdict rather than final adaptive learning coverage: a <code>success</code> or <code>failure</code> verdict can still be recorded as uncounted by <code>push_routing_history</code> in <code>runs.jsonl</code> (for example <code>receipt_missing</code>, <code>receipt_mismatch</code>, <code>awaiting_success</code>, <code>before_reset</code>, or <code>older_definition</code>).
 
 ## Workflow-call and episode attributes
 

@@ -42,6 +42,7 @@ imports:
   - shared/github-mcp-app.md
   - shared/otlp.md
   - shared/token-telemetry-check.md
+  - shared/check-detection-verdict.md
   - shared/smoke-test-brevity.md
   - shared/playwright-title-test.md
   - shared/reporting.md
@@ -151,8 +152,6 @@ safe-outputs:
           core.info(`[FICTITIOUS SLACK] → ${targetChannel}: ${text}`);
           return { success: true, channel: targetChannel, message: text };
 timeout-minutes: 10
-features:
-  gh-aw-detection: false
 post-steps:
   - name: Assert unified-session contract
     if: always()
