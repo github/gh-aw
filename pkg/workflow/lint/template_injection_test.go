@@ -265,6 +265,24 @@ jobs:
 	assert.Equal(t, "env.TITLE", diagnostics[0].Related[0].Path)
 }
 
+func TestTemplateInjectionSameScopeEnvironmentAlias(t *testing.T) {
+	workflow, err := actions.Parse([]byte(`
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      TITLE: ${{ github.event.issue.title }}
+      ALIAS: ${{ env.TITLE }}
+    steps:
+      - run: echo "${{ env.ALIAS }}"
+`))
+	require.NoError(t, err)
+	diagnostics := runTemplateInjection(t, workflow)
+	require.Len(t, diagnostics, 1)
+	assert.Equal(t, "jobs.test.steps[0].run", diagnostics[0].Path)
+	assert.Equal(t, "jobs.test.env.TITLE", diagnostics[0].Related[0].Path)
+}
+
 func TestTemplateInjectionParseGapsAndPartialFindings(t *testing.T) {
 	for _, script := range []string{
 		"echo ${{ github.event.issue.title }}\necho ${{ inputs.PRIVATE_VALUE",
