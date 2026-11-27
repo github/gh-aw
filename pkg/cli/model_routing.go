@@ -307,7 +307,9 @@ func analyzeModelRouting(runDir string) *ModelRoutingSummary {
 	proxyEntries := tokenUsageEntriesForRun(runDir)
 	var summary *ModelRoutingSummary
 	fromSideLog := false
-	hasUnifiedProvenance := sessionRouting != nil && sessionRouting.FirewallSelection != nil && sessionRouting.FirewallSelection.SelectionSource != ""
+	hasFirewallProvenance := sessionRouting != nil && sessionRouting.FirewallSelection != nil && sessionRouting.FirewallSelection.SelectionSource != ""
+	hasWorkflowProvenance := sessionRouting != nil && sessionRouting.modelRouting() != nil && sessionRouting.modelRouting().SelectionSource != ""
+	hasUnifiedProvenance := hasFirewallProvenance || hasWorkflowProvenance
 	if hasUnifiedProvenance {
 		summary = &ModelRoutingSummary{Status: "not_routed"}
 	} else if routingPath != "" {
@@ -316,13 +318,20 @@ func analyzeModelRouting(runDir string) *ModelRoutingSummary {
 	} else if sessionRouting != nil && (sessionRouting.modelRouting() != nil || sessionRouting.FirewallSelection != nil) {
 		summary = &ModelRoutingSummary{Status: "not_routed"}
 	}
-	if !hasUnifiedProvenance {
-		summary = applyAwInfoModelRouting(summary, runDir)
-	}
+	summary = applyAwInfoModelRouting(summary, runDir)
 	applySessionModelRouting(summary, sessionRouting)
-	if !fromSideLog && summary != nil && sessionRouting != nil && sessionRouting.FirewallSelection != nil &&
-		(len(sessionRouting.FirewallRequests) > 0 || len(proxyEntries) > 0) {
-		applyModelRoutingRequests(summary, sessionRouting.FirewallRequests, proxyEntries)
+	if !fromSideLog && summary != nil && sessionRouting != nil {
+		if len(sessionRouting.FirewallRequests) > 0 {
+			applyModelRoutingRequests(summary, sessionRouting.FirewallRequests, proxyEntries)
+		} else if routingPath != "" {
+			if sideRequests := readSideLogRequestsIfMatchingSelection(routingPath, summary); len(sideRequests) > 0 {
+				applyModelRoutingRequests(summary, sideRequests, proxyEntries)
+			} else if len(proxyEntries) > 0 {
+				applyModelRoutingRequests(summary, nil, proxyEntries)
+			}
+		} else if len(proxyEntries) > 0 && (sessionRouting.FirewallSelection != nil || hasWorkflowProvenance) {
+			applyModelRoutingRequests(summary, nil, proxyEntries)
+		}
 	}
 	_, _, agents, found, err := readSessionSubagentModelsDetailed(runDir)
 	if summary != nil && err == nil && found {
@@ -401,6 +410,21 @@ func applySessionModelRouting(summary *ModelRoutingSummary, session *sessionMode
 	if hasFirewallProvenance {
 		return
 	}
+	if routing.SelectionSource != "" {
+		// When workflow.info carries explicit provenance without a firewall selection
+		// event, apply its selection metadata as an authoritative unit.
+		summary.SelectionSource = routing.SelectionSource
+		summary.FallbackReason = routing.FallbackReason
+		summary.FallbackTier = routing.FallbackTier
+		summary.Provider = routing.Provider
+		summary.WireModel = routing.WireModel
+		summary.SelectedModel = firstNonEmpty(routing.Model, routing.WireModel)
+		summary.SelectedEffort = routing.Effort
+		summary.Mode = routing.Mode
+		summary.SelectedID = routing.SelectedID
+		summary.RouterVersion = routing.RouterVersion
+		return
+	}
 	if routing.WireModel != "" {
 		summary.WireModel = routing.WireModel
 	}
@@ -419,9 +443,6 @@ func applySessionModelRouting(summary *ModelRoutingSummary, session *sessionMode
 	if routing.RouterVersion != "" && summary.RouterVersion == "" {
 		summary.RouterVersion = routing.RouterVersion
 	}
-	if routing.SelectionSource != "" && summary.SelectionSource == "" {
-		summary.SelectionSource = routing.SelectionSource
-	}
 	if summary.SelectionSource != "router" {
 		if routing.FallbackReason != "" && summary.FallbackReason == "" {
 			summary.FallbackReason = routing.FallbackReason
@@ -430,6 +451,45 @@ func applySessionModelRouting(summary *ModelRoutingSummary, session *sessionMode
 			summary.FallbackTier = routing.FallbackTier
 		}
 	}
+}
+
+func readSideLogRequestsIfMatchingSelection(path string, summary *ModelRoutingSummary) []modelRoutingRecord {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			tokenUsageSubagentLog.Printf("failed to close model routing records: %v", closeErr)
+		}
+	}()
+	records, err := readModelRoutingRecords(file)
+	if err != nil {
+		return nil
+	}
+	var lastSelection *modelRoutingRecord
+	var requests []modelRoutingRecord
+	for i := range records {
+		switch records[i].Stage {
+		case "selection":
+			lastSelection = &records[i]
+		case "request":
+			requests = append(requests, records[i])
+		}
+	}
+	if lastSelection != nil {
+		sideModel := firstNonEmpty(lastSelection.SelectedModel, lastSelection.WireModel)
+		summaryModel := firstNonEmpty(summary.SelectedModel, summary.WireModel)
+		if sideModel != "" && summaryModel != "" && sideModel != summaryModel &&
+			lastSelection.WireModel != summary.WireModel {
+			return nil
+		}
+		if lastSelection.SelectedEffort != "" && summary.SelectedEffort != "" &&
+			lastSelection.SelectedEffort != summary.SelectedEffort {
+			return nil
+		}
+	}
+	return requests
 }
 
 func applySessionFirewallSelection(summary *ModelRoutingSummary, sel *sessionFirewallModelRoutingSelection) {

@@ -330,10 +330,10 @@ func renderConsoleModelRoutingSelection(routing *ModelRoutingSummary) {
 	if routing.SelectionSource == "fallback" {
 		line += " selection_source=fallback"
 		if routing.FallbackReason != "" {
-			line += " fallback_reason=" + routing.FallbackReason
+			line += " fallback_reason=" + safeModelRoutingText(routing.FallbackReason)
 		}
 		if routing.FallbackTier != "" {
-			line += " fallback_tier=" + routing.FallbackTier
+			line += " fallback_tier=" + safeModelRoutingText(routing.FallbackTier)
 		}
 	}
 	if routing.LatencyMs > 0 {

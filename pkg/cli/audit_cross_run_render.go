@@ -69,7 +69,7 @@ func renderMarkdownModelRoutingToWriter(w io.Writer, routing *ModelRoutingLogsSu
 	if len(routing.Routes) == 0 {
 		return
 	}
-	writeModelRoutingReportLine(w, "| Labels (type / scope / complexity) | Mode | Selected | Router | Runs | Total AIC | Average AIC |\n")
+	writeModelRoutingReportLine(w, "| Labels (type / scope / complexity) | Mode | Selected | Router / Fallback | Runs | Total AIC | Average AIC |\n")
 	writeModelRoutingReportLine(w, "|---|---|---|---|---:|---:|---:|\n")
 	for _, route := range routing.Routes {
 		writeModelRoutingReportLine(w, "| %s / %s / %s | %s | %s:%s | %s | %d | %.3f | %.3f |\n",

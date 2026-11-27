@@ -964,6 +964,93 @@ func TestAnalyzeModelRoutingFallbackProvenanceFromUnifiedSessionOnly(t *testing.
 		}
 	})
 
+	t.Run("workflow.info fallback provenance overrides conflicting side log and preserves matching partial-session requests", func(t *testing.T) {
+		runDir := t.TempDir()
+		routingDir := filepath.Join(runDir, "sandbox", "firewall", "logs", "api-proxy-logs")
+		sessionDir := filepath.Join(runDir, "usage")
+		if err := os.MkdirAll(routingDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(sessionDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		// Conflicting side log names gpt-5.6-luna; workflow.info names fallback gpt-5.3-codex.
+		conflictingSideLog := strings.Join([]string{
+			`{"_schema":"model-routing/v0.29.21","stage":"selection","selected_model":"github-copilot/gpt-5.6-luna","wire_model":"gpt-5.6-luna","selected_effort":"high","endpoint":"/responses","mode":"economy","router":{"name":"gh-aw-router","version":"0.2.0"}}`,
+			`{"_schema":"model-routing/v0.29.21","stage":"request","request_id":"req-conflict","routed":"as_selected","outcome":"completed"}`,
+		}, "\n") + "\n"
+		if err := os.WriteFile(filepath.Join(routingDir, "model-routing.jsonl"), []byte(conflictingSideLog), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		session := `{"type":"workflow.info","data":{"modelRouting":{"status":"selected","wireModel":"gpt-5.3-codex","model":"github-copilot/gpt-5.3-codex","effort":"medium","effectiveEndpoint":"/responses","selectionSource":"fallback","fallbackReason":"no_route","fallbackTier":"standard"}},"provenance":{"component":"workflow","phase":"conclusion","path":"usage/aw_info.json","index":0}}` + "\n"
+		if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(session), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		summary := analyzeModelRouting(runDir)
+		if summary == nil || summary.SelectedModel != "github-copilot/gpt-5.3-codex" || summary.SelectedEffort != "medium" ||
+			summary.RouterVersion != "" || summary.Mode != "" || summary.RoutedCounts["as_selected"] != 0 ||
+			summary.SelectionSource != "fallback" || summary.FallbackReason != "no_route" || summary.FallbackTier != "standard" {
+			t.Fatalf("workflow.info fallback provenance did not override conflicting side log: %+v", summary)
+		}
+
+		// When the side log selection agrees on a partial session without projected requests, keep request accounting.
+		matchingSideLog := strings.Join([]string{
+			`{"_schema":"model-routing/v0.29.21","stage":"selection","selected_model":"github-copilot/gpt-5.3-codex","wire_model":"gpt-5.3-codex","selected_effort":"medium","endpoint":"/responses"}`,
+			`{"_schema":"model-routing/v0.29.21","stage":"request","request_id":"req-match","routed":"as_selected","outcome":"completed"}`,
+		}, "\n") + "\n"
+		if err := os.WriteFile(filepath.Join(routingDir, "model-routing.jsonl"), []byte(matchingSideLog), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(routingDir, "token-usage.jsonl"), []byte(
+			`{"_schema":"token-usage/v0.29.21","event":"token_usage","request_id":"req-match","model":"gpt-5.3-codex","path":"/responses","status":200,"input_tokens":100,"output_tokens":10,"ai_credits_this_response":0.15}`+"\n",
+		), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		partial := analyzeModelRouting(runDir)
+		if partial == nil || partial.RoutedCounts["as_selected"] != 1 || partial.SelectedModelCost.Requests != 1 ||
+			math.Abs(partial.SelectedModelCost.AIC-0.15) > 0.000001 {
+			t.Fatalf("partial unified session lost matching side-log request accounting: %+v", partial)
+		}
+	})
+
+	t.Run("firewall selection without workflow.info retains aw_info endpoints and raw aw_info does not leak provenance into JSONL", func(t *testing.T) {
+		runDir := t.TempDir()
+		sessionDir := filepath.Join(runDir, "usage")
+		if err := os.MkdirAll(sessionDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		rawAwInfo := `{"engine_id":"copilot","model":"gpt-5.3-codex","model_routing":{"status":"selected","wire_model":"gpt-5.3-codex","endpoint":"/v1/messages","selected_endpoint":"/chat/completions","selection_source":"fallback","fallback_reason":"no_route","fallback_tier":"standard"}}`
+		if err := os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(rawAwInfo), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		// Without a unified session, parseAwInfo and cached JSONL output must not leak raw fallback provenance.
+		cachePath := filepath.Join(t.TempDir(), "logs.jsonl")
+		if err := newCachedLogsJSONLWriter(cachePath).AppendAudit(ProcessedRun{
+			Run: WorkflowRun{DatabaseID: 99, LogsPath: runDir},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		cacheBytes, err := os.ReadFile(cachePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(cacheBytes), "selection_source") || strings.Contains(string(cacheBytes), "fallback_reason") || strings.Contains(string(cacheBytes), "fallback_tier") {
+			t.Fatalf("raw aw_info.json fallback provenance leaked into cached JSONL without unified session: %s", cacheBytes)
+		}
+
+		// With firewall.model_routing selection and no workflow.info, aw_info endpoints are still preserved.
+		session := `{"type":"firewall.model_routing","data":{"schema":"model-routing/v0.29.21","stage":"selection","selectedModel":"github-copilot/gpt-5.3-codex","wireModel":"gpt-5.3-codex","selectedEffort":"medium","endpoint":"/chat/completions","selectionSource":"fallback","fallbackReason":"no_route","fallbackTier":"standard","router":null},"provenance":{"component":"firewall","phase":"agent","path":"sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl","index":0}}` + "\n"
+		if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(session), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		summary := analyzeModelRouting(runDir)
+		if summary == nil || summary.EffectiveEndpoint != "/v1/messages" || summary.SelectedEndpoint != "/chat/completions" ||
+			summary.SelectionSource != "fallback" || summary.FallbackReason != "no_route" || summary.FallbackTier != "standard" {
+			t.Fatalf("expected aw_info endpoints and unified fallback provenance: %+v", summary)
+		}
+	})
+
 	t.Run("contradictory model-routing.jsonl side log does not override or inject provenance", func(t *testing.T) {
 		runDir := t.TempDir()
 		routingDir := filepath.Join(runDir, "sandbox", "firewall", "logs", "api-proxy-logs")

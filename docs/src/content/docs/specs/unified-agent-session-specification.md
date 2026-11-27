@@ -4,9 +4,9 @@ spec: true
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.15.1"
+version: "2.16.0"
 status: Draft
-publication_date: "2026-11-24"
+publication_date: "2026-11-27"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -14,9 +14,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.15.1<br>
+**Version**: 2.16.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-11-24<br>
+**Publication Date**: 2026-11-27<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -31,7 +31,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.15.1 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.16.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -2876,6 +2876,12 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.16.0 - Draft (2026-11-27)
+
+- Added AWF selection-provenance fields `selectionSource`, `fallbackReason`, and `fallbackTier` to `firewall.model_routing` selection events and `workflow.info.modelRouting`, dropping malformed values while preserving explicit `null` fallback reasons and tiers on router picks (T-UAS-070).
+- Clarified that `rankedChoices` is omitted when the source selection record supplies `ranked_choices: null` (such as on a fallback selection).
+- Retained serialization-format version 1.
 
 ### Version 2.15.1 - Draft (2026-11-24)
 

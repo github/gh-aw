@@ -1,8 +1,8 @@
 # ADR-81736: Propagate Router Fallback Selection Provenance Through the Unified Session
 
 **Date**: 2026-11-27
-**Status**: Draft
-**Deciders**: Not stated in PR evidence (PR author: rabeckett)
+**Status**: Accepted
+**Deciders**: rabeckett (PR author)
 **Related**: [PR #81736](https://github.com/github/gh-aw/pull/81736), [Issue #81717](https://github.com/github/gh-aw/issues/81717) (closing reference in PR body), [Issue #80508](https://github.com/github/gh-aw/issues/80508) (parent), AWF [github/gh-aw-firewall#12035](https://github.com/github/gh-aw-firewall/issues/12035)
 
 ## Context
@@ -55,3 +55,7 @@ These alternatives are inferred from the issue text and the PR diff. The PR does
 - The compatibility rules (omitted, explicit `"router"`, and `null` are treated differently in different places) must be maintained until pre-fallback AWF releases are no longer relevant.
 - The unified session is now the only source of truth. If a projection drops these fields again, runs fail silently unless a smoke test explicitly requests the expected source. Issue #81717 describes the projection gap this PR fixes, which shows that this risk is real.
 - The smoke assertion surface gains four expectation keys. The rule that `expectedClassifierRequests` other than 1 is valid only for fallback smokes is easy for callers to misread.
+
+---
+
+*ADR reviewed and accepted by the PR author.*
