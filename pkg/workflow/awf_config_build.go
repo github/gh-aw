@@ -70,13 +70,10 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	// ── Network section ──────────────────────────────────────────────────────
 	if config.AllowedDomains != "" {
 		allowList := splitDomainList(config.AllowedDomains)
-		if slices.Contains(allowList, "localhost") {
-			// AWF's localhost entry enables local testing but its domain validator
-			// rejects the equivalent IPv6 loopback literal.
-			allowList = slices.DeleteFunc(allowList, func(domain string) bool {
-				return domain == "::1"
-			})
-		}
+		// AWF's domain validator rejects the IPv6 loopback literal.
+		allowList = slices.DeleteFunc(allowList, func(domain string) bool {
+			return domain == "::1"
+		})
 		awfConfig.Network = &AWFNetworkConfig{
 			AllowDomains: allowList,
 		}

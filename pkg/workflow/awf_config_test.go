@@ -2053,6 +2053,12 @@ func TestBuildAWFConfigJSON_LocalhostOmitsIPv6Loopback(t *testing.T) {
 	assert.Contains(t, parsed.Network.AllowDomains, "localhost")
 	assert.Contains(t, parsed.Network.AllowDomains, "127.0.0.1")
 	assert.NotContains(t, parsed.Network.AllowDomains, "::1")
+
+	config.AllowedDomains = "github.com,::1"
+	jsonStr, err = BuildAWFConfigJSON(config)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal([]byte(jsonStr), &parsed))
+	assert.NotContains(t, parsed.Network.AllowDomains, "::1")
 }
 
 // TestBuildAWFConfigJSON_SchemaCompliance validates that BuildAWFConfigJSON always produces
