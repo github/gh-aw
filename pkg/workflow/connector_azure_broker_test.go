@@ -4,6 +4,9 @@ package workflow
 
 import (
 	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -110,7 +113,96 @@ func TestConnectorAzureBrokerPhaseIsolation(t *testing.T) {
 			require.Equal(t, tc.reader, strings.Contains(string(agent), connectorAzureMount(connectorAppSecret("tracker", "reader"))))
 			require.NotContains(t, string(agent), connectorAzureMount(connectorAppSecret("tracker", "writer")))
 			require.Equal(t, tc.writer, strings.Contains(output, "vars.writer_ID"))
+			require.Equal(t, tc.reader, strings.Contains(string(agent), "privateHostSocketDirs"))
 		})
+	}
+}
+
+func TestConnectorAzureReaderPrivateSocketConfig(t *testing.T) {
+	for _, engine := range []string{"copilot", "claude", "codex", "gemini", "pi"} {
+		t.Run(engine, func(t *testing.T) {
+			c, root := awConnectorCompiler(t)
+			source := strings.Replace(awConnectorHeader, "engine: copilot", "engine: "+engine, 1)
+			data, err := c.ParseWorkflowString(source+connectorAzureSource(t)+"tools:\n  tracker: [get-issue]\n---\nReview.\n", root+"/proof.md")
+			require.NoError(t, err)
+			output, err := c.CompileToYAML(data, root+"/proof.md")
+			require.NoError(t, err)
+			var workflow struct {
+				Jobs map[string]struct {
+					Steps []struct {
+						ID  string
+						Run string
+						Env map[string]string
+					}
+				}
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(output), &workflow))
+			var run string
+			for _, step := range workflow.Jobs["agent"].Steps {
+				if step.ID == "agentic_execution" {
+					run = step.Run
+					require.Equal(t, "${{ "+connectorAzureDirectory(connectorAppSecret("tracker", "reader"))+" }}", step.Env[connectorAzurePrivateDirEnv(0)])
+				}
+			}
+			require.Contains(t, run, "privateHostSocketDirs")
+			require.Contains(t, run, "--exclude-env "+connectorAzurePrivateDirEnv(0))
+			require.Contains(t, run, "/usr/local/bin/awf")
+			installed := false
+			for _, step := range workflow.Jobs["agent"].Steps {
+				if strings.Contains(step.Run, "install_awf_binary.sh") {
+					installed = true
+					require.NotContains(t, step.Run, "--rootless")
+				}
+			}
+			require.True(t, installed)
+			for line := range strings.SplitSeq(run, "\n") {
+				if !strings.HasPrefix(line, "node -e ") || !strings.Contains(line, "privateHostSocketDirs") {
+					continue
+				}
+				temp := t.TempDir()
+				require.NoError(t, os.Mkdir(filepath.Join(temp, "gh-aw"), 0o700))
+				configPath := filepath.Join(temp, "gh-aw", "awf-config.json")
+				require.NoError(t, os.WriteFile(configPath, []byte(`{"filesystem":{"allowWrite":["/workspace"]}}`), 0o600))
+				directory := filepath.Join(temp, `dir "with $special"`)
+				cmd := exec.Command("bash", "-c", line)
+				cmd.Env = append(os.Environ(), "RUNNER_TEMP="+temp, connectorAzurePrivateDirEnv(0)+"="+directory)
+				require.NoError(t, cmd.Run())
+				content, err := os.ReadFile(configPath)
+				require.NoError(t, err)
+				var config struct {
+					Filesystem struct {
+						AllowWrite            []string
+						PrivateHostSocketDirs []string
+					}
+				}
+				require.NoError(t, json.Unmarshal(content, &config))
+				require.Equal(t, []string{directory}, config.Filesystem.PrivateHostSocketDirs)
+				require.Equal(t, []string{"/workspace"}, config.Filesystem.AllowWrite)
+				cmd = exec.Command("bash", "-c", line)
+				cmd.Env = append(os.Environ(), "RUNNER_TEMP="+temp, connectorAzurePrivateDirEnv(0)+"=")
+				require.Error(t, cmd.Run())
+				return
+			}
+			t.Fatal("missing private socket config update")
+		})
+	}
+}
+
+func TestConnectorAzureReaderMultiplePrivateSockets(t *testing.T) {
+	var frontmatter map[string]any
+	require.NoError(t, yaml.Unmarshal([]byte(connectorAzureSource(t)), &frontmatter))
+	connectors := frontmatter["connectors"].(map[string]any)
+	connectors["other"] = connectors["tracker"]
+	source, err := yaml.Marshal(frontmatter)
+	require.NoError(t, err)
+	c, root := awConnectorCompiler(t)
+	data, err := c.ParseWorkflowString(awConnectorHeader+string(source)+"tools:\n  tracker: [get-issue]\n  other: [get-issue]\n---\nReview.\n", root+"/proof.md")
+	require.NoError(t, err)
+	output, err := c.CompileToYAML(data, root+"/proof.md")
+	require.NoError(t, err)
+	for i, alias := range []string{"other", "tracker"} {
+		require.Contains(t, output, strings.TrimSpace(formatYAMLEnv("", connectorAzurePrivateDirEnv(i), "${{ "+connectorAzureDirectory(connectorAppSecret(alias, "reader"))+" }}")))
+		require.Contains(t, output, "--exclude-env "+connectorAzurePrivateDirEnv(i))
 	}
 }
 
@@ -133,15 +225,18 @@ func TestConnectorAzureBrokerRejectsUnsafeRoutes(t *testing.T) {
 		{"job-pre-steps", "", "", "jobs:\n  agent:\n    pre-steps:\n      - run: echo setup\n", "authored runner steps"},
 		{"secret-masking", "", "", "secret-masking:\n  steps:\n    - run: echo setup\n", "authored runner steps"},
 		{"mcp-scripts", "", "", "mcp-scripts:\n  example:\n    description: example\n    script: return 1;\n", "mcp-scripts"},
+		{"old-awf", "", "", "sandbox:\n  agent:\n    version: v0.29.20\n", "private socket isolation"},
+		{"workflow-env", "", "", "env:\n  NODE_OPTIONS: --require=/tmp/hook.js\n", "workflow env"},
+		{"engine-env", "engine: copilot", "engine:\n  id: copilot\n  env:\n    NODE_OPTIONS: --require=/tmp/hook.js", "", "engine.env"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c, root := awConnectorCompiler(t)
-			source := src
+			source := awConnectorHeader + src
 			if tc.replace != "" {
 				source = strings.ReplaceAll(source, tc.replace, tc.with)
 			}
 
-			_, err := c.ParseWorkflowString(awConnectorHeader+source+tc.extra+selection+"---\nReview.\n", root+"/proof.md")
+			_, err := c.ParseWorkflowString(source+tc.extra+selection+"---\nReview.\n", root+"/proof.md")
 			require.ErrorContains(t, err, tc.err)
 		})
 	}

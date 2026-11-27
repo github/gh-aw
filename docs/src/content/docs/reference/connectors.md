@@ -421,10 +421,15 @@ write performs no writer exchange, but does not suppress selected reads.
 Staging does not reduce the permissions of a selected reader application;
 grant its identity only the access appropriate for reads, even in previews.
 There is no stored-token fallback on exchange or authorization failure.
-Federated readers require a built-in sandboxed engine, the standard AWF Docker
-runtime with OIDC environment exclusion, and a trusted MCP gateway. They cannot
+Federated readers require a built-in sandboxed engine, AWF v0.29.21 or later,
+privileged local Linux Docker/runc, and a trusted MCP gateway. AWF checks the
+actual broker directories against agent-visible mounts and fails closed if it
+cannot establish isolation. Remote Docker, ARC/DinD and unprivileged inspection
+are unsupported. The check does not isolate sockets from other same-UID host
+processes. Federated readers cannot
 share the agent job with job containers or services, authored runner steps,
-secret-masking steps, or MCP scripts. Connector reader and live writer brokers
+secret-masking steps, MCP scripts, enclaves, or `engine.env`. Workflow `env`
+may contain only `DEBUG`. Connector reader and live writer brokers
 do not support `windows-latest` runners. Do not
 add the Entra authority to the agent's network allowlist for a connector
 read. `gh aw connector <id> setup` describes provisioning offline;

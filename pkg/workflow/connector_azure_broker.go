@@ -33,6 +33,30 @@ func connectorAzureMount(secret string) string {
 	return mountRoot + secret
 }
 
+func connectorAzureReaderSecrets(data *WorkflowData) []string {
+	if data == nil || data.IsDetectionRun || data.IsEvalsRun {
+		return nil
+	}
+	var secrets []string
+	for _, alias := range sliceutil.SortedKeys(data.Connectors) {
+		config := data.Connectors[alias]
+		if config.Agent == nil {
+			continue
+		}
+		for _, secret := range config.Agent.Secrets() {
+			if config.azureRoute(secret) != nil {
+				secrets = append(secrets, secret)
+			}
+		}
+	}
+	slices.Sort(secrets)
+	return slices.Compact(secrets)
+}
+
+func connectorAzurePrivateDirEnv(index int) string {
+	return fmt.Sprintf("GH_AW_PRIVATE_CONNECTOR_SOCKET_DIR_%d", index)
+}
+
 // Each broker handles one fixed credential. Only its directory (never an
 // assertion, token or OIDC request pair) crosses the runner/adapter boundary.
 func (c *Compiler) connectorAzureBrokerSteps(data *WorkflowData, phase string, teardown bool) []string {
@@ -167,16 +191,27 @@ func validateConnectorAzureReaderHost(data *WorkflowData) error {
 	engine := data.EngineConfig
 	if !slices.Contains([]string{"copilot", "claude", "codex", "gemini", "pi"}, data.AI) ||
 		(engine != nil && (engine.IsInlineDefinition || engine.Command != "")) || !isFirewallEnabled(data) ||
-		data.Container != "" || data.Services != "" {
+		data.Container != "" || data.Services != "" || enclavesEnabled(data) {
 		return errHost
 	}
 	if connectorAzureReaderHasRunnerHooks(data) {
 		return errors.New("connector Azure OIDC readers cannot grant job credentials to authored runner steps")
 	}
+	if engine != nil && len(engine.Env) != 0 {
+		return errors.New("connector Azure OIDC readers cannot share a job with engine.env")
+	}
+	for name := range data.EnvSources {
+		if name != "DEBUG" {
+			return errors.New("connector Azure OIDC readers permit only DEBUG in workflow env")
+		}
+	}
 	if data.MCPScripts != nil && len(data.MCPScripts.Tools) != 0 {
 		return errors.New("connector Azure OIDC readers cannot share a job with mcp-scripts")
 	}
 	firewall := getFirewallConfig(data)
+	if !awfVersionAtLeast(firewall, constants.AWFPrivateHostSocketDirsMinVersion) {
+		return fmt.Errorf("connector Azure OIDC readers require AWF %s or newer for private socket isolation", constants.AWFPrivateHostSocketDirsMinVersion)
+	}
 	if !awfSupportsExcludeEnv(firewall) {
 		return fmt.Errorf("connector Azure OIDC readers require AWF %s or newer to exclude Actions OIDC credentials", constants.AWFExcludeEnvMinVersion)
 	}

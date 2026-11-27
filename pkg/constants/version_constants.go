@@ -1,5 +1,8 @@
 package constants
 
+// AWFPrivateHostSocketDirsMinVersion is the first release that verifies private host socket isolation.
+const AWFPrivateHostSocketDirsMinVersion Version = "v0.29.21"
+
 // Version represents a software version string.
 // This semantic type distinguishes version strings from arbitrary strings,
 // enabling future validation logic (e.g., semver parsing) and making

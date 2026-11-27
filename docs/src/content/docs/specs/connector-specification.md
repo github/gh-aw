@@ -248,7 +248,13 @@ live effects run only in the separately authorized writer job, not in the agent
 or reader adapter.
 The compiler MUST reject agent-job host access that would bypass this boundary,
 including authored runner hooks, job containers or services, MCP scripts, and
-untrusted sibling MCP servers or gateway customization.
+untrusted sibling MCP servers, gateway customization, enclaves, `engine.env`,
+and workflow `env` entries other than `DEBUG`.
+For each active reader broker, the compiler MUST supply its actual host socket
+directory to AWF's `filesystem.privateHostSocketDirs` before agent execution.
+Readers require AWF v0.29.21 or later and privileged local Linux Docker/runc;
+AWF MUST fail closed when it cannot verify that directory against the effective
+agent-visible mounts. The compiler MUST NOT substitute a guessed temporary path.
 
 These guarantees depend on an isolated sandbox, trusted runner, gateway, adapter,
 declarations, and provider. A process able to connect to the broker socket can
@@ -985,16 +991,12 @@ effects; it cannot prove isolation against a compromised host or provider, or
 establish that a remote tool is read-only. The main boundary model separately
 covers write authorization and staged effects.
 
-The current broker creates its socket under `RUNNER_TEMP` without checking all
-agent-visible host mounts. On a local-Docker self-hosted runner, a temp
-directory beneath an exposed mount such as `/tmp/gh-aw` can let the agent
-connect directly and obtain the token. Read-only bind mounts do not prevent
-socket connections. The [AWF mount policy](https://github.com/github/gh-aw-firewall/blob/7e4883fa737d51b4c43fa11a5b86268841c607be/docs/mount-policy.md)
-likewise warns against placing host IPC in shared paths and does not guarantee
-that an arbitrary `RUNNER_TEMP` is outside every share. Requiring an enabled
-agent sandbox is necessary but does not close this gap. C-FED-002 therefore
-requires runtime mount-isolation enforcement; the model and existing unit tests
-do not establish it.
+The broker creates its socket under `RUNNER_TEMP`, which may overlap an
+agent-visible mount even when read-only. AWF checks the declared actual broker
+directories and gates agent execution on successful mount isolation; see the
+[AWF mount policy](https://github.com/github/gh-aw-firewall/blob/v0.29.21/docs/mount-policy.md).
+This protects the sandbox boundary, not other same-UID host processes. The model
+does not prove the correctness of AWF's runtime checks.
 
 To reproduce, replace the `cd` above with `cd "$repo/specs/connectors/agent-boundary"`
 and use `AgentBoundary.tla` and `AgentBoundary.cfg` in place of
