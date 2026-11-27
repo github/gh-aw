@@ -58,6 +58,7 @@ evidence-number-v1 consumes --evidence: a bounded, typed observation bundle
 selected by workflow, metric, scope, subject, and report dates. It evaluates
 declared measurements without fetching history or executing user code.
 Imported evidence never substitutes for native adoption or survival proof.
+
 One shared pipeline handles weekly/daily sampling, native adoption joins,
 isolated merge windows, and full-window file survival. Attribution currently
 requires exact human-adopted PR merges; other output types retain their native

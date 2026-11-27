@@ -340,6 +340,7 @@ func TestHelpTextUsesConsistentFlagDescriptions(t *testing.T) {
 	assert.NotContains(t, NewValueCommand().Long, "slides")
 
 	value := NewValueCommand()
+	assert.Contains(t, value.Long, "Imported evidence never substitutes for native adoption or survival proof.\n\nOne shared pipeline")
 	jsonFlag := value.Flags().Lookup("json")
 	require.NotNil(t, jsonFlag)
 	assert.Equal(t, "Output results in JSON format", jsonFlag.Usage)
