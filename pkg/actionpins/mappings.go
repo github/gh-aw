@@ -45,11 +45,16 @@ func ApplyResolvedActionPinPrefix(repo, pinnedRef string, ctx *PinContext) strin
 
 var containerDigestPinPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9/:_.-]*@sha256:[a-f0-9]{64}$`)
 
+func (ctx *PinContext) notifyMapping(key, msg string) {
+	actionPinsLog.Printf("%s", msg)
+	ctx.emitOnce(key, msg, console.FormatInfoMessage)
+}
+
 // applyActionPinMapping checks ctx.Mappings for a redirect of actionRepo@version and
 // returns the (possibly updated) repo and version. An informational message is printed
 // to stderr the first time each mapping is applied (deduplicated via ctx.Warnings).
 func applyActionPinMapping(actionRepo, version string, ctx *PinContext) (string, string) {
-	if len(ctx.Mappings) == 0 {
+	if ctx == nil || len(ctx.Mappings) == 0 {
 		return actionRepo, version
 	}
 	actionPinsLog.Printf("Checking action pin mapping for %s@%s (%d mapping(s) configured)", actionRepo, version, len(ctx.Mappings))
@@ -70,8 +75,7 @@ func applyActionPinMapping(actionRepo, version string, ctx *PinContext) (string,
 	// Emit informational message once per source key.
 	notifyKey := "map:" + cacheKey
 	msg := fmt.Sprintf("Action pin mapping applied: %s → %s", cacheKey, mapped)
-	actionPinsLog.Printf("%s", msg)
-	ctx.emitOnce(notifyKey, msg, console.FormatInfoMessage)
+	ctx.notifyMapping(notifyKey, msg)
 
 	return mappedRepo, mappedVersion
 }
@@ -102,8 +106,7 @@ func ApplyContainerPinMapping(image string, ctx *PinContext) string {
 	// Emit informational message once per source key.
 	notifyKey := "container-map:" + image
 	msg := fmt.Sprintf("Container pin mapping applied: %s → %s", image, mapped)
-	actionPinsLog.Printf("%s", msg)
-	ctx.emitOnce(notifyKey, msg, console.FormatInfoMessage)
+	ctx.notifyMapping(notifyKey, msg)
 
 	return mapped
 }

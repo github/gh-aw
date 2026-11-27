@@ -67,9 +67,9 @@ func (c *Coordinator) AllClusters() map[string][]Cluster {
 // SaveSnapshots serializes each stage miner's state and returns a map from
 // stage name to JSON bytes.
 func (c *Coordinator) SaveSnapshots() (map[string][]byte, error) {
-	coordinatorLog.Printf("SaveSnapshots: serializing %d stage miners", len(c.miners))
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	coordinatorLog.Printf("SaveSnapshots: serializing %d stage miners", len(c.miners))
 	out := make(map[string][]byte, len(c.miners))
 	for stage, m := range c.miners {
 		data, err := m.SaveJSON()
