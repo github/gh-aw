@@ -2166,8 +2166,15 @@ check_fork_backed_pr_semantics() {
     fi
 
     # Check head-github-app precedence over head-github-token is implemented (requirement 4)
+    # The implementation spans the job builder, its condition/token helpers, and the
+    # handler registry, so search all of them rather than only the job builder file.
+    local compiler_head_app_files=(
+        "$compiler_job"
+        "pkg/workflow/compiler_safe_outputs_job_conditions.go"
+        "pkg/workflow/safe_outputs_handler_registry_pull_requests.go"
+    )
     if [ -f "$compiler_job" ]; then
-        if ! grep -qE "HeadGitHubApp|head.github.app|headGithubApp" "$compiler_job"; then
+        if ! grep -qE "HeadGitHubApp|head.github.app|headGithubApp" "${compiler_head_app_files[@]}" 2>/dev/null; then
             log_high "TYPE-012: Compiler missing head-github-app support for fork credential precedence (Section 7.1 v1.26.0 requirement 4)"
             failed=1
         fi
