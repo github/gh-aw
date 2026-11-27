@@ -51,6 +51,7 @@ func repoMemoryTargetRepo(memory RepoMemoryEntry, level PermissionLevel) string 
 	return target
 }
 
+// repoMemoryAppToken requires memory.githubApp(level) to be non-nil.
 func repoMemoryAppToken(memory RepoMemoryEntry, level PermissionLevel) string {
 	if memory.githubApp(level).IgnoreIfMissing {
 		return fmt.Sprintf("${{ steps.%s.outputs.token || github.token }}", repoMemoryAppTokenStepID(memory, level))

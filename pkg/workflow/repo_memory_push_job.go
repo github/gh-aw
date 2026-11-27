@@ -8,6 +8,10 @@ import (
 	"github.com/github/gh-aw/pkg/constants"
 )
 
+// pushRepoMemoryTimeoutMinutes bounds the retry loop (about two minutes of
+// capped jittered backoff) plus git/network overhead.
+const pushRepoMemoryTimeoutMinutes = 10
+
 // buildPushRepoMemoryJob creates a job that downloads repo-memory artifacts and pushes them to git branches
 // This job runs after the agent job completes, unless agent success is required and it fails.
 // If threat detection is enabled, only runs if no threats were detected

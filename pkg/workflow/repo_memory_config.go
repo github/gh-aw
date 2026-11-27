@@ -28,9 +28,6 @@ const (
 	defaultRepoMemoryMaxPatchSize = 10240
 	// maxRepoMemoryPatchSize is the maximum allowed value for max-patch-size (1MB).
 	maxRepoMemoryPatchSize = 1048576
-	// pushRepoMemoryTimeoutMinutes bounds the retry loop (about two minutes of
-	// capped jittered backoff) plus git/network overhead.
-	pushRepoMemoryTimeoutMinutes = 10
 )
 
 // Pre-compiled regexes for performance (avoid recompilation in hot paths)
