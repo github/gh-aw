@@ -1708,8 +1708,9 @@ describe("AWF model routing candidate and request metadata", () => {
         const projected = project(event);
         for (const field of NEW_FIELDS) {
           const alias = SOURCE_FIELDS[field].find(key => Object.hasOwn(record, key));
-          expect(Object.hasOwn(projected.data, field), `${name} ${field}`).toBe(alias !== undefined);
-          if (alias === undefined) continue;
+          const expectedPresent = field === "rankedChoices" ? alias !== undefined && Array.isArray(record[alias]) : alias !== undefined;
+          expect(Object.hasOwn(projected.data, field), `${name} ${field}`).toBe(expectedPresent);
+          if (!expectedPresent) continue;
           if (field === "rankedChoices") expect(projected.data.rankedChoices).toEqual(ranked(record[alias].map(({ model, effort }) => ({ model, effort }))));
           else expect(projected.data[field]).toEqual(record[alias]);
         }
