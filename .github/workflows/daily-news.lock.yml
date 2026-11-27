@@ -1670,8 +1670,7 @@ jobs:
         if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
-          GH_AW_UPLOAD_ARTIFACT_CONFIG: "{\"upload_artifact\":{}}"
+          GH_AW_UPLOAD_ARTIFACT_CONFIG: "{\"upload_artifact\":{\"max-size-bytes\":104857600}}"
           GH_AW_UPLOAD_ARTIFACT_STAGING_DIR: ${{ runner.temp }}/gh-aw/safeoutputs/upload-artifacts/
           GH_AW_UPLOAD_ARTIFACT_TRANSFER_DIR: ${{ runner.temp }}/gh-aw/safeoutputs/upload-artifacts-transfer/
         with:
