@@ -410,6 +410,7 @@ func (c *Compiler) generateScriptModeCleanupStep(data *WorkflowData) string {
 	step.WriteString("          GH_AW_ACTIONS_SOURCE_DIR: " + scriptModeActionsSourcePath() + "\n")
 	step.WriteString("          INPUT_DESTINATION: " + SetupActionDestination + "\n")
 	step.WriteString("          INPUT_JOB_NAME: ${{ github.job }}\n")
+	step.WriteString("          GH_AW_JOB_RESULT: ${{ job.status }}\n")
 	if engineID := ResolveEngineID(data); engineID != "" {
 		writeFormattedYAML(&step, "          GH_AW_INFO_ENGINE_ID: %q\n", engineID)
 	}

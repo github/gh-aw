@@ -2450,7 +2450,8 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   // needs.detection.outputs.* in downstream jobs (conclusion, safe_outputs, etc.).
   const detectionConclusion = process.env.GH_AW_DETECTION_CONCLUSION || "";
   const detectionReason = process.env.GH_AW_DETECTION_REASON || "";
-  const jobResult = options.jobResult || (jobName === "detection" ? detectionConclusion : "");
+  const rawJobResult = (typeof options.jobResult === "string" ? options.jobResult : process.env.GH_AW_JOB_RESULT || "").trim();
+  const jobResult = rawJobResult || (jobName === "detection" ? detectionConclusion : "");
   const runtimeMetrics = readAgentRuntimeMetrics(engineId);
   // Read once and reuse for both gh-aw.aic and gen_ai.usage.* attributes.
   const agentUsageFilePath = jobName === "detection" ? "/tmp/gh-aw/threat-detection/detection_usage.json" : "/tmp/gh-aw/agent_usage.json";
@@ -2515,6 +2516,13 @@ async function sendJobConclusionSpan(spanName, options = {}) {
 
   if (isAgentFailure && errorMessages.length > 0) {
     statusMessage = `agent ${agentConclusion}: ${errorMessages[0]}`.slice(0, 256);
+  }
+  const isNonAgentJobNonOK = jobName !== "agent" && ["failure", "timed_out", "cancelled"].includes(jobResult);
+  if (isNonAgentJobNonOK) {
+    statusCode = 2;
+    if (!statusMessage) {
+      statusMessage = `${jobName || "job"} ${jobResult}`;
+    }
   }
 
   const attributes = [buildAttr(OTEL_ATTR_WORKFLOW_NAME, workflowName), buildAttr(OTEL_ATTR_RUN_ID, runId), buildAttr("gh-aw.run.attempt", runAttempt), buildAttr("gh-aw.run.actor", actor), buildAttr(OTEL_ATTR_REPOSITORY, repository)];
