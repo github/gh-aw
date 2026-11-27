@@ -750,8 +750,10 @@ When `usage/aw_session.jsonl` contains a valid `routing.observation` event as de
 | `gh-aw.model_routing.observation.skip_reason` | string | REQUIRED only when `gh-aw.model_routing.observation.outcome` is `skip`. The value MUST be `cancelled`, `infrastructure`, `rate_limited`, `pair_mismatch`, or `unknown_evidence`. It MUST be absent for `success` and `failure`. |
 
 The projected event MUST have collector provenance and conclusion phase as required by
-[T-UAS-094]. The implementation MUST use the last valid `routing.observation` event
-according to the unified agent session contract.
+[T-UAS-094]. When multiple collector/conclusion `routing.observation` events appear,
+the implementation MUST evaluate the last collector/conclusion event and fail closed
+(omitting both attributes) if that final event is invalid, matching the Go and JS
+session readers.
 
 If the session file is missing, unreadable, malformed, untrusted, or contains no valid
 collector/conclusion `routing.observation` event, the implementation MUST omit both
@@ -1282,7 +1284,7 @@ attribute-level checks mapped directly to Section 10 requirements:
 | **T-OT-018** | §6.7, §9.5, §10.5, §11.2 conformance | Built-in telemetry exported over OTLP to Weaver live-check with semantic-conventions-genai at the §18.1 commit has no undeclared violations with the opt-in; without it, every finding is declared with a reason | `actions/setup/js/fixtures/genai/`, `scripts/genai_registry.test.py` (CI) |
 | **T-OT-019** | §11.2 wire format | Opt-in GenAI spans and metrics (kind, scope `schemaUrl`, monotonic sums, 20-bound histogram) encode byte-for-byte like the reference SDK protocol types | `scripts/test_otlp_protobuf.mjs` |
 | **T-OT-020** | §6.7 backward compatibility | Without `gen_ai_v1` (unset or another value), a success and a failure agent job export every fact of a golden export captured before §6.7; with it, every `gh-aw.*` and `github.*` attribute is kept | `send_otlp_span_legacy_contract.test.cjs` |
-| **T-OT-021** | §10.3.1 model-routing observation attributes | For a valid collector/conclusion `routing.observation`, `gh-aw.conclusion.conclusion` contains `gh-aw.model_routing.observation.outcome` with value `success`, `failure`, or `skip`; `skip` also contains the permitted `gh-aw.model_routing.observation.skip_reason`, while `success` and `failure` do not. Missing, unreadable, malformed, untrusted, invalid, or non-conclusion evidence omits both attributes; no skip is synthesized and no metrics are added. Multiple candidate records use the last valid event. | Runtime OTLP contract tests covering provenance, malformed records, invalid verdicts, non-conclusion spans, absent files, and last-valid-event behavior |
+| **T-OT-021** | §10.3.1 model-routing observation attributes | For a valid collector/conclusion `routing.observation`, `gh-aw.conclusion.conclusion` contains `gh-aw.model_routing.observation.outcome` with value `success`, `failure`, or `skip`; `skip` also contains the permitted `gh-aw.model_routing.observation.skip_reason`, while `success` and `failure` do not. Missing, unreadable, malformed, untrusted, invalid, or non-conclusion evidence omits both attributes; no skip is synthesized and no metrics are added. Multiple collector/conclusion candidate records evaluate the last collector/conclusion event and fail closed if it is invalid. | Runtime OTLP contract tests covering provenance, malformed records, invalid verdicts, non-conclusion spans, absent files, and last-collector-event fail-closed behavior |
 
 
 ### 17.2 Optional Extension Tests
