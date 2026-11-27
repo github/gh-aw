@@ -430,4 +430,23 @@ describe("final recovery envelope upload boundary", () => {
     fs.symlinkSync(targetDir, path.join(root, "agent"));
     expect(() => main({ roots: [root] })).toThrow("Fallback routing recovery directory must not be a symbolic link");
   });
+
+  it("fails closed on POSIX when O_NOFOLLOW is unavailable, and uses open-and-verify on win32", () => {
+    const agentErrors = path.join(root, "agent-errors.jsonl");
+    fs.writeFileSync(agentErrors, '{"type":"agent.execution","data":{"categories":["agentic_engine_timeout"],"errorCodes":[],"errorTypes":[],"exitCode":124}}\n');
+    const origConstants = fs.constants;
+    const origPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    try {
+      Object.defineProperty(fs, "constants", { value: { ...origConstants, O_NOFOLLOW: undefined }, configurable: true });
+      Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+      expect(() => main({ roots: [root] })).toThrow("O_NOFOLLOW is required for recovery artifact validation");
+
+      Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+      expect(main({ roots: [root] })).toEqual({ removed: 0 });
+      expect(fs.existsSync(agentErrors)).toBe(true);
+    } finally {
+      Object.defineProperty(fs, "constants", { value: origConstants, configurable: true });
+      if (origPlatform) Object.defineProperty(process, "platform", origPlatform);
+    }
+  });
 });

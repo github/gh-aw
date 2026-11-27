@@ -14,22 +14,33 @@ const MAX_AGENT_ERRORS_BYTES = 64 * 1024;
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9_.:-]{1,64}$/;
 
 /**
- * Read a bounded regular file without following symlinks. Fails closed when the
- * runtime does not expose O_NOFOLLOW so symlinks can never be followed across the
- * upload boundary.
+ * Read a bounded regular file without following symlinks. Uses kernel O_NOFOLLOW
+ * on POSIX (failing closed if unavailable), and an open-and-verify lstat/fstat
+ * identity check on Windows where POSIX O_NOFOLLOW does not exist.
  * @param {string} filename
  * @param {number} maxBytes
  * @returns {string | null}
  */
 function readBoundedRegularFile(filename, maxBytes) {
-  if (typeof fs.constants.O_NOFOLLOW !== "number" || fs.constants.O_NOFOLLOW === 0) {
+  const hasNoFollow = typeof fs.constants.O_NOFOLLOW === "number" && fs.constants.O_NOFOLLOW !== 0;
+  if (!hasNoFollow && process.platform !== "win32") {
     throw new Error("O_NOFOLLOW is required for recovery artifact validation");
+  }
+  let before;
+  if (!hasNoFollow) {
+    try {
+      before = fs.lstatSync(filename);
+    } catch {
+      return null;
+    }
+    if (before.isSymbolicLink() || !before.isFile()) return null;
   }
   let fd;
   try {
-    fd = fs.openSync(filename, READ_FLAGS);
+    fd = fs.openSync(filename, hasNoFollow ? READ_FLAGS : fs.constants.O_RDONLY);
     const stat = fs.fstatSync(fd);
     if (!stat.isFile() || stat.size > maxBytes) return null;
+    if (before && (before.dev !== stat.dev || before.ino !== stat.ino)) return null;
     const buffer = Buffer.alloc(stat.size);
     let offset = 0;
     while (offset < buffer.length) {
@@ -38,6 +49,10 @@ function readBoundedRegularFile(filename, maxBytes) {
       offset += count;
     }
     if (offset !== stat.size || fs.fstatSync(fd).size !== stat.size) return null;
+    if (before) {
+      const after = fs.lstatSync(filename);
+      if (after.isSymbolicLink() || !after.isFile() || after.dev !== stat.dev || after.ino !== stat.ino) return null;
+    }
     return buffer.toString("utf8");
   } catch {
     return null;
@@ -103,8 +118,8 @@ function isValidAgentErrorsContent(text) {
       for (const item of data[key]) {
         // Categories are internal snake_case identifiers; errorTypes and errorCodes
         // can hold provider-supplied strings such as "Too Many Requests" (matching
-        // validateAgentExecution in agent_execution.cjs).
-        const validString = typeof item === "string" && (key === "categories" ? IDENTIFIER_PATTERN.test(item) : item.length > 0 && item.length <= 256 && !/[\x00-\x1f\x7f]/.test(item));
+        // validateAgentExecution in agent_execution.cjs and SessionDiagnosticName).
+        const validString = typeof item === "string" && (key === "categories" ? IDENTIFIER_PATTERN.test(item) : item.length > 0 && item.length <= 1024);
         const validCodeNumber = key === "errorCodes" && Number.isSafeInteger(item);
         if (!validString && !validCodeNumber) return false;
       }
