@@ -145,6 +145,27 @@ describe("native protected command output", () => {
     expect(fs.existsSync(path.join(directory, "agent-errors.jsonl.tmp"))).toBe(false);
   });
 
+  it("refuses to traverse a symlinked agent directory when discarding nested refusal artifacts", () => {
+    const outside = fs.mkdtempSync(path.join(root, "test-native-outside-"));
+    try {
+      const target = path.join(outside, "routing-refusal.json");
+      fs.writeFileSync(target, '{"refused":true}\n');
+      fs.symlinkSync(outside, path.join(directory, "agent"));
+      expect(() => discardUntrustedSessionArtifacts(directory)).toThrow("Failed to discard sandbox-written session artifacts");
+      expect(fs.readFileSync(target, "utf8")).toBe('{"refused":true}\n');
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("removes directories planted at nested refusal artifact paths", () => {
+    const plantedDir = path.join(directory, "agent", "routing-refusal.json");
+    fs.mkdirSync(plantedDir, { recursive: true });
+    fs.writeFileSync(path.join(plantedDir, "extra.txt"), "untrusted");
+    discardUntrustedSessionArtifacts(directory);
+    expect(fs.existsSync(plantedDir)).toBe(false);
+  });
+
   it("atomically replaces a sidecar symlink with the verified exit code", () => {
     const target = path.join(directory, "outside");
     const sidecar = path.join(directory, "agent_execution_exit_code.txt");

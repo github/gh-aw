@@ -4,6 +4,7 @@
 const { iterateJsonl, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_PARSE } = require("./error_codes.cjs");
 const { parseTokenUsageJsonl, generateTokenUsageSummary, formatAICForOutput } = require("./parse_mcp_gateway_log.cjs");
@@ -11,6 +12,7 @@ const { calculateWorkingSetFromJSONL } = require("./working_set_metrics.cjs");
 const { mapAWFRoutingEffort, resolveAWFModelRoutingSelection, getAWFModelRoutingPolicy, resolveAWFRoutingProvider, routingEndpointPaths } = require("./awf_model_routing.cjs");
 const { recordModelRouting, resolveEffectiveModel, validateModelIdentifier } = require("./model_attribution.cjs");
 const { persistCopilotModelSelection } = require("./copilot_model_selection.cjs");
+const { getApiProxyEventName } = require("./steering_helpers.cjs");
 const { persistModelConfigBaseline } = require("./routing_analytics.cjs");
 
 const DEFAULT_GH_AW_DIR = "/tmp/gh-aw";
@@ -252,6 +254,159 @@ function recordModelRoutingFromArtifacts(env = process.env, ghAwDir = env.GH_AW_
   core.setOutput("model_effort", effective.effort);
   core.setOutput("model_routing_status", routing.status);
   return { routing: modelRouting, effective };
+}
+
+const UPSTREAM_ERROR_FALLBACK_RELATIVE_PATH = "agent/upstream-errors-fallback.jsonl";
+const UPSTREAM_ERROR_REQUEST_ID_PATTERN = /^[A-Za-z0-9_.:-]{1,128}$/;
+const UPSTREAM_ERROR_LAYOUT_PATHS = ["sandbox/firewall/logs/api-proxy-logs/upstream-errors.jsonl", "sandbox/firewall/audit/api-proxy-logs/upstream-errors.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/upstream-errors.jsonl"];
+
+/**
+ * Verify every path component under rootDir is non-symlinked and the target is a regular file.
+ * @param {string} rootDir
+ * @param {string} relativePath
+ * @returns {string | null}
+ */
+function resolveRegularFileInside(rootDir, relativePath) {
+  let current = rootDir;
+  for (const part of relativePath.split("/")) {
+    current = path.join(current, part);
+    try {
+      if (fs.lstatSync(current).isSymbolicLink()) return null;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    return fs.lstatSync(current).isFile() ? current : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remove any stale upstream-error fallback file (including a sandbox-planted directory
+ * at that path) without following a symlinked agent directory.
+ * @param {string} ghAwDir
+ */
+function removeUpstreamErrorFallback(ghAwDir) {
+  const agentDir = path.join(ghAwDir, "agent");
+  let dirStat;
+  try {
+    dirStat = fs.lstatSync(agentDir);
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
+    throw error;
+  }
+  if (dirStat.isSymbolicLink() || !dirStat.isDirectory()) return;
+  const target = path.join(agentDir, "upstream-errors-fallback.jsonl");
+  let targetStat;
+  try {
+    targetStat = fs.lstatSync(target);
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
+    throw error;
+  }
+  try {
+    if (!targetStat.isSymbolicLink() && targetStat.isDirectory()) {
+      fs.rmSync(target, { recursive: true, force: true });
+    } else {
+      fs.rmSync(target, { force: true });
+    }
+  } catch (error) {
+    throw new Error(`${ERR_PARSE}: Failed to remove upstream error fallback ${target}: ${getErrorMessage(error)}`, { cause: error });
+  }
+}
+
+/**
+ * Persist an allowlisted recovery file containing only the event discriminator,
+ * `request_id`, and HTTP `status` from AWF's `upstream-errors.jsonl` (using the
+ * same logs > audit > legacy layout precedence as the unified session collector).
+ * Kept distinct from `upstream-errors.jsonl` so merged downloads never overwrite
+ * the full diagnostic, and free of sanitized headers or response bodies.
+ * @param {string} [ghAwDir]
+ * @returns {number} number of allowlisted upstream-error records persisted
+ */
+function persistUpstreamErrorFallback(ghAwDir = getGhAwPath("")) {
+  const sourceFile = UPSTREAM_ERROR_LAYOUT_PATHS.map(rel => resolveRegularFileInside(ghAwDir, rel)).find(Boolean);
+  if (!sourceFile) {
+    removeUpstreamErrorFallback(ghAwDir);
+    return 0;
+  }
+  let content;
+  const fd = fs.openSync(sourceFile, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+  try {
+    content = fs.readFileSync(fd, "utf8");
+  } catch (error) {
+    throw new Error(`${ERR_PARSE}: Failed to read upstream error log ${sourceFile}: ${getErrorMessage(error)}`, { cause: error });
+  } finally {
+    fs.closeSync(fd);
+  }
+  /** @type {Array<{event: "UPSTREAM_ERROR_RESPONSE", request_id: string, status: number}>} */
+  const records = [];
+  for (const entry of iterateJsonlEvents(content)) {
+    if (entry.type !== "json") continue;
+    const record = entry.value;
+    if (!record || typeof record !== "object" || Array.isArray(record)) continue;
+    if (getApiProxyEventName(record).toLowerCase() !== "upstream_error_response") continue;
+    const requestId = typeof record.request_id === "string" && record.request_id.length > 0 ? record.request_id : typeof record.requestId === "string" && record.requestId.length > 0 ? record.requestId : "";
+    const status = Number.isInteger(record.status) ? record.status : Number.isInteger(record.httpStatus) ? record.httpStatus : NaN;
+    if (!UPSTREAM_ERROR_REQUEST_ID_PATTERN.test(requestId) || !Number.isInteger(status) || status < 100 || status > 599) continue;
+    records.push({ event: "UPSTREAM_ERROR_RESPONSE", request_id: requestId, status });
+  }
+  if (records.length === 0) {
+    removeUpstreamErrorFallback(ghAwDir);
+    return 0;
+  }
+  const agentDir = path.join(ghAwDir, "agent");
+  try {
+    const dirStat = fs.lstatSync(agentDir);
+    if (dirStat.isSymbolicLink()) {
+      throw new Error(`${ERR_PARSE}: Refusing a symlinked agent metadata directory`);
+    }
+    if (!dirStat.isDirectory()) {
+      throw new Error(`${ERR_PARSE}: Agent metadata path is not a directory`);
+    }
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) throw error;
+    try {
+      fs.mkdirSync(agentDir, { recursive: true });
+    } catch (mkdirError) {
+      throw new Error(`${ERR_PARSE}: Failed to create agent metadata directory ${agentDir}: ${getErrorMessage(mkdirError)}`, { cause: mkdirError });
+    }
+  }
+  const target = path.join(agentDir, "upstream-errors-fallback.jsonl");
+  try {
+    const targetStat = fs.lstatSync(target);
+    if (!targetStat.isSymbolicLink() && targetStat.isDirectory()) {
+      fs.rmSync(target, { recursive: true, force: true });
+    }
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) throw error;
+  }
+  const temporary = `${target}.${crypto.randomBytes(16).toString("hex")}.tmp`;
+  let outFd;
+  try {
+    outFd = fs.openSync(temporary, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0), 0o600);
+    fs.writeFileSync(outFd, records.map(record => JSON.stringify(record)).join("\n") + "\n", "utf8");
+    fs.closeSync(outFd);
+    outFd = undefined;
+    fs.renameSync(temporary, target);
+  } catch (error) {
+    if (outFd !== undefined) {
+      try {
+        fs.closeSync(outFd);
+      } catch {
+        // Ignore cleanup failure after write error.
+      }
+    }
+    try {
+      fs.rmSync(temporary, { force: true });
+    } catch {
+      // Ignore cleanup failure after write error.
+    }
+    throw error;
+  }
+  return records.length;
 }
 
 function persistAgentAwInfoCopy(ghAwDir = process.env.GH_AW_TMP_DIR || DEFAULT_GH_AW_DIR) {
@@ -675,6 +830,13 @@ async function main(copilotSessionStateDir = getGhAwPath("sandbox/agent/logs/cop
     } catch (error) {
       core.warning(getErrorMessage(error));
     }
+    if (process.env.GH_AW_PHASE !== "detection" && process.env.GH_AW_PHASE !== "evals") {
+      try {
+        persistUpstreamErrorFallback();
+      } catch (error) {
+        core.warning(`Could not persist upstream error fallback evidence: ${getErrorMessage(error)}`);
+      }
+    }
     persistAgentAwInfoCopy();
     if (selectionError) core.setFailed(`${ERR_PARSE}: ${selectionError}`);
   }
@@ -710,6 +872,8 @@ if (typeof module !== "undefined" && module.exports) {
     resolveModelRoutingOutcome,
     recordModelRoutingFromArtifacts,
     persistAgentAwInfoCopy,
+    persistUpstreamErrorFallback,
+    UPSTREAM_ERROR_FALLBACK_RELATIVE_PATH,
   };
 }
 

@@ -144,12 +144,55 @@ function writeVerifiedExitCode(rootDir, exitCode) {
   }
 }
 
+/**
+ * Safely remove an untrusted session artifact path without following symlinked
+ * intermediate directories. Real directories planted at the target path are removed
+ * recursively; symlinks at the target path are unlinked without touching their target.
+ * @param {string} rootDir
+ * @param {string} relativePath
+ */
+function discardArtifactPath(rootDir, relativePath) {
+  const parts = relativePath.split("/");
+  let current = rootDir;
+  for (let i = 0; i < parts.length - 1; i++) {
+    current = path.join(current, parts[i]);
+    let stat;
+    try {
+      stat = fs.lstatSync(current);
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
+      throw error;
+    }
+    if (stat.isSymbolicLink()) {
+      throw new Error(`${ERR_VALIDATION}: Refusing to traverse symlinked session artifact directory ${parts.slice(0, i + 1).join("/")}`);
+    }
+    if (!stat.isDirectory()) return;
+  }
+  const target = path.join(current, parts[parts.length - 1]);
+  let stat;
+  try {
+    stat = fs.lstatSync(target);
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
+    throw error;
+  }
+  try {
+    if (!stat.isSymbolicLink() && stat.isDirectory()) {
+      fs.rmSync(target, { recursive: true, force: true });
+    } else {
+      fs.rmSync(target, { force: true });
+    }
+  } catch (error) {
+    throw new Error(`${ERR_VALIDATION}: Failed to remove untrusted session artifact ${relativePath}`, { cause: error });
+  }
+}
+
 /** @param {string} rootDir */
 function discardUntrustedSessionArtifacts(rootDir) {
   const errors = [];
-  for (const name of ["agent-stdio.log", "agent-session.jsonl", "agent-session.jsonl.tmp", "agent-errors.jsonl", "agent-errors.jsonl.tmp"]) {
+  for (const name of ["agent-stdio.log", "agent-session.jsonl", "agent-session.jsonl.tmp", "agent-errors.jsonl", "agent-errors.jsonl.tmp", "agent/routing-refusal.json", "agent/routing-refusal.json.tmp"]) {
     try {
-      fs.rmSync(path.join(rootDir, name), { force: true });
+      discardArtifactPath(rootDir, name);
     } catch (error) {
       errors.push(error);
     }

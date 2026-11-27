@@ -24,6 +24,7 @@ const { buildWorkflowCallId } = require("./aw_context.cjs");
 const SESSION_FILE_FORMAT_VERSION = 1;
 // The conclusion's sanitized detection result; only it carries a trusted conclusion reason.
 const DETECTION_RESULT_PATH = "usage/detection/detection_result.json";
+const UPSTREAM_ERROR_REQUEST_ID_PATTERN = /^[A-Za-z0-9_.:-]{1,128}$/;
 
 /** @param {any} data @returns {boolean} */
 function isModelEndpointMismatchData(data) {
@@ -190,9 +191,10 @@ function parseEngineSession(content, engine, options = {}) {
  * @param {SessionSource[]} sources
  * @param {unknown} subAgentModels aw_info.sub_agent_models
  * @param {unknown} output agent_output.json
+ * @param {boolean} [fallbackRefused=false] minimal refusal indicator used only when no agent conversation source is present
  * @returns {import("./types/unified_session").RoutingObservationData | undefined}
  */
-function observeRoutedRun(sources, subAgentModels, output) {
+function observeRoutedRun(sources, subAgentModels, output, fallbackRefused = false) {
   /** @param {string} component @param {string | undefined} phase @param {string} type */
   const eventsOf = (component, phase, type) => sources.filter(source => source.component === component && (phase === undefined || source.phase === phase)).flatMap(source => source.events.filter(event => event.type === type));
   /** @param {string} type */
@@ -215,7 +217,7 @@ function observeRoutedRun(sources, subAgentModels, output) {
     startupFailed: !attempt && startup?.outcome === "failure",
     execution: { categories: Array.isArray(execution?.categories) ? execution.categories : [], errorCodes: Array.isArray(execution?.errorCodes) ? execution.errorCodes : [] },
     proxyStatuses: run.statuses,
-    refused: eventsOf("agent", "agent", "assistant.refusal").some(event => !isNestedSessionEvent(event)),
+    refused: fallbackRefused || eventsOf("agent", "agent", "assistant.refusal").some(event => !isNestedSessionEvent(event)),
     output: summarizeAgentOutput(output),
     // As in the published session, only the conclusion's own detection result carries a reason. The
     // detection job's result counts too, for a detector that failed before any result was written.
@@ -662,6 +664,7 @@ function collectUnifiedSession({
       sources.push({ component: "agent", phase: "agent", path: path.relative(rootDir, file), events });
     }
   }
+  let hasAgentConversationSource = sources.some(source => source.component === "agent" && source.phase === "agent");
   for (const [prefix, phase] of [
     ["", "agent"],
     ["threat-detection/", "detection"],
@@ -694,6 +697,7 @@ function collectUnifiedSession({
         if (phase === "agent" && !protectedSessionCapture && engine) {
           const segments = parseHarnessAttempts(stdioContent, engine, data.attemptResults, (content, sourceEngine) => parseFallback(content, sourceEngine, stdio));
           if (segments) {
+            hasAgentConversationSource = true;
             for (let index = sources.length - 1; index >= 0; index--) {
               if (sources[index].component === "agent" && sources[index].phase === "agent") sources.splice(index, 1);
             }
@@ -743,6 +747,35 @@ function collectUnifiedSession({
         seen.add(relative);
         const unit = relative === "audit.jsonl" ? "seconds" : "milliseconds";
         add(file, "firewall", phase, undefined, unit);
+      }
+    }
+    if (prefix === "" && !seen.has(path.join("api-proxy-logs", "upstream-errors.jsonl"))) {
+      const fallbackErrors = path.join(rootDir, "agent/upstream-errors-fallback.jsonl");
+      if (exists(fallbackErrors)) {
+        /** @type {SessionEvent[]} */
+        const events = [];
+        for (const [index, record] of records(fallbackErrors).entries()) {
+          if (
+            !record ||
+            typeof record !== "object" ||
+            Array.isArray(record) ||
+            getApiProxyEventName(record).toLowerCase() !== "upstream_error_response" ||
+            typeof record.request_id !== "string" ||
+            !UPSTREAM_ERROR_REQUEST_ID_PATTERN.test(record.request_id) ||
+            !Number.isInteger(record.status) ||
+            record.status < 100 ||
+            record.status > 599
+          ) {
+            incompleteSources.add(fallbackErrors);
+            report(fallbackErrors, "invalid_upstream_error_fallback", recordLines.get(fallbackErrors)?.[index]);
+            continue;
+          }
+          events.push({
+            type: "firewall.upstream_error",
+            data: { event: "UPSTREAM_ERROR_RESPONSE", request_id: record.request_id, status: record.status },
+          });
+        }
+        sources.push({ component: "firewall", phase, path: "agent/upstream-errors-fallback.jsonl", events, timestampUnit: "milliseconds" });
       }
     }
   }
@@ -1014,7 +1047,19 @@ function collectUnifiedSession({
   const routingObservations = [];
   if (routingObservation) {
     const outputFile = choose(["agent_output.json"]);
-    const observation = observeRoutedRun(sources, runInfo?.sub_agent_models, outputFile ? records(outputFile)[0] : undefined);
+    let fallbackRefused = false;
+    if (!hasAgentConversationSource) {
+      const refusalFile = choose(["agent/routing-refusal.json"]);
+      if (refusalFile) {
+        const record = records(refusalFile)[0];
+        if (record && typeof record === "object" && !Array.isArray(record) && Object.keys(record).length === 1 && record.refused === true) {
+          fallbackRefused = true;
+        } else if (!malformedJsonSources.has(refusalFile)) {
+          report(refusalFile, "invalid_routing_refusal", undefined);
+        }
+      }
+    }
+    const observation = observeRoutedRun(sources, runInfo?.sub_agent_models, outputFile ? records(outputFile)[0] : undefined, fallbackRefused);
     if (observation) routingObservations.push({ type: "routing.observation", data: { ...observation } });
   }
   const persistedWarnings = sources.flatMap(source => source.events.filter(event => event.type === "session.collection_warning"));

@@ -2098,16 +2098,22 @@ jobs:
             ${{ runner.temp }}/gh-aw/safeoutputs.jsonl
             ${{ runner.temp }}/gh-aw/agent_execution.json
             ${{ runner.temp }}/gh-aw/agent_execution_exit_code.txt
+            ${{ runner.temp }}/gh-aw/agent-errors.jsonl
             ${{ runner.temp }}/gh-aw/agent_usage.jsonl
             ${{ runner.temp }}/gh-aw/agent_usage.json
             ${{ runner.temp }}/gh-aw/agent/harness_retry.json
             ${{ runner.temp }}/gh-aw/agent/model-endpoint-mismatch.json
+            ${{ runner.temp }}/gh-aw/agent/routing-refusal.json
+            ${{ runner.temp }}/gh-aw/agent/upstream-errors-fallback.jsonl
             ${{ runner.temp }}/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl
             ${{ runner.temp }}/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl
+            ${{ runner.temp }}/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/adaptive-selection.jsonl
             ${{ runner.temp }}/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl
             ${{ runner.temp }}/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl
+            ${{ runner.temp }}/gh-aw/sandbox/firewall/logs/api-proxy-logs/adaptive-selection.jsonl
             ${{ runner.temp }}/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl
             ${{ runner.temp }}/gh-aw/sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl
+            ${{ runner.temp }}/gh-aw/sandbox/firewall/audit/api-proxy-logs/adaptive-selection.jsonl
             ${{ runner.temp }}/gh-aw/awf-resolved-config.json
           if-no-files-found: ignore
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '0' }}

@@ -1229,9 +1229,15 @@ ran, reached a clean result. Rules apply in order:
 The verdict is evidence of validated terminal completion, not of answer quality.
 It uses only engine-neutral evidence (AWF's records, the job results, harness and
 execution records, normalized refusal events, validated safe outputs, and threat
-detection), so the same evidence gives the same verdict for every engine. It does
-not decide whether a run may update routing history: re-runs, pull request runs,
-and experiment workflows are excluded by the consumer that keeps that history.
+detection), so the same evidence gives the same verdict for every engine. When
+the full `agent` artifact is unavailable and `conclusion` recovers from
+`agent-output-fallback` alone, the collector reads the minimal main-agent
+refusal indicator (`agent/routing-refusal.json`, containing only a boolean
+`refused` flag and no conversation content) only when no agent conversation
+source is present, preserving the same refusal verdict without copying
+conversation text or altering full-artifact runs. It does not decide whether a
+run may update routing history: re-runs, pull request runs, and experiment
+workflows are excluded by the consumer that keeps that history.
 
 #### Upstream errors
 
@@ -1240,7 +1246,13 @@ and experiment workflows are excluded by the consumer that keeps that history.
 proxy) to `firewall.upstream_error`, retaining only `requestId`, `provider`,
 `model`, `httpStatus` (from `status`), and the identifier-only `errorCode`,
 `errorType`, and `errorParam` that AWF extracted from the provider's error
-envelope. `firewall.model_routing` request records likewise retain `errorCode`,
+envelope. When no `upstream-errors.jsonl` exists across the agent firewall
+layouts (for example during `agent-output-fallback` recovery), the collector
+falls back to `agent/upstream-errors-fallback.jsonl`, accepting only allowlisted
+`UPSTREAM_ERROR_RESPONSE` records carrying a non-empty `request_id` and integer
+HTTP `status` (100-599); when `upstream-errors.jsonl` is present, the fallback
+file is ignored so merged downloads neither overwrite nor duplicate the full
+diagnostic. `firewall.model_routing` request records likewise retain `errorCode`,
 `errorType`, and `errorSource` (`upstream` or `awf`) from `error_code`,
 `error_type`, and `error_source`. Identifiers MUST match
 `^[A-Za-z0-9_.:-]{1,64}$`; other values are dropped, never truncated or recovered
@@ -2872,6 +2884,11 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.15.2 - Draft (2026-11-27)
+
+- Clarified `agent-output-fallback` recovery for T-UAS-082 and T-UAS-094: when `upstream-errors.jsonl` or agent conversation sources are absent, the collector reads allowlisted upstream HTTP status records from `agent/upstream-errors-fallback.jsonl` and the content-free top-level refusal indicator from `agent/routing-refusal.json` (alongside `agent-errors.jsonl` execution categories), ignoring fallback-only substitutes whenever the full `agent` artifact supplies the primary sources.
+- Retained serialization-format version 1.
 
 ### Version 2.15.1 - Draft (2026-11-24)
 
