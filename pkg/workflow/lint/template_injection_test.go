@@ -276,27 +276,40 @@ jobs:
       - env:
           ALIAS: ${{ env.TITLE }}
           TITLE: fixed
-        run: echo "${{ env.ALIAS }}"; echo "${{ env.TITLE }}"
+          Z_ALIAS: ${{ env.TITLE }}
+        run: |
+          echo "${{ env.ALIAS }}"
+          echo "${{ env.TITLE }}"
+          echo "${{ env.Z_ALIAS }}"
 `))
 	require.NoError(t, err)
 	diagnostics := runTemplateInjection(t, workflow)
-	require.Len(t, diagnostics, 1)
+	require.Len(t, diagnostics, 2)
 	assert.Equal(t, "jobs.test.steps[0].run", diagnostics[0].Path)
+	assert.Equal(t, 1, diagnostics[0].Line)
 	assert.Equal(t, "jobs.test.env.TITLE", diagnostics[0].Related[0].Path)
+	assert.Equal(t, "jobs.test.steps[0].run", diagnostics[1].Path)
+	assert.Equal(t, 3, diagnostics[1].Line)
+	assert.Equal(t, "jobs.test.env.TITLE", diagnostics[1].Related[0].Path)
 
 	typed := templateInjectionWorkflow("", true)
 	typed.Jobs[0].Env = map[string]actions.Expression{"TITLE": actions.Context("github.event.issue.title")}
 	typed.Jobs[0].Steps = []actions.Step{actions.RunStep{
 		StepOptions: actions.StepOptions{Env: map[string]actions.Expression{
-			"ALIAS": actions.Context("env.TITLE"),
-			"TITLE": actions.Literal("fixed"),
+			"ALIAS":   actions.Context("env.TITLE"),
+			"TITLE":   actions.Literal("fixed"),
+			"Z_ALIAS": actions.Context("env.TITLE"),
 		}},
-		Run: `echo "${{ env.ALIAS }}"; echo "${{ env.TITLE }}"`,
+		Run: "echo \"${{ env.ALIAS }}\"\necho \"${{ env.TITLE }}\"\necho \"${{ env.Z_ALIAS }}\"",
 	}}
 	diagnostics = runTemplateInjection(t, typed)
-	require.Len(t, diagnostics, 1)
+	require.Len(t, diagnostics, 2)
 	assert.Equal(t, "jobs.test.steps[0].run", diagnostics[0].Path)
+	assert.Equal(t, 1, diagnostics[0].Line)
 	assert.Equal(t, "jobs.test.env.TITLE", diagnostics[0].Related[0].Path)
+	assert.Equal(t, "jobs.test.steps[0].run", diagnostics[1].Path)
+	assert.Equal(t, 3, diagnostics[1].Line)
+	assert.Equal(t, "jobs.test.env.TITLE", diagnostics[1].Related[0].Path)
 }
 
 func TestTemplateInjectionEnvironmentSiblingDoesNotTaintAlias(t *testing.T) {
@@ -310,8 +323,12 @@ jobs:
       - env:
           ALIAS: ${{ env.TITLE }}
           TITLE: ${{ github.event.issue.title }}
+          Z_ALIAS: ${{ env.TITLE }}
           INVALID: ${{ inputs.PRIVATE_VALUE
-        run: echo "${{ env.ALIAS }}"; echo "${{ env.TITLE }}"
+        run: |
+          echo "${{ env.ALIAS }}"
+          echo "${{ env.TITLE }}"
+          echo "${{ env.Z_ALIAS }}"
 `))
 	require.NoError(t, err)
 	diagnostics := runTemplateInjection(t, workflow)
@@ -319,6 +336,7 @@ jobs:
 	assert.Equal(t, "jobs.test.steps[0].env.INVALID", diagnostics[0].Path)
 	assert.Equal(t, Warning, diagnostics[0].Severity)
 	assert.Equal(t, "jobs.test.steps[0].run", diagnostics[1].Path)
+	assert.Equal(t, 2, diagnostics[1].Line)
 	assert.Equal(t, "jobs.test.steps[0].env.TITLE", diagnostics[1].Related[0].Path)
 }
 
