@@ -68,12 +68,19 @@ func sourceCommandContext(ctx context.Context, remoteURL string, includeCredenti
 		"-c", "submodule.recurse=false",
 	}
 	cmdDir := sourceCommandWorkingDirectory()
-	gitPath, err := fileutil.ResolveExecutablePath("git")
-	cmd := exec.CommandContext(ctx, gitPath, append(base, args...)...)
+	gitPath, err := exec.LookPath("git")
+	if err == nil && !filepath.IsAbs(gitPath) {
+		gitPath, err = filepath.Abs(gitPath)
+	}
+	if err == nil {
+		_, err = fileutil.ValidateExecutablePath(gitPath)
+	}
 	if err != nil {
+		cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
 		cmd.Err = fmt.Errorf("resolve git executable: %w", err)
 		return cmd, false
 	}
+	cmd := exec.CommandContext(ctx, gitPath, append(base, args...)...)
 	cmd.Dir = cmdDir
 	cmd.Env = sourceCommandEnvironment(cmdDir)
 	if gitExecPath := trustedGitExecPath(gitPath, cmdDir, cmd.Env); gitExecPath != "" {
@@ -133,7 +140,7 @@ func sourceCommandWorkingDirectory() string {
 }
 
 func trustedGitExecPath(gitPath, cmdDir string, env []string) string {
-	// gitPath is resolved and validated from the fixed name "git" by the caller.
+	// gitPath is the validated absolute PATH entry for the fixed name "git".
 	cmd := exec.Command(gitPath, "--exec-path")
 	cmd.Dir = cmdDir
 	cmd.Env = env

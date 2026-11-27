@@ -156,7 +156,7 @@ func TestSourceCommandContextRejectsExecutableTransports(t *testing.T) {
 	}
 }
 
-func TestSourceCommandContextValidatesGitExecutable(t *testing.T) {
+func TestSourceCommandContextRejectsInvalidGitExecutable(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test uses a shell executable")
 	}
@@ -172,11 +172,62 @@ func TestSourceCommandContextValidatesGitExecutable(t *testing.T) {
 	_, err := cmd.CombinedOutput()
 	require.ErrorContains(t, err, "resolve git executable")
 	require.NoFileExists(t, marker)
+}
 
+func TestSourceCommandContextReportsMissingGitExecutable(t *testing.T) {
+	root := t.TempDir()
 	t.Setenv("PATH", root)
-	cmd = SourceCommandContext(context.Background(), "", "status")
-	_, err = cmd.CombinedOutput()
+	cmd := SourceCommandContext(context.Background(), "", "status")
+	_, err := cmd.CombinedOutput()
 	require.ErrorContains(t, err, "resolve git executable")
+}
+
+func TestSourceCommandContextRejectsInvalidSymlinkTarget(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses symlinks and a shell executable")
+	}
+	root := t.TempDir()
+	targetDir := filepath.Join(root, "bad\npath")
+	require.NoError(t, os.Mkdir(targetDir, 0700))
+	marker := filepath.Join(root, "called")
+	require.NoError(t, os.WriteFile(filepath.Join(targetDir, "git"), []byte("#!/bin/sh\nprintf called > \"$GH_AW_TEST_GIT_MARKER\"\n"), 0700))
+
+	pathDir := filepath.Join(root, "safe")
+	require.NoError(t, os.Mkdir(pathDir, 0700))
+	require.NoError(t, os.Symlink(filepath.Join(targetDir, "git"), filepath.Join(pathDir, "git")))
+	t.Setenv("PATH", pathDir)
+	t.Setenv("GH_AW_TEST_GIT_MARKER", marker)
+
+	cmd := SourceCommandContext(context.Background(), "", "status")
+	_, err := cmd.CombinedOutput()
+	require.ErrorContains(t, err, "resolve git executable")
+	require.NoFileExists(t, marker)
+}
+
+func TestSourceCommandContextPreservesSymlinkExecutableName(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses symlinks and a shell executable")
+	}
+	root := t.TempDir()
+	shimPath := filepath.Join(root, "multi-call-shim")
+	script := `#!/bin/sh
+if [ "${0##*/}" != "git" ]; then
+  exit 1
+fi
+if [ "$1" = "--exec-path" ]; then
+  printf '%s\n' "$GH_AW_TEST_GIT_EXEC_PATH"
+fi
+`
+	require.NoError(t, os.WriteFile(shimPath, []byte(script), 0700))
+	gitPath := filepath.Join(root, "git")
+	require.NoError(t, os.Symlink(shimPath, gitPath))
+	t.Setenv("PATH", root)
+	t.Setenv("GH_AW_TEST_GIT_EXEC_PATH", root)
+
+	cmd := SourceCommandContext(context.Background(), "", "status")
+	require.Equal(t, gitPath, cmd.Path)
+	require.Equal(t, root, envValue(cmd.Env, "GIT_EXEC_PATH"))
+	require.NoError(t, cmd.Run())
 }
 
 func TestSourceCommandContextUsesFixedExecPathProbe(t *testing.T) {

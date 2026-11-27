@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
@@ -61,6 +62,9 @@ func validateHostMountPath(hostPath string) (string, error) {
 	}
 	if strings.Contains(colonPath, ":") {
 		return "", fmt.Errorf("host path contains unsupported ':' for docker -v mount syntax. Example: /tmp/repo or C:/repo. Got: %s", cleanHostPath)
+	}
+	if filepath.Dir(cleanHostPath) == cleanHostPath {
+		return "", fmt.Errorf("host path cannot be a filesystem root: %s", cleanHostPath)
 	}
 	return cleanHostPath, nil
 }

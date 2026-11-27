@@ -31,6 +31,11 @@ func ValidateExecutablePath(path string) (string, error) {
 		return "", fmt.Errorf("failed to resolve executable path %q: %w", path, err)
 	}
 
+	cleanPath, err = ValidateAbsolutePath(cleanPath)
+	if err != nil {
+		return "", fmt.Errorf("resolved executable path is invalid: %w", err)
+	}
+
 	info, err := os.Stat(cleanPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to stat executable path %q: %w", cleanPath, err)
