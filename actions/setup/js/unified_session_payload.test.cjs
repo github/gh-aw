@@ -1708,8 +1708,9 @@ describe("AWF model routing candidate and request metadata", () => {
         const projected = project(event);
         for (const field of NEW_FIELDS) {
           const alias = SOURCE_FIELDS[field].find(key => Object.hasOwn(record, key));
-          expect(Object.hasOwn(projected.data, field), `${name} ${field}`).toBe(alias !== undefined);
-          if (alias === undefined) continue;
+          const expectedPresent = field === "rankedChoices" ? alias !== undefined && Array.isArray(record[alias]) : alias !== undefined;
+          expect(Object.hasOwn(projected.data, field), `${name} ${field}`).toBe(expectedPresent);
+          if (!expectedPresent) continue;
           if (field === "rankedChoices") expect(projected.data.rankedChoices).toEqual(ranked(record[alias].map(({ model, effort }) => ({ model, effort }))));
           else expect(projected.data[field]).toEqual(record[alias]);
         }
@@ -1968,6 +1969,169 @@ describe("AWF model inventories with unknown endpoints and live reasoning metada
         untimedEvents: baseline.untimedEvents + 1,
         absentComponents: baseline.absentComponents.filter(component => component !== "firewall"),
       });
+    }
+  });
+});
+
+describe("AWF router fallback selection provenance", () => {
+  it("propagates selectionSource, fallbackReason, and fallbackTier on firewall.model_routing and workflow.info and handles router/ranked_choices nulls", () => {
+    const fallbackRecord = {
+      _schema: "model-routing/v0.29.21",
+      stage: "selection",
+      provider: "copilot",
+      selected_provider: "copilot",
+      selected_model: "github-copilot/gpt-5.3-codex",
+      wire_model: "gpt-5.3-codex",
+      selected_effort: "medium",
+      endpoint: "/responses",
+      selection_source: "fallback",
+      fallback_reason: "no_route",
+      fallback_tier: "standard",
+      router: null,
+      ranked_choices: null,
+    };
+    const projectedFirewall = normalizeUnifiedSessionEvent({ type: "firewall.model_routing", data: fallbackRecord });
+    expect(projectedFirewall.data).toMatchObject({
+      stage: "selection",
+      selectionSource: "fallback",
+      fallbackReason: "no_route",
+      fallbackTier: "standard",
+      router: null,
+    });
+    expect(projectedFirewall.data).not.toHaveProperty("rankedChoices");
+
+    const projectedRouter = normalizeUnifiedSessionEvent({
+      type: "firewall.model_routing",
+      data: { ...fallbackRecord, selection_source: "router", fallback_reason: null, fallback_tier: null, router: { name: "gh-aw-router", version: "0.2.0" } },
+    });
+    expect(projectedRouter.data).toMatchObject({
+      selectionSource: "router",
+      fallbackReason: null,
+      fallbackTier: null,
+      router: { name: "gh-aw-router", version: "0.2.0" },
+    });
+
+    const sanitized = normalizeUnifiedSessionEvent({
+      type: "firewall.model_routing",
+      data: {
+        stage: "selection",
+        selection_source: "unexpected",
+        fallback_reason: "free form reason with spaces",
+        fallback_tier: "ultra",
+      },
+    });
+    expect(sanitized.data).not.toHaveProperty("selectionSource");
+    expect(sanitized.data).not.toHaveProperty("fallbackReason");
+    expect(sanitized.data).not.toHaveProperty("fallbackTier");
+
+    const infoEvent = normalizeUnifiedSessionEvent({
+      type: "workflow.info",
+      data: {
+        model_routing: {
+          status: "selected",
+          wire_model: "gpt-5.3-codex",
+          selection_source: "fallback",
+          fallback_reason: "no_route",
+          fallback_tier: "standard",
+        },
+      },
+    });
+    expect(infoEvent.data.modelRouting).toMatchObject({
+      status: "selected",
+      wireModel: "gpt-5.3-codex",
+      selectionSource: "fallback",
+      fallbackReason: "no_route",
+      fallbackTier: "standard",
+    });
+
+    const sanitizedInfo = normalizeUnifiedSessionEvent({
+      type: "workflow.info",
+      data: {
+        model_routing: {
+          status: "selected",
+          selection_source: "invalid",
+          fallback_reason: "",
+          fallback_tier: "bogus",
+        },
+      },
+    });
+    expect(sanitizedInfo.data.modelRouting).toEqual({ status: "selected" });
+  });
+
+  it("projects an AWF fallback record end-to-end through parse_token_usage, recordModelRouting, and writeUnifiedSession matching the strict schema", () => {
+    const { resolveModelRoutingOutcome } = require("./parse_token_usage.cjs");
+    const { recordModelRouting } = require("./model_attribution.cjs");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "fallback-e2e-"));
+    try {
+      const routingLog = path.join(root, "sandbox", "firewall", "logs", "api-proxy-logs", "model-routing.jsonl");
+      fs.mkdirSync(path.dirname(routingLog), { recursive: true });
+      const awfFallbackSelection = {
+        _schema: "model-routing/v0.29.21",
+        timestamp: "2026-11-27T10:00:02.000Z",
+        event: "model_routing",
+        stage: "selection",
+        provider: "copilot",
+        selected_provider: "copilot",
+        selected_model: "github-copilot/gpt-5.3-codex",
+        wire_model: "gpt-5.3-codex",
+        selected_effort: "medium",
+        endpoint: "/responses",
+        selection_source: "fallback",
+        fallback_reason: "no_route",
+        fallback_tier: "standard",
+        router: null,
+        ranked_choices: null,
+        selected_id: "choice-fallback-0001",
+      };
+      fs.writeFileSync(routingLog, `${JSON.stringify(awfFallbackSelection)}\n`);
+      const env = { GH_AW_MODEL_ROUTING_ENABLED: "true", GH_AW_ENGINE_ID: "copilot", GH_AW_TMP_DIR: root };
+      const outcome = resolveModelRoutingOutcome(env, root);
+      expect(outcome).toMatchObject({
+        status: "selected",
+        wire_model: "gpt-5.3-codex",
+        selection_source: "fallback",
+        fallback_reason: "no_route",
+        fallback_tier: "standard",
+      });
+      expect(outcome.router_version).toBeUndefined();
+
+      const infoPath = path.join(root, "aw_info.json");
+      const recorded = recordModelRouting(outcome, env, infoPath);
+      expect(recorded).toMatchObject({
+        status: "selected",
+        selection_source: "fallback",
+        fallback_reason: "no_route",
+        fallback_tier: "standard",
+      });
+
+      writeUnifiedSession({ rootDir: root, engine: "copilot" });
+      const raw = fs.readFileSync(path.join(root, "usage/aw_session.jsonl"), "utf8");
+      expect(validateSession(raw, "unified", "jsonl")).toBeGreaterThan(0);
+
+      const events = raw
+        .trim()
+        .split("\n")
+        .map(line => JSON.parse(line));
+      const workflowInfo = events.find(event => event.type === "workflow.info");
+      const firewallSelection = events.find(event => event.type === "firewall.model_routing" && event.data?.stage === "selection");
+      expect(workflowInfo?.data?.modelRouting).toMatchObject({
+        status: "selected",
+        wireModel: "gpt-5.3-codex",
+        selectionSource: "fallback",
+        fallbackReason: "no_route",
+        fallbackTier: "standard",
+      });
+      expect(firewallSelection?.data).toMatchObject({
+        stage: "selection",
+        wireModel: "gpt-5.3-codex",
+        selectionSource: "fallback",
+        fallbackReason: "no_route",
+        fallbackTier: "standard",
+        router: null,
+      });
+      expect(firewallSelection?.data).not.toHaveProperty("rankedChoices");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
     }
   });
 });

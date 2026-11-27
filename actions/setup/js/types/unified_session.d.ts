@@ -238,6 +238,12 @@ export interface ModelRoutingData {
   errorType?: string;
   /** Whether a failed request was rejected by the upstream provider or by AWF; absent means unknown. */
   errorSource?: "upstream" | "awf";
+  /** Whether AWF selected the model via the router or the fallback walk; absent on older AWF releases. */
+  selectionSource?: "router" | "fallback";
+  /** Routing failure code that triggered fallback, or null on a router pick; absent on older AWF releases. */
+  fallbackReason?: string | null;
+  /** Coding tier chosen by the fallback walk, or null on a router pick; absent on older AWF releases. */
+  fallbackTier?: "standard" | "premium" | "unclassified" | "lightweight" | "none" | null;
 }
 
 /** Proxy-written upstream error response, projected without bodies, headers or messages. */
@@ -363,6 +369,12 @@ export interface UnifiedModelRoutingData {
   mode?: JsonValue;
   selectedId?: JsonValue;
   routerVersion?: JsonValue;
+  /** Whether AWF selected the model via the router or the fallback walk; absent on older AWF releases. */
+  selectionSource?: "router" | "fallback";
+  /** Routing failure code that triggered fallback, or null on a router pick; absent on older AWF releases. */
+  fallbackReason?: string | null;
+  /** Coding tier chosen by the fallback walk, or null on a router pick; absent on older AWF releases. */
+  fallbackTier?: "standard" | "premium" | "unclassified" | "lightweight" | "none" | null;
   failureCode?: JsonValue;
 }
 

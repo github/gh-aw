@@ -1,0 +1,100 @@
+{
+  "model_routing": {
+    "status": "selected",
+    "selected_model": "github-copilot/gpt-5.3-codex",
+    "selected_effort": "medium",
+    "endpoint": "/responses",
+    "effective_endpoint": "/responses",
+    "selected_endpoint": "/responses",
+    "routed_counts": {
+      "as_selected": 1
+    },
+    "outcome_counts": {
+      "completed": 1
+    },
+    "classifier_cost": {
+      "requests": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "aic": 0
+    },
+    "selected_model_cost": {
+      "requests": 1,
+      "input_tokens": 12000,
+      "output_tokens": 150,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "aic": 0.25
+    },
+    "deviated_traffic_cost": {
+      "requests": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "aic": 0
+    },
+    "main_agent_cost": {
+      "requests": 1,
+      "input_tokens": 12000,
+      "output_tokens": 150,
+      "cache_read_tokens": 0,
+      "cache_write_tokens": 0,
+      "aic": 0.25
+    }
+  },
+  "firewall_token_usage": {
+    "total_input_tokens": 12000,
+    "total_output_tokens": 150,
+    "total_cache_read_tokens": 0,
+    "total_cache_write_tokens": 0,
+    "total_requests": 1,
+    "total_duration_ms": 1500,
+    "total_response_bytes": 0,
+    "cache_efficiency": 0,
+    "total_aic": 0.25,
+    "by_model": {
+      "gpt-5.3-codex": {
+        "provider": "copilot",
+        "input_tokens": 12000,
+        "output_tokens": 150,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "requests": 1,
+        "duration_ms": 1500,
+        "response_bytes": 0,
+        "aic": 0.25
+      }
+    },
+    "agent_usage": [
+      {
+        "agent_name": "main",
+        "agent_type": "main",
+        "source_engine": "copilot",
+        "instance_count": 1,
+        "served_models": ["gpt-5.3-codex"],
+        "requests": 1,
+        "input_tokens": 12000,
+        "output_tokens": 150,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "aic": 0.25,
+        "total_api_duration_ms": 1500,
+        "models": [
+          {
+            "model": "gpt-5.3-codex",
+            "resolved_model": "gpt-5.3-codex",
+            "requests": 1,
+            "input_tokens": 12000,
+            "output_tokens": 150,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+            "aic": 0.25
+          }
+        ]
+      }
+    ]
+  }
+}

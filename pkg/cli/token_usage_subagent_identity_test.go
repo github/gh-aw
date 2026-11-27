@@ -198,9 +198,9 @@ func TestModelRoutingLogsMissingAgentIDPreservesAccounting(t *testing.T) {
 			}
 		}
 
-		assert.Equal(t, 176, summary.TotalRequests)
+		assert.Equal(t, 177, summary.TotalRequests)
 		assert.Equal(t, 36, summary.DeviatedRequests)
-		assert.InDelta(t, 0.204545, summary.DeviatedTrafficShare, 0.0000001)
+		assert.InDelta(t, 0.20339, summary.DeviatedTrafficShare, 0.0000001)
 		assert.InDelta(t, 3.05912, summary.ClassifierAIC, 0.0000001)
 
 		var instances, completed int

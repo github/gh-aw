@@ -380,3 +380,36 @@ func TestRecommendAuditComparisonAction(t *testing.T) {
 		})
 	}
 }
+
+func TestAuditComparisonModelRoutingFallbackProvenance(t *testing.T) {
+	t.Parallel()
+	legacyRoute := modelRoutingComparisonRoute(&ModelRoutingSummary{
+		SelectedModel:  "github-copilot/gpt-5.3-codex",
+		SelectedEffort: "medium",
+		RouterVersion:  "0.2.0",
+	})
+	routerRoute := modelRoutingComparisonRoute(&ModelRoutingSummary{
+		SelectedModel:   "github-copilot/gpt-5.3-codex",
+		SelectedEffort:  "medium",
+		SelectionSource: "router",
+		RouterVersion:   "0.2.0",
+	})
+	fallbackRoute := modelRoutingComparisonRoute(&ModelRoutingSummary{
+		SelectedModel:   "github-copilot/gpt-5.3-codex",
+		SelectedEffort:  "medium",
+		SelectionSource: "fallback",
+		FallbackReason:  "no_route",
+		FallbackTier:    "standard",
+	})
+	require.NotNil(t, legacyRoute)
+	require.NotNil(t, routerRoute)
+	require.NotNil(t, fallbackRoute)
+	assert.True(t, sameModelRoutingRoute(legacyRoute, routerRoute), "upgrading AWF from omitted to explicit router selection_source should not report a route change")
+	assert.False(t, sameModelRoutingRoute(routerRoute, fallbackRoute))
+	assert.Equal(t, "router", routerRoute.SelectionSource)
+	assert.Equal(t, "fallback", fallbackRoute.SelectionSource)
+	assert.Equal(t, "no_route", fallbackRoute.FallbackReason)
+	assert.Equal(t, "standard", fallbackRoute.FallbackTier)
+	assert.NotContains(t, formatAuditComparisonRoute(routerRoute), "selection_source=")
+	assert.Contains(t, formatAuditComparisonRoute(fallbackRoute), "selection_source=fallback fallback_reason=no_route fallback_tier=standard")
+}
