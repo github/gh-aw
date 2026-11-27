@@ -517,30 +517,27 @@ async function startLocalOTLPCollector() {
 }
 
 async function simulatePushRoutingHistoryFailure(root, failureKind) {
-  if (failureKind === "artifact-download") {
-    // Download usage artifact fails with continue-on-error omitted, so the push step is skipped.
-    return "failure";
-  }
-
-  // Trigger a real push failure in push_routing_history.cjs after a valid usage session is read.
   const remote = path.join(root, "remote.git");
   execFileSync("git", ["init", "--quiet", "--bare", remote]);
   execFileSync("git", ["config", "user.name", "remote"], { cwd: remote });
   execFileSync("git", ["config", "user.email", "remote@example.com"], { cwd: remote });
   const initialCommit = execFileSync("git", ["commit-tree", "4b825dc642cb6eb9a060e54bf8d69288fbee4904", "-m", "Initialize routing history"], { cwd: remote, encoding: "utf8" }).trim();
   execFileSync("git", ["update-ref", "refs/heads/memory/adaptive-routing/triage", initialCommit], { cwd: remote });
+
   const sessionPath = path.join(root, "aw_session.jsonl");
-  const events = [
-    { type: "routing.observation", data: { outcome: "success" }, provenance: { component: "collector", phase: "conclusion" } },
-    { type: "firewall.model_routing", data: { stage: "selection", selectedProvider: "copilot", wireModel: "model-a", selectedEffort: "high" }, provenance: { component: "firewall", phase: "agent" } },
-    { type: "firewall.model_routing", data: { stage: "request", requestId: "r1", routed: "as_selected", requestedModel: "model-a" }, provenance: { component: "firewall", phase: "agent" } },
-    {
-      type: "firewall.token_usage",
-      data: { requestId: "r1", provider: "copilot", aic: 1, usage: { inputTokens: 100, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, outputTokens: 20 } },
-      provenance: { component: "firewall", phase: "agent" },
-    },
-  ];
-  fs.writeFileSync(sessionPath, events.map(event => `${JSON.stringify(event)}\n`).join(""));
+  if (failureKind === "history-push") {
+    const events = [
+      { type: "routing.observation", data: { outcome: "success" }, provenance: { component: "collector", phase: "conclusion" } },
+      { type: "firewall.model_routing", data: { stage: "selection", selectedProvider: "copilot", wireModel: "model-a", selectedEffort: "high" }, provenance: { component: "firewall", phase: "agent" } },
+      { type: "firewall.model_routing", data: { stage: "request", requestId: "r1", routed: "as_selected", requestedModel: "model-a" }, provenance: { component: "firewall", phase: "agent" } },
+      {
+        type: "firewall.token_usage",
+        data: { requestId: "r1", provider: "copilot", aic: 1, usage: { inputTokens: 100, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, outputTokens: 20 } },
+        provenance: { component: "firewall", phase: "agent" },
+      },
+    ];
+    fs.writeFileSync(sessionPath, events.map(event => `${JSON.stringify(event)}\n`).join(""));
+  }
 
   const pushError = "ERR_API: failed to push memory/adaptive-routing/triage";
   const pushSignedCommitsFn = vi.fn(async () => {
@@ -595,9 +592,15 @@ async function simulatePushRoutingHistoryFailure(root, failureKind) {
     } catch (err) {
       thrownMessage = err instanceof Error ? err.message : String(err);
     }
-    expect(pushSignedCommitsFn).toHaveBeenCalled();
     const reportedFailure = thrownMessage || setFailed.mock.calls.map(([msg]) => String(msg)).join("\n");
-    expect(reportedFailure).toContain(pushError);
+    if (failureKind === "artifact-download") {
+      // Missing usage artifact fails with a missing unified session before any push runs.
+      expect(pushSignedCommitsFn).not.toHaveBeenCalled();
+      expect(reportedFailure).toContain("unified session is missing");
+    } else {
+      expect(pushSignedCommitsFn).toHaveBeenCalled();
+      expect(reportedFailure).toContain(pushError);
+    }
     return "failure";
   } finally {
     global.core = previousCore;
@@ -695,6 +698,7 @@ describe("push_routing_history OTLP failure reporting", () => {
       const attrs = Object.fromEntries(conclusionSpan.attributes.map(a => [a.key, a.value.stringValue ?? a.value.intValue]));
       expect(attrs["gh-aw.job.name"]).toBe("push_routing_history");
       expect(attrs["gh-aw.run.status"]).toBe("success");
+      expect(attrs["error.type"]).toBe("job_failed");
 
       if (metricsEnabled) {
         expect(collector.metrics).toHaveLength(1);

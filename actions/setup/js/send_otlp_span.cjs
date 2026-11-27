@@ -2450,7 +2450,9 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   // needs.detection.outputs.* in downstream jobs (conclusion, safe_outputs, etc.).
   const detectionConclusion = process.env.GH_AW_DETECTION_CONCLUSION || "";
   const detectionReason = process.env.GH_AW_DETECTION_REASON || "";
-  const rawJobResult = (typeof options.jobResult === "string" ? options.jobResult : process.env.GH_AW_JOB_RESULT || "").trim();
+  const ALLOWED_JOB_RESULTS = new Set(["success", "failure", "timed_out", "cancelled", "skipped"]);
+  const rawJobResultCandidate = (typeof options.jobResult === "string" ? options.jobResult : process.env.GH_AW_JOB_RESULT || "").trim().toLowerCase();
+  const rawJobResult = ALLOWED_JOB_RESULTS.has(rawJobResultCandidate) ? rawJobResultCandidate : "";
   const jobResult = rawJobResult || (jobName === "detection" ? detectionConclusion : "");
   const runtimeMetrics = readAgentRuntimeMetrics(engineId);
   // Read once and reuse for both gh-aw.aic and gen_ai.usage.* attributes.
@@ -2518,14 +2520,19 @@ async function sendJobConclusionSpan(spanName, options = {}) {
     statusMessage = `agent ${agentConclusion}: ${errorMessages[0]}`.slice(0, 256);
   }
   const isNonAgentJobNonOK = jobName !== "agent" && ["failure", "timed_out", "cancelled"].includes(jobResult);
+  let jobErrorType = "";
   if (isNonAgentJobNonOK) {
     statusCode = 2;
+    jobErrorType = jobResult === "timed_out" ? "job_timed_out" : jobResult === "cancelled" ? "job_cancelled" : "job_failed";
     if (!statusMessage) {
       statusMessage = `${jobName || "job"} ${jobResult}`;
     }
   }
 
   const attributes = [buildAttr(OTEL_ATTR_WORKFLOW_NAME, workflowName), buildAttr(OTEL_ATTR_RUN_ID, runId), buildAttr("gh-aw.run.attempt", runAttempt), buildAttr("gh-aw.run.actor", actor), buildAttr(OTEL_ATTR_REPOSITORY, repository)];
+  if (jobErrorType) {
+    attributes.push(buildAttr(OTEL_ATTR_ERROR_TYPE, jobErrorType));
+  }
   if (jobName === "agent") {
     const durableParentRunId = readDurableParentRunId(runId, runAttempt);
     if (durableParentRunId) attributes.push(buildAttr("gh-aw.durable.parent_run_id", durableParentRunId));

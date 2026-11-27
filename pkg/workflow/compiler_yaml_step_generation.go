@@ -410,7 +410,6 @@ func (c *Compiler) generateScriptModeCleanupStep(data *WorkflowData) string {
 	step.WriteString("          GH_AW_ACTIONS_SOURCE_DIR: " + scriptModeActionsSourcePath() + "\n")
 	step.WriteString("          INPUT_DESTINATION: " + SetupActionDestination + "\n")
 	step.WriteString("          INPUT_JOB_NAME: ${{ github.job }}\n")
-	step.WriteString("          GH_AW_JOB_RESULT: ${{ job.status }}\n")
 	if engineID := ResolveEngineID(data); engineID != "" {
 		writeFormattedYAML(&step, "          GH_AW_INFO_ENGINE_ID: %q\n", engineID)
 	}
@@ -421,4 +420,11 @@ func (c *Compiler) generateScriptModeCleanupStep(data *WorkflowData) string {
 		writeFormattedYAML(&step, "          GH_AW_INFO_GENAI_ENDPOINT: %q\n", endpoint)
 	}
 	return step.String()
+}
+
+// generateScriptModeCleanupStepWithJobResult appends GH_AW_JOB_RESULT to the
+// script-mode cleanup step so jobs that report their own failure status in OTLP
+// receive the final Actions job.status without changing other script-mode jobs.
+func (c *Compiler) generateScriptModeCleanupStepWithJobResult(data *WorkflowData) string {
+	return c.generateScriptModeCleanupStep(data) + "          GH_AW_JOB_RESULT: ${{ job.status }}\n"
 }

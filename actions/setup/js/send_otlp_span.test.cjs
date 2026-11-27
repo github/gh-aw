@@ -3214,6 +3214,10 @@ describe("sendJobConclusionSpan", () => {
     process.env.GH_AW_AGENT_CONCLUSION = "success";
     Object.assign(process.env, env);
     await sendJobConclusionSpan(`gh-aw.${jobName}.conclusion`, { startMs: Date.now() - 5000, ...options });
+    const span = appendSpy.mock.calls.filter(([filePath]) => filePath === OTEL_JSONL_PATH).map(([, content]) => JSON.parse(String(content).trim()))[0].resourceSpans[0].scopeSpans[0].spans[0];
+    expect(span.status.code).toBe(expectedJobResult === "failure" ? 2 : 1);
+    const errorTypeAttr = span.attributes.find(attr => attr.key === "error.type");
+    expect(errorTypeAttr?.value.stringValue).toBe(expectedJobResult === "failure" ? "job_failed" : undefined);
     const metrics = mirrorLines.filter(line => line.includes('"resourceMetrics"')).flatMap(line => JSON.parse(line.trim()).resourceMetrics[0].scopeMetrics[0].metrics);
     const resultOf = name => metrics.find(metric => metric.name === name).histogram.dataPoints[0].attributes.find(attr => attr.key === "cicd.pipeline.task.run.result")?.value.stringValue;
     expect(resultOf("gh_aw.job.duration")).toBe(expectedJobResult);
@@ -3223,12 +3227,12 @@ describe("sendJobConclusionSpan", () => {
   });
 
   it.each([
-    ["failure", false, ""],
-    ["failure", true, ""],
-    ["failure", false, "gen_ai_v1"],
-    ["timed_out", true, ""],
-    ["cancelled", true, ""],
-  ])("marks push_routing_history conclusion span ERROR on jobResult=%s (metrics=%s, semconv=%s) without changing run status", async (jobResult, metricsEnabled, semconv) => {
+    ["failure", "job_failed", false, ""],
+    ["failure", "job_failed", true, ""],
+    ["failure", "job_failed", false, "gen_ai_v1"],
+    ["timed_out", "job_timed_out", true, ""],
+    ["cancelled", "job_cancelled", true, ""],
+  ])("marks push_routing_history conclusion span ERROR with error.type=%s on jobResult=%s (metrics=%s, semconv=%s) without changing run status", async (jobResult, expectedErrorType, metricsEnabled, semconv) => {
     const prevSemconv = process.env.OTEL_SEMCONV_STABILITY_OPT_IN;
     try {
       if (metricsEnabled) {
@@ -3253,6 +3257,7 @@ describe("sendJobConclusionSpan", () => {
       const attrs = Object.fromEntries(span.attributes.map(a => [a.key, a.value.stringValue ?? a.value.intValue]));
       expect(attrs["gh-aw.job.name"]).toBe("push_routing_history");
       expect(attrs["gh-aw.run.status"]).toBe("success");
+      expect(attrs["error.type"]).toBe(expectedErrorType);
 
       const metricPayloads = mirrorLines.filter(line => line.includes('"resourceMetrics"')).map(line => JSON.parse(line.trim()));
       if (metricsEnabled) {
@@ -3277,6 +3282,23 @@ describe("sendJobConclusionSpan", () => {
     }
   });
 
+  it("ignores unknown GH_AW_JOB_RESULT values so untrusted strings cannot leak into OTLP payloads", async () => {
+    process.env.GH_AW_OTEL_METRICS = "true";
+    process.env.INPUT_JOB_NAME = "push_routing_history";
+    process.env.GH_AW_JOB_RESULT = "leaked-secret-value";
+
+    await sendJobConclusionSpan("gh-aw.push_routing_history.conclusion", { startMs: Date.now() - 5000 });
+
+    const span = appendSpy.mock.calls.filter(([filePath]) => filePath === OTEL_JSONL_PATH).map(([, content]) => JSON.parse(String(content).trim()))[0].resourceSpans[0].scopeSpans[0].spans[0];
+    expect(span.status.code).toBe(1);
+    expect(span.attributes.some(attr => attr.key === "error.type")).toBe(false);
+
+    const metrics = mirrorLines.filter(line => line.includes('"resourceMetrics"')).flatMap(line => JSON.parse(line.trim()).resourceMetrics[0].scopeMetrics[0].metrics);
+    const durationAttrs = metrics.find(metric => metric.name === "gh_aw.job.duration").histogram.dataPoints[0].attributes;
+    expect(durationAttrs.some(attr => attr.key === "cicd.pipeline.task.run.result")).toBe(false);
+    expect(metrics.some(metric => metric.name === "gh_aw.job.errors")).toBe(false);
+  });
+
   it("keeps push_routing_history span OK and skips gh_aw.job.errors on jobResult=success", async () => {
     process.env.GH_AW_OTEL_METRICS = "true";
     process.env.INPUT_JOB_NAME = "push_routing_history";
@@ -3287,6 +3309,7 @@ describe("sendJobConclusionSpan", () => {
     const span = spanPayloads[0].resourceSpans[0].scopeSpans[0].spans[0];
     expect(span.status.code).toBe(1);
     expect(span.status.message).toBeUndefined();
+    expect(span.attributes.some(attr => attr.key === "error.type")).toBe(false);
 
     const metrics = mirrorLines.filter(line => line.includes('"resourceMetrics"')).flatMap(line => JSON.parse(line.trim()).resourceMetrics[0].scopeMetrics[0].metrics);
     expect(metrics.some(metric => metric.name === "gh_aw.job.errors")).toBe(false);

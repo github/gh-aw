@@ -34,7 +34,7 @@ func TestScriptModeUnlockCleanupCarriesGenAIAttribution(t *testing.T) {
 
 	github := findCleanupStep(t, &EngineConfig{ID: "copilot"})
 	assert.Contains(t, github, `GH_AW_INFO_ENGINE_ID: "copilot"`)
-	assert.Contains(t, github, "GH_AW_JOB_RESULT: ${{ job.status }}")
+	assert.NotContains(t, github, "GH_AW_JOB_RESULT", "shared script-mode cleanup must not alter non-routing jobs")
 	assert.NotContains(t, github, "GH_AW_INFO_GENAI_PROVIDER")
 	assert.NotContains(t, github, "GH_AW_INFO_GENAI_ENDPOINT")
 }

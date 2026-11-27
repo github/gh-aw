@@ -217,7 +217,7 @@ func (c *Compiler) buildPushRoutingHistorySteps(data *WorkflowData) []string {
 		steps = append(steps, c.generateRestoreActionsSetupStep())
 	}
 	if c.actionMode.IsScript() {
-		steps = append(steps, c.generateScriptModeCleanupStep(data))
+		steps = append(steps, c.generateScriptModeCleanupStepWithJobResult(data))
 	} else if setupRef != "" {
 		steps = append(steps, generateRecordJobResultStep())
 	}
