@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-11-26",
+  "last_updated": "2026-11-27",
   "pending_tasks": [
     {
       "file": "docs/src/content/docs/reference/serena.md",
@@ -216,6 +216,18 @@
       "created": "2026-11-23",
       "status": "pending",
       "issue": "compile --dry-run flag help (line 882) is about 90 words on one line; keep a one-line summary and move scanner and dispatch rules to docs"
+    },
+    {
+      "file": "docs/src/content/docs/reference/permissions.md",
+      "created": "2026-11-27",
+      "status": "pending",
+      "issue": "Task 1 in the 2026-11-27 discussion. Line 50 'must always be declared as read' conflicts with the schema (read or none allowed; write rejected). Move the note out of the line 48 lead-in, list app-only scopes as bullets (lines 52-65), and state the values regular scopes accept (line 25). Docs-only change"
+    },
+    {
+      "file": ".github/workflows/q.md",
+      "created": "2026-11-27",
+      "status": "pending",
+      "issue": "Task 2 in the 2026-11-27 discussion. run-success (line 49) says 'has optimized your workflow' but fires on comment-only and noop runs (notify_comment_error.cjs:303-307 keys off agent conclusion). Reword to neutral finished-with-findings text. Recompile to regenerate the lock file (derived). Same root cause as the smoke-agent-public-approved, spec-librarian and cloclo entries; a shared fix belongs in notify_comment_error.cjs"
     }
   ]
 }

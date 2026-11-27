@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-27",
+  "run_id": "46018269006",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/reference/fork-support.md",
+      "docs/src/content/docs/reference/permissions.md"
+    ],
+    "cli": [
+      "gh aw run",
+      "gh aw (root help)"
+    ],
+    "messages": [
+      ".github/workflows/daily-max-ai-credits-test.md",
+      ".github/workflows/q.md"
+    ],
+    "validation": [
+      "pkg/workflow/concurrency_validation.go"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "daily-max-ai-credits-test.md messages: run-started, run-success and run-failure are distinct, and run-success says the verifier job decides the outcome",
+    "concurrency_validation.go error hints are actionable and match the schema (queue accepts single or max)",
+    "run help: --repeat states the arithmetic (--repeat 3 runs 4 times total) and --ref states that the workflow must already exist on the default branch"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "docs/src/content/docs/reference/permissions.md",
+      "priority": "high",
+      "issue": "Line 50 note says app-only scopes must always be declared as read, but the schema allows read or none and rejects write. The note sits between the line 48 lead-in and its lists. Lines 52-65 run scope names together as inline text. Line 25 'Key read permission scopes' does not say which values scopes accept"
+    },
+    {
+      "file": ".github/workflows/q.md",
+      "priority": "medium",
+      "issue": "run-success (line 49) says 'has optimized your workflow' but fires whenever the agent concludes success, including comment-only and noop runs (notify_comment_error.cjs:303-307). Lines 49-50 also use persona lines that add little for enterprise readers"
+    }
+  ],
+  "tasks_proposed": [
+    "docs/src/content/docs/reference/permissions.md",
+    ".github/workflows/q.md"
+  ],
+  "unverified": [
+    "Fork-support 'all jobs skip' claim is still pending maintainer confirmation and was not re-verified",
+    "Schema values were checked for actions, id-token and administration only, not for every scope",
+    "The run-success-on-noop cause is in shared notify_comment_error.cjs; a shared fix was not drafted because it changes the noop path",
+    "Root help analysis-command descriptions (routing, value, work-queue, skill) were read but not turned into a task"
+  ],
+  "caveats": "No repository files were edited, no tests were run, and no workflows were compiled or dispatched. Tasks are proposals in the discussion. A workflow sample file contained agent-directed instructions; they were not followed."
+}
