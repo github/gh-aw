@@ -7,6 +7,8 @@ disable-agentic-editing: true
 ---
 
 import Video from '../../../components/Video.astro';
+import { Image } from 'astro:assets';
+import authenticationPaths from '../../../assets/diagrams/auth-2026-11-27.svg';
 
 This page describes authentication settings for GitHub Agentic Workflows.
 
@@ -15,6 +17,8 @@ Two kinds of authentication are needed
 1. Authentication for model inference for your chosen AI engine.
 
 2. Authentication for GitHub API operations, safe outputs and other GitHub operations.
+
+<Image src={authenticationPaths} alt="A workflow uses separate authentication paths for model inference and GitHub operations." />
 
 ## Authenticating your AI Engine
 
