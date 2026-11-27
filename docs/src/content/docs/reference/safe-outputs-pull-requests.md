@@ -189,10 +189,13 @@ safe-outputs:
     target-repo: "owner/repo" # cross-repository
     required-labels: [automated]     # only update if PR has ALL these labels
     required-title-prefix: "[bot] "  # only update if PR title starts with this prefix
+    required-author: app/workflow-bot # only update PRs opened by this GitHub App
     github-token: ${{ secrets.SOME_CUSTOM_TOKEN }} # optional custom token for permissions
 ```
 
 **Target**: `"triggering"` (requires a PR event), `"*"` (any PR; the agent must supply `pull_request_number`), or a specific number.
+
+Set `required-author` to the GitHub login that must have opened the PR, or use `app/<slug>` for a GitHub App bot (whose login is `<slug>[bot]`). Comparisons are case-insensitive; a missing author or a different identity causes the update to be skipped.
 
 When `update-branch: true` is set, the handler calls the REST `pulls.updateBranch` API to merge the latest base branch into the PR branch before applying title or body updates. This requires `contents: write`. With `contents: read` only, the field cannot be used. It can also be used alone, with `title: false` and `body: false`, to update the branch without changing the description. If GitHub reports `There are no new commits on the base branch.` or `merge conflict between base and head`, the workflow logs a warning and continues.
 
@@ -424,7 +427,7 @@ GitHub can return `Resource not accessible by integration` for `resolveReviewThr
 
 ## Push to PR Branch (`push-to-pull-request-branch:`)
 
-Pushes changes to a PR's branch. Gate pushes with `required-title-prefix` and `required-labels` so that only approved PRs receive changes. Set `max` above `1` to allow multiple pushes per run.
+Pushes changes to a PR's branch. Gate pushes with `required-author`, `required-title-prefix`, and `required-labels` so only PRs meeting the configured checks receive changes. Title prefixes and labels can be shared by unrelated PRs; `required-author` additionally checks the PR's GitHub author login. Set `max` above `1` to allow multiple pushes per run.
 
 :::caution[Fork PRs Are Restricted]
 This safe output can push only to same-repository PRs, or to fork-backed PRs whose head repository exactly matches the configured `head-repo`. Other contributor forks are unsupported and fail early with a clear error.
@@ -434,6 +437,7 @@ This safe output can push only to same-repository PRs, or to fork-backed PRs who
 safe-outputs:
   push-to-pull-request-branch:
     target: "*"                 # "triggering" (default), "*", or number
+    required-author: app/workflow-bot # only push to PRs opened by this GitHub App
     required-title-prefix: "[bot] "      # require title prefix
     required-labels: [automated]         # require all labels
     max: 3                      # max pushes per run (default: 1)
@@ -456,6 +460,8 @@ safe-outputs:
       client-id: ${{ vars.FORK_APP_CLIENT_ID }}
       private-key: ${{ secrets.FORK_APP_PRIVATE_KEY }}
 ```
+
+`required-author` is optional and compares the PR's GitHub login case-insensitively. Use `app/<slug>` to require a GitHub App bot author. If omitted, behavior is unchanged; when set, an absent or different author causes the push to be rejected before any branch write.
 
 Git commands (`checkout`, `branch`, `switch`, `add`, `rm`, `commit`, `merge`) are enabled automatically when this output is configured. An explicit `target` accepts a positive integer (`123`), a numeric string (`"123"`), or a hash-prefixed string (`"#123"`). With `target: "*"`, the same forms are accepted in the message's `pull_request_number` field. Quote hash-prefixed values in YAML so they are not read as comments.
 

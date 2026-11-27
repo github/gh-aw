@@ -288,7 +288,8 @@ func computeSafeOutputHandlerPermissions(safeOutputs *SafeOutputsConfig, handler
 		config := field.Elem()
 		labels := config.FieldByName("RequiredLabels")
 		titlePrefix := config.FieldByName("RequiredTitlePrefix")
-		if (labels.IsValid() && labels.Len() > 0) || (titlePrefix.IsValid() && titlePrefix.String() != "") {
+		author := config.FieldByName("RequiredAuthor")
+		if (labels.IsValid() && labels.Len() > 0) || (titlePrefix.IsValid() && titlePrefix.String() != "") || (author.IsValid() && author.String() != "") {
 			permissions.Set(PermissionIssues, PermissionRead)
 		}
 	}

@@ -291,7 +291,7 @@ function buildPRUpdateData(item, config) {
   }
 
   const updateBranch = item.update_branch !== undefined ? item.update_branch === true : config.update_branch === true;
-  const updateBranchStacksEnabled = config.update_branch_stacks !== false;
+  const updateBranchStacksEnabled = config.update_branch_stacks !== false && !Object.prototype.hasOwnProperty.call(config, "required_author");
   updateData._update_branch_stacks = updateBranchStacksEnabled;
   if (updateBranch) {
     updateData.update_branch = true;
@@ -345,7 +345,12 @@ const main = createUpdateHandlerFactory({
   itemFilter: async (githubClient, repoParts, prNumber, config) => {
     const requiredLabels = Array.isArray(config.required_labels) ? config.required_labels : [];
     const requiredTitlePrefix = config.required_title_prefix || "";
-    return checkRequiredFilter(githubClient, repoParts, prNumber, requiredLabels, requiredTitlePrefix, "update_pull_request");
+    const hasRequiredAuthor = Object.prototype.hasOwnProperty.call(config, "required_author");
+    if (hasRequiredAuthor && (typeof config.required_author !== "string" || !config.required_author.trim())) {
+      return { success: false, error: "required_author must be a non-empty string when configured" };
+    }
+    const requiredAuthor = hasRequiredAuthor ? config.required_author.trim() : "";
+    return checkRequiredFilter(githubClient, repoParts, prNumber, requiredLabels, requiredTitlePrefix, "update_pull_request", requiredAuthor);
   },
 });
 
