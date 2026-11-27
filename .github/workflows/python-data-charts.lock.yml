@@ -1499,13 +1499,29 @@ jobs:
           path: ${{ runner.temp }}/gh-aw/safeoutputs/assets/
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
           if-no-files-found: ignore
+      - name: Prepare safe-outputs artifact staging
+        id: prepare_safe_outputs_artifact_staging
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
+          GH_AW_UPLOAD_ARTIFACT_CONFIG: "{\"upload_artifact\":{}}"
+          GH_AW_UPLOAD_ARTIFACT_STAGING_DIR: ${{ runner.temp }}/gh-aw/safeoutputs/upload-artifacts/
+          GH_AW_UPLOAD_ARTIFACT_TRANSFER_DIR: ${{ runner.temp }}/gh-aw/safeoutputs/upload-artifacts-transfer/
+        with:
+          script: |
+            const { setupGlobals } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/setup_globals.cjs`);
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { prepare } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/prepare_upload_artifact_staging.cjs`);
+            const result = await prepare({ core });
+            core.info(`Prepared ${result.count} safe-output staging file(s)`);
       # Upload safe-outputs upload-artifact staging for the upload_artifact job
       - name: Upload upload-artifact staging
-        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success'
+        if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.prepare_safe_outputs_artifact_staging.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: safe-outputs-upload-artifacts
-          path: ${{ runner.temp }}/gh-aw/safeoutputs/upload-artifacts/
+          path: ${{ runner.temp }}/gh-aw/safeoutputs/upload-artifacts-transfer/
           retention-days: ${{ vars.GH_AW_DEFAULT_ARTIFACT_RETENTION_DAYS || '1' }}
           if-no-files-found: ignore
       - name: Emit OTLP job conclusion before artifacts
