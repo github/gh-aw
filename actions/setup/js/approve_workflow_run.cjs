@@ -240,12 +240,13 @@ async function verifyWorkflowRunApproval(githubClient, runId, config) {
     return { error: `Workflow run ${runId} is not associated exclusively with the triggering pull request or explicitly allowed pull requests` };
   }
 
+  const verifiedPullRequests = [];
   for (const pullRequest of run.pull_requests) {
     const pullRequestNumber = parsePositiveInt(pullRequest.number);
     if (pullRequestNumber === undefined) return { error: `Workflow run ${runId} has invalid pull request data` };
 
     const { fullName: headRepo, headSha } = await getPullRequestDetails(githubClient, pullRequestNumber);
-    if (pullRequest.head?.sha !== headSha) {
+    if (typeof run.head_sha !== "string" || run.head_sha !== headSha || pullRequest.head?.sha !== headSha) {
       return { error: `Workflow run ${runId} was created for a different head revision of pull request #${pullRequestNumber}` };
     }
     if (!isHeadRepoAllowed(headRepo, allowedRepos)) {
@@ -264,6 +265,14 @@ async function verifyWorkflowRunApproval(githubClient, runId, config) {
         skipped: true,
         reasonCode: POLICY_FILE_PROTECTION_DENIED_REASON_CODE,
       };
+    }
+    verifiedPullRequests.push({ number: pullRequestNumber, headRepo, headSha });
+  }
+
+  for (const pullRequest of verifiedPullRequests) {
+    const current = await getPullRequestDetails(githubClient, pullRequest.number);
+    if (current.headSha !== pullRequest.headSha || current.fullName !== pullRequest.headRepo) {
+      return { error: `Workflow run ${runId} was created for a different head revision of pull request #${pullRequest.number}` };
     }
   }
 
@@ -383,21 +392,8 @@ async function main(config = {}) {
     }
 
     try {
-      const initialVerification = await verifyWorkflowRunApproval(githubClient, runId, config);
-      if (!initialVerification.run) {
-        const error = initialVerification.error || `Workflow run ${runId} could not be authorized`;
-        core.warning(error);
-        return {
-          success: false,
-          ...(initialVerification.skipped ? { skipped: true } : {}),
-          ...(initialVerification.reasonCode ? { reasonCode: initialVerification.reasonCode } : {}),
-          ...(initialVerification.reason ? { reason: initialVerification.reason } : {}),
-          error,
-        };
-      }
-
       // Re-read the run, associated PR revisions, repository ownership, and changed files
-      // at the effect boundary so approval is bound to the current authorized state.
+      // immediately before approval so the effect uses the current authorized state.
       const verification = await verifyWorkflowRunApproval(githubClient, runId, config);
       if (!verification.run) {
         const error = verification.error || `Workflow run ${runId} could not be authorized`;

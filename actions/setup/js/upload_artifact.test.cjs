@@ -421,6 +421,16 @@ describe("upload_artifact.cjs", () => {
       expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
     });
 
+    it("ignores transfer metadata markers when resolving an empty path selection", async () => {
+      writeStaging("reports/.gh-aw-empty-selection", "");
+
+      const results = await runHandler(buildConfig({ "default-if-no-files": "ignore", "allowed-paths": ["reports/**"] }), [{ type: "upload_artifact", path: "reports" }]);
+
+      expect(results[0].skipped).toBe(true);
+      expect(mockArtifactClient.uploadArtifact).not.toHaveBeenCalled();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
     it("fails when no files match and if-no-files=error (default)", async () => {
       await runHandler(buildConfig(), [{ type: "upload_artifact", filters: { include: ["nonexistent/**"] } }]);
 

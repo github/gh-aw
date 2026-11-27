@@ -227,8 +227,9 @@ func TestGenerateSafeOutputsArtifactStagingUpload(t *testing.T) {
 		data := &WorkflowData{
 			SafeOutputs: &SafeOutputsConfig{
 				UploadArtifact: &UploadArtifactConfig{
-					AllowedPaths: []string{"reports/**"},
-					Filters:      &ArtifactFiltersConfig{Exclude: []string{"reports/private/**"}},
+					MaxSizeBytes: defaultArtifactMaxSizeBytes / 2,
+					AllowedPaths: []string{"reports/${{ inputs.folder }}"},
+					Filters:      &ArtifactFiltersConfig{Exclude: []string{"reports/private/${{ inputs.folder }}"}},
 				},
 			},
 		}
@@ -238,8 +239,15 @@ func TestGenerateSafeOutputsArtifactStagingUpload(t *testing.T) {
 		assert.Contains(t, result, artifactStagingDirExpr, "should reference staging directory")
 		assert.Contains(t, result, artifactStagingTransferDirExpr, "should upload the filtered transfer directory")
 		assert.Contains(t, result, "prepare_upload_artifact_staging.cjs")
-		assert.Contains(t, result, "reports/**")
-		assert.Contains(t, result, "reports/private/**")
+		assert.Contains(t, result, `\"max-size-bytes\":52428800`)
+		assert.Contains(t, result, `GH_AW_UPLOAD_ARTIFACT_RUNTIME_POLICY_0: "${{ inputs.folder }}"`)
+		assert.Contains(t, result, `GH_AW_UPLOAD_ARTIFACT_RUNTIME_POLICY_1: "${{ inputs.folder }}"`)
+		configLineStart := strings.Index(result, "GH_AW_UPLOAD_ARTIFACT_CONFIG:")
+		runtimeLineStart := strings.Index(result, "GH_AW_UPLOAD_ARTIFACT_RUNTIME_POLICY_0:")
+		require.NotEqual(t, -1, configLineStart)
+		require.NotEqual(t, -1, runtimeLineStart)
+		assert.NotContains(t, result[configLineStart:runtimeLineStart], "${{", "runtime expressions must not be embedded in the JSON string")
+		assert.NotContains(t, result, "GH_AW_AGENT_OUTPUT:", "preparation must inherit the collector's output environment")
 		assert.Contains(t, result, "steps.prepare_safe_outputs_artifact_staging.outcome == 'success'")
 		assert.NotContains(t, result, "path: "+artifactStagingDirExpr, "must not upload the agent-writable staging directory")
 		assert.Contains(t, result, "if: always()", "should have always() condition")

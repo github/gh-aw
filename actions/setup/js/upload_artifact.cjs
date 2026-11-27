@@ -228,6 +228,7 @@ function listFilesRecursive(dir, baseDir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
+    if (entry.name === ".gh-aw-empty-selection") continue;
     if (entry.isDirectory()) {
       files.push(...listFilesRecursive(fullPath, baseDir));
     } else if (entry.isFile()) {

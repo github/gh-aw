@@ -44,6 +44,7 @@ const pendingPullRequestRun = {
   conclusion: null,
   html_url: "https://github.com/test-owner/test-repo/actions/runs/123",
   workflow_id: 456,
+  head_sha: "current-head-sha",
   pull_requests: [{ number: 42, head: { sha: "current-head-sha" } }],
 };
 const runPullRequest = number => ({ number, head: { sha: "current-head-sha" } });
@@ -406,6 +407,20 @@ describe("approve_workflow_run", () => {
     expect(mockApproveWorkflowRun).not.toHaveBeenCalled();
   });
 
+  it("rejects a run whose own head SHA differs from its current PR association", async () => {
+    mockGetWorkflowRun.mockResolvedValue({
+      data: { ...pendingPullRequestRun, head_sha: "older-run-head-sha" },
+    });
+    const { main } = require("./approve_workflow_run.cjs");
+    const handler = await main(externalTokenConfig);
+
+    const result = await handler({ run_id: 123 }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("different head revision");
+    expect(mockApproveWorkflowRun).not.toHaveBeenCalled();
+  });
+
   it("rechecks the PR revision immediately before approving", async () => {
     mockGetPullRequest
       .mockResolvedValueOnce({ data: { head: { sha: "current-head-sha", repo: { full_name: "test-owner/test-repo" } } } })
@@ -417,7 +432,37 @@ describe("approve_workflow_run", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("different head revision");
-    expect(mockGetWorkflowRun).toHaveBeenCalledTimes(2);
+    expect(mockGetWorkflowRun).toHaveBeenCalledTimes(1);
+    expect(mockListFiles).toHaveBeenCalledTimes(1);
+    expect(mockApproveWorkflowRun).not.toHaveBeenCalled();
+  });
+
+  it("revalidates every associated PR head after all paginated file enumeration", async () => {
+    const pullRequests = [runPullRequest(42), runPullRequest(43)];
+    mockGetWorkflowRun.mockResolvedValue({
+      data: { ...pendingPullRequestRun, pull_requests: pullRequests },
+    });
+    let firstPullRequestHead = "current-head-sha";
+    mockGetPullRequest.mockImplementation(async ({ pull_number: pullRequestNumber }) => ({
+      data: {
+        head: {
+          sha: pullRequestNumber === 42 ? firstPullRequestHead : "current-head-sha",
+          repo: { full_name: "test-owner/test-repo" },
+        },
+      },
+    }));
+    mockListFiles.mockImplementation(async ({ pull_number: pullRequestNumber }) => {
+      if (pullRequestNumber === 43) firstPullRequestHead = "new-head-sha";
+      return { data: [] };
+    });
+    const { main } = require("./approve_workflow_run.cjs");
+    const handler = await main({ ...externalTokenConfig, allowed_pull_requests: ["43"] });
+
+    const result = await handler({ run_id: 123 }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("different head revision");
+    expect(mockGetPullRequest).toHaveBeenCalledTimes(3);
     expect(mockApproveWorkflowRun).not.toHaveBeenCalled();
   });
 
@@ -649,7 +694,7 @@ describe("approve_workflow_run", () => {
     expect(second.success).toBe(false);
     expect(second.skipped).toBe(true);
     expect(second.reasonCode).toBe("APPROVE_WORKFLOW_RUN_PERMISSION_DENIED");
-    expect(mockGetWorkflowRun).toHaveBeenCalledTimes(2);
+    expect(mockGetWorkflowRun).toHaveBeenCalledTimes(1);
     expect(mockApproveWorkflowRun).toHaveBeenCalledTimes(1);
   });
 });

@@ -182,7 +182,7 @@ func generateSafeOutputsArtifactStagingUpload(builder *strings.Builder, data *Wo
 	publishArtifactsLog.Print("Generating safe-outputs artifact staging upload step")
 
 	prefix := artifactPrefixExprForDownstreamJob(data)
-	configJSON, err := safeOutputsArtifactStagingConfig(data)
+	configJSON, runtimePolicyValues, err := safeOutputsArtifactStagingConfig(data)
 	if err != nil {
 		return err
 	}
@@ -192,8 +192,15 @@ func generateSafeOutputsArtifactStagingUpload(builder *strings.Builder, data *Wo
 	builder.WriteString("        if: always() && " + secretRedactionSuccessCondition(data) + "\n")
 	fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/github-script")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	builder.WriteString("        env:\n")
-	builder.WriteString("          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}\n")
-	fmt.Fprintf(builder, "          GH_AW_UPLOAD_ARTIFACT_CONFIG: %q\n", configJSON)                           //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	fmt.Fprintf(builder, "          GH_AW_UPLOAD_ARTIFACT_CONFIG: %q\n", configJSON) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	runtimePolicyKeys := make([]string, 0, len(runtimePolicyValues))
+	for key := range runtimePolicyValues {
+		runtimePolicyKeys = append(runtimePolicyKeys, key)
+	}
+	slices.Sort(runtimePolicyKeys)
+	for _, key := range runtimePolicyKeys {
+		fmt.Fprintf(builder, "          %s: %q\n", key, runtimePolicyValues[key]) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	}
 	fmt.Fprintf(builder, "          GH_AW_UPLOAD_ARTIFACT_STAGING_DIR: %s\n", artifactStagingDirExpr)          //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	fmt.Fprintf(builder, "          GH_AW_UPLOAD_ARTIFACT_TRANSFER_DIR: %s\n", artifactStagingTransferDirExpr) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 	builder.WriteString("        with:\n")
@@ -215,19 +222,33 @@ func generateSafeOutputsArtifactStagingUpload(builder *strings.Builder, data *Wo
 	return nil
 }
 
-func safeOutputsArtifactStagingConfig(data *WorkflowData) (string, error) {
+func safeOutputsArtifactStagingConfig(data *WorkflowData) (string, map[string]string, error) {
 	config := make(map[string]any)
+	runtimePolicyValues := make(map[string]string)
+	nextRuntimePolicyValue := 0
+	encodePatterns := func(patterns []string) []string {
+		encoded := make([]string, len(patterns))
+		for i, pattern := range patterns {
+			encoded[i] = encodeArtifactStagingRuntimePolicy(pattern, runtimePolicyValues, &nextRuntimePolicyValue)
+		}
+		return encoded
+	}
 	if artifactConfig := data.SafeOutputs.UploadArtifact; artifactConfig != nil {
 		handlerConfig := make(map[string]any)
+		maxSizeBytes := artifactConfig.MaxSizeBytes
+		if maxSizeBytes <= 0 {
+			maxSizeBytes = defaultArtifactMaxSizeBytes
+		}
+		handlerConfig["max-size-bytes"] = maxSizeBytes
 		if len(artifactConfig.AllowedPaths) > 0 {
-			handlerConfig["allowed-paths"] = artifactConfig.AllowedPaths
+			handlerConfig["allowed-paths"] = encodePatterns(artifactConfig.AllowedPaths)
 		}
 		if artifactConfig.Filters != nil {
 			if len(artifactConfig.Filters.Include) > 0 {
-				handlerConfig["filters-include"] = artifactConfig.Filters.Include
+				handlerConfig["filters-include"] = encodePatterns(artifactConfig.Filters.Include)
 			}
 			if len(artifactConfig.Filters.Exclude) > 0 {
-				handlerConfig["filters-exclude"] = artifactConfig.Filters.Exclude
+				handlerConfig["filters-exclude"] = encodePatterns(artifactConfig.Filters.Exclude)
 			}
 		}
 		config["upload_artifact"] = handlerConfig
@@ -241,9 +262,46 @@ func safeOutputsArtifactStagingConfig(data *WorkflowData) (string, error) {
 	}
 	configJSON, err := json.Marshal(config)
 	if err != nil {
-		return "", fmt.Errorf("cannot serialize safe-output staging configuration: %w", err)
+		return "", nil, fmt.Errorf("cannot serialize safe-output staging configuration: %w", err)
 	}
-	return string(configJSON), nil
+	return string(configJSON), runtimePolicyValues, nil
+}
+
+func encodeArtifactStagingRuntimePolicy(pattern string, values map[string]string, nextIndex *int) string {
+	var encoded strings.Builder
+	for offset := 0; offset < len(pattern); {
+		start := strings.Index(pattern[offset:], "${{")
+		if start < 0 {
+			encoded.WriteString(pattern[offset:])
+			break
+		}
+		start += offset
+		end := strings.Index(pattern[start+3:], "}}")
+		if end < 0 {
+			encoded.WriteString(pattern[offset:])
+			break
+		}
+		end += start + 3
+		expression := strings.TrimSpace(pattern[start+3 : end])
+		if expression == "" {
+			encoded.WriteString(pattern[offset : end+2])
+			offset = end + 2
+			continue
+		}
+		key := fmt.Sprintf("GH_AW_UPLOAD_ARTIFACT_RUNTIME_POLICY_%d", *nextIndex)
+		placeholder := "__" + key + "__"
+		for strings.Contains(pattern, placeholder) || values[key] != "" {
+			(*nextIndex)++
+			key = fmt.Sprintf("GH_AW_UPLOAD_ARTIFACT_RUNTIME_POLICY_%d", *nextIndex)
+			placeholder = "__" + key + "__"
+		}
+		(*nextIndex)++
+		values[key] = "${{ " + expression + " }}"
+		encoded.WriteString(pattern[offset:start])
+		encoded.WriteString(placeholder)
+		offset = end + 2
+	}
+	return encoded.String()
 }
 
 func usesSafeOutputsArtifactStaging(config *SafeOutputsConfig) bool {
