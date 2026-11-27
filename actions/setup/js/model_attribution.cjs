@@ -304,12 +304,13 @@ function resolveModelRoutingSummary({
 /**
  * Read the collector-emitted `routing.observation` verdict from `usage/aw_session.jsonl` (T-UAS-094).
  * Only events with `provenance.component === "collector"` and `provenance.phase === "conclusion"` are trusted.
- * Returns null when absent, unreadable, or invalid; never synthesizes `"skip"`.
+ * Returns null when absent, unreadable, or malformed; never synthesizes `"skip"`.
  *
- * @param {{ sessionPath?: string }} [options]
+ * @param {string} sessionPath
  * @returns {{ outcome: "success" | "failure" } | { outcome: "skip", skip_reason: string } | null}
  */
-function resolveRoutingObservation({ sessionPath = require("path").join((process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw", "usage/aw_session.jsonl") } = {}) {
+function resolveRoutingObservation(sessionPath) {
+  if (typeof sessionPath !== "string" || !sessionPath) return null;
   /** @param {unknown} value @returns {value is Record<string, any>} */
   const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
   /** @type {any} */

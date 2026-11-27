@@ -2586,7 +2586,7 @@ async function sendJobConclusionSpan(spanName, options = {}) {
         }
       }
     }
-    const routingObservation = resolveRoutingObservation({ sessionPath: getGhAwPath("usage/aw_session.jsonl") });
+    const routingObservation = resolveRoutingObservation(getGhAwPath("usage/aw_session.jsonl"));
     if (routingObservation) {
       attributes.push(buildAttr("gh-aw.model_routing.observation.outcome", routingObservation.outcome));
       if (routingObservation.outcome === "skip") {
