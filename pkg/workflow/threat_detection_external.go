@@ -163,12 +163,6 @@ func buildThreatDetectionWorkflowData(data *WorkflowData, engineID string) *Work
 	if firewallConfig := getFirewallConfig(data); firewallConfig != nil {
 		firewallCopy := *firewallConfig
 		detectionData.NetworkPermissions = &NetworkPermissions{Firewall: &firewallCopy}
-		if detectionData.SandboxConfig == nil {
-			detectionData.SandboxConfig = &SandboxConfig{}
-		}
-		if detectionData.SandboxConfig.Agent == nil {
-			detectionData.SandboxConfig.Agent = &AgentSandboxConfig{Type: SandboxTypeAWF}
-		}
 		detectionData.SandboxConfig.Agent.Version = firewallCopy.Version
 	}
 	if len(detectionData.SandboxConfig.Agent.Images) == 0 {
@@ -393,33 +387,16 @@ type externalDetectorPathSetup struct {
 	commandPrefix string
 }
 
-const threatDetectBinaryPathSetup = `detector="${THREAT_DETECT_BINARY:?Verified detector path must be supplied by the install step}"
-if [[ ! -f "$detector" || ! -x "$detector" || -L "$detector" ]]; then
-  echo "ERROR: Verified detector must be a regular executable file" >&2
-  exit 1
-fi
-mkdir -p "${RUNNER_TEMP}/gh-aw/bin"
-rm -f "${RUNNER_TEMP}/gh-aw/bin/threat-detect"
-cp "$detector" "${RUNNER_TEMP}/gh-aw/bin/threat-detect"
-chmod +x "${RUNNER_TEMP}/gh-aw/bin/threat-detect"
-`
-
 // buildExternalDetectorPathSetup returns the host-side shell commands that run
 // before AWF plus any command prefix needed inside the external detector container.
 // For the installed Copilot engine, threat-detect invokes the engine binary by
 // name, so the mounted ${RUNNER_TEMP}/gh-aw/bin/ directory must be prepended to
 // PATH in the container command. Non-ARC topologies also need a host-side copy
 // into that mounted directory; ARC/DinD already stages Copilot there during install.
-// Every ARC detection engine also needs the detector binary and prepared inputs
-// staged on the shared volume before AWF starts.
+// Every ARC detection engine needs its prepared inputs staged on the shared volume.
 func (c *Compiler) buildExternalDetectorPathSetup(data *WorkflowData, engineID string) externalDetectorPathSetup {
 	setup := externalDetectorPathSetup{}
 	threatLog.Printf("Building external detector path setup: engine=%s", engineID)
-	if useRootlessCLIInstallation(data) && !isArcDindTopology(data) {
-		// Mount the verified user-space binary without relying on the container's HOME.
-		setup.hostSetup = threatDetectBinaryPathSetup
-		setup.commandPrefix = `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH" && `
-	}
 	if isArcDindTopology(data) {
 		threatLog.Print("ARC/DinD topology detected, staging threat detection inputs on shared volume")
 		setup.hostSetup = `bash "${RUNNER_TEMP}/gh-aw/actions/stage_threat_detection_arc_dind.sh" stage`
@@ -606,6 +583,9 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// detection_result.json inside the container and it becomes visible
 	// on the host through the bind mount.
 	threatDetectionData.SandboxConfig.Agent.Mounts = appendThreatDetectionRWMount(threatDetectionData.SandboxConfig.Agent.Mounts)
+	if !isArcDindTopology(threatDetectionData) {
+		threatDetectionData.SandboxConfig.Agent.Mounts = append(threatDetectionData.SandboxConfig.Agent.Mounts, constants.ThreatDetectionInputDir+":"+constants.ThreatDetectionInputDir+":ro")
+	}
 
 	// Compute which env vars to exclude from the AWF container. The API proxy
 	// handles authentication, so the raw credentials must not reach the container.
@@ -633,21 +613,12 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		allowedDomains = mergeAPITargetDomains(allowedDomains, threatDetectionData.EngineConfig.APITarget)
 	}
 
-	// Build the threat-detect command. The binary reads the prepared detection
-	// artifacts directory from /tmp/gh-aw/threat-detection/ (set up by previous
-	// steps) and writes the structured verdict to detection_result.json there.
-	// Prepend npm PATH setup so that npm-installed engine CLIs (e.g. claude, codex)
-	// can be found inside the AWF container's chroot environment. threat-detect
-	// invokes the engine binary as a subprocess and relies on PATH to locate it.
-	//
-	// The --step-summary flag was removed from threat-detect (v0.4.5+): the binary
-	// no longer writes any step-summary output (see
-	// github/gh-aw-threat-detection#792), so the flag is intentionally omitted here.
+	// The bundled harness still needs npm-installed engine CLIs inside the AWF chroot.
 	npmPathSetup := GetNpmBinPathSetup()
 	if engineID == "codex" && (isCodexAzureOIDC(threatDetectionData) || isCodexOpenAIWIF(threatDetectionData)) {
 		npmPathSetup += " && " + codexOIDCReflectionGuard(threatDetectionData.EngineConfig.Auth.Provider)
 	}
-	threatDetectCmd := buildThreatDetectCommand(npmPathSetup, engineID, data.SafeOutputs.ThreatDetection, isArcDindTopology(threatDetectionData))
+	threatDetectCmd := buildThreatDetectCommand(npmPathSetup, data.SafeOutputs.ThreatDetection, isArcDindTopology(threatDetectionData))
 
 	// Build the complete AWF command. BuildAWFCommand handles config file setup,
 	// ARC/DinD probes, tool cache mount, and the log tee pattern.
@@ -667,7 +638,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		WorkflowData:       threatDetectionData,
 		ExcludeEnvVarNames: excludeEnvVarNames,
 		AllowedDomains:     allowedDomains,
-		PathSetup:          pathSetup.hostSetup,
+		PathSetup:          pathSetup.hostSetup + "\n" + `"${GH_AW_NODE:-node}" "${RUNNER_TEMP}/gh-aw/actions/stage_threat_detection_runtime.cjs" ` + shellEscapeArg(engineID) + " || exit 1",
 	}
 	command := BuildAWFCommand(awfConfig)
 	command = injectComponentExecutionStartedInShellScript(command, "detection", detectionExecutionEvidencePath)
@@ -692,13 +663,10 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		continueOnErrorExpr = data.SafeOutputs.ThreatDetection.ContinueOnErrorExpr
 	}
 
-	executionCondition := detectionExecutionCondition + " && steps.threat_detect_install.outcome == 'success'"
+	executionCondition := detectionStepCondition + " && steps.detection_staging_reset.outcome == 'success' && steps.detection_prepare.outcome == 'success'"
 	if c.hasExternalDetectorAWFInstallStep(data) {
 		// Never run a missing or unverified AWF binary after a failed installation.
 		executionCondition += " && steps." + detectionAWFInstallStepID + ".outcome == 'success'"
-	}
-	if isArcDindTopology(threatDetectionData) {
-		executionCondition += " && steps.detection_staging_reset.outcome == 'success'"
 	}
 	steps := []string{
 		"      - name: " + constants.ThreatDetectionExecutionStepName + "\n",
@@ -728,9 +696,6 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		}
 		steps = append(steps, fmt.Sprintf("          GH_AW_DETECTION_INPUT_DIR: %q\n", inputDir))
 	}
-	if useRootlessCLIInstallation(threatDetectionData) {
-		steps = append(steps, "          THREAT_DETECT_BINARY: ${{ steps.threat_detect_install.outputs.binary-path }}\n")
-	}
 	steps = append(steps, "        run: |\n")
 	for _, line := range strings.SplitAfter(command, "\n") {
 		if line == "" {
@@ -743,7 +708,7 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		steps = append(steps, prefixed)
 	}
 
-	return append(c.buildTokenBrokerRequestStep(threatDetectionData, detectionExecutionCondition), steps...)
+	return append(c.buildTokenBrokerRequestStep(threatDetectionData, executionCondition), steps...)
 }
 
 func codexOIDCReflectionGuard(provider string) string {
@@ -762,10 +727,11 @@ func codexOIDCReflectionGuard(provider string) string {
 	return "node -e " + shellEscapeArg(script)
 }
 
-func buildThreatDetectCommand(npmPathSetup, engineID string, config *ThreatDetectionConfig, arcDind bool) string {
+func buildThreatDetectCommand(npmPathSetup string, config *ThreatDetectionConfig, arcDind bool) string {
 	args := []string{
-		"threat-detect",
-		"--engine", shellEscapeArg(engineID),
+		`"${RUNNER_TEMP}/gh-aw/threat-detection-runtime/node"`,
+		`"${RUNNER_TEMP}/gh-aw/actions/detect_threats.cjs"`,
+		`--launch-config "${RUNNER_TEMP}/gh-aw/threat-detection-runtime/launch.json"`,
 	}
 
 	if config != nil {
@@ -839,7 +805,7 @@ func (c *Compiler) buildUploadDetectionArtifactStep(data *WorkflowData) []string
 	detectionArtifactName := artifactPrefixExprForAgentDownstreamJob(data) + constants.DetectionArtifactName.String()
 	steps := []string{
 		"      - name: Upload threat detection artifact\n",
-		"        if: " + detectionArtifactsRedactedCondition + "\n",
+		"        if: " + detectionArtifactsRedactedCondition + " && steps.detection_staging_reset.outcome == 'success'\n",
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/upload-artifact")),
 		"        with:\n",
 		"          name: " + detectionArtifactName + "\n",
@@ -895,10 +861,11 @@ func (c *Compiler) buildExternalDetectorConcludeStep(data *WorkflowData) []strin
 		"        env:\n",
 		"          RUN_DETECTION: ${{ steps.detection_guard.outputs.run_detection }}\n",
 		"          DETECTION_AGENTIC_EXECUTION_OUTCOME: ${{ steps.detection_agentic_execution.outcome }}\n",
-		// A failed verified install means no detector could run. The host reader
-		// reports this outcome rather than looking for a verdict.
-		"          THREAT_DETECT_INSTALL_OUTCOME: ${{ steps.threat_detect_install.outcome }}\n",
+		"          DETECTION_RESET_OUTCOME: ${{ steps.detection_staging_reset.outcome }}\n",
 	}...)
+	if isArcDindTopology(data) {
+		steps = append(steps, "          DETECTION_COLLECTION_OUTCOME: ${{ steps.detection_collect.outcome }}\n")
+	}
 	if c.hasExternalDetectorAWFInstallStep(data) {
 		// A failed AWF install (for example a GitHub API quota stop during attestation
 		// verification) is reported explicitly instead of as a missing verdict.

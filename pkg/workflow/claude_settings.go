@@ -10,9 +10,8 @@ import (
 var claudeSettingsLog = logger.New("workflow:claude_settings")
 
 // claudeSettingsEnvVar carries Claude Code --settings JSON to claude_harness.cjs.
-// The external threat-detect binary builds its own Claude Code arguments and
-// launches Claude Code through the harness, so the harness appends --settings
-// from this variable when the arguments do not already contain one.
+// The harness appends --settings from this variable for detection when the
+// arguments do not already contain one.
 const claudeSettingsEnvVar = "GH_AW_CLAUDE_SETTINGS"
 
 // claudeArgsHaveSettings reports whether args pass --settings in either the
@@ -43,8 +42,7 @@ func claudeArgsSettingsValue(args []string) (string, bool) {
 
 // claudeDetectionSettings returns the --settings value for claude_harness.cjs in a
 // Claude-on-Copilot detection run: the workflow's own --settings from engine.args
-// on the external detector path, where threat-detect
-// builds its own Claude Code arguments and does not receive engine.args.
+// on the bundled detector path.
 func claudeDetectionSettings(workflowData *WorkflowData) string {
 	if !claudeUsesCopilotInference(workflowData) || workflowData.EngineConfig == nil ||
 		!isFeatureEnabled(constants.GHAWDetectionFeatureFlag, workflowData) {

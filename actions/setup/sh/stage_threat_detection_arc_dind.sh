@@ -10,7 +10,6 @@ DETECTION_DIR="${2:-/tmp/gh-aw/threat-detection}"
 DETECTION_INPUT_DIR="$(dirname "$DETECTION_DIR")/threat-detection-inputs"
 STAGED_DIR="${RUNNER_TEMP:?RUNNER_TEMP must be set}/gh-aw/threat-detection"
 STAGED_INPUT_DIR="${RUNNER_TEMP}/gh-aw/threat-detection-inputs"
-BIN_DIR="${RUNNER_TEMP}/gh-aw/bin"
 RESULT_FILES=(detection_result.json detection_result_full.json detection_usage.json detection_usage.jsonl)
 
 if [[ -L "$STAGED_DIR" || -L "$DETECTION_DIR" || -L "$STAGED_INPUT_DIR" || -L "$DETECTION_INPUT_DIR" || "$STAGED_DIR" = "$DETECTION_DIR" ]]; then
@@ -37,18 +36,12 @@ esac
 case "$MODE" in
   reset) ;;
   stage)
-    detector="${THREAT_DETECT_BINARY:?Verified detector path must be supplied by the install step}"
-    if [[ ! -f "$detector" || ! -x "$detector" || -L "$detector" ]]; then
-      echo "ERROR: Verified detector must be a regular executable file" >&2
-      exit 1
+    # CODEX_HOME is writable inside the sandbox. All assessment inputs use
+    # the separate read-only mount, never the host log/evidence directory.
+    if [[ -d "$DETECTION_DIR/codex-home" && ! -L "$DETECTION_DIR/codex-home" ]]; then
+      cp -R "$DETECTION_DIR/codex-home" "$STAGED_DIR/"
     fi
-    mkdir -p "$BIN_DIR"
-    cp -R "${DETECTION_DIR}/." "$STAGED_DIR/"
     cp -R "${DETECTION_INPUT_DIR}/." "$STAGED_INPUT_DIR/"
-    # Remove a stale destination symlink instead of following it during copy.
-    rm -f "${BIN_DIR}/threat-detect"
-    cp "$detector" "${BIN_DIR}/threat-detect"
-    chmod +x "${BIN_DIR}/threat-detect"
     ;;
   collect)
     mkdir -p "$DETECTION_DIR"

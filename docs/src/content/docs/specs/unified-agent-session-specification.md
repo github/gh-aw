@@ -2592,7 +2592,7 @@ separately from the historical parser gap inventory above.
 | Missing evidence | No unified coverage record distinguished missing, empty, untimed, or malformed sources. | Append explicit collection coverage and warnings; preserve untimed observations and fail visibly on I/O errors. |
 
 Remaining boundaries are intentional: unobserved execution times are not
-reconstructed, clocks are not corrected, and binary threat-detection runs do not
+reconstructed, clocks are not corrected, and threat-detection runs do not
 become fabricated agent conversations. Go audit readers consume selected
 detection and execution evidence; `gh aw sessions download` exports published
 or reconstructed unified files, rather than independently reimplementing every

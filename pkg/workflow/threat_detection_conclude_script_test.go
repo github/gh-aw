@@ -52,7 +52,7 @@ func runConclusion(t *testing.T, executable string, args []string, overrides ...
 	cmd.WaitDelay = 5 * time.Second
 	cmd.Env = append(os.Environ(),
 		"GITHUB_OUTPUT="+output, "GITHUB_ENV="+env, "GITHUB_STEP_SUMMARY="+summary,
-		"RUN_DETECTION=true", "AWF_INSTALL_OUTCOME=success", "THREAT_DETECT_INSTALL_OUTCOME=success",
+		"RUN_DETECTION=true", "AWF_INSTALL_OUTCOME=success",
 		"GH_AW_GITHUB_API_QUOTA_BLOCKED=", "GH_AW_DETECTION_CONTINUE_ON_ERROR=",
 		"DETECTION_AGENTIC_EXECUTION_OUTCOME=failure", "DETECTION_LOG_FILE=")
 	cmd.Env = append(cmd.Env, overrides...)
@@ -262,10 +262,10 @@ func TestConcludeThreatDetectionScript_HostOutcomes(t *testing.T) {
 		exit                              int
 		env                               []string
 	}{
-		{"skip", "skipped", "", "", 0, []string{"RUN_DETECTION=false", "THREAT_DETECT_INSTALL_OUTCOME=skipped"}},
-		{"install failure warn", "warning", "agent_failure", "", 0, []string{"THREAT_DETECT_INSTALL_OUTCOME=failure"}},
-		{"install failure strict", "failure", "agent_failure", "", 1, []string{"THREAT_DETECT_INSTALL_OUTCOME=failure", "GH_AW_DETECTION_CONTINUE_ON_ERROR=false"}},
-		{"quota warn", "warning", "github_api_quota_exhausted", "GitHub API quota exhausted", 0, []string{"AWF_INSTALL_OUTCOME=failure", "THREAT_DETECT_INSTALL_OUTCOME=skipped", "GH_AW_GITHUB_API_QUOTA_BLOCKED=remaining=0"}},
+		{"skip", "skipped", "", "", 0, []string{"RUN_DETECTION=false"}},
+		{"reset failure warn", "warning", "agent_failure", "", 0, []string{"DETECTION_RESET_OUTCOME=failure"}},
+		{"reset failure strict", "failure", "agent_failure", "", 1, []string{"DETECTION_RESET_OUTCOME=failure", "GH_AW_DETECTION_CONTINUE_ON_ERROR=false"}},
+		{"quota warn", "warning", "github_api_quota_exhausted", "GitHub API quota exhausted", 0, []string{"AWF_INSTALL_OUTCOME=failure", "GH_AW_GITHUB_API_QUOTA_BLOCKED=remaining=0"}},
 		{"quota strict", "failure", "github_api_quota_exhausted", "GitHub API quota exhausted", 1, []string{"AWF_INSTALL_OUTCOME=failure", "GH_AW_GITHUB_API_QUOTA_BLOCKED=remaining=0", "GH_AW_DETECTION_CONTINUE_ON_ERROR=false"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -290,7 +290,7 @@ func TestConcludeThreatDetectionScript_MissingNode(t *testing.T) {
 		exit                              int
 		env                               []string
 	}{
-		{"skipped", "", "skipped", "", 0, []string{"RUN_DETECTION=false", "THREAT_DETECT_INSTALL_OUTCOME=skipped"}},
+		{"skipped", "", "skipped", "", 0, []string{"RUN_DETECTION=false"}},
 		{"install failure warn", "", "warning", "agent_failure", 0, []string{"AWF_INSTALL_OUTCOME=failure"}},
 		{"install failure strict", "", "failure", "agent_failure", 1, []string{"AWF_INSTALL_OUTCOME=failure", "GH_AW_DETECTION_CONTINUE_ON_ERROR=false"}},
 		{"quota", "", "warning", "github_api_quota_exhausted", 0, []string{"AWF_INSTALL_OUTCOME=failure", "GH_AW_GITHUB_API_QUOTA_BLOCKED=remaining=0"}},
