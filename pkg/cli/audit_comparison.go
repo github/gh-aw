@@ -42,6 +42,9 @@ type AuditComparisonRoute struct {
 	Effort            string                  `json:"effort,omitempty"`
 	Mode              string                  `json:"mode,omitempty"`
 	RouterVersion     string                  `json:"router_version,omitempty"`
+	SelectionSource   string                  `json:"selection_source,omitempty"`
+	FallbackReason    string                  `json:"fallback_reason,omitempty"`
+	FallbackTier      string                  `json:"fallback_tier,omitempty"`
 	EffectiveEndpoint string                  `json:"effective_endpoint,omitempty"`
 	SelectedEndpoint  string                  `json:"selected_endpoint,omitempty"`
 	MainAgentCost     ModelRoutingCost        `json:"main_agent_cost,omitzero"`
@@ -131,17 +134,28 @@ func modelRoutingComparisonRoute(routing *ModelRoutingSummary) *AuditComparisonR
 	return &AuditComparisonRoute{
 		Model: routing.SelectedModel, Effort: routing.SelectedEffort,
 		Mode: routing.Mode, RouterVersion: routing.RouterVersion,
+		SelectionSource: routing.SelectionSource, FallbackReason: routing.FallbackReason, FallbackTier: routing.FallbackTier,
 		EffectiveEndpoint: routing.EffectiveEndpoint, SelectedEndpoint: routing.SelectedEndpoint,
 		MainAgentCost: routing.MainAgentCost, SubagentCosts: routing.SubagentCosts,
 	}
+}
+
+func normalizedRouteSelectionSource(source string) string {
+	if source == "fallback" {
+		return "fallback"
+	}
+	return ""
 }
 
 func sameModelRoutingRoute(left, right *AuditComparisonRoute) bool {
 	if left == nil || right == nil {
 		return left == right
 	}
+	leftSource := normalizedRouteSelectionSource(left.SelectionSource)
+	rightSource := normalizedRouteSelectionSource(right.SelectionSource)
 	return left.Model == right.Model && left.Effort == right.Effort &&
 		left.Mode == right.Mode && left.RouterVersion == right.RouterVersion &&
+		leftSource == rightSource && left.FallbackReason == right.FallbackReason && left.FallbackTier == right.FallbackTier &&
 		left.EffectiveEndpoint == right.EffectiveEndpoint && left.SelectedEndpoint == right.SelectedEndpoint
 }
 

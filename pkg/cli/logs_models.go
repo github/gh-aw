@@ -550,6 +550,9 @@ type AwInfoModelRouting struct {
 	Mode             string `json:"mode,omitempty"`
 	SelectedID       string `json:"selected_id,omitempty"`
 	RouterVersion    string `json:"router_version,omitempty"`
+	SelectionSource  string `json:"selection_source,omitempty"`
+	FallbackReason   string `json:"fallback_reason,omitempty"`
+	FallbackTier     string `json:"fallback_tier,omitempty"`
 	FailureCode      string `json:"failure_code,omitempty"`
 	Detail           string `json:"detail,omitempty"`
 }

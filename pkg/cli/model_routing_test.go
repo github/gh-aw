@@ -856,4 +856,193 @@ func TestModelRoutingTextReports(t *testing.T) {
 		!strings.Contains(markdown.String(), "Classifier AIC: 0.059") {
 		t.Fatalf("markdown routing report missing route mix or classifier cost: %s", markdown.String())
 	}
+
+	// Router pick stays concise; fallback pick surfaces selection_source, fallback_reason, and fallback_tier.
+	captureConsole := func(r *ModelRoutingSummary) string {
+		old := os.Stderr
+		pr, pw, pipeErr := os.Pipe()
+		if pipeErr != nil {
+			t.Fatal(pipeErr)
+		}
+		os.Stderr = pw
+		renderConsoleModelRouting(r)
+		pw.Close()
+		os.Stderr = old
+		var buf bytes.Buffer
+		if _, copyErr := io.Copy(&buf, pr); copyErr != nil {
+			t.Fatal(copyErr)
+		}
+		_ = pr.Close()
+		return buf.String()
+	}
+
+	routerConsole := captureConsole(&ModelRoutingSummary{
+		Status: "selected", SelectedModel: "github-copilot/gpt-5.6-luna", SelectedEffort: "high",
+		RouterName: "gh-aw-router", RouterVersion: "0.2.0", SelectionSource: "router",
+	})
+	if strings.Contains(routerConsole, "selection_source=") || strings.Contains(routerConsole, "fallback_reason=") {
+		t.Errorf("router console output should stay concise without selection_source: %s", routerConsole)
+	}
+
+	fallbackConsole := captureConsole(&ModelRoutingSummary{
+		Status: "selected", SelectedModel: "github-copilot/gpt-5.3-codex", SelectedEffort: "medium",
+		Endpoint: "/responses", SelectionSource: "fallback", FallbackReason: "no_route", FallbackTier: "standard",
+	})
+	if !strings.Contains(fallbackConsole, "selection_source=fallback fallback_reason=no_route fallback_tier=standard") {
+		t.Errorf("fallback console output missing fallback provenance: %s", fallbackConsole)
+	}
+
+	var fallbackMarkdown bytes.Buffer
+	renderMarkdownModelRoutingToWriter(&fallbackMarkdown, &ModelRoutingLogsSummary{
+		Routes: []ModelRoutingRouteSummary{{
+			Model: "github-copilot/gpt-5.3-codex", Effort: "medium",
+			SelectionSource: "fallback", FallbackReason: "no_route", FallbackTier: "standard",
+			RunCount: 1, TotalAIC: 0.25, AverageAIC: 0.25,
+		}},
+	})
+	if !strings.Contains(fallbackMarkdown.String(), "| fallback (no_route, standard) |") {
+		t.Errorf("markdown routing report should distinguish fallback runs from blank router versions: %s", fallbackMarkdown.String())
+	}
+}
+
+func TestAnalyzeModelRoutingFallbackProvenanceFromUnifiedSessionOnly(t *testing.T) {
+	t.Run("firewall.model_routing selection without side log or workflow.info", func(t *testing.T) {
+		runDir := t.TempDir()
+		sessionDir := filepath.Join(runDir, "usage")
+		if err := os.MkdirAll(sessionDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		session := strings.Join([]string{
+			`{"type":"firewall.model_routing","data":{"schema":"model-routing/v0.29.21","stage":"selection","provider":"copilot","selectedProvider":"copilot","selectedModel":"github-copilot/gpt-5.3-codex","wireModel":"gpt-5.3-codex","selectedEffort":"medium","endpoint":"/responses","selectionSource":"fallback","fallbackReason":"no_route","fallbackTier":"standard","router":null,"rankedChoices":null},"provenance":{"component":"firewall","phase":"agent","path":"sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl","index":0}}`,
+			`{"type":"firewall.token_usage","data":{"provider":"copilot","model":"gpt-5.3-codex","path":"/responses","requestId":"req-fallback-1","status":200,"aic":0.25,"usage":{"inputTokens":12000,"outputTokens":150}},"timestamp":"2026-11-27T10:00:07Z","provenance":{"component":"firewall","phase":"agent","path":"sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl","index":0}}`,
+			`{"type":"firewall.model_routing","data":{"schema":"model-routing/v0.29.21","stage":"request","requestId":"req-fallback-1","routed":"as_selected","deviations":[],"requestedModel":"gpt-5.3-codex","requestedEffort":"medium","outcome":"completed"},"provenance":{"component":"firewall","phase":"agent","path":"sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl","index":1}}`,
+		}, "\n") + "\n"
+		if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(session), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		summary := analyzeModelRouting(runDir)
+		if summary == nil || summary.Status != "selected" || summary.SelectedModel != "github-copilot/gpt-5.3-codex" ||
+			summary.SelectedEffort != "medium" || summary.RouterVersion != "" ||
+			summary.SelectionSource != "fallback" || summary.FallbackReason != "no_route" || summary.FallbackTier != "standard" ||
+			summary.RoutedCounts["as_selected"] != 1 || summary.SelectedModelCost.Requests != 1 || math.Abs(summary.SelectedModelCost.AIC-0.25) > 0.000001 {
+			t.Fatalf("unexpected session-only firewall fallback summary: %+v", summary)
+		}
+
+		logsSummary := buildModelRoutingLogsSummary([]ProcessedRun{{Run: WorkflowRun{LogsPath: runDir}}})
+		if logsSummary == nil || logsSummary.TotalRequests != 1 || len(logsSummary.Routes) != 1 ||
+			logsSummary.Routes[0].SelectionSource != "fallback" || math.Abs(logsSummary.Routes[0].TotalAIC-0.25) > 0.000001 {
+			t.Fatalf("session-only logs summary lost fallback request count or AIC: %+v", logsSummary)
+		}
+
+		// Even when root aw_info.json exists alongside usage/aw_session.jsonl, logs without precomputed ModelRouting must still join unified requests and AIC.
+		if err := os.WriteFile(filepath.Join(runDir, "aw_info.json"), []byte(`{"model_routing":{"status":"selected","endpoint":"/responses"}}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		logsWithAwInfo := buildModelRoutingLogsSummary([]ProcessedRun{{Run: WorkflowRun{LogsPath: runDir}}})
+		if logsWithAwInfo == nil || logsWithAwInfo.TotalRequests != 1 || len(logsWithAwInfo.Routes) != 1 ||
+			math.Abs(logsWithAwInfo.Routes[0].TotalAIC-0.25) > 0.000001 {
+			t.Fatalf("logs summary with aw_info.json skipped unified request join: %+v", logsWithAwInfo)
+		}
+	})
+
+	t.Run("workflow.info modelRouting without side log", func(t *testing.T) {
+		runDir := t.TempDir()
+		sessionDir := filepath.Join(runDir, "usage")
+		if err := os.MkdirAll(sessionDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		session := `{"type":"workflow.info","data":{"modelRouting":{"status":"selected","wireModel":"gpt-5.3-codex","model":"github-copilot/gpt-5.3-codex","effort":"medium","effectiveEndpoint":"/responses","selectionSource":"fallback","fallbackReason":"router_unavailable","fallbackTier":"premium"}},"provenance":{"component":"workflow","phase":"conclusion","path":"usage/aw_info.json","index":0}}` + "\n"
+		if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(session), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		summary := analyzeModelRouting(runDir)
+		if summary == nil || summary.Status != "selected" || summary.SelectionSource != "fallback" ||
+			summary.FallbackReason != "router_unavailable" || summary.FallbackTier != "premium" {
+			t.Fatalf("unexpected workflow.info fallback summary: %+v", summary)
+		}
+	})
+
+	t.Run("contradictory model-routing.jsonl side log does not override or inject provenance", func(t *testing.T) {
+		runDir := t.TempDir()
+		routingDir := filepath.Join(runDir, "sandbox", "firewall", "logs", "api-proxy-logs")
+		sessionDir := filepath.Join(runDir, "usage")
+		if err := os.MkdirAll(routingDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(sessionDir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		// Side log claims router pick on a different model with a deviated request; unified session says fallback on gpt-5.3-codex with a conflicting workflow.info.
+		sideLog := strings.Join([]string{
+			`{"_schema":"model-routing/v0.29.21","stage":"selection","selected_model":"github-copilot/gpt-5.6-luna","wire_model":"gpt-5.6-luna","selected_effort":"high","endpoint":"/responses","mode":"economy","selection_source":"router","fallback_reason":null,"fallback_tier":null,"router":{"name":"gh-aw-router","version":"0.2.0"},"ranked_choices":[{"model":"github-copilot/gpt-5.6-luna","effort":"high"}]}`,
+			`{"_schema":"model-routing/v0.29.21","stage":"request","request_id":"stale-side-1","routed":"deviated","deviations":["model"],"requested_model":"gpt-5.3-codex","requested_effort":"medium","outcome":"completed"}`,
+		}, "\n") + "\n"
+		if err := os.WriteFile(filepath.Join(routingDir, "model-routing.jsonl"), []byte(sideLog), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		session := strings.Join([]string{
+			`{"type":"workflow.info","data":{"modelRouting":{"status":"selected","wireModel":"gpt-5.6-luna","mode":"economy","routerVersion":"0.2.0","effectiveEndpoint":"/responses"}},"provenance":{"component":"workflow","phase":"conclusion","path":"usage/aw_info.json","index":0}}`,
+			`{"type":"firewall.model_routing","data":{"schema":"model-routing/v0.29.21","stage":"selection","selectedModel":"github-copilot/gpt-5.3-codex","wireModel":"gpt-5.3-codex","selectedEffort":"medium","endpoint":"/responses","selectionSource":"fallback","fallbackReason":"no_route","fallbackTier":"standard","router":null},"provenance":{"component":"firewall","phase":"agent","path":"sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl","index":0}}`,
+			`{"type":"firewall.model_routing","data":{"schema":"model-routing/v0.29.21","stage":"request","requestId":"req-1","routed":"as_selected","deviations":[],"requestedModel":"gpt-5.3-codex","requestedEffort":"medium","outcome":"completed"},"provenance":{"component":"firewall","phase":"agent","path":"sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl","index":1}}`,
+		}, "\n") + "\n"
+		if err := os.WriteFile(filepath.Join(sessionDir, "aw_session.jsonl"), []byte(session), 0o600); err != nil {
+			t.Fatal(err)
+		}
+
+		summary := analyzeModelRouting(runDir)
+		if summary == nil || summary.SelectedModel != "github-copilot/gpt-5.3-codex" || summary.WireModel != "gpt-5.3-codex" ||
+			summary.SelectedEffort != "medium" || summary.EffectiveEndpoint != "/responses" ||
+			summary.RouterName != "" || summary.RouterVersion != "" || summary.Mode != "" || len(summary.TopChoices) != 0 ||
+			len(summary.Deviations) != 0 || summary.RoutedCounts["as_selected"] != 1 || summary.RoutedCounts["deviated"] != 0 ||
+			summary.SelectionSource != "fallback" || summary.FallbackReason != "no_route" || summary.FallbackTier != "standard" {
+			t.Fatalf("expected unified session fallback selection and requests to override contradictory side log and workflow.info: %+v", summary)
+		}
+
+		// When unified session is absent, side log fallback fields must NOT be read.
+		if err := os.Remove(filepath.Join(sessionDir, "aw_session.jsonl")); err != nil {
+			t.Fatal(err)
+		}
+		fallbackSideLog := `{"_schema":"model-routing/v0.29.21","stage":"selection","selected_model":"github-copilot/gpt-5.3-codex","wire_model":"gpt-5.3-codex","selected_effort":"medium","endpoint":"/responses","selection_source":"fallback","fallback_reason":"no_route","fallback_tier":"standard","router":null,"ranked_choices":null}` + "\n"
+		if err := os.WriteFile(filepath.Join(routingDir, "model-routing.jsonl"), []byte(fallbackSideLog), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		legacyOnly := analyzeModelRouting(runDir)
+		if legacyOnly == nil || legacyOnly.SelectionSource != "" || legacyOnly.FallbackReason != "" || legacyOnly.FallbackTier != "" {
+			t.Fatalf("side log alone must not populate fallback provenance: %+v", legacyOnly)
+		}
+	})
+
+	t.Run("logs route summary merges legacy and explicit router picks while keeping fallback separate", func(t *testing.T) {
+		summary := buildModelRoutingLogsSummary([]ProcessedRun{
+			{
+				ModelRouting: &ModelRoutingSummary{
+					Status: "selected", SelectedModel: "github-copilot/gpt-5.3-codex", SelectedEffort: "medium",
+					Endpoint: "/responses", SelectedModelCost: ModelRoutingCost{AIC: 0.2},
+				},
+			},
+			{
+				ModelRouting: &ModelRoutingSummary{
+					Status: "selected", SelectedModel: "github-copilot/gpt-5.3-codex", SelectedEffort: "medium",
+					Endpoint: "/responses", SelectionSource: "router", SelectedModelCost: ModelRoutingCost{AIC: 0.4},
+				},
+			},
+			{
+				ModelRouting: &ModelRoutingSummary{
+					Status: "selected", SelectedModel: "github-copilot/gpt-5.3-codex", SelectedEffort: "medium",
+					Endpoint: "/responses", SelectionSource: "fallback", FallbackReason: "no_route", FallbackTier: "standard",
+					SelectedModelCost: ModelRoutingCost{AIC: 0.3},
+				},
+			},
+		})
+		if summary == nil || len(summary.Routes) != 2 {
+			t.Fatalf("expected legacy+router picks to merge and fallback to stay separate: %+v", summary)
+		}
+		if summary.Routes[0].SelectionSource != "" || summary.Routes[0].RunCount != 2 ||
+			summary.Routes[1].SelectionSource != "fallback" || summary.Routes[1].RunCount != 1 ||
+			summary.Routes[1].FallbackReason != "no_route" || summary.Routes[1].FallbackTier != "standard" {
+			t.Fatalf("unexpected grouped routes: %+v", summary.Routes)
+		}
+	})
 }

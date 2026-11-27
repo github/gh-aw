@@ -152,6 +152,15 @@ func formatAuditComparisonRoute(route *AuditComparisonRoute) string {
 	if route.RouterVersion != "" {
 		value += " router=" + safeModelRoutingText(route.RouterVersion)
 	}
+	if route.SelectionSource == "fallback" {
+		value += " selection_source=fallback"
+		if route.FallbackReason != "" {
+			value += " fallback_reason=" + safeModelRoutingText(route.FallbackReason)
+		}
+		if route.FallbackTier != "" {
+			value += " fallback_tier=" + safeModelRoutingText(route.FallbackTier)
+		}
+	}
 	if route.EffectiveEndpoint != "" {
 		value += " effective_endpoint=" + safeModelRoutingText(route.EffectiveEndpoint)
 	}
@@ -316,6 +325,15 @@ func renderConsoleModelRoutingSelection(routing *ModelRoutingSummary) {
 		line += " router=" + routing.RouterName
 		if routing.RouterVersion != "" {
 			line += "@" + routing.RouterVersion
+		}
+	}
+	if routing.SelectionSource == "fallback" {
+		line += " selection_source=fallback"
+		if routing.FallbackReason != "" {
+			line += " fallback_reason=" + routing.FallbackReason
+		}
+		if routing.FallbackTier != "" {
+			line += " fallback_tier=" + routing.FallbackTier
 		}
 	}
 	if routing.LatencyMs > 0 {
