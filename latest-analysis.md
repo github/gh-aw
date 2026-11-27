@@ -1,9 +1,8 @@
-# NLP Analysis - 2026-07-07
+# NLP Analysis - 2026-11-27
 
-- PRs analyzed: 28
-- Avg sentiment: -0.099 (neutral/slightly negative)
-- Positive: 12 (43%), Neutral: 1 (4%), Negative: 15 (54%)
-- Top topic: cap / agent / report (28 PRs)
-- Top keywords: run, workflow, aic, sub, sous, chef, generated, ---
-- Notable bigrams: sous chef, aic aic, aic sub
-- Run: https://github.com/github/gh-aw/actions/runs/28861695752
+- PRs analyzed: 137 (merged 2026-11-20 to 2026-11-27)
+- Messages NLP set: 651 (human + Copilot, incl. PR bodies)
+- Avg sentiment: +0.039 (median 0.00)
+- Positive 39.5%, Neutral 43.0%, Negative 17.5%
+- Top topic: fix/validation/regression (78.6%)
+- Comment data: yes (first run with conversation text; prior runs were metadata-only)
