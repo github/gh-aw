@@ -1,14 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
+import http from "http";
+import os from "os";
 import path from "path";
+import { execFileSync, spawn } from "child_process";
+import { createRequire } from "module";
 import { fileURLToPath } from "url";
 
 // ---------------------------------------------------------------------------
 // Module imports
 // ---------------------------------------------------------------------------
 
+const req = createRequire(import.meta.url);
 const { run: runSetup } = await import("./action_setup_otlp.cjs");
 const { run: runConclusion } = await import("./action_conclusion_otlp.cjs");
+const { main: runPushRoutingHistory } = req("./push_routing_history.cjs");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -448,5 +454,268 @@ describe("action_conclusion_otlp run()", () => {
     expect(startNano).toBeGreaterThanOrEqual(BigInt(beforeMs) * 1_000_000n);
     expect(startNano).toBeLessThanOrEqual(BigInt(afterMs) * 1_000_000n);
     fetchSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// push_routing_history failure reporting across action mode and script mode
+// ---------------------------------------------------------------------------
+
+function parseGitHubEnvFile(filePath) {
+  const vars = {};
+  if (!fs.existsSync(filePath)) return vars;
+  for (const line of fs.readFileSync(filePath, "utf8").split(/\r?\n/)) {
+    const idx = line.indexOf("=");
+    if (idx > 0) vars[line.slice(0, idx)] = line.slice(idx + 1);
+  }
+  return vars;
+}
+
+function runCommandAsync(command, args, options) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", chunk => {
+      stdout += chunk.toString("utf8");
+    });
+    child.stderr.on("data", chunk => {
+      stderr += chunk.toString("utf8");
+    });
+    child.on("error", reject);
+    child.on("close", status => resolve({ status, stdout, stderr }));
+  });
+}
+
+async function startLocalOTLPCollector() {
+  const traces = [];
+  const metrics = [];
+  const server = http.createServer((reqMessage, res) => {
+    const chunks = [];
+    reqMessage.on("data", chunk => chunks.push(chunk));
+    reqMessage.on("end", () => {
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      if (reqMessage.url?.includes("/v1/traces")) traces.push(body);
+      if (reqMessage.url?.includes("/v1/metrics")) metrics.push(body);
+      res.writeHead(200, { "Content-Type": "application/json", Connection: "close" });
+      res.end("{}");
+    });
+  });
+  await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const port = typeof address === "object" && address ? address.port : 0;
+  return {
+    endpoint: `http://127.0.0.1:${port}`,
+    traces,
+    metrics,
+    close: () =>
+      new Promise(resolve => {
+        server.closeAllConnections?.();
+        server.close(resolve);
+      }),
+  };
+}
+
+async function simulatePushRoutingHistoryFailure(root, failureKind) {
+  const remote = path.join(root, "remote.git");
+  execFileSync("git", ["init", "--quiet", "--bare", remote]);
+  execFileSync("git", ["config", "user.name", "remote"], { cwd: remote });
+  execFileSync("git", ["config", "user.email", "remote@example.com"], { cwd: remote });
+  const initialCommit = execFileSync("git", ["commit-tree", "4b825dc642cb6eb9a060e54bf8d69288fbee4904", "-m", "Initialize routing history"], { cwd: remote, encoding: "utf8" }).trim();
+  execFileSync("git", ["update-ref", "refs/heads/memory/adaptive-routing/triage", initialCommit], { cwd: remote });
+
+  const sessionPath = path.join(root, "aw_session.jsonl");
+  if (failureKind === "history-push") {
+    const events = [
+      { type: "routing.observation", data: { outcome: "success" }, provenance: { component: "collector", phase: "conclusion" } },
+      { type: "firewall.model_routing", data: { stage: "selection", selectedProvider: "copilot", wireModel: "model-a", selectedEffort: "high" }, provenance: { component: "firewall", phase: "agent" } },
+      { type: "firewall.model_routing", data: { stage: "request", requestId: "r1", routed: "as_selected", requestedModel: "model-a" }, provenance: { component: "firewall", phase: "agent" } },
+      {
+        type: "firewall.token_usage",
+        data: { requestId: "r1", provider: "copilot", aic: 1, usage: { inputTokens: 100, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, outputTokens: 20 } },
+        provenance: { component: "firewall", phase: "agent" },
+      },
+    ];
+    fs.writeFileSync(sessionPath, events.map(event => `${JSON.stringify(event)}\n`).join(""));
+  }
+
+  const pushError = "ERR_API: failed to push memory/adaptive-routing/triage";
+  const pushSignedCommitsFn = vi.fn(async () => {
+    throw new Error(pushError);
+  });
+  const previousCore = global.core;
+  const setFailed = vi.fn();
+  global.core = { info: vi.fn(), warning: vi.fn(), debug: vi.fn(), error: vi.fn(), setFailed, summary: { addRaw: vi.fn().mockReturnThis(), write: vi.fn() } };
+  try {
+    const github = {
+      rest: {
+        repos: {
+          get: async () => ({ data: { default_branch: "main" } }),
+        },
+        actions: {
+          getWorkflowRun: async () => ({ data: { workflow_id: 42 } }),
+          listWorkflowRuns: async () => ({
+            data: { total_count: 1, workflow_runs: [{ id: 9001, run_number: 1, run_attempt: 1, status: "in_progress", conclusion: null, head_branch: "main", event: "workflow_dispatch", created_at: "2026-11-27T00:00:00Z" }] },
+          }),
+          listJobsForWorkflowRunAttempt: async () => ({ data: { jobs: [] } }),
+        },
+      },
+    };
+    let thrownMessage = "";
+    try {
+      await runPushRoutingHistory({
+        github,
+        context: { repo: { owner: "octo", repo: "demo" }, runId: 9001, runNumber: 1, payload: { repository: { default_branch: "main" } } },
+        env: {
+          GH_AW_ROUTING_WORKFLOW: "triage",
+          GH_AW_ROUTING_GENERATION: `${"a".repeat(64)}:${"b".repeat(64)}`,
+          GH_AW_ROUTING_MODE: "observe",
+          GH_AW_ROUTING_ENGINE: "copilot",
+          GH_AW_ROUTING_GOAL: "cost",
+          GH_AW_ROUTING_LEVEL: "",
+          GH_AW_ROUTING_SESSION_FILE: sessionPath,
+          GITHUB_RUN_ATTEMPT: "1",
+          GITHUB_WORKFLOW_REF: "octo/demo/.github/workflows/triage.lock.yml@refs/heads/main",
+          GH_TOKEN: "test-token",
+          GITHUB_SERVER_URL: "https://github.com",
+        },
+        workspaceDir: fs.mkdtempSync(path.join(root, "writer-")),
+        remoteUrl: remote,
+        pushSignedCommitsFn,
+        execGetExecOutput: async (command, args, options) => ({
+          stdout: execFileSync(command, args, { cwd: options.cwd, encoding: "utf8" }),
+          stderr: "",
+          exitCode: 0,
+        }),
+        sleepFn: async () => {},
+      });
+    } catch (err) {
+      thrownMessage = err instanceof Error ? err.message : String(err);
+    }
+    const reportedFailure = thrownMessage || setFailed.mock.calls.map(([msg]) => String(msg)).join("\n");
+    if (failureKind === "artifact-download") {
+      // Missing usage artifact fails with a missing unified session before any push runs.
+      expect(pushSignedCommitsFn).not.toHaveBeenCalled();
+      expect(reportedFailure).toContain("unified session is missing");
+    } else {
+      expect(pushSignedCommitsFn).toHaveBeenCalled();
+      expect(reportedFailure).toContain(pushError);
+    }
+    return "failure";
+  } finally {
+    global.core = previousCore;
+  }
+}
+
+describe("push_routing_history OTLP failure reporting", () => {
+  const cases = [
+    ["action", "artifact-download", false],
+    ["action", "artifact-download", true],
+    ["action", "history-push", false],
+    ["action", "history-push", true],
+    ["script", "artifact-download", false],
+    ["script", "artifact-download", true],
+    ["script", "history-push", false],
+    ["script", "history-push", true],
+  ];
+
+  it.each(cases)("emits one ERROR conclusion span in %s mode on %s (metrics=%s)", async (mode, failureKind, metricsEnabled) => {
+    const collector = await startLocalOTLPCollector();
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-push-routing-otlp-"));
+    try {
+      const githubEnv = path.join(root, "github_env");
+      const githubOutput = path.join(root, "github_output");
+      const ghAwTmp = path.join(root, "gh-aw-tmp");
+      fs.mkdirSync(ghAwTmp, { recursive: true });
+
+      const baseEnv = {
+        ...process.env,
+        RUNNER_TEMP: root,
+        GH_AW_TMP_DIR: ghAwTmp,
+        GH_AW_OTLP_ENDPOINTS: JSON.stringify([{ url: collector.endpoint }]),
+        GH_AW_OTEL_METRICS: metricsEnabled ? "true" : "false",
+        INPUT_JOB_NAME: "push_routing_history",
+        GITHUB_JOB: "push_routing_history",
+        GITHUB_REPOSITORY: "octo/demo",
+        GITHUB_RUN_ID: "9001",
+        GITHUB_WORKFLOW: "Triage",
+        GH_AW_INFO_ENGINE_ID: "copilot",
+        GITHUB_ENV: githubEnv,
+        GITHUB_OUTPUT: githubOutput,
+      };
+      delete baseEnv.RUNNER_ENVIRONMENT;
+      delete baseEnv.GH_AW_AGENT_CONCLUSION;
+      delete baseEnv.GH_AW_JOB_RESULT;
+      delete baseEnv.GH_AW_OTEL_CONCLUSION_PREUPLOAD;
+      delete baseEnv.OTEL_SEMCONV_STABILITY_OPT_IN;
+      delete baseEnv.OTEL_EXPORTER_OTLP_PROTOCOL;
+
+      const setupResult = await runCommandAsync(process.execPath, [path.join(__dirname, "action_setup_otlp.cjs")], {
+        cwd: root,
+        env: { ...baseEnv, SETUP_START_MS: String(Date.now() - 100) },
+      });
+      expect(setupResult.status, setupResult.stderr).toBe(0);
+
+      const jobResult = await simulatePushRoutingHistoryFailure(root, failureKind);
+
+      if (mode === "action") {
+        // Mirror the "Record job result for OTLP" step writing GH_AW_JOB_RESULT to GITHUB_ENV
+        // before GitHub Actions runs actions/setup/post.js with that inherited environment.
+        fs.appendFileSync(githubEnv, `GH_AW_JOB_RESULT=${jobResult}\n`);
+        const postEnv = { ...baseEnv, ...parseGitHubEnvFile(githubEnv) };
+        const postResult = await runCommandAsync(process.execPath, [path.resolve(__dirname, "../post.js")], {
+          cwd: root,
+          env: postEnv,
+        });
+        expect(postResult.status, postResult.stderr).toBe(0);
+      } else {
+        // Mirror the script-mode "Clean Scripts" step running clean.sh with GH_AW_JOB_RESULT.
+        const cleanEnv = {
+          ...baseEnv,
+          ...parseGitHubEnvFile(githubEnv),
+          INPUT_DESTINATION: __dirname,
+          GH_AW_NODE: process.execPath,
+          GH_AW_JOB_RESULT: jobResult,
+        };
+        const cleanResult = await runCommandAsync("bash", [path.resolve(__dirname, "../clean.sh")], {
+          cwd: root,
+          env: cleanEnv,
+        });
+        expect(cleanResult.status, cleanResult.stderr).toBe(0);
+      }
+
+      const spans = collector.traces.flatMap(payload => payload.resourceSpans[0].scopeSpans[0].spans);
+      const setupSpans = spans.filter(span => span.name === "gh-aw.push_routing_history.setup");
+      const conclusionSpans = spans.filter(span => span.name === "gh-aw.push_routing_history.conclusion");
+      expect(setupSpans).toHaveLength(1);
+      expect(conclusionSpans).toHaveLength(1);
+
+      const conclusionSpan = conclusionSpans[0];
+      expect(conclusionSpan.traceId).toBe(setupSpans[0].traceId);
+      expect(conclusionSpan.parentSpanId).toBe(setupSpans[0].spanId);
+      expect(conclusionSpan.status.code).toBe(2);
+      expect(conclusionSpan.status.message).toBe("push_routing_history failure");
+      const attrs = Object.fromEntries(conclusionSpan.attributes.map(a => [a.key, a.value.stringValue ?? a.value.intValue]));
+      expect(attrs["gh-aw.job.name"]).toBe("push_routing_history");
+      expect(attrs["gh-aw.run.status"]).toBe("success");
+      expect(attrs["error.type"]).toBe("job_failed");
+
+      if (metricsEnabled) {
+        expect(collector.metrics).toHaveLength(1);
+        const emittedMetrics = collector.metrics[0].resourceMetrics[0].scopeMetrics[0].metrics;
+        const jobErrors = emittedMetrics.filter(metric => metric.name === "gh_aw.job.errors");
+        expect(jobErrors).toHaveLength(1);
+        const errorPoint = jobErrors[0].sum.dataPoints[0];
+        expect(errorPoint.asInt).toBe("1");
+        expect(errorPoint.attributes).toContainEqual({ key: "gh-aw.job.name", value: { stringValue: "push_routing_history" } });
+        expect(errorPoint.attributes).toContainEqual({ key: "cicd.pipeline.task.run.result", value: { stringValue: "failure" } });
+        expect(emittedMetrics.some(metric => metric.name === "gh_aw.run.errors")).toBe(false);
+      } else {
+        expect(collector.metrics).toHaveLength(0);
+      }
+    } finally {
+      await collector.close();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
