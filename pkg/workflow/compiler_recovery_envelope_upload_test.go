@@ -37,13 +37,19 @@ func TestRecoveryEnvelopeValidationGatesStagingUploads(t *testing.T) {
 		UploadCodeCoverage: &UploadCodeCoverageConfig{},
 	}}
 	pin := func(action string) string { return action + "@test-pin" }
-	for _, generate := range []func(*strings.Builder, *WorkflowData, func(string) string){
-		generateSafeOutputsAssetsArtifactUpload,
+	for _, generate := range []func(*strings.Builder, *WorkflowData, func(string) string) error{
+		func(builder *strings.Builder, data *WorkflowData, pin func(string) string) error {
+			generateSafeOutputsAssetsArtifactUpload(builder, data, pin)
+			return nil
+		},
 		generateSafeOutputsArtifactStagingUpload,
-		generateSafeOutputsCodeCoverageStagingUpload,
+		func(builder *strings.Builder, data *WorkflowData, pin func(string) string) error {
+			generateSafeOutputsCodeCoverageStagingUpload(builder, data, pin)
+			return nil
+		},
 	} {
 		var output strings.Builder
-		generate(&output, data, pin)
+		require.NoError(t, generate(&output, data, pin))
 		assert.Contains(t, output.String(), "if: always() && "+secretRedactionSuccessCondition(data))
 	}
 }

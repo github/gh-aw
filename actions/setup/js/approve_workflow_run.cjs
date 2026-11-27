@@ -157,9 +157,9 @@ async function getModifiedPullRequestFiles(githubClient, pullRequestNumber) {
  *
  * @param {any} githubClient
  * @param {number} pullRequestNumber
- * @returns {Promise<string>} Head repository slug in "owner/repo" format
+ * @returns {Promise<{fullName: string, headSha: string}>}
  */
-async function getPullRequestHeadRepo(githubClient, pullRequestNumber) {
+async function getPullRequestDetails(githubClient, pullRequestNumber) {
   const { data: pullRequest } = await githubClient.rest.pulls.get({
     owner: context.repo.owner,
     repo: context.repo.repo,
@@ -172,7 +172,11 @@ async function getPullRequestHeadRepo(githubClient, pullRequestNumber) {
   if (typeof fullName !== "string" || fullName === "") {
     throw new Error(`${SAFE_OUTPUT_E007}: Unable to verify the head repository for pull request #${pullRequestNumber}`);
   }
-  return fullName;
+  const headSha = pullRequest.head.sha;
+  if (typeof headSha !== "string" || headSha === "") {
+    throw new Error(`${SAFE_OUTPUT_E007}: Unable to verify the head revision for pull request #${pullRequestNumber}`);
+  }
+  return { fullName, headSha };
 }
 
 /**
@@ -189,6 +193,81 @@ async function getPullRequestHeadRepo(githubClient, pullRequestNumber) {
 function isHeadRepoAllowed(headRepo, allowedRepos) {
   const currentRepo = `${context.repo.owner}/${context.repo.repo}`;
   return headRepo === currentRepo || isRepoAllowed(headRepo, allowedRepos);
+}
+
+/**
+ * Fetch and authorize the current state of a workflow run immediately before approval.
+ *
+ * @param {any} githubClient
+ * @param {number} runId
+ * @param {Record<string, any>} config
+ * @returns {Promise<{run?: any, error?: string, skipped?: boolean, reasonCode?: string, reason?: string}>}
+ */
+async function verifyWorkflowRunApproval(githubClient, runId, config) {
+  const { data: run } = await githubClient.rest.actions.getWorkflowRun({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    run_id: runId,
+  });
+
+  if (run.event !== "pull_request" || !Array.isArray(run.pull_requests) || run.pull_requests.length === 0) {
+    return { error: `Workflow run ${runId} is not associated with a pull request` };
+  }
+  if (!isAwaitingApproval(run)) {
+    const reason = `Workflow run ${runId} is not awaiting approval (status: ${run.status || "none"})`;
+    return { error: reason, skipped: true, reasonCode: "NOT_AWAITING_APPROVAL", reason };
+  }
+
+  const workflowId = parsePositiveInt(run.workflow_id);
+  if (!workflowId) return { error: `Workflow run ${runId} has invalid workflow data` };
+  const { data: workflow } = await githubClient.rest.actions.getWorkflow({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    workflow_id: workflowId,
+  });
+  if (!isAllowedWorkflow(workflow?.path, config.allowed_workflows)) {
+    return { error: `Workflow run ${runId} does not match an allowed workflow` };
+  }
+
+  const allowedPullRequests = parseAllowedPullRequests(config.allowed_pull_requests);
+  const allowedRepos = parseAllowedRepos(config.allowed_repos);
+  const currentPullRequest = getCurrentPullRequestNumber();
+  const isAuthorized = run.pull_requests.every(pullRequest => {
+    const pullRequestNumber = parsePositiveInt(pullRequest.number);
+    return pullRequestNumber !== undefined && ((currentPullRequest !== undefined && pullRequestNumber === currentPullRequest) || allowedPullRequests.has(pullRequestNumber));
+  });
+  if (!isAuthorized) {
+    return { error: `Workflow run ${runId} is not associated exclusively with the triggering pull request or explicitly allowed pull requests` };
+  }
+
+  for (const pullRequest of run.pull_requests) {
+    const pullRequestNumber = parsePositiveInt(pullRequest.number);
+    if (pullRequestNumber === undefined) return { error: `Workflow run ${runId} has invalid pull request data` };
+
+    const { fullName: headRepo, headSha } = await getPullRequestDetails(githubClient, pullRequestNumber);
+    if (pullRequest.head?.sha !== headSha) {
+      return { error: `Workflow run ${runId} was created for a different head revision of pull request #${pullRequestNumber}` };
+    }
+    if (!isHeadRepoAllowed(headRepo, allowedRepos)) {
+      const hint = allowedRepos.size === 0 ? "configure allowed-repos to approve pull requests from other repositories" : `allowed repositories: ${Array.from(allowedRepos).join(", ")}`;
+      return { error: `Workflow run ${runId} cannot be approved because pull request #${pullRequestNumber} comes from repository ${headRepo}, which is not in the allowed-repos list (${hint})` };
+    }
+
+    const files = await getModifiedPullRequestFiles(githubClient, pullRequestNumber);
+    const protection = checkFileProtectionPostApply(files, {
+      ...config,
+      protected_files_policy: "blocked",
+    });
+    if (protection.action !== "allow") {
+      return {
+        error: `Workflow run ${runId} cannot be approved because pull request #${pullRequestNumber} modifies protected files (${protection.files.join(", ")})`,
+        skipped: true,
+        reasonCode: POLICY_FILE_PROTECTION_DENIED_REASON_CODE,
+      };
+    }
+  }
+
+  return { run };
 }
 
 /**
@@ -304,82 +383,34 @@ async function main(config = {}) {
     }
 
     try {
-      const { data: run } = await githubClient.rest.actions.getWorkflowRun({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        run_id: runId,
-      });
-
-      if (run.event !== "pull_request" || !Array.isArray(run.pull_requests) || run.pull_requests.length === 0) {
-        const error = `Workflow run ${runId} is not associated with a pull request`;
+      const initialVerification = await verifyWorkflowRunApproval(githubClient, runId, config);
+      if (!initialVerification.run) {
+        const error = initialVerification.error || `Workflow run ${runId} could not be authorized`;
         core.warning(error);
-        return { success: false, error };
+        return {
+          success: false,
+          ...(initialVerification.skipped ? { skipped: true } : {}),
+          ...(initialVerification.reasonCode ? { reasonCode: initialVerification.reasonCode } : {}),
+          ...(initialVerification.reason ? { reason: initialVerification.reason } : {}),
+          error,
+        };
       }
 
-      if (!isAwaitingApproval(run)) {
-        // Benign race: by the time the safe_outputs job runs, the workflow run may have
-        // already been approved (by a human or an earlier run) and moved past the
-        // pending-approval state. There is nothing left to do, so report this as a skipped
-        // no-op instead of a failure that would fail the whole safe outputs step.
-        const reason = `Workflow run ${runId} is not awaiting approval (status: ${run.status || "none"})`;
-        core.warning(reason);
-        return { success: false, skipped: true, reasonCode: "NOT_AWAITING_APPROVAL", reason, error: reason };
-      }
-
-      const workflowId = parsePositiveInt(run.workflow_id);
-      if (!workflowId) {
-        const error = `Workflow run ${runId} has invalid workflow data`;
+      // Re-read the run, associated PR revisions, repository ownership, and changed files
+      // at the effect boundary so approval is bound to the current authorized state.
+      const verification = await verifyWorkflowRunApproval(githubClient, runId, config);
+      if (!verification.run) {
+        const error = verification.error || `Workflow run ${runId} could not be authorized`;
         core.warning(error);
-        return { success: false, error };
+        return {
+          success: false,
+          ...(verification.skipped ? { skipped: true } : {}),
+          ...(verification.reasonCode ? { reasonCode: verification.reasonCode } : {}),
+          ...(verification.reason ? { reason: verification.reason } : {}),
+          error,
+        };
       }
-      const { data: workflow } = await githubClient.rest.actions.getWorkflow({
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        workflow_id: workflowId,
-      });
-      if (!isAllowedWorkflow(workflow?.path, config.allowed_workflows)) {
-        const error = `Workflow run ${runId} does not match an allowed workflow`;
-        core.warning(error);
-        return { success: false, error };
-      }
-
-      const allowedPullRequests = parseAllowedPullRequests(config.allowed_pull_requests);
-      const currentPullRequest = getCurrentPullRequestNumber();
-      const isAuthorized = run.pull_requests.every(pullRequest => {
-        const pullRequestNumber = parsePositiveInt(pullRequest.number);
-        return pullRequestNumber !== undefined && ((currentPullRequest !== undefined && pullRequestNumber === currentPullRequest) || allowedPullRequests.has(pullRequestNumber));
-      });
-      if (!isAuthorized) {
-        const error = `Workflow run ${runId} is not associated exclusively with the triggering pull request or explicitly allowed pull requests`;
-        core.warning(error);
-        return { success: false, error };
-      }
-
-      for (const pullRequest of run.pull_requests) {
-        const pullRequestNumber = parsePositiveInt(pullRequest.number);
-        if (pullRequestNumber === undefined) {
-          const error = `Workflow run ${runId} has invalid pull request data`;
-          core.warning(error);
-          return { success: false, error };
-        }
-        const headRepo = await getPullRequestHeadRepo(githubClient, pullRequestNumber);
-        if (!isHeadRepoAllowed(headRepo, allowedRepos)) {
-          const hint = allowedRepos.size === 0 ? "configure allowed-repos to approve pull requests from other repositories" : `allowed repositories: ${Array.from(allowedRepos).join(", ")}`;
-          const error = `Workflow run ${runId} cannot be approved because pull request #${pullRequestNumber} comes from repository ${headRepo}, which is not in the allowed-repos list (${hint})`;
-          core.warning(error);
-          return { success: false, error };
-        }
-        const files = await getModifiedPullRequestFiles(githubClient, pullRequestNumber);
-        const protection = checkFileProtectionPostApply(files, {
-          ...config,
-          protected_files_policy: "blocked",
-        });
-        if (protection.action !== "allow") {
-          const error = `Workflow run ${runId} cannot be approved because pull request #${pullRequestNumber} modifies protected files (${protection.files.join(", ")})`;
-          core.warning(error);
-          return { success: false, skipped: true, reasonCode: POLICY_FILE_PROTECTION_DENIED_REASON_CODE, error };
-        }
-      }
+      const run = verification.run;
 
       try {
         await githubClient.rest.actions.approveWorkflowRun({
@@ -434,7 +465,7 @@ module.exports = {
   isAwaitingApproval,
   isPermissionDeniedError,
   getModifiedPullRequestFiles,
-  getPullRequestHeadRepo,
+  getPullRequestDetails,
   isHeadRepoAllowed,
   buildApprovalCommentBody,
   postApprovalComment,

@@ -42,12 +42,17 @@ func TestConnectorArtifactUploadRequiresCompletedRedaction(t *testing.T) {
 		ids := []string{"redact_secrets", "connector_fixture_mask", "validate_recovery_envelopes"}
 		switch step.Name {
 		case "Upload upload-artifact staging":
-			foundStaging = true
+			ids = append(ids, "prepare_safe_outputs_artifact_staging")
+		case "Prepare safe-outputs artifact staging":
+			continue
 		case "Upload agent artifacts", "Upload agent output fallback artifact":
 			agentUploads++
 			ids = append(ids, "validate_final_recovery_envelopes")
 		default:
 			continue
+		}
+		if step.Name == "Upload upload-artifact staging" {
+			foundStaging = true
 		}
 		outcomes := map[string]string{}
 		for _, id := range ids {

@@ -44,8 +44,9 @@ const pendingPullRequestRun = {
   conclusion: null,
   html_url: "https://github.com/test-owner/test-repo/actions/runs/123",
   workflow_id: 456,
-  pull_requests: [{ number: 42 }],
+  pull_requests: [{ number: 42, head: { sha: "current-head-sha" } }],
 };
+const runPullRequest = number => ({ number, head: { sha: "current-head-sha" } });
 const externalTokenConfig = { "github-token": "external-token", allowed_workflows: ["test.yml"] };
 
 describe("approve_workflow_run", () => {
@@ -56,7 +57,7 @@ describe("approve_workflow_run", () => {
     mockGetWorkflowRun.mockResolvedValue({ data: pendingPullRequestRun });
     mockGetWorkflow.mockResolvedValue({ data: { path: ".github/workflows/test.yaml" } });
     mockApproveWorkflowRun.mockResolvedValue({ status: 201 });
-    mockGetPullRequest.mockResolvedValue({ data: { head: { repo: { full_name: "test-owner/test-repo" } } } });
+    mockGetPullRequest.mockResolvedValue({ data: { head: { sha: "current-head-sha", repo: { full_name: "test-owner/test-repo" } } } });
     mockListFiles.mockResolvedValue({ data: [] });
     mockCreateComment.mockResolvedValue({ data: { id: 999, html_url: "https://github.com/test-owner/test-repo/issues/42#issuecomment-999" } });
   });
@@ -276,7 +277,7 @@ describe("approve_workflow_run", () => {
   });
 
   it("approves pull requests opened from a branch in the current repository", async () => {
-    mockGetPullRequest.mockResolvedValue({ data: { head: { ref: "copilot/fix-bug", repo: { full_name: "test-owner/test-repo" } } } });
+    mockGetPullRequest.mockResolvedValue({ data: { head: { ref: "copilot/fix-bug", sha: "current-head-sha", repo: { full_name: "test-owner/test-repo" } } } });
     const { main } = require("./approve_workflow_run.cjs");
     const handler = await main(externalTokenConfig);
 
@@ -287,7 +288,7 @@ describe("approve_workflow_run", () => {
   });
 
   it("rejects fork pull requests by default", async () => {
-    mockGetPullRequest.mockResolvedValue({ data: { head: { repo: { full_name: "contributor/test-repo" } } } });
+    mockGetPullRequest.mockResolvedValue({ data: { head: { sha: "current-head-sha", repo: { full_name: "contributor/test-repo" } } } });
     const { main } = require("./approve_workflow_run.cjs");
     const handler = await main(externalTokenConfig);
 
@@ -301,7 +302,7 @@ describe("approve_workflow_run", () => {
   });
 
   it("allows fork pull requests listed in allowed-repos", async () => {
-    mockGetPullRequest.mockResolvedValue({ data: { head: { repo: { full_name: "contributor/test-repo" } } } });
+    mockGetPullRequest.mockResolvedValue({ data: { head: { sha: "current-head-sha", repo: { full_name: "contributor/test-repo" } } } });
     const { main } = require("./approve_workflow_run.cjs");
     const handler = await main({ ...externalTokenConfig, allowed_repos: ["contributor/test-repo"] });
 
@@ -312,7 +313,7 @@ describe("approve_workflow_run", () => {
   });
 
   it("allows fork pull requests matching an allowed-repos wildcard pattern", async () => {
-    mockGetPullRequest.mockResolvedValue({ data: { head: { repo: { full_name: "contributor/test-repo" } } } });
+    mockGetPullRequest.mockResolvedValue({ data: { head: { sha: "current-head-sha", repo: { full_name: "contributor/test-repo" } } } });
     const { main } = require("./approve_workflow_run.cjs");
     const handler = await main({ ...externalTokenConfig, allowed_repos: ["contributor/*"] });
 
@@ -324,10 +325,10 @@ describe("approve_workflow_run", () => {
 
   it("rejects a run when any associated pull request comes from a disallowed repository", async () => {
     mockGetWorkflowRun.mockResolvedValue({
-      data: { ...pendingPullRequestRun, pull_requests: [{ number: 42 }, { number: 43 }] },
+      data: { ...pendingPullRequestRun, pull_requests: [runPullRequest(42), runPullRequest(43)] },
     });
     mockGetPullRequest.mockImplementation(async ({ pull_number: pullRequestNumber }) => ({
-      data: { head: { repo: { full_name: pullRequestNumber === 43 ? "contributor/test-repo" : "test-owner/test-repo" } } },
+      data: { head: { sha: "current-head-sha", repo: { full_name: pullRequestNumber === 43 ? "contributor/test-repo" : "test-owner/test-repo" } } },
     }));
     const { main } = require("./approve_workflow_run.cjs");
     const handler = await main({ ...externalTokenConfig, allowed_pull_requests: ["43"] });
@@ -379,7 +380,7 @@ describe("approve_workflow_run", () => {
 
   it("rejects a run for a pull request other than the current pull request", async () => {
     mockGetWorkflowRun.mockResolvedValue({
-      data: { ...pendingPullRequestRun, pull_requests: [{ number: 43 }] },
+      data: { ...pendingPullRequestRun, pull_requests: [runPullRequest(43)] },
     });
     const { main } = require("./approve_workflow_run.cjs");
     const handler = await main(externalTokenConfig);
@@ -388,6 +389,35 @@ describe("approve_workflow_run", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain("not associated");
+    expect(mockApproveWorkflowRun).not.toHaveBeenCalled();
+  });
+
+  it("rejects a run whose associated PR revision differs from the current revision", async () => {
+    mockGetWorkflowRun.mockResolvedValue({
+      data: { ...pendingPullRequestRun, pull_requests: [{ number: 42, head: { sha: "older-head-sha" } }] },
+    });
+    const { main } = require("./approve_workflow_run.cjs");
+    const handler = await main(externalTokenConfig);
+
+    const result = await handler({ run_id: 123 }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("different head revision");
+    expect(mockApproveWorkflowRun).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the PR revision immediately before approving", async () => {
+    mockGetPullRequest
+      .mockResolvedValueOnce({ data: { head: { sha: "current-head-sha", repo: { full_name: "test-owner/test-repo" } } } })
+      .mockResolvedValueOnce({ data: { head: { sha: "new-head-sha", repo: { full_name: "test-owner/test-repo" } } } });
+    const { main } = require("./approve_workflow_run.cjs");
+    const handler = await main(externalTokenConfig);
+
+    const result = await handler({ run_id: 123 }, {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("different head revision");
+    expect(mockGetWorkflowRun).toHaveBeenCalledTimes(2);
     expect(mockApproveWorkflowRun).not.toHaveBeenCalled();
   });
 
@@ -445,7 +475,7 @@ describe("approve_workflow_run", () => {
 
   it("approves a run for an explicitly allowed pull request", async () => {
     mockGetWorkflowRun.mockResolvedValue({
-      data: { ...pendingPullRequestRun, pull_requests: [{ number: 43 }] },
+      data: { ...pendingPullRequestRun, pull_requests: [runPullRequest(43)] },
     });
     const { main } = require("./approve_workflow_run.cjs");
     const handler = await main({ ...externalTokenConfig, allowed_pull_requests: ["43"] });
@@ -459,7 +489,7 @@ describe("approve_workflow_run", () => {
   it("approves a run for a pull request allowed by a JSON-string list", async () => {
     global.context.payload = {};
     mockGetWorkflowRun.mockResolvedValue({
-      data: { ...pendingPullRequestRun, pull_requests: [{ number: 43 }] },
+      data: { ...pendingPullRequestRun, pull_requests: [runPullRequest(43)] },
     });
     const { main } = require("./approve_workflow_run.cjs");
     const handler = await main({ ...externalTokenConfig, allowed_pull_requests: '["43"]' });
@@ -472,7 +502,7 @@ describe("approve_workflow_run", () => {
 
   it("approves a run when every associated pull request is triggering or explicitly allowed", async () => {
     mockGetWorkflowRun.mockResolvedValue({
-      data: { ...pendingPullRequestRun, pull_requests: [{ number: 42 }, { number: 43 }] },
+      data: { ...pendingPullRequestRun, pull_requests: [runPullRequest(42), runPullRequest(43)] },
     });
     const { main } = require("./approve_workflow_run.cjs");
     const handler = await main({ ...externalTokenConfig, allowed_pull_requests: ["43"] });
@@ -485,7 +515,7 @@ describe("approve_workflow_run", () => {
 
   it("rejects a run when any associated pull request is not authorized", async () => {
     mockGetWorkflowRun.mockResolvedValue({
-      data: { ...pendingPullRequestRun, pull_requests: [{ number: 42 }, { number: 43 }] },
+      data: { ...pendingPullRequestRun, pull_requests: [runPullRequest(42), runPullRequest(43)] },
     });
     const { main } = require("./approve_workflow_run.cjs");
     const handler = await main(externalTokenConfig);
@@ -619,7 +649,7 @@ describe("approve_workflow_run", () => {
     expect(second.success).toBe(false);
     expect(second.skipped).toBe(true);
     expect(second.reasonCode).toBe("APPROVE_WORKFLOW_RUN_PERMISSION_DENIED");
-    expect(mockGetWorkflowRun).toHaveBeenCalledTimes(1);
+    expect(mockGetWorkflowRun).toHaveBeenCalledTimes(2);
     expect(mockApproveWorkflowRun).toHaveBeenCalledTimes(1);
   });
 });

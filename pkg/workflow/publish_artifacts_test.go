@@ -211,7 +211,10 @@ func TestHasSafeOutputsEnabledWithUploadArtifact(t *testing.T) {
 func TestComputeEnabledToolNamesIncludesUploadArtifact(t *testing.T) {
 	data := &WorkflowData{
 		SafeOutputs: &SafeOutputsConfig{
-			UploadArtifact: &UploadArtifactConfig{},
+			UploadArtifact: &UploadArtifactConfig{
+				AllowedPaths: []string{"reports/**"},
+				Filters:      &ArtifactFiltersConfig{Exclude: []string{"reports/private/**"}},
+			},
 		},
 	}
 	tools := computeEnabledToolNames(data)
@@ -223,13 +226,22 @@ func TestGenerateSafeOutputsArtifactStagingUpload(t *testing.T) {
 		var b strings.Builder
 		data := &WorkflowData{
 			SafeOutputs: &SafeOutputsConfig{
-				UploadArtifact: &UploadArtifactConfig{},
+				UploadArtifact: &UploadArtifactConfig{
+					AllowedPaths: []string{"reports/**"},
+					Filters:      &ArtifactFiltersConfig{Exclude: []string{"reports/private/**"}},
+				},
 			},
 		}
-		generateSafeOutputsArtifactStagingUpload(&b, data, getActionPin)
+		require.NoError(t, generateSafeOutputsArtifactStagingUpload(&b, data, getActionPin))
 		result := b.String()
 		assert.Contains(t, result, "safe-outputs-upload-artifacts", "should reference staging artifact name")
 		assert.Contains(t, result, artifactStagingDirExpr, "should reference staging directory")
+		assert.Contains(t, result, artifactStagingTransferDirExpr, "should upload the filtered transfer directory")
+		assert.Contains(t, result, "prepare_upload_artifact_staging.cjs")
+		assert.Contains(t, result, "reports/**")
+		assert.Contains(t, result, "reports/private/**")
+		assert.Contains(t, result, "steps.prepare_safe_outputs_artifact_staging.outcome == 'success'")
+		assert.NotContains(t, result, "path: "+artifactStagingDirExpr, "must not upload the agent-writable staging directory")
 		assert.Contains(t, result, "if: always()", "should have always() condition")
 	})
 
@@ -238,14 +250,14 @@ func TestGenerateSafeOutputsArtifactStagingUpload(t *testing.T) {
 		data := &WorkflowData{
 			SafeOutputs: &SafeOutputsConfig{UploadArtifact: nil},
 		}
-		generateSafeOutputsArtifactStagingUpload(&b, data, getActionPin)
+		require.NoError(t, generateSafeOutputsArtifactStagingUpload(&b, data, getActionPin))
 		assert.Empty(t, b.String(), "should generate nothing when UploadArtifact is nil")
 	})
 
 	t.Run("generates nothing when SafeOutputs is nil", func(t *testing.T) {
 		var b strings.Builder
 		data := &WorkflowData{SafeOutputs: nil}
-		generateSafeOutputsArtifactStagingUpload(&b, data, getActionPin)
+		require.NoError(t, generateSafeOutputsArtifactStagingUpload(&b, data, getActionPin))
 		assert.Empty(t, b.String(), "should generate nothing when SafeOutputs is nil")
 	})
 }

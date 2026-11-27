@@ -304,7 +304,9 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 	// Add safe-outputs upload-artifact staging upload (after agent execution)
 	// This creates a separate artifact for files the model staged for artifact upload,
 	// to be downloaded and processed by the upload_artifact job
-	generateSafeOutputsArtifactStagingUpload(yaml, data, c.getActionPin)
+	if err := generateSafeOutputsArtifactStagingUpload(yaml, data, c.getActionPin); err != nil {
+		return fmt.Errorf("failed to generate safe-outputs artifact staging upload: %w", err)
+	}
 
 	// Add safe-outputs upload-code-coverage staging upload (after agent execution)
 	// This creates a separate artifact for the coverage report file the model staged,
