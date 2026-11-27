@@ -93,8 +93,8 @@ BYOK does not automatically bypass model-alias resolution. For providers without
 | `COPILOT_PROVIDER_BEARER_TOKEN` | Optional | Bearer-token alternative to `COPILOT_PROVIDER_API_KEY`; takes precedence when set |
 | `COPILOT_PROVIDER_TYPE` | Optional | Provider format: `openai` (default), `azure`, or `anthropic` |
 | `COPILOT_PROVIDER_WIRE_API` | Optional | Wire API variant: `completions` (default) or `responses` (for GPT-5 series) |
-| `COPILOT_PROVIDER_MODEL_ID` | Optional | Model ID sent on the wire when it differs from `COPILOT_MODEL` (e.g. an Azure deployment name) |
-| `COPILOT_PROVIDER_WIRE_MODEL` | Optional | Alternative to `COPILOT_PROVIDER_MODEL_ID` for overriding the wire model |
+| `COPILOT_PROVIDER_MODEL_ID` | Optional | Well-known model ID for agent configuration and token limits; defaults to `COPILOT_MODEL` |
+| `COPILOT_PROVIDER_WIRE_MODEL` | Optional | Model name sent to the provider (e.g. an Azure deployment name or gateway alias); defaults to `COPILOT_MODEL` |
 | `COPILOT_PROVIDER_MAX_PROMPT_TOKENS` | Optional | Override the maximum prompt token limit (otherwise resolved from model catalog) |
 | `COPILOT_PROVIDER_MAX_OUTPUT_TOKENS` | Optional | Override the maximum output token limit |
 
@@ -119,7 +119,7 @@ network:
 
 ### Azure Foundry OpenAI
 
-Use the resource's `/openai/v1` endpoint with API-key or GitHub OIDC authentication. Keep `engine.model` on the advertised model ID and set `COPILOT_PROVIDER_MODEL_ID` when the deployment name differs. See [Azure OpenAI BYOK](/gh-aw/reference/azure-openai-byok/) for complete configurations, Responses API selection, and troubleshooting.
+Use the resource's `/openai/v1` endpoint with API-key or GitHub OIDC authentication. Keep `engine.model` on the advertised model ID and set `COPILOT_PROVIDER_WIRE_MODEL` when the deployment name differs. See [Azure OpenAI BYOK](/gh-aw/reference/azure-openai-byok/) for complete configurations, Responses API selection, and troubleshooting.
 
 ## Copilot SDK Support
 

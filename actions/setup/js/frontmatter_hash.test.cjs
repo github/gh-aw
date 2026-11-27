@@ -6,6 +6,18 @@ const path = require("path");
 
 describe("frontmatter_hash (API)", () => {
   describe("computeFrontmatterHash", () => {
+    it("should verify the Copilot Session Insights lock with all imports readable", async () => {
+      const workflowPath = path.resolve(__dirname, "../../../.github/workflows/copilot-session-insights.md");
+      const lockPath = workflowPath.replace(/\.md$/, ".lock.yml");
+      const hash = await computeFrontmatterHash(workflowPath, {
+        onMissingImport: (importPath, error) => {
+          throw new Error(`Unreadable import ${importPath}: ${error.message}`);
+        },
+      });
+
+      expect(hash).toBe(extractHashFromLockFile(fs.readFileSync(lockPath, "utf8")));
+    });
+
     it("should compute hash deterministically", async () => {
       // Create a temporary test file
       const testFile = path.join(__dirname, "test-api-workflow.md");

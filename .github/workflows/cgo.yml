@@ -422,13 +422,10 @@ jobs:
         # List all test dependencies to ensure they're in the cache
         # This will fail fast if any dependencies are missing
         echo "Checking test dependencies for all packages..."
-        if go list -test -deps ./... >/dev/null 2>&1; then
+        if go list -test -deps ./... >/dev/null; then
           echo "✅ All test dependencies are available"
         else
           echo "❌ Failed to resolve test dependencies"
-          echo ""
-          echo "Attempting to show which dependencies are missing:"
-          go list -test -deps ./... 2>&1 || true
           exit 1
         fi
 

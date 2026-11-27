@@ -10,6 +10,7 @@ import (
 
 	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 )
 
 var azureAIGatewayScenario = connectorCompilerScenario{"azure-ai-gateway", nil, "", "create-issue"}
@@ -50,7 +51,8 @@ func TestAzureAIGatewayInferenceCompilation(t *testing.T) {
 			env := data.EngineConfig.Env
 			require.Equal(t, "https://example.ai.gateway.azure.com/default/models/openai/v1", env["COPILOT_PROVIDER_BASE_URL"])
 			require.Equal(t, "openai", env["COPILOT_PROVIDER_TYPE"])
-			require.Equal(t, "deployment-checklist", env["COPILOT_PROVIDER_MODEL_ID"])
+			require.Equal(t, "deployment-checklist", env["COPILOT_PROVIDER_WIRE_MODEL"])
+			require.NotContains(t, env, "COPILOT_PROVIDER_MODEL_ID", "provider metadata must default to COPILOT_MODEL")
 			require.Equal(t, "gpt-5.2", data.Model, "catalog metadata must not replace the granted wire alias")
 			require.True(t, data.EngineConfig.ModelCatalogDisabled, "the gateway has no /models route")
 			wire := "responses"
@@ -61,6 +63,9 @@ func TestAzureAIGatewayInferenceCompilation(t *testing.T) {
 			output, err := compiler.CompileToYAML(data, path)
 			require.NoError(t, err)
 			require.Contains(t, output, "GH_AW_MODEL_CATALOG: false")
+			require.Contains(t, output, "COPILOT_MODEL: gpt-5.2")
+			require.Contains(t, output, `COPILOT_PROVIDER_WIRE_MODEL: "deployment-checklist"`)
+			require.NotContains(t, output, "COPILOT_PROVIDER_MODEL_ID:")
 			agent, effects := connectorPhaseJobJSON(t, output)
 			require.NotContains(t, output, "GH_AW_CONNECTOR_PLAN")
 			require.NotContains(t, effects, "AZURE_AI_GATEWAY_KEY")
@@ -89,6 +94,39 @@ func TestAzureAIGatewayInferenceCompilation(t *testing.T) {
 	}
 }
 
+func TestConnectorInferenceModelAliasYAMLRoundTrip(t *testing.T) {
+	for _, alias := range []string{"deployment # approved", "#alias", "true", "123", "[alias]", `alias "quoted" \path`} {
+		t.Run(alias, func(t *testing.T) {
+			compiler, path := prepareConnectorScenario(t, azureAIGatewayScenario, false, func(consumer, _ map[string]any) {
+				inferenceSelection(consumer)["model"] = alias
+				imports := consumer["imports"].([]any)
+				imports[0].(map[string]any)["with"].(map[string]any)["models"] = []any{alias}
+			})
+			data, err := compiler.ParseWorkflowFile(path)
+			require.NoError(t, err)
+			output, err := compiler.CompileToYAML(data, path)
+			require.NoError(t, err)
+
+			var workflow struct {
+				Jobs map[string]struct {
+					Steps []struct {
+						Env map[string]any `yaml:"env"`
+					} `yaml:"steps"`
+				} `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(output), &workflow))
+			found := false
+			for _, step := range workflow.Jobs["agent"].Steps {
+				if value, ok := step.Env["COPILOT_PROVIDER_WIRE_MODEL"]; ok {
+					require.Equal(t, alias, value)
+					found = true
+				}
+			}
+			require.True(t, found, "agent step must receive the approved wire model")
+		})
+	}
+}
+
 func TestConnectorInferenceRejectsInvalidSelection(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -107,6 +145,9 @@ func TestConnectorInferenceRejectsInvalidSelection(t *testing.T) {
 		{"conflicting env", func(f map[string]any) {
 			f["engine"].(map[string]any)["env"] = map[string]any{"COPILOT_PROVIDER_API_KEY": "${{ secrets.OTHER }}"}
 		}, "conflicts"},
+		{"conflicting wire model", func(f map[string]any) {
+			f["engine"].(map[string]any)["env"] = map[string]any{"COPILOT_PROVIDER_WIRE_MODEL": "other"}
+		}, "COPILOT_PROVIDER_WIRE_MODEL conflicts"},
 		{"global auth env", func(f map[string]any) { f["env"] = map[string]any{"AWF_AUTH_PROVIDER": "openai"} }, "conflicts"},
 		{"routing", func(f map[string]any) { f["model-routing"] = map[string]any{"allowed-models": []any{"gpt-5.2"}} }, "conflicts"},
 		{"CLI override", func(f map[string]any) { f["engine"].(map[string]any)["args"] = []any{"--model", "other"} }, "conflicts"},
