@@ -28,7 +28,7 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		{"OpenAI WIF", AWFOpenAIWIFMinVersion, "v0.29.11"},
 		{"Router", DefaultRouterVersion, "0.1.3"},
 		{"Router image release", AWFRouterReleaseImageMinVersion, "v0.28.62"},
-		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.5.14"},
+		{"MCP Gateway", DefaultMCPGatewayVersion, "v0.5.15"},
 	}
 
 	for _, tt := range tests {
