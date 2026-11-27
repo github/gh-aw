@@ -28,8 +28,16 @@ type ConnectorImport struct {
 	Registrations map[string]any
 }
 
+// EnginePrerequisites are the job prerequisites declared alongside an imported
+// engine definition, before unrelated workflow and import fields are merged.
+type EnginePrerequisites struct {
+	Runtimes      map[string]any
+	PreAgentSteps string
+}
+
 // ImportsResult holds the result of processing imports from frontmatter
 type ImportsResult struct {
+	EnginePrerequisites           map[string]EnginePrerequisites
 	Connectors                    []ConnectorImport
 	MergedTools                   string                // Merged tools configuration from all imports
 	MergedMCPServers              string                // Merged mcp-servers configuration from all imports

@@ -120,6 +120,39 @@ exec threat_detection_result --prompt-injection=false --secret-leak=false --mali
   });
 });
 
+it("runs an imported harness with literal argv and consumes only its corrected verdict", () => {
+  const root = fixture();
+  const actions = path.join(root, "gh-aw/actions");
+  fs.mkdirSync(actions, { recursive: true });
+  fs.writeFileSync(
+    path.join(actions, "pydantic-ai_harness.cjs"),
+    `
+const fs = require("node:fs");
+const { spawnSync } = require("node:child_process");
+const assert = require("node:assert/strict");
+assert.deepEqual(process.argv.slice(2), ["python3", "-m", "fixture.harness"]);
+assert.equal(process.cwd(), process.env.GH_AW_ENGINE_CWD);
+assert.match(fs.readFileSync(process.env.GH_AW_PROMPT, "utf8"), /threat_detection_result/);
+const report = patch => spawnSync("threat_detection_result", ["--prompt-injection=false", "--secret-leak=true", "--malicious-patch=" + patch, "--reason=fixture evidence"], {encoding:"utf8"});
+const rejected = report(true);
+assert.notEqual(rejected.status, 0);
+assert.match(rejected.stderr, /not eligible/);
+assert.ok(!fs.existsSync(process.env.THREAT_DETECTION_RESULT_FILE));
+assert.equal(report(false).status, 0);
+`
+  );
+  const env = { ...process.env, RUNNER_TEMP: root, GH_AW_DETECTION_CONTINUE_ON_ERROR: "false" };
+  const stage = run(root, process.execPath, [path.join(__dirname, "stage_threat_detection_runtime.cjs"), "pydantic-ai", Buffer.from(JSON.stringify(["python3", "-m", "fixture.harness"])).toString("base64")], env);
+  expect(stage.status, stage.stderr).toBe(0);
+  const detect = run(root, process.execPath, [path.join(__dirname, "detect_threats.cjs"), "--launch-config", "gh-aw/threat-detection-runtime/launch.json", "--output", "verdict.json", "artifacts"], env);
+  expect(detect.status, detect.stderr).toBe(1);
+  expect(detect.stderr).toContain("[imported-harness] Detection harness started");
+  const output = path.join(root, "github-output");
+  const host = run(root, process.execPath, [path.join(__dirname, "conclude_threat_detection.cjs"), "verdict.json"], { ...env, RUN_DETECTION: "true", GITHUB_OUTPUT: output });
+  expect(host.status).toBe(1);
+  expect(fs.readFileSync(output, "utf8").split("\n")).toEqual(expect.arrayContaining(["reason=threat_detected", "threat_kinds=secret_leak"]));
+});
+
 describe("result destinations", () => {
   it("does not leave a stale conventional sidecar when full output is disabled", () => {
     const root = fixture();

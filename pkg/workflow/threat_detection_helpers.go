@@ -362,7 +362,7 @@ func inheritedDetectionModel(data *WorkflowData, detectionEngineID string) strin
 	if engineID != detectionEngineID && len(data.ModelMappings[data.Model]) > 0 {
 		return ""
 	}
-	if engineID == "" || engineID == "pi" || isThreatDetectionCapableEngineID(engineID) {
+	if engineID == detectionEngineID || engineID == "" || engineID == "pi" || isThreatDetectionCapableEngineID(engineID) {
 		return data.Model
 	}
 	return ""
@@ -380,7 +380,7 @@ func defaultDetectionModel(engine CodingAgentEngine, catalogDisabled bool) strin
 	if model := compilerenv.ResolveDefaultDetectionModel(""); model != "" {
 		return model
 	}
-	suffix := strings.ToUpper(engine.GetID())
+	suffix := strings.ToUpper(strings.ReplaceAll(engine.GetID(), "-", "_"))
 	primaryVar := "GH_AW_MODEL_DETECTION_" + suffix
 	enterpriseVar := "GH_AW_DEFAULT_MODEL_" + suffix
 	var model string

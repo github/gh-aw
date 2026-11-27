@@ -46,7 +46,7 @@ function envTurns() {
 function readLaunch(file) {
   const launch = JSON.parse(fs.readFileSync(file, "utf8"));
   if (!launch || typeof launch.command !== "string" || !launch.command.trim()) throw new Error("The launch descriptor requires an executable command");
-  if (!["copilot", "claude", "codex"].includes(launch.convention)) throw new Error("Expected a copilot, claude, or codex launch convention");
+  if (!["copilot", "claude", "codex", "imported"].includes(launch.convention)) throw new Error("Expected a supported launch convention");
   if (launch.args !== undefined && (!Array.isArray(launch.args) || !launch.args.every(arg => typeof arg === "string"))) throw new Error("Launch args must be an array of strings");
   if (launch.mode !== undefined && !["direct", "harness"].includes(launch.mode)) throw new Error("Expected direct or harness launch mode");
   return launch;

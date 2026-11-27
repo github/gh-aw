@@ -37,6 +37,10 @@ function launchArgs(launch, env, promptFile, artifactsDir, sink, maxTurns) {
   const { convention, model, provider } = launch;
   const direct = launch.mode === "direct";
   switch (convention) {
+    case "imported":
+      if (direct) throw new Error("Imported detection requires a harness");
+      env.GH_AW_PROMPT = promptFile;
+      return args;
     case "copilot": {
       args.push("--log-level", "all", "--disable-builtin-mcps", "--no-ask-user");
       if (artifactsDir) args.push("--add-dir", artifactsDir, "--allow-tool", `read(${artifactsDir}/**)`);
@@ -134,7 +138,7 @@ async function runHarness({ launch, prompt, artifactsDir, sink, eligibility, max
     if (sink) {
       provisionTool(dir, sink, eligibility, env);
       prompt = `Host-provided reasons file (literal path, JSON-encoded): ${JSON.stringify(env.THREAT_DETECTION_REASONS_FILE)}\n\n${prompt}`;
-      if (["claude", "codex"].includes(launch.convention)) {
+      if (["claude", "codex", "imported"].includes(launch.convention)) {
         launch = { ...launch, cwd: path.dirname(sink) };
         env.GITHUB_WORKSPACE = path.dirname(sink);
         env.GH_AW_ENGINE_CWD = path.dirname(sink);

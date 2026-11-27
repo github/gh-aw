@@ -152,7 +152,7 @@ function supervise({ launch, args, env, prompt, sink, timeoutMs, signal }) {
       // Only the trusted subreaper owns fd 3. AWF needs the startup marker
       // on nonzero exits too (a finding exits 1); never relay engine output.
       if (startedSeen) {
-        if (["copilot", "claude", "codex"].includes(launch.convention)) process.stderr.write(`[${launch.convention}-harness] Detection harness started\n`);
+        if (["copilot", "claude", "codex", "imported"].includes(launch.convention)) process.stderr.write(`[${launch.convention}-harness] Detection harness started\n`);
       }
       if (spawnError) error ??= Object.assign(new Error(`engine launch failed: ${spawnError}`), { code: spawnError });
       if (timedOut || cancelled) error ??= new Error(timedOut ? "engine timed out" : "engine cancelled");

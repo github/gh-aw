@@ -94,6 +94,11 @@ func parseEngineDefinitionFromJSON(engineJSON string) (*EngineDefinition, error)
 	if def.RuntimeID == "" {
 		def.RuntimeID = def.ID
 	}
+	if id := def.DetectionEngine; id != "" && !isThreatDetectionCapableEngineID(id) {
+		if id != def.ID || def.Behaviors == nil || def.Behaviors.Execution == nil || def.Behaviors.Execution.CommandName == "" || def.Behaviors.HarnessScript == "" {
+			return nil, fmt.Errorf("detection-engine %q must be copilot, claude, codex, or the definition's own id with behaviors.execution.command-name and behaviors.harness-script", id)
+		}
+	}
 	// Cache only built-in engine definitions (keys pre-seeded by loadBuiltinEngineDefinitions)
 	// to prevent unbounded memory growth. Store a deep copy so that any mutations the
 	// caller makes to the returned definition cannot corrupt the cached entry.

@@ -43,6 +43,9 @@ func (acc *importAccumulator) extractImportFields(content []byte, item importQue
 		acc.warnings = append(acc.warnings, fmt.Sprintf("import %q: %s", item.importPath, warning))
 	}
 	acc.extractEngineConfig(fm, item.fullPath)
+	if err := acc.extractDetectionPrerequisites(fm); err != nil {
+		return fmt.Errorf("import %q: %w", item.importPath, err)
+	}
 
 	// Phase 4: Extract scalar and builder-based configuration fields.
 	acc.extractConfigFields(fm, item.fullPath)

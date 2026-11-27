@@ -73,6 +73,30 @@ func (acc *importAccumulator) extractEngineConfig(fm map[string]any, fullPath st
 	}
 }
 
+func (acc *importAccumulator) extractDetectionPrerequisites(fm map[string]any) error {
+	engine, ok := fm["engine"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	id, ok := engine["id"].(string)
+	if !ok || id == "" || engine["detection-engine"] != id || engine["behaviors"] == nil {
+		return nil
+	}
+	steps, err := extractYAMLFieldFromMap(fm, "pre-agent-steps")
+	if err != nil {
+		return err
+	}
+	prereqs := EnginePrerequisites{PreAgentSteps: steps}
+	if runtimes, ok := fm["runtimes"].(map[string]any); ok {
+		prereqs.Runtimes = runtimes
+	}
+	if acc.enginePrerequisites == nil {
+		acc.enginePrerequisites = make(map[string]EnginePrerequisites)
+	}
+	acc.enginePrerequisites[id] = prereqs
+	return nil
+}
+
 func (acc *importAccumulator) extractTopLevelRouting(fm map[string]any, fullPath string) {
 	switch routing := fm["model-routing"].(type) {
 	case bool:

@@ -363,11 +363,8 @@ type EngineDefinition struct {
 	// default version that downstream steps and env vars (such as
 	// GH_AW_ENGINE_VERSION) can rely on even when workflows omit engine.version.
 	Version string `yaml:"version,omitempty"`
-	// DetectionEngine names the built-in engine that runs threat detection for
-	// workflows using this engine. The threat detection analyzer only supports the
-	// built-in engines, so a custom engine definition must declare which built-in
-	// engine handles detection; otherwise detection falls back to the default
-	// built-in engine (see defaultThreatDetectionEngineID).
+	// DetectionEngine names a built-in replacement, or ID to opt the engine's
+	// own harness into bundled threat detection.
 	DetectionEngine string `yaml:"detection-engine,omitempty"`
 	// MCP indicates whether the engine supports MCP. Nil defaults to supported.
 	MCP              *bool  `yaml:"mcp,omitempty"`
@@ -589,7 +586,7 @@ func knownEngineImportDefaultBranch(ctx context.Context, importPath string) stri
 	var repository struct {
 		DefaultBranch string `json:"default_branch"`
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, knownEngineImportsMaxBytes)).Decode(&repository); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, knownEngineImportsMaxBytes)).Decode(&repository); err != nil { //nolint:jsondecoderunknownfields // Only default_branch is relevant from the GitHub repository response.
 		return fallback
 	}
 	if branch := strings.TrimSpace(repository.DefaultBranch); branch != "" {
