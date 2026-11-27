@@ -22,6 +22,31 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("URL domain allowlist input validation", () => {
+  it("discards empty and malformed allowlist entries", () => {
+    expect(sanitizeUrlDomains("https://outside.invalid./path", ["", " ", null, 42])).toBe("(outside.invalid/redacted)");
+  });
+
+  it.each(["*.", " *. ", ".", "..", "*..", ".invalid", "invalid.", "*..invalid", "*.invalid."])("rejects malformed domain entry %j", allowed => {
+    expect(sanitizeUrlDomains("https://outside.invalid../path", [allowed])).toBe("(outside.invalid/redacted)");
+    expect(sanitizeUrlDomains("https://outside.invalid./path", [allowed])).toBe("(outside.invalid/redacted)");
+  });
+
+  it.each([".invalid", "*..invalid"])("rejects a leading-dot base %j", allowed => {
+    expect(sanitizeUrlDomains("https://outside..invalid/path", [allowed])).toBe("(outside.invalid/redacted)");
+  });
+
+  it("preserves normalized valid entries alongside malformed entries", () => {
+    expect(sanitizeUrlDomains("https://sub.example.invalid/path", ["*.", null, " *.Example.Invalid "])).toBe("https://sub.example.invalid/path");
+    expect(sanitizeUrlDomains("https://example.invalid/path", ["..", " Example.Invalid "])).toBe("https://example.invalid/path");
+  });
+
+  it("fails closed for malformed allowlist containers and non-string content", () => {
+    expect(sanitizeUrlDomains("https://outside.invalid/path", null)).toBe("(outside.invalid/redacted)");
+    expect(sanitizeUrlDomains(42, ["github.com"])).toBe("");
+  });
+});
+
 describe("scheme-less www URL filtering", () => {
   it.each([{}, { allowedAliases: ["synthetic"] }, { deferMentions: true }])("redacts the full URL through each sanitization path: %j", options => {
     const input = "See www.outside.invalid/leak?sample=synthetic#fragment";

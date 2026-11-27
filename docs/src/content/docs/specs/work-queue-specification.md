@@ -399,7 +399,7 @@ These are protocol constants, not configuration. Publication makes at most 8 com
 | `dispatch_state_conflict` | Dispatch in the wrong state |
 | `run_binding_conflict` | Bind from another workflow, run, or older attempt |
 | `claim_ineffective`, `claim_scope_invalid` | Settling a non-open Claim or a Claim outside the bound run |
-| `work_terminal` | Cancelling completed Work or recancelling with another reason |
+| `work_terminal` | Cancelling completed Work or re-cancelling with another reason |
 | `issue_binding_conflict` | Changing an immutable Issue binding, or a second successor pinned to one approval Issue |
 | `approval_required` | Claiming an `issue` continuation before its `approved` gate is ready |
 | `checkpoint_invalid` | Misplaced or inconsistent checkpoint |

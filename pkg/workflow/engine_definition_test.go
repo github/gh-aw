@@ -155,6 +155,8 @@ func TestEngineCatalog_ResolveRejectsTypoThatExtendsBuiltinID(t *testing.T) {
 // descriptive validation error containing the engine ID, a list of valid engines, and
 // the documentation URL.
 func TestEngineCatalog_Resolve_UnknownEngine(t *testing.T) {
+	withKnownEngineImportsForTest(t, []byte(`{"engines":[]}`), nil)
+
 	registry := NewEngineRegistry()
 	catalog := NewEngineCatalog(registry)
 

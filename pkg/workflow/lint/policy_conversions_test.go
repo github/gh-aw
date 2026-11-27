@@ -90,6 +90,7 @@ func TestPushTargetRule(t *testing.T) {
 	}{
 		{"", 1},
 		{"required-title-prefix: '[bot] '", 0},
+		{"required-author: workflow-bot", 0},
 		{"title-prefix: '[legacy] '", 0},
 		{"required-title-prefix: ''\n    title-prefix: '[legacy] '", 0},
 		{"required-labels: [automated]", 0},

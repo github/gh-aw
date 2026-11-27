@@ -10,7 +10,7 @@ sidebar:
 
 **Version**: 1.4.0<br>
 **Status**: Experimental Working Draft<br>
-**Publication Date**: 2026-11-24<br>
+**Publication Date**: 2026-11-26<br>
 **Editor**: GitHub Agentic Workflows Team
 
 ## Abstract
@@ -27,8 +27,10 @@ TLA+ models of selected authority boundaries.
 This Experimental Working Draft is maintained by the GitHub Agentic Workflows
 project through repository review. It is not a W3C Recommendation or evidence
 of provider certification. Version 1.4.0 extends Entra workload identity
-federation to selected reads and safe outputs without changing existing token
-routes or inference transport. Publication does not establish provider authorization
+federation to selected reads and safe outputs and specifies the selected
+inference alias as the Copilot request wire model. Existing token routes,
+inference transport, and authority boundaries are preserved. Publication does not
+establish provider authorization
 or operational trigger ingress.
 
 ## Table of Contents
@@ -399,8 +401,10 @@ Initially only Copilot's existing OpenAI-compatible BYOK transport is supported.
 The compiler lowers the selected SDK base, protocol, alias and credential to
 `COPILOT_PROVIDER_*` and optional Azure `engine.auth`. `engine.model` remains
 the Copilot model metadata selection; the granted wire alias is preserved in
-`COPILOT_PROVIDER_MODEL_ID`. Model metadata MUST be explicit and literal, not
-a router value or expression. Unknown engines/protocols and conflicting native
+`COPILOT_PROVIDER_WIRE_MODEL`. `COPILOT_PROVIDER_MODEL_ID` MUST remain unset so
+that it defaults to `COPILOT_MODEL` for agent configuration and token limits.
+Model metadata MUST be explicit and literal, not a router value or expression.
+Unknown engines/protocols and conflicting native
 provider/auth/environment, routing, fallback or CLI overrides MUST fail rather
 than silently override either configuration. Imported engine settings MUST NOT
 override the resolved inference binding.
@@ -1094,9 +1098,11 @@ sections 4–8; this specification defines no new public error-code registry.
 
 ## 14. Change Log
 
-### Version 1.4.0 (Experimental Working Draft) — 2026-11-24
+### Version 1.4.0 (Experimental Working Draft) — 2026-11-26
 
 - Extended `azure-oidc` to agent and safe-output credentials, with trusted-host exchange and renewal. Connector selection derives the job's OIDC permission, including for inference. Existing inference transport and stored-token routes are unchanged.
+- Changed Copilot inference lowering to use `COPILOT_PROVIDER_WIRE_MODEL` for the granted request alias while leaving provider metadata to default to `COPILOT_MODEL`.
+- Preserved existing model catalog, exact grant, network approval, credential isolation, and native engine transport obligations.
 
 ### Version 1.3.0 (Experimental Working Draft) — 2026-11-23
 

@@ -34,6 +34,7 @@ func (c *Compiler) buildPreActivationJob(data *WorkflowData, needsPermissionChec
 	}
 
 	steps, permissions := c.buildPreActivationPermissions(data, setupActionRef)
+	steps = c.appendIssueStatusFilterStep(data, steps)
 	steps = c.buildPreActivationCheckSteps(data, steps, needsPermissionCheck)
 
 	// Emit a single unified GitHub App token mint step if on.github-app is configured
@@ -421,6 +422,7 @@ func (c *Compiler) injectPreActivationOnSteps(data *WorkflowData, steps, customS
 
 func buildPreActivationActivatedConditions(data *WorkflowData, needsPermissionCheck bool) []ConditionNode {
 	conditions := buildPreActivationMembershipAndTimeConditions(data, needsPermissionCheck)
+	conditions = appendPreActivationCondition(conditions, data.IssueStatusFilter != nil, "check_issue_status", "status_match")
 	return append(conditions, buildPreActivationSkipAndCommandConditions(data)...)
 }
 

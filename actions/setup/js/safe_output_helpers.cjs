@@ -497,7 +497,23 @@ function isStagedMode(config) {
 }
 
 /**
- * Checks required-labels and required-title-prefix precondition filters.
+ * Checks a PR author against a GitHub login or an app/<slug> identifier.
+ * @param {{login?: unknown, type?: unknown}|null|undefined} user - GitHub API author
+ * @param {string} requiredAuthor - GitHub login or app slug
+ * @returns {boolean}
+ */
+function matchesRequiredAuthor(user, requiredAuthor) {
+  const authorLogin = typeof user?.login === "string" ? user.login.toLowerCase() : "";
+  const expectedAuthor = requiredAuthor.trim().toLowerCase();
+  if (expectedAuthor.startsWith("app/")) {
+    const appSlug = expectedAuthor.slice(4);
+    return appSlug.length > 0 && user?.type === "Bot" && authorLogin === `${appSlug}[bot]`;
+  }
+  return authorLogin === expectedAuthor;
+}
+
+/**
+ * Checks required-author, required-labels and required-title-prefix precondition filters.
  * Returns a skip result if the item does not pass, or null if it passes.
  * Fetches the issue/PR from GitHub to check its labels and title.
  *
@@ -507,16 +523,22 @@ function isStagedMode(config) {
  * @param {string[]} requiredLabels - Labels that must ALL be present on the item
  * @param {string} requiredTitlePrefix - Title prefix the item must start with
  * @param {string} handlerType - Handler type name used in log messages
+ * @param {string} [requiredAuthor] - GitHub login that must have opened the item
  * @returns {Promise<{success: false, skipped: true, error: string}|null>}
  */
-async function checkRequiredFilter(githubClient, repoParts, itemNumber, requiredLabels, requiredTitlePrefix, handlerType) {
-  if (!requiredLabels.length && !requiredTitlePrefix) return null;
+async function checkRequiredFilter(githubClient, repoParts, itemNumber, requiredLabels, requiredTitlePrefix, handlerType, requiredAuthor = "") {
+  if (!requiredLabels.length && !requiredTitlePrefix && !requiredAuthor) return null;
 
   const { data: item } = await githubClient.rest.issues.get({
     owner: repoParts.owner,
     repo: repoParts.repo,
     issue_number: itemNumber,
   });
+
+  if (requiredAuthor && !matchesRequiredAuthor(item.user, requiredAuthor)) {
+    core.info(`Skipping ${handlerType} for #${itemNumber}: author does not match required-author filter (${requiredAuthor})`);
+    return { success: false, skipped: true, error: `Item author does not match required-author filter` };
+  }
 
   if (requiredLabels.length > 0) {
     const itemLabels = (item.labels || []).map(/** @param {any} l */ l => (typeof l === "string" ? l : l.name || ""));
@@ -548,6 +570,7 @@ module.exports = {
   isUsernameBlocked,
   isTemplatableTrue,
   isStagedMode,
+  matchesRequiredAuthor,
   logStagedPreviewInfo,
   checkRequiredFilter,
 };

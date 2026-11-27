@@ -75,6 +75,8 @@ safe-outputs:
   create-issue:
     title-prefix: "[agentrx-optimizer] "
     labels: [automation, observability, optimization, traces, "backlog:reports"]
+    planning-status: Backlog
+    allowed-statuses: [Backlog]
     close-older-issues: true
     expires: 7d
     max: 1

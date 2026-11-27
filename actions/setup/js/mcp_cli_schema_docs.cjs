@@ -173,6 +173,10 @@ function exampleValueForKey(key, schema) {
     switch (key) {
       case "issue_type":
         return "Bug";
+      case "planning_status":
+        return "Todo";
+      case "status":
+        return Array.isArray(chosenSchema.enum) && chosenSchema.enum.length ? chosenSchema.enum[0] : "Todo";
       case "name":
         return "bug";
       case "rationale":

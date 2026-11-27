@@ -194,6 +194,9 @@ func retainedLifecycleExecution(item CreatedItemReport) *lifecycle.Execution {
 	if item.Type == "add_labels" {
 		fields = []string{"labels"}
 	}
+	if item.Type == "set_issue_status" {
+		fields = []string{"planning_status", "state", "state_reason", "duplicate_issue_id"}
+	}
 	execution.BeforeState = retainedLifecycleFields(item.BeforeState, fields)
 	execution.AfterState = retainedLifecycleFields(item.AfterState, fields)
 	return execution

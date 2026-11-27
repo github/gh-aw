@@ -6,6 +6,30 @@ description: Trigger patterns for GitHub Agentic Workflows — events, fuzzy sch
 
 Use the smallest trigger that matches the request.
 
+For native issue statuses, use `issues.types: [status_changed]` with optional
+`status-ids` and `status-categories`; see the
+[trigger reference](https://github.github.com/gh-aw/reference/triggers/#issue-triggers-issues).
+Match captured `github.event.status`, not names or the potentially newer
+`issue.status` snapshot. List explicit issue activity types: unrestricted
+`issues` also activates on automatic status changes. Deliveries may repeat or
+be stale; fetch current state before mutation and do not promise exactly-once
+activation. Preserve status ID/name/category and the captured/previous/current
+distinction in agent context. Use MCP issue reads and `status:` searches when
+available; `null` or absent status is not Backlog.
+Search results can omit status even when `status:` works; use `issue_read`
+for status details rather than reconstructing them from the query.
+
+For other triggers, select the matching row in the **Decision Matrix** below,
+then read the corresponding **Scenario Examples** and **Trigger Patterns**
+sections before authoring. Apply their event-specific permission, fork,
+filtering, and failure constraints. For commands, read the slash/label command
+sections before configuring activation. Use the
+[trigger reference](https://github.github.com/gh-aw/reference/triggers/) for
+declarative syntax; never invent trigger fields or infer write authority from
+activation. Validate and compile changed workflow sources before publishing.
+
+<!-- instruction-prefix-end -->
+
 ### Decision Matrix
 
 | User intent | Trigger | Typical read tools | Typical safe output |

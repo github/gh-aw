@@ -69,6 +69,7 @@ func connectorHTTP(ctx context.Context, client *http.Client, request *http.Reque
 		if suggested := connectorRetryAfter(retryAfter); suggested > delay {
 			delay = suggested
 		}
+		log.Printf("Considering connector HTTP retry: status=%d attempt=%d/%d delay=%s", status, attempt+1, attempts, delay)
 		deadline, _ := ctx.Deadline()
 		if delay >= time.Until(deadline) {
 			return nil, 0, errors.New("connector retry delay exceeds the bounded execution window")

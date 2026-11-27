@@ -921,6 +921,10 @@ func (c *Compiler) processOnSectionAndFilters( //nolint:largefunc // Existing or
 	orchestratorWorkflowLog.Print("Processing on section and filters")
 
 	var err error
+	workflowData.IssueStatusFilter, err = extractIssueStatusFilter(frontmatter)
+	if err != nil {
+		return err
+	}
 	frontmatter, err = c.processWebhookTriggers(frontmatter, workflowData)
 	if err != nil {
 		return err

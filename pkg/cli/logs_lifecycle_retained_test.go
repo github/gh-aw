@@ -92,6 +92,8 @@ func TestRetainedAdoptionRejectsUnrelatedCommandModes(t *testing.T) {
 }
 
 func TestRetainedLifecycleExecutionOmitsUnneededPayload(t *testing.T) {
+	t.Parallel()
+
 	execution := retainedLifecycleExecution(CreatedItemReport{
 		Type: "submit_pull_request_review", Number: 42,
 		Metadata: map[string]any{"review_id": 7, "body": "do not retain"},

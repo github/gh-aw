@@ -54,7 +54,7 @@ function requireEnvVar(name) {
 function webFetchStdioConfig() {
   return {
     command: "node",
-    args: [path.join(requireEnvVar("RUNNER_TEMP"), "gh-aw/actions/web_fetch_mcp_server.cjs")],
+    args: [path.join(process.env.GH_AW_WEB_FETCH_MCP_NVX === "1" ? "/workspace/.gh-aw-nvx" : requireEnvVar("RUNNER_TEMP"), "gh-aw/actions/web_fetch_mcp_server.cjs")],
   };
 }
 
