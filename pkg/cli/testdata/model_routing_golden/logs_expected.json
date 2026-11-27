@@ -1,6 +1,19 @@
 {
   "routes": [
     {
+      "model": "github-copilot/gpt-5.3-codex",
+      "effort": "medium",
+      "selection_source": "fallback",
+      "fallback_reason": "no_route",
+      "fallback_tier": "standard",
+      "endpoint": "/responses",
+      "effective_endpoint": "/responses",
+      "selected_endpoint": "/responses",
+      "run_count": 1,
+      "total_aic": 0.25,
+      "average_aic": 0.25
+    },
+    {
       "task_type": "chore",
       "scope": "multi_file",
       "task_complexity": "[redacted]",
@@ -90,12 +103,12 @@
   ],
   "classifier_aic": 3.05912,
   "main_agent_cost": {
-    "requests": 61,
-    "input_tokens": 4812027,
-    "output_tokens": 34378,
+    "requests": 62,
+    "input_tokens": 4824027,
+    "output_tokens": 34528,
     "cache_read_tokens": 4546175,
     "cache_write_tokens": 70700,
-    "aic": 410.820516
+    "aic": 411.070516
   },
   "subagent_costs": [
     {
@@ -248,8 +261,8 @@
       "aic": 0.757534
     }
   ],
-  "total_requests": 176,
+  "total_requests": 177,
   "deviated_requests": 36,
-  "deviated_traffic_share": 0.204545,
+  "deviated_traffic_share": 0.20339,
   "endpoint_only_deviation_normalized": true
 }

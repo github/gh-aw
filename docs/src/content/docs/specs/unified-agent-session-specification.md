@@ -4,9 +4,9 @@ spec: true
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.15.1"
+version: "2.16.0"
 status: Draft
-publication_date: "2026-11-24"
+publication_date: "2026-11-27"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -14,9 +14,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.15.1<br>
+**Version**: 2.16.0<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-11-24<br>
+**Publication Date**: 2026-11-27<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -31,7 +31,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.15.1 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.16.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -258,7 +258,7 @@ opaque because its essential fields are not defined by this specification.
 | Graders and evals | Grader IDs/names, sources, enabled flags, bounds, values, units, statuses, decisions, thresholds, errors, severity, and diagnostic messages. Manifest/result versions, run ID/attempt and counts, implementation ID/version/digest, and metric ID/value pairs are retained when supplied. Eval ID, answer, model, error, run ID, and experiment assignments are retained. No grader scripts, opaque diagnostics, or eval questions. |
 | Runtime accounting | Provider, model, request ID, status, AIC, cumulative/checkpoint AIC, premium requests, duration, and normalized `usage`; overlapping reports stay separate. Detection and eval usage reports resolve per-observation AIC from known model pricing only when explicit AIC is unavailable; unknown pricing leaves AIC absent, while explicit zero and checkpoints remain authoritative. |
 | Execution, detection, workflow | Observed outcomes, exit code, duration/start/end, detection job result/conclusion/categorical reason and verdict flags, engine ID, requested model, trigger type, workflow/repository/run ID, and available gh-aw, AWF, MCPG, and agent versions. No detector transcript or free-form reasons. |
-| Model routing | `firewall.model_routing` retains its stage, purpose, provider, labels, selection, endpoint, router, request, outcome, and deviation fields, plus AWF's ranked choices, pool counts, request endpoints, telemetry availability, HTTP status, and failure phase when supplied. `workflow.info` includes the observed `model`, `requestedModel`, and a compact `modelRouting` object. `model_routing.outcome` records the harness's status, wire model, effective and selected endpoints, effort, applied effort, and failure code. |
+| Model routing | `firewall.model_routing` retains its stage, purpose, provider, labels, selection, selection provenance (`selectionSource`, `fallbackReason`, `fallbackTier`), endpoint, router, request, outcome, and deviation fields, plus AWF's ranked choices, pool counts, request endpoints, telemetry availability, HTTP status, and failure phase when supplied. `workflow.info` includes the observed `model`, `requestedModel`, and a compact `modelRouting` object with the same optional selection provenance fields. `model_routing.outcome` records the harness's status, wire model, effective and selected endpoints, effort, applied effort, and failure code. |
 | Caller context and episode lineage | `workflow.info.awContext` retains the supplied `aw_context` object from runner-owned `aw_info.json.context`, including original keys and nested work-queue data. For webhook batches, it retains unique affected items and delivery IDs but omits each delivery's raw `payload`; those bodies remain in runner-owned context files. Text and Markdown summaries display the log-safe context as compact JSON alongside the workflow metadata, subject to existing output-size limits. Registered secrets are redacted during artifact serialization and summary rendering. `workflow.info.episode` additionally projects supplied canonical lineage and parent repository, run, attempt, workflow, call identity, and event type. |
 | Skills | Activation inventory records installed skill name, relative source, scope, and SHA-256 content digest, without skill descriptions or content. Exact-name and cross-scope collisions retain names, kinds, and source identifiers: current sources are workspace-relative paths, while overwritten frontmatter installations use ordinal identifiers such as `frontmatter-1`. Observed engine invocations retain the selected skill name, path, source, trigger, model, and turn when supplied; a declared or installed skill is not proof of invocation. |
 
@@ -1015,7 +1015,8 @@ and emit its workflow metadata as `workflow.info` with agent-phase provenance.
 The event MUST retain observed `model`, prefer `requested_model` for
 `requestedModel`, and project only status, source, provider, wire model, model,
 effort, applied effort, effective endpoint, selected endpoint, mode, selected
-ID, router version, and failure code into `modelRouting`. The collector MUST
+ID, router version, selection source, fallback reason, fallback tier, and
+failure code into `modelRouting`. The collector MUST
 also emit `agent/awf-routing-outcome.json` as `model_routing.outcome` in the
 agent phase, retaining status, wire model, effective endpoint, selected
 endpoint, effort, applied effort, and failure code. Free-form detail MUST NOT
@@ -1033,7 +1034,10 @@ accepting each snake_case source spelling and its camelCase equivalent:
 
 | Field | AWF source | Meaning |
 | --- | --- | --- |
-| `rankedChoices` | `ranked_choices` | Route choices in AWF order. Each entry has a one-based `rank` equal to its array position, `model`, and `effort` as supplied, including an explicit `null`. `id` appears only when supplied. |
+| `selectionSource` | `selection_source` | Whether AWF selected the model via `"router"` or `"fallback"`; absent on older AWF releases. Invalid values are dropped. |
+| `fallbackReason` | `fallback_reason` | Identifier-only routing failure code (such as `no_route` or `router_unavailable`) that triggered fallback, or `null` on a router pick; absent on older AWF releases. Non-identifier values are dropped. |
+| `fallbackTier` | `fallback_tier` | Coding tier (`"standard"`, `"premium"`, `"unclassified"`, `"lightweight"`, or `"none"`) chosen by the fallback walk, or `null` on a router pick; absent on older AWF releases. Invalid values are dropped. |
+| `rankedChoices` | `ranked_choices` | Route choices in AWF order. Each entry has a one-based `rank` equal to its array position, `model`, and `effort` as supplied, including an explicit `null`. `id` appears only when supplied. Omitted when the source record supplies `null` (such as on a fallback selection). |
 | `eligibleChoices` | `eligible_choices` | Count of choices remaining after inventory and policy filtering. |
 | `catalogueOverlap` | `catalogue_overlap` | Count of routing-table choices present in the live catalogue. |
 | `selectedEndpoint` | `selected_endpoint` | Selected endpoint, including on request records. The existing `endpoint` field is unchanged. |
@@ -2885,9 +2889,15 @@ Native IDs can collide, timestamps can be out of order, and a trace can contain 
 
 ## 13. Change Log (Informative)
 
-### Version 2.15.2 - Draft (2026-11-27)
+### Version 2.16.1 - Draft (2026-11-27)
 
 - Clarified `agent-output-fallback` recovery for T-UAS-082 and T-UAS-094: when `upstream-errors.jsonl` or agent conversation sources are absent, the collector reads allowlisted upstream HTTP status records from `agent/upstream-errors-fallback.jsonl` and the content-free top-level refusal indicator from `agent/routing-refusal.json` (alongside `agent-errors.jsonl` execution categories), ignoring fallback-only substitutes whenever the full `agent` artifact supplies the primary sources.
+- Retained serialization-format version 1.
+
+### Version 2.16.0 - Draft (2026-11-27)
+
+- Added AWF selection-provenance fields `selectionSource`, `fallbackReason`, and `fallbackTier` to `firewall.model_routing` selection events and `workflow.info.modelRouting`, dropping malformed values while preserving explicit `null` fallback reasons and tiers on router picks (T-UAS-070).
+- Clarified that `rankedChoices` is omitted when the source selection record supplies `ranked_choices: null` (such as on a fallback selection).
 - Retained serialization-format version 1.
 
 ### Version 2.15.1 - Draft (2026-11-24)

@@ -16,6 +16,7 @@ listed workflow runs; they retain only the inputs needed by those analyses.
 | `codex-routed-provider-unavailable` | `37728959715` | Codex routed to gpt-5.6-luna (high) on `/responses`: one aborted request, a proxy `provider_unavailable` failure, and an upstream 400; predates `workflow.info` routing, so the status comes from the proxy log alone |
 | `copilot-sdk-claude-subagent-completions` | `38181851405` | Copilot SDK mode with the main session on gpt-5.6-luna (xhigh); sub-agent `file-summarizer` on claude-haiku-4.5 through `/chat/completions` and `quick-checker` on gpt-5.6-luna |
 | `copilot-cli-builtin-subagents` | `38164386960` | Copilot CLI routed to gpt-5.6-sol (medium) with the built-in `explore`, `research` and `task` sub-agents on gpt-5.6-luna and `code-review` and `general-purpose` on gpt-5.6-sol in the unified session; audit names their rows by agent definition (`agentName`) and lists the chosen display names in `display_names` |
+| `copilot-routed-fallback-no-route` | synthetic | Copilot CLI routed fallback selection (`selection_source=fallback`, `fallback_reason=no_route`, `fallback_tier=standard`, `router: null`, `ranked_choices: null`) with zero classifier requests and one main-agent `/responses` request; legacy variant without `usage/aw_session.jsonl` omits fallback provenance |
 
 Audit does not read the conclusion job's failure issue, `agent-stdio.log`,
 `awf-config.json`, or `agent_execution_exit_code.txt`, so the goldens cannot pin

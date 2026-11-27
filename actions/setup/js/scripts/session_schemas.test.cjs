@@ -459,4 +459,56 @@ describe("Generated session schemas", () => {
     expect(spawnSync(process.execPath, [generator, "--check"], { cwd: root, encoding: "utf8" }).status).toBe(0);
     expect(spawnSync(process.execPath, [generator, "--invalid"], { cwd: root, encoding: "utf8" }).status).toBe(1);
   });
+
+  it("validates fallback selection provenance on firewall.model_routing and workflow.info and rejects invalid enum values", () => {
+    const valid = [
+      header,
+      {
+        type: "workflow.info",
+        data: {
+          modelRouting: {
+            status: "selected",
+            wireModel: "gpt-5.3-codex",
+            selectionSource: "fallback",
+            fallbackReason: "no_route",
+            fallbackTier: "standard",
+          },
+        },
+        provenance: { component: "workflow", phase: "conclusion", path: "usage/aw_info.json", index: 0 },
+      },
+      {
+        type: "firewall.model_routing",
+        data: {
+          stage: "selection",
+          wireModel: "gpt-5.3-codex",
+          selectionSource: "fallback",
+          fallbackReason: "no_route",
+          fallbackTier: "standard",
+          router: null,
+        },
+        provenance: { component: "firewall", phase: "agent", path: "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", index: 0 },
+      },
+    ];
+    expect(validateSession(jsonl(valid), "unified", "jsonl")).toBe(3);
+
+    const invalidSource = [
+      header,
+      {
+        type: "firewall.model_routing",
+        data: { stage: "selection", selectionSource: "heuristic" },
+        provenance: { component: "firewall", phase: "agent", path: "sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", index: 0 },
+      },
+    ];
+    expect(() => validateSession(jsonl(invalidSource), "unified", "jsonl")).toThrow();
+
+    const invalidTier = [
+      header,
+      {
+        type: "workflow.info",
+        data: { modelRouting: { status: "selected", selectionSource: "fallback", fallbackTier: "extreme" } },
+        provenance: { component: "workflow", phase: "conclusion", path: "usage/aw_info.json", index: 0 },
+      },
+    ];
+    expect(() => validateSession(jsonl(invalidTier), "unified", "jsonl")).toThrow();
+  });
 });

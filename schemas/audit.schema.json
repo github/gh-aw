@@ -185,6 +185,15 @@
                     "router_version": {
                       "type": "string"
                     },
+                    "selection_source": {
+                      "type": "string"
+                    },
+                    "fallback_reason": {
+                      "type": "string"
+                    },
+                    "fallback_tier": {
+                      "type": "string"
+                    },
                     "effective_endpoint": {
                       "type": "string"
                     },
@@ -328,6 +337,15 @@
                   "type": "string"
                 },
                 "router_version": {
+                  "type": "string"
+                },
+                "selection_source": {
+                  "type": "string"
+                },
+                "fallback_reason": {
+                  "type": "string"
+                },
+                "fallback_tier": {
                   "type": "string"
                 },
                 "effective_endpoint": {
@@ -574,6 +592,15 @@
                         "router_version": {
                           "type": "string"
                         },
+                        "selection_source": {
+                          "type": "string"
+                        },
+                        "fallback_reason": {
+                          "type": "string"
+                        },
+                        "fallback_tier": {
+                          "type": "string"
+                        },
                         "effective_endpoint": {
                           "type": "string"
                         },
@@ -711,6 +738,15 @@
                           "type": "string"
                         },
                         "router_version": {
+                          "type": "string"
+                        },
+                        "selection_source": {
+                          "type": "string"
+                        },
+                        "fallback_reason": {
+                          "type": "string"
+                        },
+                        "fallback_tier": {
                           "type": "string"
                         },
                         "effective_endpoint": {
@@ -2778,6 +2814,15 @@
               "type": "string"
             },
             "router_version": {
+              "type": "string"
+            },
+            "selection_source": {
+              "type": "string"
+            },
+            "fallback_reason": {
+              "type": "string"
+            },
+            "fallback_tier": {
               "type": "string"
             },
             "latency_ms": {

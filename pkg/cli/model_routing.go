@@ -86,6 +86,9 @@ type ModelRoutingSummary struct {
 	TopChoices                      []ModelRoutingChoice    `json:"top_choices,omitempty"`
 	RouterName                      string                  `json:"router_name,omitempty"`
 	RouterVersion                   string                  `json:"router_version,omitempty"`
+	SelectionSource                 string                  `json:"selection_source,omitempty"`
+	FallbackReason                  string                  `json:"fallback_reason,omitempty"`
+	FallbackTier                    string                  `json:"fallback_tier,omitempty"`
 	LatencyMs                       int                     `json:"latency_ms,omitempty"`
 	Failure                         *ModelRoutingFailure    `json:"failure,omitempty"`
 	RoutedCounts                    map[string]int          `json:"routed_counts,omitempty"`
@@ -296,20 +299,40 @@ func modelRoutingFileExists(path string) bool {
 }
 
 func analyzeModelRouting(runDir string) *ModelRoutingSummary {
-	sessionRouting, sessionFound, sessionErr := readSessionModelRouting(runDir)
+	sessionRouting, _, sessionErr := readSessionModelRouting(runDir)
 	if sessionErr != nil {
 		tokenUsageSubagentLog.Printf("failed to read unified session model routing: %v", sessionErr)
 	}
 	routingPath := findModelRoutingFile(runDir)
 	proxyEntries := tokenUsageEntriesForRun(runDir)
 	var summary *ModelRoutingSummary
-	if routingPath != "" {
+	fromSideLog := false
+	hasFirewallProvenance := sessionRouting != nil && sessionRouting.FirewallSelection != nil && sessionRouting.FirewallSelection.SelectionSource != ""
+	hasWorkflowProvenance := sessionRouting != nil && sessionRouting.modelRouting() != nil && sessionRouting.modelRouting().SelectionSource != ""
+	hasUnifiedProvenance := hasFirewallProvenance || hasWorkflowProvenance
+	if hasUnifiedProvenance {
+		summary = &ModelRoutingSummary{Status: "not_routed"}
+	} else if routingPath != "" {
 		summary = parseModelRoutingFile(routingPath, proxyEntries)
-	} else if sessionFound && sessionRouting.modelRouting() != nil {
+		fromSideLog = true
+	} else if sessionRouting != nil && (sessionRouting.modelRouting() != nil || sessionRouting.FirewallSelection != nil) {
 		summary = &ModelRoutingSummary{Status: "not_routed"}
 	}
 	summary = applyAwInfoModelRouting(summary, runDir)
 	applySessionModelRouting(summary, sessionRouting)
+	if !fromSideLog && summary != nil && sessionRouting != nil {
+		if len(sessionRouting.FirewallRequests) > 0 {
+			applyModelRoutingRequests(summary, sessionRouting.FirewallRequests, proxyEntries)
+		} else if routingPath != "" {
+			if sideRequests := readSideLogRequestsIfMatchingSelection(routingPath, summary); len(sideRequests) > 0 {
+				applyModelRoutingRequests(summary, sideRequests, proxyEntries)
+			} else if len(proxyEntries) > 0 {
+				applyModelRoutingRequests(summary, nil, proxyEntries)
+			}
+		} else if len(proxyEntries) > 0 && (sessionRouting.FirewallSelection != nil || hasWorkflowProvenance) {
+			applyModelRoutingRequests(summary, nil, proxyEntries)
+		}
+	}
 	_, _, agents, found, err := readSessionSubagentModelsDetailed(runDir)
 	if summary != nil && err == nil && found {
 		models := make([]string, 0, len(proxyEntries))
@@ -359,12 +382,48 @@ func applySessionModelRouting(summary *ModelRoutingSummary, session *sessionMode
 		return
 	}
 	summary.Observation = session.Observation
+	hasFirewallProvenance := session.FirewallSelection != nil && session.FirewallSelection.SelectionSource != ""
+	if sel := session.FirewallSelection; sel != nil {
+		applySessionFirewallSelection(summary, sel)
+	}
+	if hasFirewallProvenance && session.FirewallFailure != nil {
+		failure := *session.FirewallFailure
+		summary.Status = "failed"
+		summary.Failure = &failure
+	}
 	routing := session.modelRouting()
 	if routing == nil {
 		return
 	}
 	if routing.Status != "" {
 		summary.Status = routing.Status
+	}
+	if routing.Endpoint != "" {
+		summary.EffectiveEndpoint = routing.Endpoint
+	}
+	if routing.SelectedEndpoint != "" {
+		summary.SelectedEndpoint = routing.SelectedEndpoint
+	}
+	if routing.FailureCode != "" && summary.Failure == nil {
+		summary.Failure = &ModelRoutingFailure{Code: routing.FailureCode}
+	}
+	if hasFirewallProvenance {
+		return
+	}
+	if routing.SelectionSource != "" {
+		// When workflow.info carries explicit provenance without a firewall selection
+		// event, apply its selection metadata as an authoritative unit.
+		summary.SelectionSource = routing.SelectionSource
+		summary.FallbackReason = routing.FallbackReason
+		summary.FallbackTier = routing.FallbackTier
+		summary.Provider = routing.Provider
+		summary.WireModel = routing.WireModel
+		summary.SelectedModel = firstNonEmpty(routing.Model, routing.WireModel)
+		summary.SelectedEffort = routing.Effort
+		summary.Mode = routing.Mode
+		summary.SelectedID = routing.SelectedID
+		summary.RouterVersion = routing.RouterVersion
+		return
 	}
 	if routing.WireModel != "" {
 		summary.WireModel = routing.WireModel
@@ -375,12 +434,6 @@ func applySessionModelRouting(summary *ModelRoutingSummary, session *sessionMode
 	if routing.Effort != "" && summary.SelectedEffort == "" {
 		summary.SelectedEffort = routing.Effort
 	}
-	if routing.Endpoint != "" {
-		summary.EffectiveEndpoint = routing.Endpoint
-	}
-	if routing.SelectedEndpoint != "" {
-		summary.SelectedEndpoint = routing.SelectedEndpoint
-	}
 	if routing.Mode != "" && summary.Mode == "" {
 		summary.Mode = routing.Mode
 	}
@@ -390,8 +443,181 @@ func applySessionModelRouting(summary *ModelRoutingSummary, session *sessionMode
 	if routing.RouterVersion != "" && summary.RouterVersion == "" {
 		summary.RouterVersion = routing.RouterVersion
 	}
-	if routing.FailureCode != "" && summary.Failure == nil {
-		summary.Failure = &ModelRoutingFailure{Code: routing.FailureCode}
+	if summary.SelectionSource != "router" {
+		if routing.FallbackReason != "" && summary.FallbackReason == "" {
+			summary.FallbackReason = routing.FallbackReason
+		}
+		if routing.FallbackTier != "" && summary.FallbackTier == "" {
+			summary.FallbackTier = routing.FallbackTier
+		}
+	}
+}
+
+func readSideLogRequestsIfMatchingSelection(path string, summary *ModelRoutingSummary) []modelRoutingRecord {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			tokenUsageSubagentLog.Printf("failed to close model routing records: %v", closeErr)
+		}
+	}()
+	records, err := readModelRoutingRecords(file)
+	if err != nil {
+		return nil
+	}
+	var lastSelection *modelRoutingRecord
+	var requests []modelRoutingRecord
+	for i := range records {
+		switch records[i].Stage {
+		case "selection":
+			lastSelection = &records[i]
+		case "request":
+			requests = append(requests, records[i])
+		}
+	}
+	if lastSelection != nil {
+		sideModel := firstNonEmpty(lastSelection.SelectedModel, lastSelection.WireModel)
+		summaryModel := firstNonEmpty(summary.SelectedModel, summary.WireModel)
+		if sideModel != "" && summaryModel != "" && sideModel != summaryModel &&
+			lastSelection.WireModel != summary.WireModel {
+			return nil
+		}
+		if lastSelection.SelectedEffort != "" && summary.SelectedEffort != "" &&
+			lastSelection.SelectedEffort != summary.SelectedEffort {
+			return nil
+		}
+	}
+	return requests
+}
+
+func applySessionFirewallSelection(summary *ModelRoutingSummary, sel *sessionFirewallModelRoutingSelection) {
+	if summary.Status == "" || summary.Status == "not_routed" {
+		summary.Status = "selected"
+	}
+	// When the unified session carries explicit selection provenance, apply the
+	// entire selection as a coherent unit so contradictory side-log fields cannot
+	// leak into the provenance-bearing unified record.
+	if sel.SelectionSource != "" {
+		summary.SelectionSource = sel.SelectionSource
+		summary.FallbackReason = sel.FallbackReason
+		summary.FallbackTier = sel.FallbackTier
+		if sel.Schema != "" {
+			summary.Schema = sel.Schema
+		}
+		if sel.Objective != nil {
+			summary.Objective = sel.Objective.Goal
+			summary.ObjectiveMode = sel.Objective.Mode
+		} else {
+			summary.Objective = ""
+			summary.ObjectiveMode = ""
+		}
+		summary.Provider = sel.Provider
+		if sel.Labels != nil {
+			summary.Labels = *sel.Labels
+		} else {
+			summary.Labels = ModelRoutingLabels{}
+		}
+		summary.Mode = sel.Mode
+		summary.ClassifierModel = sel.ClassifierModel
+		summary.ClassifierEffort = sel.ClassifierEffort
+		summary.ClassifierAttempts = sel.ClassifierAttempts
+		summary.DegradedClassification = sel.DegradedClassification
+		summary.DegradedReason = sel.DegradedReason
+		summary.SelectedID = sel.SelectedID
+		summary.SelectedProvider = sel.SelectedProvider
+		summary.SelectedModel = sel.SelectedModel
+		summary.SelectedEffort = sel.SelectedEffort
+		summary.WireModel = sel.WireModel
+		summary.Endpoint = sel.Endpoint
+		if sel.Router != nil {
+			summary.RouterName = sel.Router.Name
+			summary.RouterVersion = sel.Router.Version
+		} else {
+			summary.RouterName = ""
+			summary.RouterVersion = ""
+		}
+		summary.LatencyMs = sel.LatencyMs
+		if len(sel.RankedChoices) > 0 {
+			summary.TopChoices = topModelRoutingChoices(sel.RankedChoices)
+		} else {
+			summary.TopChoices = nil
+		}
+		return
+	}
+	if sel.FallbackReason != "" {
+		summary.FallbackReason = sel.FallbackReason
+	}
+	if sel.FallbackTier != "" {
+		summary.FallbackTier = sel.FallbackTier
+	}
+	if summary.Schema == "" {
+		summary.Schema = sel.Schema
+	}
+	if sel.Objective != nil {
+		if summary.Objective == "" {
+			summary.Objective = sel.Objective.Goal
+		}
+		if summary.ObjectiveMode == "" {
+			summary.ObjectiveMode = sel.Objective.Mode
+		}
+	}
+	if summary.Provider == "" {
+		summary.Provider = sel.Provider
+	}
+	if sel.Labels != nil && summary.Labels == (ModelRoutingLabels{}) {
+		summary.Labels = *sel.Labels
+	}
+	if summary.Mode == "" {
+		summary.Mode = sel.Mode
+	}
+	if summary.ClassifierModel == "" {
+		summary.ClassifierModel = sel.ClassifierModel
+	}
+	if summary.ClassifierEffort == "" {
+		summary.ClassifierEffort = sel.ClassifierEffort
+	}
+	if summary.ClassifierAttempts == 0 {
+		summary.ClassifierAttempts = sel.ClassifierAttempts
+	}
+	if !summary.DegradedClassification && sel.DegradedClassification {
+		summary.DegradedClassification = sel.DegradedClassification
+	}
+	if summary.DegradedReason == "" {
+		summary.DegradedReason = sel.DegradedReason
+	}
+	if summary.SelectedID == "" {
+		summary.SelectedID = sel.SelectedID
+	}
+	if summary.SelectedProvider == "" {
+		summary.SelectedProvider = sel.SelectedProvider
+	}
+	if summary.SelectedModel == "" {
+		summary.SelectedModel = sel.SelectedModel
+	}
+	if summary.SelectedEffort == "" {
+		summary.SelectedEffort = sel.SelectedEffort
+	}
+	if summary.WireModel == "" {
+		summary.WireModel = sel.WireModel
+	}
+	if summary.Endpoint == "" {
+		summary.Endpoint = sel.Endpoint
+	}
+	if sel.Router != nil {
+		if summary.RouterName == "" {
+			summary.RouterName = sel.Router.Name
+		}
+		if summary.RouterVersion == "" {
+			summary.RouterVersion = sel.Router.Version
+		}
+	}
+	if summary.LatencyMs == 0 {
+		summary.LatencyMs = sel.LatencyMs
+	}
+	if len(summary.TopChoices) == 0 && len(sel.RankedChoices) > 0 {
+		summary.TopChoices = topModelRoutingChoices(sel.RankedChoices)
 	}
 }
 
@@ -468,7 +694,21 @@ func parseModelRoutingFile(path string, usageEntries []TokenUsageEntry) *ModelRo
 	if summary.Status == "not_routed" && len(requests) > 0 {
 		summary.Status = "selected"
 	}
+	applyModelRoutingRequests(summary, requests, usageEntries)
+	return summary
+}
+
+func applyModelRoutingRequests(summary *ModelRoutingSummary, requests []modelRoutingRecord, usageEntries []TokenUsageEntry) {
+	if summary.RoutedCounts == nil {
+		summary.RoutedCounts = make(map[string]int)
+	}
+	if summary.OutcomeCounts == nil {
+		summary.OutcomeCounts = make(map[string]int)
+	}
 	for _, request := range requests {
+		if summary.Schema == "" && request.Schema != "" {
+			summary.Schema = request.Schema
+		}
 		normalizeLegacyEndpointDeviation(summary, &request)
 		if request.Routed != "" {
 			summary.RoutedCounts[request.Routed]++
@@ -481,7 +721,6 @@ func parseModelRoutingFile(path string, usageEntries []TokenUsageEntry) *ModelRo
 		}
 	}
 	aggregateModelRoutingCosts(summary, requests, usageEntries)
-	return summary
 }
 
 func readModelRoutingRecords(source io.Reader) ([]modelRoutingRecord, error) {
@@ -640,12 +879,14 @@ func normalizeLegacyEndpointDeviation(summary *ModelRoutingSummary, request *mod
 
 type modelRoutingRouteKey struct {
 	taskType, scope, complexity, mode, model, effort, routerVersion string
+	selectionSource, fallbackReason, fallbackTier                   string
 	endpoint, effectiveEndpoint, selectedEndpoint                   string
 }
 
 type modelRoutingRouteTotals struct {
-	count int
-	aic   float64
+	count          int
+	aic            float64
+	explicitRouter int
 }
 
 func buildModelRoutingLogsSummary(runs []ProcessedRun) *ModelRoutingLogsSummary {
@@ -653,10 +894,11 @@ func buildModelRoutingLogsSummary(runs []ProcessedRun) *ModelRoutingLogsSummary 
 	subagentTotals := make(map[string]ModelRoutingAgentCost)
 	result := &ModelRoutingLogsSummary{}
 	for _, run := range runs {
+		hadPrecomputedRouting := run.ModelRouting != nil
 		routing := applyAwInfoModelRouting(run.ModelRouting, run.Run.LogsPath)
-		if sessionRouting, found, err := readSessionModelRouting(run.Run.LogsPath); err != nil {
+		if sessionRouting, _, err := readSessionModelRouting(run.Run.LogsPath); err != nil {
 			tokenUsageSubagentLog.Printf("failed to read unified session model routing: %v", err)
-		} else if found && sessionRouting.modelRouting() != nil {
+		} else if sessionRouting != nil && (sessionRouting.modelRouting() != nil || sessionRouting.FirewallSelection != nil) {
 			if routing == nil {
 				routing = &ModelRoutingSummary{}
 			} else {
@@ -664,6 +906,9 @@ func buildModelRoutingLogsSummary(runs []ProcessedRun) *ModelRoutingLogsSummary 
 				routing = &routingCopy
 			}
 			applySessionModelRouting(routing, sessionRouting)
+			if !hadPrecomputedRouting && sessionRouting.FirewallSelection != nil && len(sessionRouting.FirewallRequests) > 0 {
+				applyModelRoutingRequests(routing, sessionRouting.FirewallRequests, tokenUsageEntriesForRun(run.Run.LogsPath))
+			}
 		}
 		if routing == nil {
 			continue
@@ -681,13 +926,23 @@ func buildModelRoutingLogsSummary(runs []ProcessedRun) *ModelRoutingLogsSummary 
 		if routing.Status != "selected" || routing.SelectedModel == "" {
 			continue
 		}
+		routeSource := normalizedRouteSelectionSource(routing.SelectionSource)
+		fallbackReason, fallbackTier := "", ""
+		if routeSource == "fallback" {
+			fallbackReason = routing.FallbackReason
+			fallbackTier = routing.FallbackTier
+		}
 		key := modelRoutingRouteKey{
 			routing.Labels.TaskType, routing.Labels.Scope, routing.Labels.TaskComplexity,
 			routing.Mode, routing.SelectedModel, routing.SelectedEffort, routing.RouterVersion,
+			routeSource, fallbackReason, fallbackTier,
 			routing.Endpoint, routing.EffectiveEndpoint, routing.SelectedEndpoint,
 		}
 		route := totals[key]
 		route.count++
+		if routing.SelectionSource == "router" {
+			route.explicitRouter++
+		}
 		route.aic += routing.ClassifierCost.AIC + routing.SelectedModelCost.AIC + routing.DeviatedTrafficCost.AIC
 		totals[key] = route
 	}
@@ -738,16 +993,21 @@ func appendModelRoutingSubagentCosts(summary *ModelRoutingLogsSummary, totals ma
 
 func appendModelRoutingRouteSummaries(summary *ModelRoutingLogsSummary, totals map[modelRoutingRouteKey]modelRoutingRouteTotals) {
 	for key, route := range totals {
+		selectionSource := key.selectionSource
+		if selectionSource == "" && route.explicitRouter == route.count {
+			selectionSource = "router"
+		}
 		summary.Routes = append(summary.Routes, ModelRoutingRouteSummary{
 			TaskType: key.taskType, Scope: key.scope, Complexity: key.complexity, Mode: key.mode,
 			Model: key.model, Effort: key.effort, RouterVersion: key.routerVersion,
+			SelectionSource: selectionSource, FallbackReason: key.fallbackReason, FallbackTier: key.fallbackTier,
 			Endpoint: key.endpoint, EffectiveEndpoint: key.effectiveEndpoint, SelectedEndpoint: key.selectedEndpoint,
 			RunCount: route.count, TotalAIC: route.aic, AverageAIC: route.aic / float64(route.count),
 		})
 	}
 	slices.SortFunc(summary.Routes, func(left, right ModelRoutingRouteSummary) int {
-		leftKey := strings.Join([]string{left.TaskType, left.Scope, left.Complexity, left.Mode, left.Model, left.Effort, left.RouterVersion, left.Endpoint, left.EffectiveEndpoint, left.SelectedEndpoint}, "\x00")
-		rightKey := strings.Join([]string{right.TaskType, right.Scope, right.Complexity, right.Mode, right.Model, right.Effort, right.RouterVersion, right.Endpoint, right.EffectiveEndpoint, right.SelectedEndpoint}, "\x00")
+		leftKey := strings.Join([]string{left.TaskType, left.Scope, left.Complexity, left.Mode, left.Model, left.Effort, left.RouterVersion, left.SelectionSource, left.FallbackReason, left.FallbackTier, left.Endpoint, left.EffectiveEndpoint, left.SelectedEndpoint}, "\x00")
+		rightKey := strings.Join([]string{right.TaskType, right.Scope, right.Complexity, right.Mode, right.Model, right.Effort, right.RouterVersion, right.SelectionSource, right.FallbackReason, right.FallbackTier, right.Endpoint, right.EffectiveEndpoint, right.SelectedEndpoint}, "\x00")
 		return strings.Compare(leftKey, rightKey)
 	})
 }

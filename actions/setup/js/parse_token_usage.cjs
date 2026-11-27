@@ -140,6 +140,9 @@ function resolveModelRoutingOutcome(env = process.env, ghAwDir = env.GH_AW_TMP_D
       mode: record.mode,
       selected_id: record.selected_id,
       router_version: record.router?.version,
+      selection_source: record.selection_source,
+      fallback_reason: record.fallback_reason,
+      fallback_tier: record.fallback_tier,
       failure_code: wireModel ? "" : "invalid_selection",
     };
     const policy = getAWFModelRoutingPolicy(String(env.GH_AW_ENGINE_ID || ""));
