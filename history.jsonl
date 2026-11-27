@@ -20,3 +20,4 @@
 {"date": "2026-11-24", "total_prs": 729, "merged": 612, "closed": 114, "open": 3, "merge_rate": 0.843, "category_rules": "v6-title-regex (same as 2026-11-17)", "triage_verify_rate": 0.182, "last_7_days_rate": 0.785}
 {"date": "2026-11-25", "total_prs": 724, "merged": 602, "closed": 109, "open": 13, "merge_rate": 0.847, "category_rules": "v6-title-regex (same as 2026-11-17)", "triage_verify_rate": 0.217, "last_7_days_rate": 0.811}
 {"date": "2026-11-26", "total_prs": 749, "merged": 624, "closed": 111, "open": 14, "merge_rate": 0.849, "category_rules": "v6-title-regex (same as 2026-11-17)", "triage_verify_rate": 0.200, "last_7_days_rate": 0.810}
+{"date": "2026-11-27", "total_prs": 762, "merged": 642, "closed": 110, "open": 10, "merge_rate": 0.854, "category_rules": "v6-title-regex (same as 2026-11-17)", "triage_verify_rate": 0.222, "refactor_rate": 0.467, "security_rate": 0.786, "last_7_days_rate": 0.864}

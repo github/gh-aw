@@ -1,0 +1,44 @@
+{
+ "date": "2026-11-27",
+ "window": "2026-10-28..2026-11-27 (dataset as fetched; 763 PRs, 762 created within 30 days)",
+ "total_prs": 762,
+ "merged": 642,
+ "closed": 110,
+ "open": 10,
+ "merge_rate": 0.854,
+ "merge_rate_basis": "completed (merged/(merged+closed)); 752 completed",
+ "categories": {
+  "other": {"total": 426, "merged": 351, "closed": 68, "open": 7, "rate": 0.838},
+  "feature": {"total": 85, "merged": 78, "closed": 7, "open": 0, "rate": 0.918},
+  "testing": {"total": 66, "merged": 63, "closed": 3, "open": 0, "rate": 0.955},
+  "documentation": {"total": 53, "merged": 46, "closed": 6, "open": 1, "rate": 0.885},
+  "bug_fix": {"total": 51, "merged": 43, "closed": 6, "open": 2, "rate": 0.878},
+  "security": {"total": 42, "merged": 33, "closed": 9, "open": 0, "rate": 0.786},
+  "dependency": {"total": 24, "merged": 21, "closed": 3, "open": 0, "rate": 0.875},
+  "refactor": {"total": 15, "merged": 7, "closed": 8, "open": 0, "rate": 0.467}
+ },
+ "negative_titles": {
+  "triage_verify_investigate": {"total": 28, "merged": 6, "closed": 21, "open": 1, "rate": 0.222}
+ },
+ "length_buckets_completed": {
+  "0-100": {"total": 442, "merged": 361, "closed": 81, "rate": 0.817},
+  "100-150": {"total": 187, "merged": 168, "closed": 19, "rate": 0.898},
+  "150-250": {"total": 38, "merged": 35, "closed": 3, "rate": 0.921},
+  "250+": {"total": 85, "merged": 78, "closed": 7, "rate": 0.918}
+ },
+ "structural": {
+  "avg_words_merged": 134.9,
+  "avg_words_closed": 113.9,
+  "code_block_merged_pct": 55.8,
+  "code_block_closed_pct": 32.7,
+  "bullet_merged_pct": 99.1,
+  "bullet_closed_pct": 98.2
+ },
+ "last_7_days": {"total": 164, "merged": 133, "closed": 21, "open": 10, "rate": 0.864},
+ "weekly_completed_rate": {"2026-10-26": 0.847, "2026-11-02": 0.914, "2026-11-09": 0.856, "2026-11-16": 0.759, "2026-11-23": 0.872},
+ "authors_top": [["app/copilot-swe-agent", 417, 0.887], ["pelikhan", 175, 0.877], ["gh-aw-bot", 149, 0.734], ["lpcox", 11, 0.818], ["app/github-actions", 5, 0.8]],
+ "empty_bodies": 0,
+ "category_rules": "v6-title-regex (same as 2026-11-17)",
+ "negative_title_rule": "\\b(triage|verify|investigate)\\b",
+ "caveat": "PR body used as prompt proxy; bodies are often agent-written summaries. Author batches confound category and length effects; not causal. Closed review/triage PRs may reflect no-change outcomes, not bad prompts."
+}
