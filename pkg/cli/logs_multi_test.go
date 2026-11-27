@@ -552,6 +552,7 @@ func TestCountLimitedLogsTargetResultPreservesDateRangeContinuation(t *testing.T
 }
 
 func TestMergeLogsTargetResultsPropagatesCountLimitReached(t *testing.T) {
+	t.Parallel()
 	processedRuns, _, _, countLimitReached, _, errs := mergeLogsTargetResults([]logsTargetResult{
 		{target: logsWorkflowTarget{workflowName: "limited"}, result: workflowLogsResult{countLimitReached: true}},
 		{target: logsWorkflowTarget{workflowName: "complete"}, result: workflowLogsResult{countLimitReached: false}},
@@ -563,6 +564,7 @@ func TestMergeLogsTargetResultsPropagatesCountLimitReached(t *testing.T) {
 }
 
 func TestMergeLogsTargetResultsPreservesPartialRunsFromFailedTarget(t *testing.T) {
+	t.Parallel()
 	run := ProcessedRun{Run: WorkflowRun{DatabaseID: 42}}
 	processedRuns, _, _, _, _, errs := mergeLogsTargetResults([]logsTargetResult{{
 		target: logsWorkflowTarget{workflowName: "partial"},

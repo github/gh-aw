@@ -12,6 +12,16 @@ import (
 	"github.com/github/gh-aw/pkg/workflow/aw"
 )
 
+// TestSpec_PublicAPI_StepSections checks README.md / Public API: the exported
+// list contains every documented authored step-list key.
+func TestSpec_PublicAPI_StepSections(t *testing.T) {
+	t.Parallel()
+
+	assert.ElementsMatch(t,
+		[]string{"setup-steps", "pre-steps", "steps", "pre-agent-steps", "post-steps"},
+		aw.StepSections, "StepSections must list exactly the documented authored step-list keys")
+}
+
 // TestSpec_PublicAPI_ParseEmit preserves unchanged source bytes as promised in
 // README.md / Overview, including comments, line endings, and prompt whitespace.
 func TestSpec_PublicAPI_ParseEmit(t *testing.T) {
