@@ -500,7 +500,7 @@ type auditArgs struct {
 	RunID        any      `json:"run_id,omitempty"          jsonschema:"Alias for run_id_or_url. Accepts run ID or run/job URL (including step anchors). String or number."`
 	RunIDOrURL   any      `json:"run_id_or_url,omitempty"   jsonschema:"Deprecated: use run_ids_or_urls instead. Accepts run ID or run/job URL (including step anchors). String or number."`
 	RunIDsOrURLs []string `json:"run_ids_or_urls,omitempty" jsonschema:"One or more workflow run IDs or URLs. Single item: detailed audit report. Multiple items: diff mode with first as base (see tool description for accepted formats)."`
-	Artifacts    []string `json:"artifacts,omitempty"        jsonschema:"Artifact sets to download (default: all). Valid sets: all, activation, agent, delivery, detection, experiment, firewall, github-api, mcp, usage, work-queue"`
+	Artifacts    []string `json:"artifacts,omitempty"        jsonschema:"Artifact sets to download (default: all)."`
 	Delivery     bool     `json:"delivery,omitempty"         jsonschema:"Include recorded safe-output delivery evidence; requires a single full run"`
 	Adoption     bool     `json:"adoption,omitempty"         jsonschema:"Include delivery and refresh supported adoption and survival observations; requires a single full run"`
 	MaxTokens    int      `json:"max_tokens,omitempty"       jsonschema:"Deprecated: accepted for backward compatibility but ignored."`
@@ -543,6 +543,7 @@ func registerAuditTool(server *mcp.Server, execCmd execCmdFunc, actor string, va
 		mcpLog.Printf("Failed to generate audit tool schema: %v", err)
 		return err
 	}
+	auditSchema.Properties["artifacts"].Description += " Valid sets: " + strings.Join(ValidArtifactSetNames(), ", ")
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "audit",
@@ -907,7 +908,7 @@ func isKnownAuditStage(stage string) bool {
 type auditDiffArgs struct {
 	BaseRunID     string   `json:"base_run_id"     jsonschema:"Numeric ID of the base (reference) workflow run"`
 	CompareRunIDs []string `json:"compare_run_ids" jsonschema:"One or more numeric IDs of the comparison runs"`
-	Artifacts     []string `json:"artifacts,omitempty" jsonschema:"Artifact sets to download (default: all). Valid sets: all, activation, agent, detection, experiment, firewall, github-api, mcp, usage, work-queue"`
+	Artifacts     []string `json:"artifacts,omitempty" jsonschema:"Artifact sets to download (default: all)."`
 }
 
 // registerAuditDiffTool registers the audit-diff tool with the MCP server.
@@ -918,6 +919,7 @@ func registerAuditDiffTool(server *mcp.Server, execCmd execCmdFunc, actor string
 		mcpLog.Printf("Failed to generate audit-diff tool schema: %v", err)
 		return err
 	}
+	schema.Properties["artifacts"].Description += " Valid sets: " + strings.Join(ValidArtifactSetNames(), ", ")
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "audit-diff",
