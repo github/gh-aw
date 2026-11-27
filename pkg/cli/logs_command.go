@@ -457,7 +457,7 @@ func loadCommonLogsOptions(cmd *cobra.Command) (LogsDownloadOptions, error) { //
 		Verbose:               getBoolFlag(cmd, "verbose"),
 		ToolGraph:             getBoolFlag(cmd, "tool-graph"),
 		NoStaged:              getBoolFlag(cmd, "exclude-staged"),
-		DryRun:                getBoolFlag(cmd, "dry-run"),
+		DryRun:                getBoolFlag(cmd, "only-dry-run") || getBoolFlag(cmd, "dry-run"),
 		NoDryRun:              getBoolFlag(cmd, "no-dry-run"),
 		FirewallOnly:          getBoolFlag(cmd, "firewall"),
 		NoFirewall:            getBoolFlag(cmd, "no-firewall"),
@@ -700,8 +700,11 @@ func addLogsCommandFlags(logsCmd *cobra.Command, validArtifactSets string) {
 	addRepoFlag(logsCmd)
 	logsCmd.Flags().Bool("tool-graph", false, "Generate Mermaid tool sequence graph from agent logs")
 	logsCmd.Flags().Bool("exclude-staged", false, "Exclude workflow runs that executed in staged mode (safe outputs previewed but not applied)")
-	logsCmd.Flags().Bool("dry-run", false, "Filter to only dry-run workflow runs; does not preview this command")
+	logsCmd.Flags().Bool("only-dry-run", false, "Filter to only dry-run workflow runs; does not preview log collection")
+	logsCmd.Flags().Bool("dry-run", false, "Deprecated alias for --only-dry-run")
+	_ = logsCmd.Flags().MarkDeprecated("dry-run", "use --only-dry-run to filter workflow runs")
 	logsCmd.Flags().Bool("no-dry-run", false, "Exclude dry-run workflow runs (legacy metadata without dry_run counts as a normal run)")
+	logsCmd.MarkFlagsMutuallyExclusive("only-dry-run", "no-dry-run")
 	logsCmd.MarkFlagsMutuallyExclusive("dry-run", "no-dry-run")
 	logsCmd.Flags().Bool("firewall", false, "Filter to only runs with firewall enabled")
 	logsCmd.Flags().Bool("no-firewall", false, "Filter to only runs without firewall enabled")

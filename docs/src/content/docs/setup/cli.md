@@ -49,7 +49,7 @@ The `--timeout` flag uses different formats depending on the command:
 | `compile` | Emits specially configured lock files for development testing; does not dispatch them. |
 | `edit` | Validates and prints changed workflow content without writing or compiling. |
 | `run` | Previews dispatch without triggering a run; preparation can still compile, enable, or push workflows. |
-| `logs` | Filters for dry-run workflow runs; does not preview log collection. |
+| `logs` (`--only-dry-run`) | Filters for dry-run workflow runs; does not preview log collection. |
 
 Other commands describe their own preview behavior in their help.
 
@@ -823,10 +823,10 @@ cat run-ids.txt | gh aw logs --stdin --repo owner/repo   # required for bare num
 gh aw logs --runtime cloud-hypervisor                    # Filter to runs using a specific sandbox agent runtime
 ```
 
-**Options:** `--additional-grader`, `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--delivery`, `--drain3-weights`, `--dry-run`, `--end-date`, `--engine/-e`, `--episodes`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--harbor`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--adoption`, `--adoption-dir`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--retained`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
+**Options:** `--additional-grader`, `--after-run-id`, `--artifacts`, `--audit`, `--before-run-id`, `--cache-before`, `--cached-jsonl`, `--count/-c`, `--delivery`, `--drain3-weights`, `--only-dry-run`, `--end-date`, `--engine/-e`, `--episodes`, `--evals`, `--exclude-staged`, `--filtered-integrity`, `--firewall`, `--format`, `--graders`, `--harbor`, `--ignore-workflow-runs`, `--json/-j`, `--last`, `--max-github-api-rate-limit`, `--max-storage`, `--no-dry-run`, `--no-firewall`, `--adoption`, `--adoption-dir`, `--output/-o`, `--parse`, `--prune-older-runs`, `--ref`, `--report-file`, `--repo/-r`, `--retained`, `--runtime`, `--safe-output`, `--start-date`, `--stdin`, `--summary-file`, `--timeout`, `--tool-graph`, `--train`
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. When usage lacks `aw_info.json`, metadata is fetched from the compact `info` artifact before falling back to legacy activation artifacts. The `--last` flag is an alias for `--count/-c`.
-`--dry-run` selects only dry-run runs; `--no-dry-run` excludes them. These flags are mutually exclusive and work with workflow targets or `--stdin`. Older valid metadata without `dry_run` counts as a normal run; missing or malformed `aw_info.json` is excluded when either filter is active. Unified sessions preserve the flag as `workflow.info.data.dryRun`, and audit engine configuration exposes `dry_run`.
+`--only-dry-run` selects only dry-run runs; `--no-dry-run` excludes them. These filters are mutually exclusive and work with workflow targets or `--stdin`. The old `--dry-run` name remains available as a deprecated alias for `--only-dry-run`. Older valid metadata without `dry_run` counts as a normal run; missing or malformed `aw_info.json` is excluded when either filter is active. Unified sessions preserve the flag as `workflow.info.data.dryRun`, and audit engine configuration exposes `dry_run`.
 When multiple targets run concurrently, `--count` limits the combined number of workflow runs and `--timeout` limits the total wall-clock download time across all targets. `--timeout` accepts integer minutes or whole-minute durations (for example, `--timeout 10` or `--timeout 10m`); the default `0` disables the timeout.
 `--retained` refreshes due retained deliveries without discovering or downloading runs. It requires `--adoption` and `--repo`; `--count` limits delivery checks.
 
