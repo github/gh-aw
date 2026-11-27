@@ -216,40 +216,26 @@ func (c *templateInjectionChecker) rawEnvironment(ctx context.Context, raw any, 
 	if !ok {
 		return nil, fmt.Errorf("environment must be a mapping at %s", path)
 	}
-	keys := slices.Sorted(maps.Keys(env))
-	for pass := 0; pass < len(keys)+1; pass++ {
-		changed := false
-		for _, key := range keys {
-			text, ok := env[key].(string)
-			if !ok {
-				switch env[key].(type) {
-				case nil, bool, int, int8, int16, int32, int64,
-					uint, uint8, uint16, uint32, uint64, float32, float64:
-					text = ""
-				default:
-					return nil, fmt.Errorf("environment binding must be a scalar at %s.%s", path, key)
-				}
+	for _, key := range slices.Sorted(maps.Keys(env)) {
+		text, ok := env[key].(string)
+		if !ok {
+			switch env[key].(type) {
+			case nil, bool, int, int8, int16, int32, int64,
+				uint, uint8, uint16, uint32, uint64, float32, float64:
+				text = ""
+			default:
+				return nil, fmt.Errorf("environment binding must be a scalar at %s.%s", path, key)
 			}
-			expressions, err := c.text(ctx, text, path+"."+key, bindings)
-			if err != nil {
-				return nil, err
-			}
-			var sources []taint.Source
-			for _, expression := range expressions {
-				sources = append(sources, expression.Sources...)
-			}
-			ref := "env." + strings.ToLower(key)
-			previous := bindings[ref]
-			if !slices.EqualFunc(previous, sources, func(a, b taint.Source) bool {
-				return a.Reference == b.Reference && a.Path == b.Path
-			}) {
-				changed = true
-			}
-			bindings[ref] = sources
 		}
-		if !changed {
-			return bindings, nil
+		expressions, err := c.text(ctx, text, path+"."+key, parent)
+		if err != nil {
+			return nil, err
 		}
+		var sources []taint.Source
+		for _, expression := range expressions {
+			sources = append(sources, expression.Sources...)
+		}
+		bindings["env."+strings.ToLower(key)] = sources
 	}
 	return bindings, nil
 }
