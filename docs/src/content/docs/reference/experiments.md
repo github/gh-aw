@@ -77,24 +77,15 @@ experiments:
 Summarize the findings in a **${{ experiments.prompt_style }}** way.
 ```
 
-When `evals` are configured, `metric` can reference an eval question ID using
-`eval:<id>` (for example `eval:focused`) or `evals.<id>`.
+`metric` can reference an eval question with `eval:<id>` (or `evals.<id>`), or a
+grader result with `grader:<id>` (or `graders.<id>.value`). Use `adoption:accepted`
+or `adoption:zero_touch` to measure live adopted outputs with
+`gh aw experiments analyze <workflow> --adoption`. These references also work in
+`secondary_metrics` and `guardrail_metrics` without declaring a grader or eval.
 
-When `graders` are configured, `metric` can reference a grader result using
-`grader:<id>` (for example `grader:tool-success-rate`) or
-`graders.<id>.value`.
-
-Use `adoption:accepted` or `adoption:zero_touch` to measure live GitHub adopted outputs
-with `gh aw experiments analyze <workflow> --adoption`. These references also work in `secondary_metrics` and
-`guardrail_metrics`, without declaring a grader or eval.
-
-`gh aw experiments analyze <workflow>` resolves the referenced eval question and, when
-eval result data is available, shows YES/NO/UNKNOWN totals for that eval-backed metric.
-It also joins per-run eval answers to persisted experiment assignments and analyzes the
-valid YES/NO observations by variant using the same statistical comparisons available
-for grader-backed metrics. For a grader-backed primary metric, it joins persisted
-experiment assignments to completed run artifacts and analyzes the valid grader values
-by variant.
+`gh aw experiments analyze <workflow>` joins persisted assignments to each run's eval
+answers or grader artifacts, then compares variants with the same statistics. Eval
+results also show YES/NO/UNKNOWN totals.
 
 > [!NOTE]
 > Experiment names must be valid identifiers: start with a letter or
@@ -128,22 +119,9 @@ Address the issue described above.
 Most experiments compare a single decision in the workflow. The examples below
 show common patterns.
 
-### Try different prompt styles
-
-```aw wrap
----
-experiments:
-  style: [concise, detailed]
----
-
-Summarize this issue in a **${{ experiments.style }}** way.
-```
-
 ### Try different models
 
-Model experiments are useful when you want to compare speed, cost, and output
-quality. gh-aw model aliases such as `small` and `large` are often a good place
-to start. See [Model Aliases](/gh-aw/reference/model-tables/).
+Compare speed, cost, and quality with model aliases such as `small` and `large`. See [Model Aliases](/gh-aw/reference/model-tables/).
 
 ```aw wrap
 ---
@@ -185,22 +163,18 @@ Read the given file and return a concise summary.
 See [Inline Sub-Agents](/gh-aw/reference/inline-sub-agents/) for the full
 syntax.
 
-With Copilot, you can also declare `subagent_model: [small, large]` in
-`experiments` and set the sub-agent's `model` to
-`${{ experiments.subagent_model }}`. The activation job replaces the reference
-with the selected variant before it writes the sub-agent file, and records the
-same variant in the run's declared-model metadata. If no assignment is available,
-activation fails instead of writing the expression.
-Audit patterns and model-routing request policy expand every declared variant
-through the workflow's model aliases, while `models.allowed` and `models.blocked`
-still constrain admission. Router candidates remain unchanged. These patterns
-describe possible models; matching observed usage does not prove that the selected
-variant was honored.
+With Copilot, you can also declare `subagent_model: [small, large]` and set the
+sub-agent's `model` to `${{ experiments.subagent_model }}`. Activation replaces the
+reference with the selected variant before writing the sub-agent file and records that
+variant in the run's declared-model metadata. If no assignment is available, activation
+fails rather than writing the expression. Audit patterns and model-routing request policy
+expand every variant through the model aliases, still constrained by `models.allowed` and
+`models.blocked`. Router candidates are unchanged. Matching observed usage does not prove
+the variant was honored.
 
-Use a direct `${{ experiments.subagent_model }}` reference for sub-agent models.
-Compound expressions such as `${{ experiments.subagent_model || 'small' }}` or
-`format(...)` are rejected because the sub-agent runtime does not evaluate them.
-Put the complete model or alias in each experiment variant instead.
+Use a direct `${{ experiments.subagent_model }}` reference. Compound expressions such as
+`${{ experiments.subagent_model || 'small' }}` or `format(...)` are rejected, because the
+sub-agent runtime does not evaluate them. Put the complete model or alias in each variant.
 Pi sub-agents require literal models or aliases, not expressions.
 
 ### Try different subskills
@@ -277,42 +251,36 @@ experiments:
 Summarize in a **${{ experiments.prompt_style }}** style.
 ```
 
-`broker-url` accepts a literal HTTPS endpoint, not a GitHub Actions expression.
-When omitted, it defaults to the repository or organization Actions secret
-`GH_AW_EXPERIMENTS_BROKER_URL`. Both assignment and reporting POST to this exact
-endpoint, which is also the exact OIDC audience. Do not include credentials in
-the URL. `storage: broker` and `broker-url` can be provided by a shared workflow
-import; the importing workflow's values take precedence. Imported experiment
-variants and non-broker storage modes are not merged. An explicit non-broker
-storage mode in a shared workflow prevents a nested import from enabling broker
-storage. Treat imports as trusted configuration: the selected
-endpoint receives the workflow's OIDC identity. gh-aw does not ship the server.
+`broker-url` must be a literal HTTPS endpoint, not a GitHub Actions expression. If
+omitted, it defaults to the `GH_AW_EXPERIMENTS_BROKER_URL` Actions secret (repository or
+organization). Assignment and reporting both POST to this exact endpoint, which is also the
+OIDC audience. Do not put credentials in the URL. A shared workflow import can provide
+`storage: broker` and `broker-url`, but the importing workflow's values win. Imported variants
+and non-broker storage modes are not merged, and an explicit non-broker mode in a shared
+workflow stops a nested import from enabling broker storage. Imports are trusted
+configuration: the endpoint receives the workflow's OIDC identity. gh-aw does not ship the server.
 
-Activation obtains assignments and required cumulative counts. A separate,
-isolated job after conclusion (and graders when needed) submits allowlisted
-numeric/status observations from a compact `activity/experiment-results.json` in the `usage` artifact.
-Reporting is best effort: failures, cancellation, or missing artifacts can leave assignments
-without results. Reported values are untrusted observations, not authorization
-or verified human adoption. Eval answers, custom grader values, and adoption
-results are not currently reported. Authored steps and workflow-level environment
-hooks cannot customize the isolated broker report job.
-The report job uses the configured framework runner (`runs-on-slim` or
-`safe-outputs.runs-on`), which must satisfy the deployment's runner policy.
-Friction costs are reported only for available measurement dimensions;
-unavailable or unsupported values are omitted rather than recorded as zero.
-New attempts require fresh activation/conclusion artifacts; rerunning only a
-failed reporter rejects prior-attempt data instead of attributing it to the new attempt.
+Activation obtains assignments and cumulative counts from the broker. After conclusion (and
+graders, when needed), a separate isolated job submits allowlisted numeric and status
+observations from `activity/experiment-results.json` in the `usage` artifact. Reporting is
+best effort: failures, cancellation, or missing artifacts can leave assignments without
+results. Reported values are untrusted observations, not authorization or verified adoption.
+Eval answers, custom grader values, and adoption results are not reported. Authored steps and
+workflow-level environment hooks cannot customize the report job. It runs on the framework
+runner (`runs-on-slim` or `safe-outputs.runs-on`), which must satisfy the deployment's runner
+policy. Friction costs are reported only for measured dimensions; unavailable values are
+omitted, not recorded as zero. A new attempt needs fresh activation and conclusion artifacts;
+rerunning only a failed reporter rejects prior-attempt data.
 
-Broker storage requires a generated agent job and does not support status-only
-workflows. Define an agent job or use `repo`/`cache` storage instead.
-Repeated reusable-workflow calls with identical inputs in the same attempt are
-also unsupported because they share the artifact/invocation prefix. The broker
-must bind supported invocation hints to trusted job evidence, not trust the hash alone.
+Broker storage requires a generated agent job and does not support status-only workflows.
+Define an agent job, or use `repo` or `cache` storage instead. Repeated reusable-workflow
+calls with identical inputs in the same attempt are also unsupported, because they share the
+artifact and invocation prefix. The broker must bind invocation hints to trusted job evidence,
+not trust the hash alone.
 
-The calling jobs require `id-token: write` within the caller's permission
-envelope. Broker errors do not retry or fall back to git/cache. Dry-run uses an
-ephemeral local picker and makes no experiments broker HTTP or OIDC calls.
-Existing `repo` and `cache` behavior is unchanged.
+Calling jobs need `id-token: write` within their permission envelope. Broker errors do not
+retry or fall back to git or cache. Dry-run uses an ephemeral local picker and makes no broker
+HTTP or OIDC calls. `repo` and `cache` behavior is unchanged.
 
 `gh aw experiments` commands, including `gh aw experiments analyze`, currently
 use only the git backend; there is no broker analysis client. See the
@@ -373,45 +341,34 @@ experiments:
 Follow the **${{ experiments.prompt_v2 }}** instructions.
 ```
 
-Run `gh aw experiments analyze <workflow> --adoption` to evaluate adopted outputs on demand;
-no scheduled collector is needed. Live adoption collection is opt-in because it
-downloads artifacts and makes additional GitHub API requests. Without `--adoption`,
-analysis of an adoption-backed primary, secondary, or guardrail metric returns an
-error explaining how to enable collection; no adoption evidence is fetched.
-`adoption_window` defaults to `auto`: analysis estimates the
-pooled 95th-percentile decision time from this experiment's outputs across variants
-with Kaplan–Meier censoring
-for still-open outputs, clamps the window to 24 hours–30 days, and uses `72h`
-until 20 outputs have known decision times. Set a positive Go duration such as
-`72h` to override the learned window. Only runs at least the effective window contribute
-observations. Each run contributes one
-value: accepted outputs divided by resolved outputs, or zero-touch outputs
-divided by resolved outputs. Resolved outputs are accepted, rejected, or still
-pending after the window. Stale pending outputs score zero.
+Run `gh aw experiments analyze <workflow> --adoption` to evaluate adopted outputs on demand.
+No scheduled collector is needed. Collection is opt-in because it downloads artifacts and makes
+extra GitHub API requests. Without `--adoption`, an adoption-backed metric returns an error that
+explains how to enable collection, and no adoption evidence is fetched.
 
-Zero-touch means a merged PR with no non-bot comments, reviews, or commits after
-creation. Accepted PR outputs without complete zero-touch evidence are excluded
-from that metric rather than scored zero. Unknown or errored adopted outputs are also
-excluded. Historical records without `zero_touch_evidence_complete` remain valid,
-but do not establish complete zero-touch evidence. Lifecycle, lifecycle-close,
-ignored, and skipped outputs do not contribute; runs with no adoption-bearing
-outputs are no-ops, not successes.
-Other resolved output types remain in the denominator and score zero for
-`adoption:zero_touch`.
+`adoption_window` defaults to `auto`. Analysis estimates the pooled 95th-percentile decision time
+across this experiment's variants, using Kaplan–Meier censoring for still-open outputs. It clamps
+the result to 24 hours–30 days and uses `72h` until 20 outputs have known decision times. Set a
+positive Go duration such as `72h` to override it. Only runs at least the effective window contribute observations. Each run contributes one value: accepted outputs divided by resolved outputs, or
+zero-touch outputs divided by resolved outputs. Resolved outputs are accepted, rejected, or still
+pending after the window; stale pending outputs score zero.
 
-Text and `--json` reports include per-variant run coverage: `immature`,
-`stale_pending`, `unavailable`, and `no_op`. A run with some usable outputs can
-also count as stale pending or unavailable. Only usable
-run observations count toward `min_samples`. When `analysis_type` is omitted,
-the analyzer uses a two-proportion test if every observed run value is 0 or 1,
-otherwise Welch's t-test (for example, when a run creates several PRs).
-Explicit `proportion_test` or `bayesian_ab` analysis requires binary per-run
-values and cannot analyze fractional adopted outputs.
-The report includes the effective window, its source, and the sample size used for
-learning or the cold-start fallback. Adoption-backed secondary metrics include
-per-variant observations, coverage, and statistical comparisons in text and JSON.
-Prefer `adoption:zero_touch` when acceptance is already high and reducing human
-intervention is the goal.
+Zero-touch means a merged PR with no non-bot comments, reviews, or commits after creation. Accepted
+PR outputs without complete zero-touch evidence are excluded rather than scored zero, as are unknown
+or errored outputs. Historical records without `zero_touch_evidence_complete` remain valid but do not
+establish complete evidence. Lifecycle, lifecycle-close, ignored, and skipped outputs do not contribute.
+Runs with no adoption-bearing outputs are no-ops, not successes. Other resolved output types stay in
+the denominator and score zero for `adoption:zero_touch`.
+
+Text and `--json` reports show per-variant run coverage (`immature`, `stale_pending`, `unavailable`,
+and `no_op`). A run with some usable outputs can also count as stale pending or unavailable. Only usable
+run observations count toward `min_samples`. When `analysis_type` is omitted, the analyzer uses a
+two-proportion test if every run value is 0 or 1, and Welch's t-test otherwise (for example, when a run
+creates several PRs). Explicit `proportion_test` or `bayesian_ab` requires binary per-run values and
+cannot analyze fractional adopted outputs. Reports include the effective window, its source, and the
+sample size used for learning or the cold-start fallback. Adoption-backed secondary metrics also include
+per-variant observations, coverage, and comparisons. Prefer `adoption:zero_touch` when acceptance is
+already high and reducing human intervention is the goal.
 
 ### Analyze a grader-backed metric
 
@@ -454,9 +411,8 @@ assigned, usable, and excluded observations per variant. Missing artifacts, miss
 failed graders, and invalid values are excluded rather than counted as zero. Only usable
 observations count toward `min_samples`.
 
-This analysis does not replay traces or invoke an evaluator model. A deterministic grader
-measures only the behavior encoded by that grader and is not a universal correctness metric.
-The decision layer treats grader observations like any other resolved numeric metric.
+This analysis does not replay traces or invoke an evaluator model. The decision layer treats
+grader observations like any other resolved numeric metric.
 
 ### Analyze an eval-backed metric
 
@@ -479,25 +435,19 @@ experiments:
 Follow the **${{ experiments.prompt_v2 }}** instructions.
 ```
 
-`gh aw experiments analyze <workflow>` joins each assigned run's recorded eval answer
-(from `evals.jsonl`) to the assignment ledger by run ID and reports assigned, usable, and
-excluded YES/NO observations per variant. Runs missing an eval answer, or with an
-`UNKNOWN`/unrecognized answer, are excluded rather than counted as zero. Only usable
-observations count toward `min_samples`, and the same t-test, Mann–Whitney, proportion, or
-Bayesian comparisons available for grader-backed metrics are applied to the YES/NO adopted outputs.
-`UNKNOWN` answers remain excluded. They are not treated as `NO`.
+`gh aw experiments analyze <workflow>` joins each assigned run's eval answer (from `evals.jsonl`)
+to the assignment ledger by run ID and reports assigned, usable, and excluded YES/NO observations
+per variant. Runs with a missing or `UNKNOWN`/unrecognized answer are excluded, not counted as zero
+or `NO`. The same t-test, Mann–Whitney, proportion, or Bayesian comparisons used for grader-backed
+metrics apply to the YES/NO adopted outputs.
 
-The evals job batches 1–400 binary questions into a single OpenAI-compatible
-`POST /decisions` request, using `choice` answers (`YES`, `NO`, or `UNKNOWN`).
-It runs independently of the agentic engine and defaults to `copilot/gpt-6-luna-decisions`.
-Set `evals.model` to another Decisions-compatible model, or
-`openai/gpt-6-luna` to use `CODEX_API_KEY`/`OPENAI_API_KEY` instead of Copilot
-credentials. Configure the provider's actual model ID; model names are not remapped.
-OpenAI WIF configured under `engine.auth` applies only to Codex inference through
-the AWF API proxy; the evals job calls Decisions directly and does not inherit that
-authentication. OpenAI evals therefore still require `CODEX_API_KEY` or
-`OPENAI_API_KEY`; eval-specific WIF or proxy authentication is not currently supported.
-Per-question model overrides are not supported. Transport failures
+The evals job batches 1–400 binary questions into one OpenAI-compatible `POST /decisions` request,
+with `choice` answers (`YES`, `NO`, or `UNKNOWN`). It runs independently of the agentic engine and
+defaults to `copilot/gpt-6-luna-decisions`. Set `evals.model` to another Decisions-compatible model,
+or to `openai/gpt-6-luna` to use `CODEX_API_KEY` or `OPENAI_API_KEY` instead of Copilot credentials.
+Use the provider's actual model ID; names are not remapped. OpenAI WIF under `engine.auth` applies only
+to Codex inference through the AWF API proxy and is not inherited here, so OpenAI evals still require
+`CODEX_API_KEY` or `OPENAI_API_KEY`. Per-question model overrides are not supported. Transport failures
 are recorded as `not_evaluated`, not as negative or unknown answers.
 
 ### Deterministic decisions
@@ -518,22 +468,11 @@ or change traffic. `readiness` is `COLLECTING` or `READY`; the legacy `recommend
 `EXTEND` or `READY_FOR_ANALYSIS` for compatibility. A ready experiment can still have an
 `INCONCLUSIVE` decision.
 
-The complete flow is:
-
-```text
-variant assignment
-→ run observation (for example, a grader value)
-→ statistical analysis
-→ readiness
-→ deterministic decision
-```
-
-Assignment identifies the treatment (`control` or `candidate`); it is not an adoption. Observation
-records what happened during that assigned run. Analysis estimates the effect and evidence.
-Readiness only answers whether every variant has reached `min_samples`: usable primary-metric
-observations for observation-backed metrics, or assignment counts when no supported observation
-source is resolved. The decision then applies policy and mandatory guardrails to the existing
-analysis.
+Assignment identifies the treatment (`control` or `candidate`), not an adoption. Analysis
+estimates the effect and evidence. Readiness checks whether every variant has reached
+`min_samples`: usable primary-metric observations for observation-backed metrics, or assignment
+counts when no supported observation source is resolved. The decision then applies policy and
+mandatory guardrails to the existing analysis.
 
 For two-variant experiments, the command emits one of these decisions:
 
@@ -544,11 +483,10 @@ For two-variant experiments, the command emits one of these decisions:
 | `REJECT` | The candidate materially regresses or fails a mandatory guardrail. |
 | `INCONCLUSIVE` | Minimum samples exist, but the evidence or practical effect does not establish a winner. |
 
-In particular, `EXTEND` means that evidence collection or computation is incomplete.
-`INCONCLUSIVE` means that the engine could adjudicate the available evidence, but it did not
-establish a decision-quality improvement or regression. A candidate that fails to prove an
-improvement is not automatically harmful; `REJECT` requires a failed guardrail or sufficient
-evidence of a material regression.
+`EXTEND` means evidence collection or computation is incomplete. `INCONCLUSIVE` means the
+available evidence was adjudicated without establishing an improvement or regression. An
+unproven candidate is not automatically harmful; `REJECT` requires a failed guardrail or
+sufficient evidence of a material regression.
 
 The `decision` configuration uses absolute primary-metric units. `minimum_effect` defaults to
 `0`. `regression_tolerance` defaults to `minimum_effect`. `confidence` defaults to `0.95`.
@@ -592,18 +530,7 @@ The decision portion of the default CLI output uses these fields:
   Reason     : candidate materially improves the primary metric with sufficient evidence and all guardrails pass (candidate_improved)
 ```
 
-An adequately sampled result without sufficient evidence remains distinct:
-
-```text
-  Readiness  : READY
-
-  READY FOR ANALYSIS — all 2 variants have reached min_samples (20); adoption metric analysis is available
-
-  Decision   : INCONCLUSIVE
-  Reason     : minimum samples are available but the configured evidence threshold is not satisfied (evidence_insufficient)
-```
-
-While observations are still accumulating, output instead includes:
+Before enough samples accumulate, output looks like:
 
 ```text
   Readiness  : COLLECTING
@@ -641,12 +568,10 @@ Use `--json` for the stable automation boundary:
 gh aw experiments analyze <workflow> --json
 ```
 
-Each entry in `analyses` includes `decision`, `reason_code`, `samples`, `decision_guardrails`, and
-`decision_policy`, alongside the separate `readiness` field. `control`, `candidate`, `effect`, and
-`evidence` are emitted when those values are available for the decision path (for example
-two-variant statistical comparisons); early `EXTEND` and multi-variant `INCONCLUSIVE` results may
-omit them. Future promotion automation can consume these fields without rerunning statistics or
-interpreting grader artifacts.
+Each `analyses` entry includes `decision`, `reason_code`, `samples`, `decision_guardrails`,
+and `decision_policy`, plus the separate `readiness` field. `control`, `candidate`, `effect`,
+and `evidence` appear only when available, such as for two-variant statistical comparisons.
+Automation should consume these fields rather than recomputing statistics.
 
 A ready two-variant result can contain:
 
@@ -692,27 +617,23 @@ A ready two-variant result can contain:
 
 The stable automation boundary is `analyses[].readiness`, `analyses[].decision`, and
 `analyses[].reason_code`. Reporting workflows may add a presentation or interaction-safety hold,
-but must preserve the core decision rather than recomputing it.
+but must preserve the core decision.
 
-The core CLI supports all four analysis methods (`t_test`, `mann_whitney`, `proportion_test`, and
-`bayesian_ab`). Frequentist methods provide p-value evidence. Bayesian analysis provides
-`probability_superiority`; it is significant when that probability is at least `confidence` or at
-most `1-confidence`, and it is never described as a p-value.
+The CLI supports four analysis methods (`t_test`, `mann_whitney`, `proportion_test`, and
+`bayesian_ab`). Frequentist methods provide p-values. `bayesian_ab` provides
+`probability_superiority`, which is significant when it is at least `confidence` or at most
+`1-confidence`. It is never described as a p-value.
 
-The daily experiment report consumes this structured core decision. It does not independently
-recompute the decision policy. Its only additional adoption handling is the interaction safety hold
-described above. Older reporting terminology such as `ABANDON`, and guardrail statuses such as
-`GUARDRAIL_FAILED`, are not core decision values.
+The daily experiment report uses this structured core decision and adds only the interaction
+safety hold described above. Older terms such as `ABANDON` and `GUARDRAIL_FAILED` are not core
+decision values.
 
 Existing experiment configurations remain compatible. Analysis still defaults to 20 samples per
 variant and the configured or inferred statistical method. A deterministic `decision` is emitted
 even when no `decision:` block exists, using `minimum_effect: 0`, `regression_tolerance: 0`, and
 `confidence: 0.95`. The legacy `recommendation` remains in JSON. No migration is required.
 
-Decisions are only as meaningful as their configured observations. A grader measures the behavior
-it encodes, not universal task correctness. Low-frequency or heterogeneous tasks may need larger
-samples, simultaneous experiments can complicate attribution, and no observed regression proves
-only the configured evidence—not universal non-regression.
+Decisions are only as meaningful as their observations. Low-frequency or heterogeneous tasks may need larger samples, and simultaneous experiments can complicate attribution. A passing non-regression check covers only the configured evidence, not universal non-regression.
 
 ### Filtering audit results by variant
 
@@ -758,7 +679,7 @@ Tracking issue: [#1234](https://github.com/owner/repo/issues/1234)
 
 ## Frontmatter reference
 
-### Bare-array form
+### Map fields
 
 | Field | Type | Description |
 |---|---|---|
@@ -776,13 +697,13 @@ Tracking issue: [#1234](https://github.com/owner/repo/issues/1234)
 | `metric` | `string` | | Primary metric to observe (e.g. `aic`, `duration_ms`) |
 | `secondary_metrics` | `string[]` | | Additional metrics to track alongside the primary metric |
 | `guardrail_metrics` | `object[]` | | List of guardrail objects with `name` (string), `threshold` (comparison string like `>=0.95` or bare number like `0.0`), and optional `direction` (`"min"` or `"max"`). When `threshold` is a bare number, `direction` governs the pass condition (≤ for `min`, ≥ for `max`). See [experiments-specification §4.4](/gh-aw/specs/experiments-specification/#44-guardrail-metrics) for full semantics. |
-| `min_samples` | `integer` | | Minimum runs per variant required before statistical analysis is considered reliable. The step summary shows a progress bar toward this target. |
+| `min_samples` | `integer` | | Minimum usable runs per variant before analysis is considered reliable. The step summary shows progress toward it. |
 | `analysis_type` | `string` | | Statistical method: `t_test`, `mann_whitney`, `proportion_test`, or `bayesian_ab`. |
 | `decision` | `object` | | Deterministic policy with optional non-negative `minimum_effect`, non-negative `regression_tolerance`, and `confidence` between 0 and 1. Effects use absolute primary-metric units. |
 | `weight` | `integer[]` | | Per-variant probability weights (same length as `variants`). Enables weighted-random selection; values are relative and need not sum to 100. |
 | `issue` | `integer` | | GitHub issue number that tracks this experiment's lifecycle |
-| `start_date` | `string` | | ISO-8601 date (`YYYY-MM-DD`) before which the experiment is inactive. The control variant is returned before this date without incrementing any counter. |
-| `end_date` | `string` | | ISO-8601 date (`YYYY-MM-DD`) after which the experiment is inactive. The control variant is returned after this date without incrementing any counter. |
+| `start_date` | `string` | | ISO-8601 date (`YYYY-MM-DD`) before which the experiment is inactive. The control variant is returned, and no counter increments. |
+| `end_date` | `string` | | ISO-8601 date (`YYYY-MM-DD`) after which the experiment is inactive. The control variant is returned, and no counter increments. |
 | `continual` | `object` | | Experimental deterministic control/candidate assignment with automatic traffic ramping. |
 
 ## Continual experiment ramps

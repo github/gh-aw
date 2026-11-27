@@ -222,7 +222,9 @@ The detection job runs on a separate runner from the agent job. Ensure the selec
 
 ## Configuring the framework job runner
 
-Framework jobs — activation, pre-activation, safe-outputs, unlock, APM, update_cache_memory, and push_repo_memory — default to `ubuntu-slim`. Use `runs-on-slim:` to override all of them at once:
+Framework jobs — activation, pre-activation, safe-outputs, unlock, APM, update_cache_memory, and push_repo_memory — generally default to GitHub-hosted `ubuntu-slim`. The `safe-outputs` job defaults to GitHub-hosted `ubuntu-latest` when it creates or pushes pull requests, because it checks out and publishes repository code; staged handlers do not trigger this switch. An explicit job timeout over 15 minutes can also select `ubuntu-latest` when the framework runner is not overridden.
+
+Setting only `runs-on:` does not select the runner for these jobs. To keep them on a self-hosted pool, set `runs-on-slim:` for framework jobs or `safe-outputs.runs-on:` specifically for safe-output jobs:
 
 ```aw
 ---
@@ -238,6 +240,8 @@ safe-outputs:
 > [!NOTE]
 > `runs-on` controls only the main agent job. `runs-on-slim` controls all framework/generated jobs. `safe-outputs.runs-on` still takes precedence over `runs-on-slim` for safe-output jobs specifically.
 > `runs-on-slim` accepts the same string, array, or runner-group object forms as `runs-on`.
+
+Enable `require_self_hosted_runners` to fail compilation if any generated job, including `safe-outputs`, defaults to a GitHub-hosted runner such as `ubuntu-latest`. The check accepts the `self-hosted` label or a runner group; ensure any selected group contains the intended self-hosted runners.
 
 ## Configuring the maintenance workflow runner
 
