@@ -501,7 +501,7 @@ func TestResolveMCPGatewayContainerImagePreservesDigest(t *testing.T) {
 	})
 	t.Run("default gateway reviewed digest", func(t *testing.T) {
 		image := string(constants.DefaultMCPGatewayContainer) + ":" + string(constants.DefaultMCPGatewayVersion)
-		assert.Equal(t, image+"@sha256:716b41d53a20660e945c351c08140380430d65d98d3263596e45114c29fa7a43",
+		assert.Equal(t, image+"@sha256:3f6567e6db31d820e43031fa17a745e5a056fd074604192a884ac12a443ff5c1",
 			resolveMCPGatewayContainerImage(image, nil))
 	})
 	t.Run("mapped digest", func(t *testing.T) {
