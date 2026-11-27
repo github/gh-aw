@@ -117,12 +117,13 @@ The following 9 personas cover both technical and non-technical information work
 Use `cache-memory` to load the exploration history and select personas.
 
 1. **Load history**: Read `/tmp/gh-aw/cache-memory/agent-persona-explorer/explored-personas.json` and check whether `/tmp/gh-aw/cache-memory/agent-persona-explorer/baseline-completed.json` exists.
-   - If the file does not exist, treat the explored list as empty.
-   - The stored value is a JSON object: `{ "explored": ["Backend Engineer", "DevOps Engineer", ...] }`
+   - If the file does not exist, treat both lists as empty.
+   - The stored value is a JSON object: `{ "explored": ["Backend Engineer"], "attempted": ["Backend Engineer", "DevOps Engineer"] }`. `explored` contains only personas with evaluated scenarios; `attempted` controls rotation.
+   - For older history without `attempted`, initialize it from `explored`.
 
 2. **Select personas**:
    - If `baseline-completed.json` does not exist, select Program Manager, Designer, and Legal / Compliance for the one-time baseline, regardless of the explored list.
-   - Otherwise, pick up to 3 personas from the Full Persona Pool that are **not** in the explored list. If 1 or 2 remain, select those before resetting the rotation; reset the explored list only when no personas remain.
+   - Otherwise, pick up to 3 personas from the Full Persona Pool that are **not** in the attempted list. If 1 or 2 remain, select those before resetting the rotation. When none remain, clear both lists and select from the full pool.
    - In normal rotation, prioritize non-technical personas (Program Manager, Designer, Legal / Compliance, Information Worker) when multiple options are available.
 
 3. **Store selected personas in working memory** for use in Phase 2 and beyond.
@@ -214,7 +215,7 @@ Summarize the recommendation; do not include full YAML. For successful invocatio
 
 {{#if experiments.sub_agent_strategy_prefix_v1 == 'batch' }}
 Invoke the inline `persona-evaluator` Claude Code sub-agent once with all 3-4 selected scenarios. Require one recommendation per scenario, and then record and score each response using the structured template above.
-{{else}}
+{{#else}}
 Invoke the inline `persona-evaluator` Claude Code sub-agent once per selected scenario, presenting it as a request from that persona. Record and score each response using the structured template above.
 {{/if}}
 
@@ -378,9 +379,9 @@ Distinguish static risks from observed regressions.]
 Store the structured records in `/tmp/gh-aw/cache-memory/agent-persona-explorer/results-${{ github.run_id }}.json` for historical comparison across runs.
 
 **Update the exploration history**: After publishing the issue, update `/tmp/gh-aw/cache-memory/agent-persona-explorer/explored-personas.json`:
-- Append the personas tested in this run to the existing explored list
-- If the updated list now contains all 9 personas, reset to an empty list (start a new rotation cycle)
-- Store as: `{ "explored": ["Persona A", "Persona B", ...] }`
+- Add each persona for which at least one scenario invocation was attempted to `attempted`, even if it failed or was contaminated. Do not count selected personas with no invocation.
+- Add a persona to `explored` only if at least one of its scenarios was successfully evaluated with a clean canary. Do not add failed or contaminated invocations.
+- Keep both lists deduplicated and store as `{ "explored": ["Persona A"], "attempted": ["Persona A", "Persona B"] }`. If the updated list now contains all 9 personas, reset to an empty list at the next selection; otherwise preserve both lists.
 - If this was the initial baseline and all four scenario invocations succeeded, write `{ "completed": true, "scenario_ids": ["PM-1", "DS-1", "LC-1", "LC-2"] }` to `baseline-completed.json`. If any invocation failed, leave the marker absent so the exact baseline is retried next run.
 
 **Output Efficiency Guidelines:**

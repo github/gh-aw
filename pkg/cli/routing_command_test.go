@@ -188,3 +188,105 @@ func TestRoutingResetCommitsWhatTheWriterWould(t *testing.T) {
 	}
 	t.Fatal("the reducer vectors have no reset case")
 }
+
+func TestRoutingResetPreservesReconciliationCoverage(t *testing.T) {
+	decodeRaw := func(t *testing.T, data []byte) map[string]any {
+		t.Helper()
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.UseNumber()
+		var raw map[string]any
+		require.NoError(t, dec.Decode(&raw))
+		return raw
+	}
+
+	t.Run("raises reconciled_through to reset_after_run and clears unresolved runs at or below it", func(t *testing.T) {
+		stateJSON := `{"v":2,"workflow":"triage","seq":5,"generation":{"hash":"9f2c41d0","since_run":1},"reset_after_run":0,"last_run":85,"reconciled_through":80,"unresolved_runs":[75,80],"unresolved_run_ids":{"75":"9075","80":"9080"},"unresolved_lookup_cursor":75,"unexplained":2,"scopes":{},"updated":{"run":"9085","at":"2026-11-24T09:00:00Z"}}`
+		api := &fakeRoutingAPI{
+			heads:  map[string]string{"memory/adaptive-routing/triage": "head1"},
+			files:  map[string]string{"head1:state.json": stateJSON},
+			latest: 100,
+		}
+		at := time.Date(2026, 11, 24, 10, 0, 0, 0, time.UTC)
+		require.NoError(t, runRoutingReset(context.Background(), api, "triage", at))
+		require.Len(t, api.commits, 1)
+
+		raw := decodeRaw(t, api.commits[0].content)
+		assert.Equal(t, json.Number("100"), raw["reset_after_run"])
+		assert.Equal(t, json.Number("85"), raw["last_run"])
+		assert.Equal(t, json.Number("100"), raw["reconciled_through"])
+		assert.Equal(t, []any{}, raw["unresolved_runs"], "unresolved_runs field must be preserved as an empty array")
+		assert.NotContains(t, raw, "unresolved_run_ids")
+		assert.NotContains(t, raw, "unresolved_lookup_cursor")
+		assert.Equal(t, json.Number("0"), raw["unexplained"])
+	})
+
+	t.Run("keeps an unfinished first write until the reset covers all saved runs", func(t *testing.T) {
+		var state routingHistoryState
+		require.NoError(t, json.Unmarshal([]byte(`{"first_write_run":12,"last_run":15,"reconciled_through":9}`), &state))
+		for _, fence := range []int64{10, 12, 15} {
+			content, err := encodeRoutingState(resetRoutingState(state, fence, "2026-11-24T10:00:00Z"))
+			require.NoError(t, err)
+			raw := decodeRaw(t, content)
+			if fence < 15 {
+				assert.Equal(t, json.Number("12"), raw["first_write_run"])
+			} else {
+				assert.NotContains(t, raw, "first_write_run")
+			}
+		}
+	})
+
+	t.Run("preserves reconciliation obligations above reset_after_run", func(t *testing.T) {
+		stateJSON := `{"v":2,"workflow":"triage","seq":5,"generation":{"hash":"9f2c41d0","since_run":1},"reset_after_run":0,"last_run":105,"reconciled_through":105,"unresolved_runs":[104,98,100,102,102],"unresolved_run_ids":{"98":"9098","100":"9100","102":"9102","104":"9104"},"unresolved_lookup_cursor":102,"unexplained":1,"scopes":{},"updated":{"run":"9105","at":"2026-11-24T09:00:00Z"}}`
+		api := &fakeRoutingAPI{
+			heads:  map[string]string{"memory/adaptive-routing/triage": "head2"},
+			files:  map[string]string{"head2:state.json": stateJSON},
+			latest: 100,
+		}
+		at := time.Date(2026, 11, 24, 10, 0, 0, 0, time.UTC)
+		require.NoError(t, runRoutingReset(context.Background(), api, "triage", at))
+		require.Len(t, api.commits, 1)
+
+		raw := decodeRaw(t, api.commits[0].content)
+		assert.Equal(t, json.Number("100"), raw["reset_after_run"])
+		assert.Equal(t, json.Number("105"), raw["reconciled_through"])
+		assert.Equal(t, []any{json.Number("102"), json.Number("104")}, raw["unresolved_runs"])
+		assert.Equal(t, map[string]any{"102": "9102", "104": "9104"}, raw["unresolved_run_ids"])
+		assert.Equal(t, json.Number("102"), raw["unresolved_lookup_cursor"])
+	})
+
+	t.Run("clears stale lookup cursor at or below reset_after_run while retaining surviving IDs", func(t *testing.T) {
+		stateJSON := `{"v":2,"workflow":"triage","seq":5,"generation":{"hash":"9f2c41d0","since_run":1},"reset_after_run":0,"last_run":105,"reconciled_through":105,"unresolved_runs":[98,102],"unresolved_run_ids":{"98":"9098","102":"9102"},"unresolved_lookup_cursor":98,"unexplained":1,"scopes":{},"updated":{"run":"9105","at":"2026-11-24T09:00:00Z"}}`
+		api := &fakeRoutingAPI{
+			heads:  map[string]string{"memory/adaptive-routing/triage": "head2b"},
+			files:  map[string]string{"head2b:state.json": stateJSON},
+			latest: 100,
+		}
+		at := time.Date(2026, 11, 24, 10, 0, 0, 0, time.UTC)
+		require.NoError(t, runRoutingReset(context.Background(), api, "triage", at))
+		require.Len(t, api.commits, 1)
+
+		raw := decodeRaw(t, api.commits[0].content)
+		assert.Equal(t, map[string]any{"102": "9102"}, raw["unresolved_run_ids"])
+		assert.NotContains(t, raw, "unresolved_lookup_cursor")
+	})
+}
+
+func TestRoutingStatusSurfacesReconciliationCoverage(t *testing.T) {
+	stateJSON := `{"v":2,"workflow":"triage","seq":1,"generation":{"hash":"9f2c41d0","since_run":1},"reset_after_run":0,"last_run":105,"reconciled_through":105,"unresolved_runs":[102],"unexplained":0,"scopes":{},"updated":{"run":"9105","at":"2026-11-24T10:00:00Z"}}`
+	api := &fakeRoutingAPI{
+		heads: map[string]string{"memory/adaptive-routing/triage": "head3"},
+		files: map[string]string{"head3:state.json": stateJSON},
+	}
+	var out bytes.Buffer
+	require.NoError(t, runRoutingStatus(context.Background(), api, "triage", &out, true))
+	var status RoutingStatus
+	require.NoError(t, json.Unmarshal(out.Bytes(), &status))
+	require.NotNil(t, status.ReconciledThrough)
+	assert.Equal(t, int64(105), *status.ReconciledThrough)
+	require.NotNil(t, status.UnresolvedRuns)
+	assert.Equal(t, []int64{102}, *status.UnresolvedRuns)
+
+	var text bytes.Buffer
+	require.NoError(t, printRoutingStatus(&text, status))
+	assert.Contains(t, text.String(), "Reconciled:  through run 105 (1 unresolved)")
+}

@@ -3,44 +3,21 @@ package workqueue
 import (
 	"bytes"
 	"crypto/sha256"
-	"embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"reflect"
-	"sort"
+	"slices"
 	"strconv"
-	"sync"
-	"unicode"
 	"unicode/utf8"
-
-	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-//go:embed schema/*.json
-var schemas embed.FS
-
-const maxParseBytes = 80 << 20
-const maxLineBytes = 8 << 20
-
-var commitSchema = sync.OnceValues(func() (*jsonschema.Schema, error) {
-	data, err := schemas.ReadFile("schema/QueueCommit.json")
-	if err != nil {
-		return nil, err
-	}
-	var resource any
-	if err := json.Unmarshal(data, &resource); err != nil {
-		return nil, err
-	}
-	compiler := jsonschema.NewCompiler()
-	if err := compiler.AddResource("QueueCommit.json", resource); err != nil {
-		return nil, err
-	}
-	return compiler.Compile("QueueCommit.json")
-})
+// maxSafeInteger is the largest integer the canonical profile admits (2^53-1).
+const maxSafeInteger int64 = 9007199254740991
 
 // ProtocolError preserves a stable rejection code without requiring message matching.
 type ProtocolError struct {
@@ -54,6 +31,15 @@ func (e *ProtocolError) Error() string {
 
 func queueError(code, message string, args ...any) error {
 	return &ProtocolError{Code: code, Message: fmt.Sprintf(message, args...)}
+}
+
+// ErrorCode returns the protocol code of err, or "" when err is not a ProtocolError.
+func ErrorCode(err error) string {
+	var protocol *ProtocolError
+	if errors.As(err, &protocol) {
+		return protocol.Code
+	}
+	return ""
 }
 
 func readValue(decoder *json.Decoder, depth int) (any, error) {
@@ -89,7 +75,7 @@ func readValue(decoder *json.Decoder, depth int) (any, error) {
 		return nil, errors.New("unexpected JSON delimiter")
 	case json.Number:
 		n, err := strconv.ParseInt(string(value), 10, 64)
-		if err != nil || n < -MaxTimestamp || n > MaxTimestamp || strconv.FormatInt(n, 10) != string(value) {
+		if err != nil || n < -maxSafeInteger || n > maxSafeInteger || strconv.FormatInt(n, 10) != string(value) {
 			return nil, queueError("noncanonical_number", "use safe integer numbers or canonical decimal strings")
 		}
 		return value, nil
@@ -124,6 +110,7 @@ func readObject(decoder *json.Decoder, depth int) (any, error) {
 	return result, nil
 }
 
+// decodeStrict parses one JSON value under the integer-only, duplicate-free profile.
 func decodeStrict(data []byte) (any, error) {
 	if !utf8.Valid(data) {
 		return nil, queueError("invalid_utf8", "JSON must be valid UTF-8")
@@ -174,19 +161,13 @@ func decodeStrict(data []byte) (any, error) {
 func writeCanonical(buffer *bytes.Buffer, value any) error {
 	switch value := value.(type) {
 	case map[string]any:
-		keys := make([]string, 0, len(value))
-		for key := range value {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(value))
 		buffer.WriteByte('{')
 		for i, key := range keys {
 			if i > 0 {
 				buffer.WriteByte(',')
 			}
-			if err := writeCanonical(buffer, key); err != nil {
-				return err
-			}
+			writeCanonicalString(buffer, key)
 			buffer.WriteByte(':')
 			if err := writeCanonical(buffer, value[key]); err != nil {
 				return err
@@ -247,17 +228,51 @@ func writeCanonicalString(buffer *bytes.Buffer, value string) {
 	buffer.WriteByte('"')
 }
 
+func canonicalGeneric(value any) ([]byte, error) {
+	var buffer bytes.Buffer
+	if err := writeCanonical(&buffer, value); err != nil {
+		return nil, err
+	}
+	return buffer.Bytes(), nil
+}
+
+// canonicalStringObject is the canonical encoding of an object whose members are all strings.
+func canonicalStringObject(members map[string]string) string {
+	var buffer bytes.Buffer
+	buffer.WriteByte('{')
+	for i, key := range slices.Sorted(maps.Keys(members)) {
+		if i > 0 {
+			buffer.WriteByte(',')
+		}
+		writeCanonicalString(&buffer, key)
+		buffer.WriteByte(':')
+		writeCanonicalString(&buffer, members[key])
+	}
+	buffer.WriteByte('}')
+	return buffer.String()
+}
+
+// canonicalStringArray is the canonical encoding of an array of strings.
+func canonicalStringArray(values ...string) string {
+	var buffer bytes.Buffer
+	buffer.WriteByte('[')
+	for i, value := range values {
+		if i > 0 {
+			buffer.WriteByte(',')
+		}
+		writeCanonicalString(&buffer, value)
+	}
+	buffer.WriteByte(']')
+	return buffer.String()
+}
+
 // Canonical uses the contract's integer-only JSON profile and UTF-8 key order.
 func Canonical(data []byte) ([]byte, error) {
 	value, err := decodeStrict(data)
 	if err != nil {
 		return nil, err
 	}
-	var buffer bytes.Buffer
-	if err := writeCanonical(&buffer, value); err != nil {
-		return nil, err
-	}
-	return buffer.Bytes(), nil
+	return canonicalGeneric(value)
 }
 
 // CanonicalValue encodes typed JSON without repairing strings or losing numeric values.
@@ -272,19 +287,25 @@ func CanonicalValue(value any) ([]byte, error) {
 	return Canonical(data)
 }
 
-func validateTypedValue(value reflect.Value, depth int) error {
+// unwrapTypedValue follows interfaces and pointers; ok is false for nil or invalid values.
+func unwrapTypedValue(value reflect.Value) (reflect.Value, bool, error) {
 	for wrappers := 0; value.IsValid() &&
 		(value.Kind() == reflect.Interface || value.Kind() == reflect.Pointer); wrappers++ {
 		if value.IsNil() {
-			return nil
+			return value, false, nil
 		}
 		if wrappers > 64 {
-			return queueError("resource_limit", "cyclic or excessive typed JSON indirection")
+			return value, false, queueError("resource_limit", "cyclic or excessive typed JSON indirection")
 		}
 		value = value.Elem()
 	}
-	if !value.IsValid() {
-		return nil
+	return value, value.IsValid(), nil
+}
+
+func validateTypedValue(value reflect.Value, depth int) error {
+	value, ok, err := unwrapTypedValue(value)
+	if err != nil || !ok {
+		return err
 	}
 	if depth > 64 {
 		return queueError("resource_limit", "typed JSON nesting exceeds 64")
@@ -296,7 +317,7 @@ func validateTypedValue(value reflect.Value, depth int) error {
 		}
 	case reflect.Float32, reflect.Float64:
 		number := value.Float()
-		if math.IsNaN(number) || math.IsInf(number, 0) || math.Abs(number) > float64(MaxTimestamp) ||
+		if math.IsNaN(number) || math.IsInf(number, 0) || math.Abs(number) > float64(maxSafeInteger) ||
 			number != math.Trunc(number) || number == 0 && math.Signbit(number) {
 			return queueError("noncanonical_number", "typed numbers must be finite safe integers without negative zero")
 		}
@@ -323,25 +344,26 @@ func validateTypedValue(value reflect.Value, depth int) error {
 			}
 		}
 	case reflect.Struct:
-		return validateTypedFields(value, depth)
+		for index := range value.NumField() {
+			field := value.Type().Field(index)
+			if field.PkgPath != "" || field.Tag.Get("json") == "-" {
+				continue
+			}
+			if err := validateTypedValue(value.Field(index), depth+1); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
 
-func validateTypedFields(value reflect.Value, depth int) error {
-	for index := range value.NumField() {
-		field := value.Type().Field(index)
-		if field.PkgPath != "" || field.Tag.Get("json") == "-" {
-			continue
-		}
-		if err := validateTypedValue(value.Field(index), depth+1); err != nil {
-			return err
-		}
+// genericValue converts typed JSON into the strict generic representation.
+func genericValue(value any) (any, error) {
+	data, err := CanonicalValue(value)
+	if err != nil {
+		return nil, err
 	}
-	return nil
-}
-func canonicalValue(value any) ([]byte, error) {
-	return CanonicalValue(value)
+	return decodeStrict(data)
 }
 
 func hashBytes(data []byte) string {
@@ -349,262 +371,20 @@ func hashBytes(data []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func NodeID(graphID, nodeKey string) string {
-	data, _ := canonicalValue(map[string]string{"graph_id": graphID, "node_key": nodeKey})
-	return hashBytes(data)
+func sha256Text(text string) string {
+	return hashBytes([]byte(text))
 }
 
+// NodeID binds a Work identity to its graph and node key.
+func NodeID(graphID, nodeKey string) string {
+	return sha256Text(canonicalStringObject(map[string]string{"graph_id": graphID, "node_key": nodeKey}))
+}
+
+// IndependentGraphID derives a graph identity from a canonical payload.
 func IndependentGraphID(payload []byte) (string, error) {
 	data, err := Canonical(payload)
 	if err != nil {
 		return "", err
 	}
 	return hashBytes(data), nil
-}
-
-func Fingerprint(actor Actor, kind string, parameters json.RawMessage) (string, error) {
-	if kind == "finish" {
-		var fields map[string]json.RawMessage
-		if err := json.Unmarshal(parameters, &fields); err != nil {
-			return "", err
-		}
-		if string(fields["keep_open"]) == "false" {
-			delete(fields, "keep_open")
-			normalized, err := json.Marshal(fields)
-			if err != nil {
-				return "", err
-			}
-			parameters = normalized
-		}
-	}
-	data, err := canonicalValue(map[string]any{"actor": actor, "kind": kind, "parameters": parameters})
-	if err != nil {
-		return "", err
-	}
-	return hashBytes(data), nil
-}
-
-func NewRequest(id, kind string, actor Actor, parameters any) (Request, error) {
-	data, err := canonicalValue(parameters)
-	if err != nil {
-		return Request{}, err
-	}
-	fingerprint, err := Fingerprint(actor, kind, data)
-	return Request{ID: id, Kind: kind, Parameters: data, Fingerprint: fingerprint}, err
-}
-
-func Op(value any) (Operation, error) {
-	data, err := canonicalValue(value)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func appendOperation(operations *[]Operation, value any) error {
-	operation, err := Op(value)
-	if err != nil {
-		return err
-	}
-	*operations = append(*operations, operation)
-	return nil
-}
-
-func operationKind(op Operation) (string, error) {
-	var value struct {
-		Kind string `json:"kind"`
-	}
-	if err := json.Unmarshal(op, &value); err != nil {
-		return "", err
-	}
-	return value.Kind, nil
-}
-
-func singleOperation(operations []Operation) (Operation, bool) {
-	if len(operations) != 1 {
-		return nil, false
-	}
-	for _, operation := range operations {
-		return operation, true
-	}
-	return nil, false
-}
-
-func ValidateCommit(commit QueueCommit) error {
-	data, err := canonicalValue(commit)
-	if err != nil {
-		return err
-	}
-	if len(data) > maxLineBytes {
-		return queueError("resource_limit", "commit exceeds parser bound")
-	}
-	schema, err := commitSchema()
-	if err != nil {
-		return err
-	}
-	// The schema library consumes float64 for safe numbers, while canonical
-	// validation has already checked their exact representability.
-	var schemaValue any
-	if err := json.Unmarshal(data, &schemaValue); err != nil {
-		return err
-	}
-	if err := schema.Validate(schemaValue); err != nil {
-		return queueError("unsupported_protocol", "invalid version-3 QueueCommit: %v", err)
-	}
-	if err := validateContractIdentityBytes("QueueCommit", schemaValue); err != nil {
-		return err
-	}
-	if err := validateActorOrigin(commit.Actor); err != nil {
-		return err
-	}
-	fingerprint, err := Fingerprint(commit.Actor, commit.Request.Kind, commit.Request.Parameters)
-	if err != nil {
-		return err
-	}
-	if fingerprint != commit.Request.Fingerprint {
-		return queueError("request_fingerprint", "request %s does not bind actor and intent", commit.Request.ID)
-	}
-	return nil
-}
-
-func Parse(data []byte) ([]QueueCommit, error) {
-	if len(data) > maxParseBytes {
-		return nil, queueError("resource_limit", "ledger exceeds 80 MiB parser bound")
-	}
-	if len(data) == 0 || !bytes.HasSuffix(data, []byte{'\n'}) {
-		return nil, queueError("ledger_invalid", "queue log must be nonempty and newline terminated")
-	}
-	result := []QueueCommit{}
-	for index, line := range bytes.Split(data[:len(data)-1], []byte{'\n'}) {
-		if len(line) == 0 || len(line) > maxLineBytes {
-			return nil, queueError("ledger_invalid", "invalid line %d size", index+1)
-		}
-		value, err := decodeStrict(line)
-		if err != nil {
-			return nil, queueError("ledger_invalid", "line %d: %v", index+1, err)
-		}
-		var canonical bytes.Buffer
-		if err := writeCanonical(&canonical, value); err != nil {
-			return nil, err
-		}
-		schema, err := commitSchema()
-		if err != nil {
-			return nil, err
-		}
-		var raw any
-		if err := json.Unmarshal(canonical.Bytes(), &raw); err != nil {
-			return nil, err
-		}
-		if err := schema.Validate(raw); err != nil {
-			return nil, queueError("unsupported_protocol", "line %d: invalid version-3 QueueCommit: %v", index+1, err)
-		}
-		var commit QueueCommit
-		decoder := json.NewDecoder(bytes.NewReader(canonical.Bytes()))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&commit); err != nil {
-			return nil, queueError("unsupported_protocol", "line %d: %v", index+1, err)
-		}
-		if err := ValidateCommit(commit); err != nil {
-			return nil, fmt.Errorf("%w (line %d)", err, index+1)
-		}
-		result = append(result, commit)
-	}
-	return result, nil
-}
-
-func causalOrder(commits []QueueCommit) ([]QueueCommit, error) {
-	if len(commits) == 0 {
-		return nil, queueError("policy_missing", "existing queue has no policy genesis")
-	}
-	byID := map[string]QueueCommit{}
-	successor := map[string]string{}
-	genesis := ""
-	for _, commit := range commits {
-		if err := ValidateCommit(commit); err != nil {
-			return nil, err
-		}
-		if existing, ok := byID[commit.ID]; ok {
-			a, _ := canonicalValue(existing)
-			b, _ := canonicalValue(commit)
-			if !bytes.Equal(a, b) {
-				return nil, queueError("ledger_invalid", "conflicting commit %s", commit.ID)
-			}
-			continue
-		}
-		byID[commit.ID] = commit
-		if commit.Previous == nil {
-			if genesis != "" {
-				return nil, queueError("ledger_invalid", "multiple genesis commits")
-			}
-			genesis = commit.ID
-		} else {
-			if _, ok := successor[*commit.Previous]; ok {
-				return nil, queueError("ledger_invalid", "fork after %s", *commit.Previous)
-			}
-			successor[*commit.Previous] = commit.ID
-		}
-	}
-	if genesis == "" {
-		return nil, queueError("ledger_invalid", "missing genesis")
-	}
-	result := make([]QueueCommit, 0, len(byID))
-	for id := genesis; id != ""; id = successor[id] {
-		if len(result) >= len(byID) {
-			return nil, queueError("ledger_invalid", "causal cycle")
-		}
-		commit, ok := byID[id]
-		if !ok {
-			return nil, queueError("ledger_invalid", "missing predecessor")
-		}
-		result = append(result, commit)
-	}
-	if len(result) != len(byID) {
-		return nil, queueError("ledger_invalid", "disconnected chain, missing predecessor or cycle")
-	}
-	return result, nil
-}
-
-func Serialize(commits []QueueCommit) ([]byte, error) {
-	ordered, err := causalOrder(commits)
-	if err != nil {
-		return nil, err
-	}
-	var result bytes.Buffer
-	for _, commit := range ordered {
-		data, err := canonicalValue(commit)
-		if err != nil {
-			return nil, err
-		}
-		result.Write(data)
-		result.WriteByte('\n')
-	}
-	return result.Bytes(), nil
-}
-
-func Compact(commits []QueueCommit) ([]QueueCommit, error) {
-	if _, err := Replay(commits); err != nil {
-		return nil, err
-	}
-	return causalOrder(commits)
-}
-
-func sameJSON(a, b any) bool {
-	left, err := canonicalValue(a)
-	if err != nil {
-		return false
-	}
-	right, err := canonicalValue(b)
-	return err == nil && bytes.Equal(left, right)
-}
-
-func validKey(key string) bool {
-	if !utf8.ValidString(key) || len(key) > 128 {
-		return false
-	}
-	for _, char := range key {
-		if unicode.IsControl(char) {
-			return false
-		}
-	}
-	return true
 }

@@ -23,6 +23,45 @@ func TestAuditCommandDescriptionsAreConsistent(t *testing.T) {
 	assert.Contains(t, cmd.Long, "remaining runs are compared against it", "audit help should document multi-run analysis mode")
 }
 
+func TestCLIHelpClarifiesToolsAndFilters(t *testing.T) {
+	t.Parallel()
+
+	assert.Contains(t, NewMCPServerCommand().Long, "  - audit-diff  - Compare workflow runs")
+	assert.Contains(t, NewCompletionCommand().Long, "Engine name completion for --engine flag ("+engineFlagHelpList+")")
+	assert.Contains(t, NewLogsCommand().Flags().Lookup("dry-run").Usage, "does not preview this command")
+	assert.Contains(t, NewDeployCommand(validateEngineStub).Long, "hidden --pr alias")
+	assert.Contains(t, NewEditCommand().Long, "typed bindings")
+
+	for _, cmd := range []*cobra.Command{NewLogsCommand(), NewForecastCommand(), NewTrialCommand(validateEngineStub)} {
+		assert.Contains(t, cmd.UsageString(), "--timeout minutes|duration")
+	}
+}
+
+func TestCLIValueAndExperimentsDocsOptions(t *testing.T) {
+	t.Parallel()
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	content, err := os.ReadFile(filepath.Join(filepath.Dir(currentFile), "..", "..", "docs", "src", "content", "docs", "setup", "cli.md"))
+	require.NoError(t, err)
+	text := string(content)
+	for _, section := range []struct {
+		start string
+		end   string
+		flags []string
+	}{
+		{"#### `value`", "#### `graders`", []string{"--start", "--end", "--daily", "--ref", "--timeout", "--recipe", "--evidence", "--value-function", "--logs-dir", "--repo/-r", "--json/-j"}},
+		{"#### `experiments`", "#### `routing`", []string{"--adoption", "--repo/-r", "--json/-j"}},
+	} {
+		start := strings.Index(text, section.start)
+		require.NotEqual(t, -1, start)
+		end := strings.Index(text[start:], section.end)
+		require.NotEqual(t, -1, end)
+		for _, flag := range section.flags {
+			assert.Contains(t, text[start:start+end], "`"+flag+"`", section.start)
+		}
+	}
+}
+
 func TestCLICommandPathUsesExtensionPrefixWhenAttached(t *testing.T) {
 	root := &cobra.Command{Use: "gh aw"}
 	cmd := &cobra.Command{Use: "work-queue"}
@@ -126,9 +165,33 @@ func TestCLIDocsDocumentTimeoutFlagFormats(t *testing.T) {
 	assert.Contains(t, text, "| `health` | Go duration | `2m` | `--timeout 5m` | Disables its collection deadline |")
 	assert.Contains(t, text, "| `connector test` | Go duration greater than zero and at most `20s` | `20s` | `--timeout 10s` | Rejected |")
 	assert.Contains(t, text, "| `logs episode` | Go duration | `5m` | `--timeout 10m` | Rejected |")
-	assert.Contains(t, text, "| `logs`, `forecast` | Integer minutes | `0` | `--timeout 5` | No timeout |")
-	assert.Contains(t, text, "| `trial` | Integer minutes | `30` | `--timeout 10` | No timeout |")
+	assert.Contains(t, text, "| `logs`, `forecast` | Integer minutes or whole-minute duration | `0` | `--timeout 5` or `--timeout 5m` | No timeout |")
+	assert.Contains(t, text, "| `trial` | Integer minutes or whole-minute duration | `30` | `--timeout 10` or `--timeout 10m` | No timeout |")
 	assert.Equal(t, 2, strings.Count(text, "`--repos`, `--interactive/-i`, `--dry-run`"))
+}
+
+func TestEditAndUpgradeHelpScope(t *testing.T) {
+	t.Parallel()
+	assert.Contains(t, NewEditCommand().Long, "gh aw update --no-merge to replace them with the upstream version")
+	assert.Contains(t, NewUpgradeCommand(validateEngineStub).Long, "all Markdown files in the workflow directory (default .github/workflows)")
+}
+
+func TestCLIDocsDocumentLogsEpisodeDeliveryOptions(t *testing.T) {
+	t.Parallel()
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	content, err := os.ReadFile(filepath.Join(filepath.Dir(currentFile), "..", "..", "docs", "src", "content", "docs", "setup", "cli.md"))
+	require.NoError(t, err)
+	text := string(content)
+	start := strings.Index(text, "##### `logs episode <run-id-or-url>`")
+	require.NotEqual(t, -1, start)
+	end := strings.Index(text[start:], "\n#### ")
+	require.NotEqual(t, -1, end)
+	section := text[start : start+end]
+	assert.Contains(t, section, "| `--delivery` |")
+	assert.Contains(t, section, "| `--adoption` |")
+	assert.Contains(t, section, "| `--adoption-dir` |")
+	assert.Contains(t, section, "Requires `--adoption`")
 }
 
 func TestCLIDocsDocumentCommandSideEffectsAndDefaults(t *testing.T) {

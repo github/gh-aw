@@ -9,6 +9,7 @@ import { loadTools, attachHandlers, registerPredefinedTools, registerDynamicTool
 import { createServer, registerTool } from "./mcp_server_core.cjs";
 import { validateValueAgainstSchema } from "./schema-validation.cjs";
 import generateSafeOutputsTools from "./generate_safe_outputs_tools.cjs";
+import { summarizeHelpText } from "./mcp_cli_schema_docs.cjs";
 
 const scriptPath = path.join(__dirname, "generate_safe_outputs_tools.cjs");
 const { main: generateTools } = generateSafeOutputsTools;
@@ -200,13 +201,7 @@ describe("generate_safe_outputs_tools", () => {
     runScript();
     const tools = JSON.parse(fs.readFileSync(outputPath, "utf8"));
     const assignment = count => ({
-      version: 3,
       dispatch_id: "dispatch",
-      request_id: "request",
-      commit_id: "commit",
-      policy_epoch: "policy",
-      pool: "pool",
-      worker_profile: "worker",
       claims: Array.from({ length: count }, (_, index) => ({ handle: `h${index + 1}`, claim_id: `c${index + 1}`, work_id: `w${index + 1}`, work: {}, result_refs: [] })),
     });
     expect(tools.map(tool => tool.name)).toEqual(["create_issue", "custom_job"]);
@@ -220,17 +215,14 @@ describe("generate_safe_outputs_tools", () => {
       for (const claim_handle of ["", " ", "\t", null]) {
         const normalized = normalizeSafeOutputToolArguments(tool.name, { claim_handle }, undefined, tool.inputSchema);
         expect(normalized).toHaveProperty("claim_handle", claim_handle);
-        for (const count of [1, 2]) {
-          expect(() => normalizeClaimScope(normalized, assignment(count))).toThrow();
-        }
+        expect(() => normalizeClaimScope(normalized, assignment(1))).toThrow();
       }
       const selected = normalizeSafeOutputToolArguments(tool.name, { claim_handle: "h1" }, undefined, tool.inputSchema);
-      for (const count of [1, 2]) {
-        expect(normalizeClaimScope(selected, assignment(count)).claim_handle).toBe("h1");
-      }
+      expect(normalizeClaimScope(selected, assignment(1)).claim_handle).toBe("h1");
+      expect(() => normalizeClaimScope(normalizeSafeOutputToolArguments(tool.name, { claim_handle: "h2" }, undefined, tool.inputSchema), assignment(1))).toThrow(/foreign/);
       const omitted = normalizeSafeOutputToolArguments(tool.name, {}, undefined, tool.inputSchema);
       expect(normalizeClaimScope(omitted, assignment(1)).claim_handle).toBe("h1");
-      expect(() => normalizeClaimScope(omitted, assignment(2))).toThrow(/original multi-Claim/);
+      expect(() => normalizeClaimScope(omitted, assignment(2))).toThrow(/exactly one open Claim/);
     }
     const custom = tools.find(tool => tool.name === "custom_job");
     expect(normalizeSafeOutputToolArguments(custom.name, { count: "", claim_handle: "h1" }, undefined, custom.inputSchema)).toEqual({ claim_handle: "h1" });
@@ -297,6 +289,16 @@ describe("generate_safe_outputs_tools", () => {
     expect(mixed.map((/** @type {{name: string}} */ tool) => tool.name)).toEqual(["ledger_append", builtin.name]);
     expect(mixed[0].inputSchema.properties.ledger.enum).toEqual(["events"]);
     expect(mixed[0].inputSchema.required).toContain("ledger");
+  });
+
+  it("keeps the ledger_append object-vs-string warning visible in the truncated CLI help description", () => {
+    const readLedgerAppend = (/** @type {string} */ file) => JSON.parse(fs.readFileSync(file, "utf8")).find((/** @type {{name: string}} */ tool) => tool.name === "ledger_append");
+    const tool = readLedgerAppend(path.join(__dirname, "safe_outputs_tools.json"));
+    // `safeoutputs <tool> --help` shows only the first 90 characters of "[safeoutputs] <description>",
+    // so agents never see later guidance; they sent `value` as a JSON-encoded string and had to retry.
+    const helpDescription = summarizeHelpText(`[safeoutputs] ${tool.description}`, 90);
+    expect(helpDescription).toContain("never as JSON-encoded strings");
+    expect(readLedgerAppend(path.join(__dirname, "..", "..", "..", "pkg", "workflow", "js", "safe_outputs_tools.json"))).toEqual(tool);
   });
 
   it.each(["", undefined])("advertises the required custom record envelope for ledger type %s", type => {

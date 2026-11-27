@@ -149,13 +149,7 @@ describe("custom safe-output issue API", () => {
     const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
     const render = vi.spyOn(require("./report_ast.cjs"), "renderReport");
     const assignment = {
-      version: 3,
       dispatch_id: "dispatch",
-      request_id: "request",
-      commit_id: "commit",
-      policy_epoch: "policy",
-      pool: "default",
-      worker_profile: "default",
       claims: [{ handle: "claim", work_id: "work-id", claim_id: "claim-id", work: {}, result_refs: [] }],
     };
     await withClaimExecution({ assignment, claim_handle: "claim" }, async () => {

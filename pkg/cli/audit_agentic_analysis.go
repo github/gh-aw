@@ -246,7 +246,7 @@ func detectTaskDomain(processedRun ProcessedRun, createdItems []CreatedItemRepor
 		return &TaskDomainInfo{Name: "release_ops", Label: "Release / Ops", Reason: "Workflow metadata matches release or operational automation."}
 	case containsAny(combined, "research", "investigat", "analysis", "analy", "report", "audit"):
 		return &TaskDomainInfo{Name: "research", Label: "Research", Reason: "Workflow naming and instructions suggest exploratory analysis or reporting."}
-	case containsAny(combined, "triage", "label", "classif", "route") || containsAny(createdJoined, "add_labels", "remove_labels", "set_issue_type"):
+	case containsAny(combined, "triage", "label", "classif", "route") || containsAny(createdJoined, "add_labels", "remove_labels", "set_issue_type", "set_issue_status"):
 		return &TaskDomainInfo{Name: "triage", Label: "Triage", Reason: "The run focused on classification, routing, or issue state updates."}
 	case containsAny(combined, "fix", "patch", "repair", "refactor", "swe", "code", "review") || containsAny(createdJoined, "create_pull_request_review_comment", "submit_pull_request_review"):
 		return &TaskDomainInfo{Name: "code_fix", Label: "Code Fix", Reason: "The workflow appears oriented toward code changes or pull request review."}

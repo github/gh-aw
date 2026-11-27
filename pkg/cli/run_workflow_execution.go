@@ -47,7 +47,6 @@ type RunOptions struct {
 	RepeatCount       int      // Number of times to repeat (0 = run once)
 	Inputs            []string // Workflow inputs in key=value format
 	JSON              bool     // Output results in JSON format
-	ExpectedRevision  string   // Require the returned native run to match this verified SHA without latest-run fallback.
 }
 
 // WorkflowRunResult contains the result of a single workflow run trigger for JSON output
@@ -408,7 +407,12 @@ func executeWorkflowRun(ctx context.Context, lockFileName string, args []string,
 	}
 	stdout, err := workflow.ExecGHContext(ctx, args...).Output()
 	if err != nil {
-		return nil, formatWorkflowRunError(err)
+		var stderr []byte
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			stderr = exitError.Stderr
+		}
+		return nil, formatWorkflowRunError(err, stderr)
 	}
 	output := strings.TrimSpace(string(stdout))
 	if output != "" {
@@ -417,28 +421,17 @@ func executeWorkflowRun(ctx context.Context, lockFileName string, args []string,
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Triggered workflow: "+lockFileName))
 	executionLog.Printf("Workflow triggered successfully: %s", lockFileName)
 	runInfo, runErr := resolveWorkflowRunInfo(lockFileName, output, opts)
-	if opts.ExpectedRevision != "" {
-		if runErr != nil {
-			return nil, fmt.Errorf("workflow activation was accepted but its run identity is unresolved; do not redispatch: %w", runErr)
-		}
-		if err := verifyExpectedWorkflowRun(ctx, lockFileName, runInfo, opts); err != nil {
-			return nil, fmt.Errorf("workflow activation was accepted but run verification failed; do not redispatch: %w", err)
-		}
-	}
 	return &workflowRunExecutionResult{
 		runInfo:    runInfo,
 		runInfoErr: runErr,
 	}, nil
 }
 
-func formatWorkflowRunError(err error) error {
-	var stderrOutput string
-	var exitError *exec.ExitError
-	if errors.As(err, &exitError) {
-		stderrOutput = string(exitError.Stderr)
-		fmt.Fprintf(os.Stderr, "%s", exitError.Stderr)
-	}
-	errorMsg := err.Error() + " " + stderrOutput
+// formatWorkflowRunError echoes gh's stderr and wraps err with a remediation hint
+// recognized from err and that stderr.
+func formatWorkflowRunError(err error, stderr []byte) error {
+	fmt.Fprintf(os.Stderr, "%s", stderr)
+	errorMsg := err.Error() + " " + string(stderr)
 	if isRunningInCodespace() && is403PermissionError(errorMsg) {
 		fmt.Fprint(os.Stderr, getCodespacePermissionErrorMessage())
 		return errors.New("failed to run workflow on GitHub Actions: permission denied (403)")
@@ -457,9 +450,6 @@ func resolveWorkflowRunInfo(lockFileName, output string, opts RunOptions) (*Work
 	if parsedRunInfo := parseRunInfoFromOutput(output); parsedRunInfo != nil {
 		executionLog.Printf("Parsed run info from gh output: id=%d, url=%s", parsedRunInfo.DatabaseID, parsedRunInfo.URL)
 		return parsedRunInfo, nil
-	}
-	if opts.ExpectedRevision != "" {
-		return nil, errors.New("GitHub CLI did not return the activated run URL; refusing to select the latest workflow run")
 	}
 	return getLatestWorkflowRunWithRetry(lockFileName, opts.RepoOverride, opts.Verbose)
 }
@@ -481,14 +471,8 @@ func waitForWorkflowRunCompletion(ctx context.Context, opts RunOptions, runInfo 
 		return nil
 	}
 	if runErr != nil {
-		if opts.ExpectedRevision != "" {
-			return runErr
-		}
 		printWorkflowRunInfoWarning(opts, runErr)
 		return nil
-	}
-	if opts.ExpectedRevision != "" && (opts.RepoOverride == "" || runInfo == nil || runInfo.DatabaseID <= 0) {
-		return errors.New("cannot wait without an exact verified dispatcher run identity and repository")
 	}
 	targetRepo := resolveWorkflowTargetRepo(opts)
 	if targetRepo == "" || runInfo == nil {
@@ -497,9 +481,6 @@ func waitForWorkflowRunCompletion(ctx context.Context, opts RunOptions, runInfo 
 	printWorkflowWaitMessage(opts.AutoMergePRs)
 	runIDStr := strconv.FormatInt(runInfo.DatabaseID, 10)
 	if err := WaitForWorkflowCompletion(ctx, targetRepo, runIDStr, workflowCompletionWaitTimeoutMinutes, opts.Verbose); err != nil {
-		if opts.ExpectedRevision != "" {
-			return fmt.Errorf("dispatcher wait failed; inspect the accepted activation before redispatching: %w", err)
-		}
 		if ctx.Err() != nil || errors.Is(err, ErrInterrupted) {
 			return err
 		}

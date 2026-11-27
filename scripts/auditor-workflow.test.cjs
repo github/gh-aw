@@ -146,10 +146,11 @@ async function fixture(t, options = {}) {
           clock.time = new Date(Date.parse(clock.time) + (options.logElapsedMs || 0)).toISOString();
           used += options.logCost || 0;
           const id = Number(args[args.indexOf("--after-run-id") + 1]) + 1;
-          assert.equal(args[args.indexOf("--count") + 1], "1");
+          assert.equal(args[args.indexOf("--count") + 1], "2");
           const timeout = (options.logTimeouts || []).find(item => item.id === id && item.audit === args.includes("--audit"));
           if (timeout?.kind === "subprocess") throw timeoutError();
           const selected = runs.find(item => item.id === id);
+          assert.equal(args[args.indexOf("--end-date") + 1], new Date(Date.parse(selected.created_at) + 1000).toISOString());
           const report = {
             runs: [
               {
@@ -171,10 +172,10 @@ async function fixture(t, options = {}) {
               },
             ],
             ...(options.partial ? { continuation: { before_run_id: id } } : {}),
-            ...(timeout?.kind === "cli" ? { continuation: { message: "Timeout reached. Use these parameters to continue fetching more logs.", before_run_id: id } } : {}),
+            ...(timeout?.kind === "cli" ? { runs: [], partial: true, continuation: { message: "Timeout reached. Use these parameters to continue fetching more logs.", before_run_id: id + 1 } } : {}),
             ...(options.changedAttempt ? { runs: [{ run_id: id, run_attempt: "2" }] } : {}),
           };
-          if (args.includes("--audit")) {
+          if (args.includes("--audit") && report.runs.length) {
             const output = args[args.indexOf("--output") + 1];
             fs.mkdirSync(output, { recursive: true });
             const auditFile = path.join(output, "audit.json");
@@ -329,6 +330,9 @@ for (const [name, options] of [
     await assert.rejects(f.execute());
     assert.equal(f.outputs.has_new_failures, "false");
     assert.equal(fs.existsSync(path.join(f.cache, "checkpoint.json")), false);
+    if (options.changedAttempt) {
+      assert.equal(fs.existsSync(path.join(f.cache, "queries", `42-1-${now.replaceAll(":", "-")}`, "report.json")), false);
+    }
   });
 }
 
@@ -857,20 +861,22 @@ for (const kind of ["subprocess", "cli"]) {
   });
 }
 
-test("audit timeout leaves new failures pending without activating", async t => {
-  const options = { runs: [run(42)], logTimeouts: [{ id: 42, audit: true, kind: "subprocess" }] };
-  const f = await fixture(t, options);
-  await f.execute();
-  let state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
-  assert.deepEqual(state.seen, []);
-  assert.deepEqual(state.pending, [42]);
-  assert.equal(state.backlog.length, 1);
-  assert.equal(f.outputs.has_new_failures, "false");
-  assert.match(f.warnings.join("\n"), /Deferred audit of run 42/);
-  options.logTimeouts = [];
-  await f.execute();
-  assert.equal(f.outputs.has_new_failures, "true");
-});
+for (const kind of ["subprocess", "cli"]) {
+  test(`${kind} audit timeout leaves new failures pending without activating`, async t => {
+    const options = { runs: [run(42)], logTimeouts: [{ id: 42, audit: true, kind }] };
+    const f = await fixture(t, options);
+    await f.execute();
+    let state = JSON.parse(fs.readFileSync(path.join(f.cache, "checkpoint.json")));
+    assert.deepEqual(state.seen, []);
+    assert.deepEqual(state.pending, [42]);
+    assert.equal(state.backlog.length, 1);
+    assert.equal(f.outputs.has_new_failures, "false");
+    assert.match(f.warnings.join("\n"), /Deferred audit of run 42/);
+    options.logTimeouts = [];
+    await f.execute();
+    assert.equal(f.outputs.has_new_failures, "true");
+  });
+}
 
 test("health subprocess timeout uses the bounded retry path", async t => {
   const f = await fixture(t, { healthTimeout: true });

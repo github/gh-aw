@@ -120,6 +120,11 @@ function getRunFailureStatusText(agentConclusion, assignToAgentErrorCount, safeO
  * @param {Array<{type?: string, message?: unknown, reason?: unknown} | null>} items
  */
 function appendAgentReports(children, items) {
+  const maxReports = 50;
+  let reportCount = 0;
+  let omitted = false;
+  /** @type {import("./report_ast.cjs").ReportBlock[]} */
+  const reports = [];
   for (const item of items) {
     let summary;
     let text;
@@ -154,16 +159,23 @@ function appendAgentReports(children, items) {
         core.warning("Omitting an agent explanation flagged by credential screening");
         continue;
       }
-      // Unlike top-level status sections, headings nested in details start at level 3.
       const blocks = parseReportMarkdown(sanitizeContent(text), { agentTainted: true });
       if (!blocks.length) continue;
-      /** @type {import("./report_ast.cjs").ReportBlock} */
-      const details = { type: "details", summary, children: blocks, agentTainted: true };
-      // Validate with the wrapper in place so nested depth is checked before publication.
-      normalizeReport({ type: "report", title: "Workflow status", children: [details] });
-      children.push(details);
+      normalizeReport({ type: "report", title: "Workflow status", children: blocks });
+      if (reportCount === maxReports) {
+        omitted = true;
+        break;
+      }
+      reports.push({ type: "paragraph", children: [{ type: "strong", children: [{ type: "text", value: summary, agentTainted: false }], agentTainted: false }], agentTainted: false }, ...blocks);
+      reportCount++;
     } catch {
       core.warning("Omitting an invalid agent explanation from the completion comment");
+    }
+  }
+  if (reports.length) {
+    children.push({ type: "heading", level: 2, children: [{ type: "text", value: "Agent messages", agentTainted: false }], agentTainted: false }, ...reports);
+    if (omitted) {
+      children.push({ type: "paragraph", children: [{ type: "text", value: "Additional agent messages omitted.", agentTainted: false }], agentTainted: false });
     }
   }
 }
@@ -309,6 +321,14 @@ async function main() {
   // consume the following status sections or generated metadata.
   children.push(...detectionBlocks);
 
+  // The detector may accept a skipped run, so also require an explicit clean verdict.
+  if (!staged && process.env.GH_AW_DETECTION_ACCEPTED === "true" && detectionConclusion === "success" && agentOutputResult.success) {
+    appendAgentReports(
+      children,
+      agentOutputResult.items.filter(item => typeof item?.type === "string" && canPublishReport(item.type))
+    );
+  }
+
   // Preserve links (e.g. "Pull request created: #X") that safe outputs appended to the
   // activation comment; otherwise this final status update would overwrite them.
   if (activationCommentLinks) {
@@ -321,14 +341,6 @@ async function main() {
     } else if (noopMessages.length > 0) {
       core.warning("No categorized no-op comment body is available; omitting the no-op category from the public comment");
     }
-  }
-
-  // The detector may accept a skipped run, so also require an explicit clean verdict.
-  if (!staged && process.env.GH_AW_DETECTION_ACCEPTED === "true" && detectionConclusion === "success" && agentOutputResult.success) {
-    appendAgentReports(
-      children,
-      agentOutputResult.items.filter(item => typeof item?.type === "string" && canPublishReport(item.type))
-    );
   }
 
   // Collect generated asset URLs from safe output jobs

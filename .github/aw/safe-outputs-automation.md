@@ -4,6 +4,41 @@ description: Safe-output reference for workflow dispatch, code scanning, checks,
 
 # Safe Outputs: Automation and Orchestration
 
+Configure automation safe outputs using the [shared rules](safe-outputs.md#shared-rules)
+and [runtime controls](safe-outputs-runtime.md). Before configuring an operation,
+read its complete entry below for permissions, limits, authorization, and
+failure behavior. For native issue statuses, the mandatory contract is
+[Native issue statuses](#native-issue-statuses). Keep the agent read-only and
+never treat staged or failed outputs as applied effects.
+
+<!-- instruction-prefix-end -->
+
+## Native issue statuses
+
+Use `set-issue-status` with `allowed` status names or numeric IDs, `target`,
+`required-labels`, `required-title-prefix`, `target-repo`, `allowed-repos`, and
+`max` (default 5), following the issue-type target restrictions. The agent calls
+`set_issue_status` with `status`, optional `issue_number`, and optional `repo`.
+GitHub's issue-status preview must be available in the destination repository.
+
+`allow-close` and `allow-reopen` default to false and are independent of every
+other output's permissions. Closed categories are `completed`, `not_planned`,
+and `duplicate`; open categories are `backlog`, `planned`, and `started`.
+Changing a closed issue's close reason requires both permissions. Duplicate
+also requires a same-repository `duplicate_of` issue number. Verify the canonical
+duplicate through GraphQL; changing a duplicate target
+requires both lifecycle flags. Fail closed if relationship evidence is missing.
+Resolve statuses at runtime, re-read current issue state, skip an identical status, and fail
+closed for unavailable, ambiguous, or unknown statuses/categories. Never clear
+statuses or fall back to a state-only write. Staged mode performs no mutation.
+`update-issue.status` remains open/closed.
+
+For initial statuses use `create-issue.planning-status` and `allowed-statuses`;
+creation accepts only open categories. MCP issue reads and `status:` searches
+can expose status ID/name/category; preserve these fields and distinguish null
+or unavailable status from Backlog. See the
+[reference](https://github.github.com/gh-aw/reference/safe-outputs/#set-issue-status-set-issue-status).
+
 - `update-discussion:` - Update discussion title, body, or labels
 
   ```yaml
@@ -81,7 +116,7 @@ description: Safe-output reference for workflow dispatch, code scanning, checks,
       allowed-refs: ["release/*"]         # Optional: glob allowlist for agent-provided per-call ref overrides (default: caller's ref only)
   ```
 
-  Triggers other agentic workflows using workflow_dispatch. Agent output includes `workflow_name` (without .md extension) and optional `inputs` (key-value pairs). Cross-repo dispatch is supported via `target-repo` plus an `allowed-repos` allowlist; cross-repo targets require a token with `actions: write` on the target repository. For queue workers, load [work-queue.md](work-queue.md) and use `work_queue_dispatch_next` to request a bounded pool prefix. Trusted processing selects Work and the installed worker profile; do not select `work_id` through `dispatch_workflow` or declare reserved assignment/caller inputs.
+  Triggers other agentic workflows using workflow_dispatch. Agent output includes `workflow_name` (without .md extension) and optional `inputs` (key-value pairs). Cross-repo dispatch is supported via `target-repo` plus an `allowed-repos` allowlist; cross-repo targets require a token with `actions: write` on the target repository. For queue workers, load [work-queue.md](work-queue.md) and use `work_queue_dispatch_next` to request a bounded pool prefix. Trusted processing selects Work and the compiled worker profile; do not select `work_id` through `dispatch_workflow` or declare reserved assignment/caller inputs.
 - `dispatch-repository:` - Dispatch `repository_dispatch` events to external repositories
 
   ```yaml

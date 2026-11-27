@@ -1,5 +1,8 @@
 # ADR-68827: Route Trusted Work-Queue Dispatch Through the Controller and Build the Control Queue Client From the Publisher Token
 
+> [!NOTE]
+> Superseded by work queue protocol v4 ([specification](../src/content/docs/specs/work-queue-specification.md)): v4 removed revision pinning and principal proofs; dispatchers launch workers at the configured target ref and actors come from the job's own context.
+
 **Date**: 2026-10-14
 **Status**: Proposed (implemented in PR #68827; maintainer acceptance pending)
 **Decision owner**: @pelikhan, the PR author. Formal architecture approval is not implied by this record.

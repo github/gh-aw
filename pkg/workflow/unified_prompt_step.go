@@ -677,6 +677,9 @@ func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *Com
 	if safeOutputs.HideComment != nil {
 		tools = append(tools, toolWithMaxBudget("hide_comment", safeOutputs.HideComment.Max))
 	}
+	if safeOutputs.SetIssueStatus != nil {
+		tools = append(tools, toolWithMaxBudget("set_issue_status", safeOutputs.SetIssueStatus.Max))
+	}
 	if safeOutputs.SetIssueType != nil {
 		tools = append(tools, toolWithMaxBudget("set_issue_type", safeOutputs.SetIssueType.Max))
 	}
@@ -821,6 +824,12 @@ func buildSafeOutputsSections(safeOutputs *SafeOutputsConfig, commentMemory *Com
 	}
 	if commentMemory != nil {
 		sections = append(sections, PromptSection{Content: safeOutputsCommentMemoryFile, IsFile: true})
+	}
+	switch requestContinuationRoute(safeOutputs) {
+	case RequestContinuationRouteWorkqueue, RequestContinuationRouteIssue:
+		sections = append(sections, PromptSection{Content: safeOutputsContinuationQueueFile, IsFile: true})
+	case RequestContinuationRouteDispatch:
+		sections = append(sections, PromptSection{Content: safeOutputsContinuationDispatchFile, IsFile: true})
 	}
 	if safeOutputs.UploadAssets != nil {
 		sections = append(sections, PromptSection{

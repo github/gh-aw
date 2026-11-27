@@ -1,701 +1,284 @@
 // @ts-check
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { main, maintenance } from "./reconcile_work_queue_run.cjs";
 import { createRequire } from "node:module";
-import { reconcileQueue } from "./work_queue_reconciler.cjs";
-import { queueFixture, REF, REPOSITORY, WORKFLOW } from "./work_queue_lifecycle.test_helpers.cjs";
 
 const require = createRequire(import.meta.url);
+const h = require("./work_queue_test_helpers.cjs");
+const { applyCommit, buildCommit, checkpointCommit, newRequest, newState, replayTransactionLog, replayTransactions } = require("./work_queue_replay.cjs");
+const { main, maintenance } = require("./reconcile_work_queue_run.cjs");
 
-function setup(fixtureOptions = {}) {
-  const fixture = queueFixture({ bound: true, count: 2, ...fixtureOptions });
-  const nativeRun = fixture.nativeRun();
-  const publisher = structuredClone(nativeRun);
-  const jobs = [
-    { id: "201", run_id: "42", run_attempt: 1, name: "activation", status: "completed", conclusion: "success" },
-    { id: "202", run_id: "42", run_attempt: 1, name: "agent", status: "completed", conclusion: "success" },
-    { id: "203", run_id: "42", run_attempt: 1, name: "conclusion", status: "in_progress", conclusion: null },
-  ];
-  fixture.githubClient.rest.actions.getWorkflowRun = vi.fn().mockResolvedValue({ status: 200, data: publisher });
-  fixture.githubClient.rest.actions.getWorkflowRunAttempt = vi.fn().mockResolvedValue({ status: 200, data: nativeRun });
-  fixture.githubClient.rest.actions.listJobsForWorkflowRunAttempt = vi.fn().mockImplementation(async () => ({ status: 200, data: { jobs, total_count: jobs.length } }));
-  const options = {
-    context: { ...fixture.workerContext, job: "conclusion" },
-    githubClient: fixture.githubClient,
-    workflowRef: `${REPOSITORY}/${WORKFLOW}@${REF}`,
-    readWorkQueueLog: vi.fn(fixture.readWorkQueueLog),
-    publishWorkQueueRequest: vi.fn(fixture.publishWorkQueueRequest),
-    core: { info: vi.fn(), warning: vi.fn() },
-    jobNames: { activation: "activation", agent: "agent", conclusion: "conclusion" },
-    jobResults: { activation: { result: "success" }, agent: { result: "success" } },
-    sleepFn: vi.fn(async () => {}),
-    now: fixture.at,
-  };
-  return { fixture, nativeRun, publisher, jobs, options };
+const POLICY = {
+  version: 4,
+  pending_limit: 4096,
+  issues: false,
+  effect_scope: "owner/repo",
+  workers: ["worker"],
+  pools: { default: { concurrency: 16, per_account_limit: 0, max_attempts: 3 } },
+};
+
+function fakeCore() {
+  return { info: vi.fn(), warning: vi.fn(), setOutput: vi.fn(), setFailed: vi.fn() };
 }
 
-describe("inline trusted worker termination", () => {
-  it("prefixes invalid worker job context with a stable error code", async () => {
-    const { options } = setup();
-    options.jobNames = {};
+const saved = {};
+beforeEach(() => {
+  for (const key of ["GITHUB_WORKFLOW_REF", "GH_AW_WORK_QUEUE_ROLE", "GH_AW_SAFE_OUTPUTS_STAGED"]) saved[key] = process.env[key];
+  delete process.env.GH_AW_WORK_QUEUE_ROLE;
+  delete process.env.GH_AW_SAFE_OUTPUTS_STAGED;
+});
+afterEach(() => {
+  for (const [key, value] of Object.entries(saved)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
 
-    await expect(main(options)).rejects.toMatchObject({
-      message: "ERR_VALIDATION: work_queue_worker_job_context_invalid",
-      code: "work_queue_worker_job_context_invalid",
-      category: "ERR_WORK_QUEUE_RECONCILIATION",
-    });
+/** Ledger with one dispatched Work per key; returns the dispatch IDs in key order. */
+function dispatched(keys) {
+  const nodes = keys.map(key => h.work(key));
+  const planned = h.dispatchNext(h.submit([], nodes));
+  return { log: planned.log, nodes, dispatches: planned.decision.dispatches };
+}
+
+describe("worker termination", () => {
+  const workerContext = dispatchId => ({
+    repo: { owner: "owner", repo: "repo" },
+    eventName: "workflow_dispatch",
+    job: "conclusion",
+    runId: 200,
+    runAttempt: 1,
+    payload: { inputs: { work_queue_assignment: JSON.stringify({ version: 4, dispatch_id: dispatchId }) } },
   });
 
-  it.each(["success", "failure", "cancelled", "skipped"])("releases after predecessor jobs end with %s while the run is still active", async conclusion => {
-    const { fixture, jobs, nativeRun, options } = setup();
-    jobs[1].conclusion = conclusion;
-    options.jobResults.agent.result = conclusion;
-    const attempts = [...fixture.state.works.values()].map(work => work.attempts);
-    expect(await main(options)).toMatchObject({ released: true });
-    expect(nativeRun.status).toBe("in_progress");
-    expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(true);
-    expect([...fixture.state.claims.values()].every(claim => claim.state === "cancelled")).toBe(true);
-    expect([...fixture.state.works.values()].map(work => work.attempts)).toEqual(attempts);
-    expect([...fixture.state.works.values()].every(work => work.state === "available")).toBe(true);
-    const release = fixture.transactions.at(-1).operations.find(operation => operation.kind === "Release");
-    expect(release.evidence).toMatchObject({ kind: "worker_termination", source: "github_api", run_id: "42", run_attempt: 1 });
-    expect(release.evidence).not.toHaveProperty("status");
-    expect(release.evidence).not.toHaveProperty("conclusion");
-    const count = fixture.transactions.length;
-    await expect(main(options)).resolves.toMatchObject({ released: true });
-    expect(fixture.transactions).toHaveLength(count);
+  it("releases the run's own Dispatch while its Claim is open", async () => {
+    process.env.GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/worker.lock.yml@refs/heads/main";
+    const { log, nodes, dispatches } = dispatched(["a"]);
+    const fake = h.fakeQueueGitHub(h.ledgerText(h.bind(h.launch(log, dispatches[0]), dispatches[0], h.workerActor("200", 1))));
+    const result = await main({ githubClient: fake.githubClient, context: workerContext(dispatches[0]), core: fakeCore(), policy: POLICY });
+
+    expect(result).toEqual({ status: "released", dispatch_id: dispatches[0] });
+    const state = replayTransactionLog(fake.contents());
+    expect(state.dispatches.get(dispatches[0]).state).toBe("closed");
+    expect(state.works.get(nodes[0].work_id)).toMatchObject({ state: "available", attempts: 1 });
+    expect(state.transactions.at(-1)).toMatchObject({ actor: { role: "reconciler" }, request: { kind: "release", parameters: { reason: "worker_terminated" } } });
   });
 
-  it("preserves completed siblings and pending delivery without manufacturing Result", async () => {
-    const { fixture, options } = setup();
-    const handle = fixture.assignment.claims[0].handle;
-    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: handle });
-    await main(options);
-    expect(fixture.state.works.get(fixture.assignment.claims[0].work_id)).toMatchObject({ state: "completed", barrier: "pending" });
-    expect(fixture.transactions.flatMap(commit => commit.operations).some(operation => ["Result", "DeliveryFailure"].includes(operation.kind))).toBe(false);
+  it("leaves a Dispatch bound to another run untouched", async () => {
+    const { log, dispatches } = dispatched(["a"]);
+    const fake = h.fakeQueueGitHub(h.ledgerText(h.bind(h.launch(log, dispatches[0], true, h.dispatcher, "999"), dispatches[0], h.workerActor("999", 1))));
+    const before = fake.contents();
+    expect(await main({ githubClient: fake.githubClient, context: workerContext(dispatches[0]), core: fakeCore(), policy: POLICY })).toEqual({ status: "settled", dispatch_id: dispatches[0] });
+    expect(fake.contents()).toBe(before);
   });
 
-  it("recovers a socket failure in the final release authentication without replaying effects or creating Result", async () => {
-    const { fixture, options } = setup();
-    const member = fixture.assignment.claims[0];
-    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-    const get = options.githubClient.rest.repos.get;
-    const read = vi.fn(async parameters => {
-      if (read.mock.calls.length === 3) throw Object.assign(new Error("other side closed"), { cause: { cause: { code: "UND_ERR_SOCKET" } } });
-      return get(parameters);
-    });
-    options.githubClient.rest.repos.get = read;
-    await expect(main(options)).resolves.toMatchObject({ released: true });
-    expect(read).toHaveBeenCalledTimes(4);
-    expect(options.sleepFn).toHaveBeenCalledExactlyOnceWith(1000);
-    const operations = fixture.transactions.flatMap(commit => commit.operations);
-    expect(operations.filter(operation => operation.kind === "Release")).toHaveLength(1);
-    expect(operations.some(operation => ["Result", "DeliveryFailure"].includes(operation.kind))).toBe(false);
-    expect(fixture.state.works.get(member.work_id)).toMatchObject({ state: "completed", barrier: "pending" });
+  it("leaves a Dispatch launched as another run untouched", async () => {
+    const { log, dispatches } = dispatched(["a"]);
+    const fake = h.fakeQueueGitHub(h.ledgerText(h.launch(log, dispatches[0], true, h.dispatcher, "999")));
+    const before = fake.contents();
+    expect(await main({ githubClient: fake.githubClient, context: workerContext(dispatches[0]), core: fakeCore(), policy: POLICY })).toEqual({ status: "settled", dispatch_id: dispatches[0] });
+    expect(fake.contents()).toBe(before);
   });
 
-  it("retries only a failed job-inventory page before releasing the original reservation", async () => {
-    const { fixture, options } = setup();
-    const read = options.githubClient.rest.actions.listJobsForWorkflowRunAttempt;
-    read.mockRejectedValueOnce({ status: 503 });
-    await expect(main(options)).resolves.toMatchObject({ released: true });
-    expect(read).toHaveBeenCalledTimes(2);
-    expect(read.mock.calls[0][0]).toEqual(read.mock.calls[1][0]);
-    expect(read.mock.calls[0][0]).toMatchObject({ run_id: "42", attempt_number: 1, page: 1, request: { retries: 0, retryCount: 0, timeout: 15000 } });
-    expect(options.sleepFn).toHaveBeenCalledExactlyOnceWith(1000);
-    expect(fixture.transactions.flatMap(commit => commit.operations).filter(operation => operation.kind === "Release")).toHaveLength(1);
+  it("leaves a reserved Dispatch untouched: no run was launched for it yet", async () => {
+    const { log, dispatches } = dispatched(["a"]);
+    const fake = h.fakeQueueGitHub(h.ledgerText(log));
+    const before = fake.contents();
+    expect(await main({ githubClient: fake.githubClient, context: workerContext(dispatches[0]), core: fakeCore(), policy: POLICY })).toEqual({ status: "settled", dispatch_id: dispatches[0] });
+    expect(fake.contents()).toBe(before);
   });
 
-  it.each(["UND_ERR_SOCKET", "ECONNRESET", "ETIMEDOUT"])("recovers %s at the original-attempt boundary before checking quiescence", async code => {
-    const { fixture, options } = setup();
-    const member = fixture.assignment.claims[0];
-    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-    const read = options.githubClient.rest.actions.getWorkflowRunAttempt;
-    read.mockRejectedValueOnce({ cause: { cause: { code } } }).mockRejectedValueOnce({ status: 503 });
-    const jobs = options.githubClient.rest.actions.listJobsForWorkflowRunAttempt;
-    const list = jobs.getMockImplementation();
-    jobs.mockImplementation(async parameters => {
-      expect(read).toHaveBeenCalledTimes(3);
-      expect(options.publishWorkQueueRequest).not.toHaveBeenCalled();
-      return list(parameters);
-    });
-    await expect(main(options)).resolves.toMatchObject({ released: true });
-    for (const [parameters] of read.mock.calls) {
-      expect(parameters).toEqual({ ...read.mock.calls[0][0], request: { ...read.mock.calls[0][0].request, signal: expect.any(AbortSignal) } });
-      expect(parameters).toMatchObject({ run_id: "42", attempt_number: 1, request: { retries: 0, retryCount: 0, timeout: 15000 } });
-    }
-    expect(new Set(read.mock.calls.map(([parameters]) => parameters.request.signal)).size).toBe(3);
-    expect(options.sleepFn.mock.calls).toEqual([[1000], [1000]]);
-    expect(jobs).toHaveBeenCalledTimes(1);
-    const operations = fixture.transactions.flatMap(commit => commit.operations);
-    expect(operations.filter(operation => operation.kind === "Release")).toHaveLength(1);
-    expect(operations.some(operation => ["Result", "DeliveryFailure"].includes(operation.kind))).toBe(false);
-    expect(fixture.state.works.get(member.work_id)).toMatchObject({ state: "completed", barrier: "pending" });
-  });
-
-  it.each(["repository", "publisher", "attempt", "jobs"])("retains the reservation and pending delivery after three failed %s reads", async endpoint => {
-    const { fixture, options } = setup();
-    const member = fixture.assignment.claims[0];
-    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-    const read = vi.fn().mockRejectedValue({ status: 503 });
-    if (endpoint === "repository") options.githubClient.rest.repos.get = read;
-    else if (endpoint === "publisher") options.githubClient.rest.actions.getWorkflowRun = read;
-    else if (endpoint === "attempt") options.githubClient.rest.actions.getWorkflowRunAttempt = read;
-    else options.githubClient.rest.actions.listJobsForWorkflowRunAttempt = read;
-    await expect(main(options)).rejects.toMatchObject({ status: 503 });
-    expect(read).toHaveBeenCalledTimes(3);
-    expect(options.sleepFn.mock.calls).toEqual([[1000], [1000]]);
-    expect(options.publishWorkQueueRequest).not.toHaveBeenCalled();
-    if (endpoint !== "jobs") expect(options.githubClient.rest.actions.listJobsForWorkflowRunAttempt).not.toHaveBeenCalled();
-    expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(false);
-    expect(fixture.state.works.get(member.work_id)).toMatchObject({ state: "completed", barrier: "pending" });
-  });
-
-  it("uses the authenticated bound principal for logical AW profiles without a stored principal", async () => {
-    const { fixture, options } = setup({
-      workerPrincipal: "22",
-      configurePolicy: policy => {
-        policy.authorization = "aw";
-        policy.producers = {};
-        delete policy.pools.default.profiles.default.principal;
-        policy.pools.default.profiles.default.logical_contract = "b".repeat(64);
-      },
-    });
-    expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).profile).not.toHaveProperty("principal");
-    await expect(main(options)).resolves.toMatchObject({ released: true });
-    const release = fixture.transactions.at(-1).operations.find(operation => operation.kind === "Release");
-    expect(release.evidence.principal).toBe("22");
-    expect(JSON.parse(JSON.stringify(release.evidence))).toEqual(release.evidence);
-  });
-
-  it("enforces retry exhaustion", async () => {
-    const { fixture, options } = setup({
-      configurePolicy: policy => {
-        policy.pools.default.retry.max_attempts = 1;
-      },
-    });
-    await main(options);
-    expect([...fixture.state.works.values()].every(work => work.state === "cancelled" && work.cancellation_reason === "attempts_exhausted")).toBe(true);
-  });
-
-  it.each(["issues", "workflow_run", "schedule", "fork"])("ignores %s without queue reads", async kind => {
-    const { options } = setup();
-    if (kind === "fork") options.context.payload.repository.fork = true;
-    else options.context.eventName = kind;
-    expect(await main(options)).toEqual({ status: "ignored" });
-    expect(options.readWorkQueueLog).not.toHaveBeenCalled();
-  });
-
-  it.each(["rerun", "wrong-job"])("rejects %s before accessing the ledger", async kind => {
-    const { options } = setup();
-    if (kind === "rerun") options.context.runAttempt = 2;
-    else options.context.job = "safe_outputs";
-    await expect(main(options)).rejects.toThrow("ERR_VALIDATION: work_queue_worker_finalizer_context_invalid");
-    expect(options.readWorkQueueLog).not.toHaveBeenCalled();
-  });
-
-  it("previews staged cleanup without reads or writes", async () => {
-    const { options } = setup();
-    options.staged = true;
-    expect(await main(options)).toEqual({ status: "staged_preview" });
-    expect(options.readWorkQueueLog).not.toHaveBeenCalled();
-  });
-
-  it("does not borrow another run's reservation", async () => {
-    const { options, fixture } = setup();
-    options.context.runId = "100";
-    expect(await main(options)).toEqual({ status: "unbound" });
-    expect(options.publishWorkQueueRequest).not.toHaveBeenCalled();
-    expect(options.githubClient.rest.actions.getWorkflowRunAttempt).not.toHaveBeenCalled();
-    expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(false);
-  });
-
-  it.each(["revision", "principal", "repository", "correlation", "attempt", "unavailable", "publisher"])("retains capacity on independent %s mismatch", async kind => {
-    const { fixture, options, nativeRun, publisher } = setup();
-    if (kind === "revision") nativeRun.head_sha = "b".repeat(40);
-    if (kind === "principal") nativeRun.actor = { id: "22" };
-    if (kind === "repository") nativeRun.repository.id = 8;
-    if (kind === "correlation") nativeRun.display_title = "unrelated";
-    if (kind === "attempt") nativeRun.run_attempt = 2;
-    if (kind === "publisher") publisher.path = ".github/workflows/untrusted.yml";
-    if (kind === "unavailable") options.githubClient.rest.actions.getWorkflowRunAttempt.mockRejectedValue(new Error("API unavailable"));
-    await expect(main(options)).rejects.toThrow();
-    expect(options.publishWorkQueueRequest).not.toHaveBeenCalled();
-    expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(false);
-  });
-
-  it.each(["active", "queued", "missing", "duplicate-finalizer", "wrong-attempt", "wrong-run", "duplicate-id", "missing-conclusion", "missing-metadata", "unfinished-needs", "missing-finalizer", "unavailable"])(
-    "retains capacity for %s job evidence",
-    async kind => {
-      const { fixture, options, jobs } = setup();
-      if (kind === "active") jobs[1].status = "in_progress";
-      if (kind === "queued") jobs[1].status = "queued";
-      if (kind === "missing") jobs.splice(1, 1);
-      if (kind === "duplicate-finalizer") jobs.push({ ...jobs[2], id: "204" });
-      if (kind === "wrong-attempt") jobs[0].run_attempt = 2;
-      if (kind === "wrong-run") jobs[0].run_id = "99";
-      if (kind === "duplicate-id") jobs[0].id = jobs[1].id;
-      if (kind === "missing-conclusion") jobs[0].conclusion = null;
-      if (kind === "missing-metadata") options.jobResults = {};
-      if (kind === "unfinished-needs") options.jobResults.agent.result = "in_progress";
-      if (kind === "missing-finalizer") jobs.pop();
-      if (kind === "unavailable") options.githubClient.rest.actions.listJobsForWorkflowRunAttempt.mockRejectedValue(new Error("API unavailable"));
-      await expect(main(options)).rejects.toThrow();
-      expect(options.publishWorkQueueRequest).not.toHaveBeenCalled();
-      expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(false);
-    }
-  );
-
-  it("accepts custom job names and matrix members", async () => {
-    const { options, jobs } = setup();
-    options.jobNames.agent = "Execute";
-    options.jobNames.conclusion = "Wrap up";
-    jobs[1].name = "Execute (node, linux)";
-    jobs[2].name = "Wrap up";
-    await expect(main(options)).resolves.toMatchObject({ released: true });
-  });
-
-  it("uses the attempt-specific endpoint when optional job attempt fields are absent", async () => {
-    const { options, jobs } = setup();
-    for (const job of jobs) delete job.run_attempt;
-    await expect(main(options)).resolves.toMatchObject({ released: true });
-    expect(options.githubClient.rest.actions.listJobsForWorkflowRunAttempt).toHaveBeenCalledWith(expect.objectContaining({ run_id: "42", attempt_number: 1 }));
-  });
-
-  it("verifies complete paginated inventories", async () => {
-    const { options, jobs } = setup();
-    const completed = Array.from({ length: 99 }, (_, index) => ({ ...jobs[0], id: String(1000 + index) }));
-    const inventory = [...completed, jobs[1], jobs[2]];
-    options.githubClient.rest.actions.listJobsForWorkflowRunAttempt.mockImplementation(async ({ page }) => ({
-      status: 200,
-      data: { jobs: inventory.slice((page - 1) * 100, page * 100), total_count: inventory.length },
-    }));
-    await expect(main(options)).resolves.toMatchObject({ released: true });
-    expect(options.githubClient.rest.actions.listJobsForWorkflowRunAttempt).toHaveBeenCalledTimes(2);
-  });
-
-  it("fails closed when a paginated job listing is incomplete or exceeds its bound", async () => {
-    for (const total of [101, 500]) {
-      const { options, jobs } = setup();
-      const page = Array.from({ length: 100 }, (_, index) => ({ ...jobs[0], id: String(1000 + index) }));
-      options.githubClient.rest.actions.listJobsForWorkflowRunAttempt.mockResolvedValue({ status: 200, data: { total_count: total, jobs: total === 101 ? jobs : page } });
-      await expect(main(options)).rejects.toThrow(total === 101 ? "work_queue_worker_jobs_incomplete" : "work_queue_worker_jobs_limit");
-      expect(options.publishWorkQueueRequest).not.toHaveBeenCalled();
-    }
+  it("releases a Dispatch launched as this run before it bound", async () => {
+    process.env.GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/worker.lock.yml@refs/heads/main";
+    const { log, nodes, dispatches } = dispatched(["a"]);
+    const fake = h.fakeQueueGitHub(h.ledgerText(h.launch(log, dispatches[0])));
+    expect(await main({ githubClient: fake.githubClient, context: workerContext(dispatches[0]), core: fakeCore(), policy: POLICY })).toEqual({ status: "released", dispatch_id: dispatches[0] });
+    expect(replayTransactionLog(fake.contents()).works.get(nodes[0].work_id)).toMatchObject({ state: "available", attempts: 1 });
   });
 });
 
-describe("scheduled work queue recovery", () => {
-  it("retires obsolete backlog through the scheduled maintenance entry point without dispatching", async () => {
-    const contract = "a".repeat(64);
-    const { fixture, options } = setup({
-      bound: false,
-      granted: false,
-      count: 1,
-      configurePolicy: policy => {
-        policy.authorization = "aw";
-        policy.producers = {};
-        const profile = policy.pools.default.profiles.default;
-        delete profile.principal;
-        profile.logical_contract = contract;
-      },
-    });
-    const worker = fixture.state.deployments.get("default").get("default");
-    fixture.append("deployment", {
-      operations: [
-        {
-          kind: "Deployment",
-          pool: "default",
-          worker_profile: "default",
-          expected_ref: worker.current_ref,
-          expected_contract: contract,
-          profile: { ...worker.revisions[REF].profile, ref: "b".repeat(40), logical_contract: "b".repeat(64) },
-          available: true,
-          reason: "compiler_deployment",
-        },
-      ],
-    });
-    const publisher = fixture.nativeRun(fixture.dispatcherContext);
-    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
-    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
-    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
-    expect(await maintenance(options)).toMatchObject({ obsolete_work_cancelled: 1, obsolete_work_reconciliation_failed: false });
-    expect([...fixture.state.works.values()][0]).toMatchObject({ state: "cancelled", cancellation_reason: "worker_contract_obsolete" });
-    expect(fixture.state.dispatches.size).toBe(0);
-    expect(fixture.state.claims.size).toBe(0);
-    expect(await maintenance(options)).toMatchObject({ obsolete_work_cancelled: 0 });
-  });
-
-  it.each([
-    ["deployment race", { code: "deployment_conflict" }],
-    ["authentication", { status: 401 }],
-    ["read", { status: 503 }],
-    ["publication", { status: 403 }],
-    ["durability", { code: "work_queue_obsolete_cancellation_not_durable" }],
-  ])("recovers a held reservation and expired pending delivery despite an obsolete sweep %s failure", async (_kind, failure) => {
-    const { fixture, options, nativeRun } = setup({ count: 1 });
-    const member = fixture.assignment.claims[0];
-    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-    expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(false);
-    expect(fixture.state.works.get(member.work_id).barrier).toBe("pending");
-    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
-    const publisher = fixture.nativeRun(fixture.dispatcherContext);
-    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
-    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
-    options.now = fixture.at + fixture.policy.pools.default.reconciliation.deadline_ms;
-    options.publishWorkQueueRequest = vi.fn(async args => fixture.append(args.request.kind, args.request.parameters, args.actor, args.request.id, options.now));
-    nativeRun.status = "completed";
-    nativeRun.conclusion = "failure";
-    const canary = "private-obsolete-provider-message-token-and-stack";
-    const error = Object.assign(new Error(canary, { cause: new Error(canary) }), failure, { response: { data: { message: canary }, headers: { authorization: canary } } });
-    const sweep = vi.spyOn(require("./work_queue_deployment_control.cjs"), "reconcileObsoleteWork").mockRejectedValue(error);
-    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-    try {
-      const result = await maintenance(options);
-      expect(sweep).toHaveBeenCalledOnce();
-      expect(result).toMatchObject({
-        obsolete_work_cancelled: null,
-        obsolete_work_reconciliation_failed: true,
-        reconciled: 1,
-        results: [{ released: true, delivery: { claims: { h1: { state: "delivery_failed", effects: "unknown" } } } }],
-      });
-      expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(true);
-      expect(fixture.state.works.get(member.work_id)).toMatchObject({ barrier: "failed", disposition: "unknown" });
-      const operations = fixture.transactions.flatMap(commit => commit.operations);
-      expect(operations.filter(operation => operation.kind === "Release")).toHaveLength(1);
-      expect(operations.filter(operation => operation.kind === "DeliveryFailure")).toHaveLength(1);
-      expect(operations.some(operation => operation.kind === "Result")).toBe(false);
-      expect(options.core.warning).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("obsolete-work reconciliation failed; core recovery will continue"));
-      const diagnostics = stderr.mock.calls.map(call => call[0]).join("");
-      expect(diagnostics).toContain("maintenance.obsolete.failed failed=true");
-      expect(diagnostics).not.toContain(canary);
-      expect(JSON.stringify(result)).not.toContain(canary);
-      expect(JSON.stringify(options.core.warning.mock.calls)).not.toContain(canary);
-    } finally {
-      sweep.mockRestore();
-      stderr.mockRestore();
-    }
-  });
-
-  it("keeps independent delivery verification failures fatal after an obsolete sweep failure", async () => {
-    const { fixture, options, nativeRun } = setup({ count: 1 });
-    const member = fixture.assignment.claims[0];
-    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
-    const publisher = fixture.nativeRun(fixture.dispatcherContext);
-    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
-    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
-    nativeRun.status = "completed";
-    nativeRun.conclusion = "failure";
-    const sweep = vi.spyOn(require("./work_queue_deployment_control.cjs"), "reconcileObsoleteWork").mockRejectedValue(new Error("private-sweep-error"));
-    const finalize = vi.spyOn(require("./finish_work_queue_claim.cjs"), "finalizeWorkerResults").mockRejectedValue(new Error("private-delivery-error"));
-    try {
-      await expect(maintenance(options)).rejects.toThrow("work_queue_maintenance_reconciliation_unresolved");
-      expect(finalize).toHaveBeenCalledOnce();
-      expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(true);
-      expect(fixture.state.works.get(member.work_id).barrier).toBe("pending");
-      expect(options.core.warning).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("obsolete-work reconciliation failed"));
-    } finally {
-      sweep.mockRestore();
-      finalize.mockRestore();
-    }
-  });
-
-  it.each([
-    { pending: false, deferIssueWarning: false },
-    { pending: true, deferIssueWarning: false },
-    { pending: true, deferIssueWarning: true },
-  ])("reconciles all mirrors from the checked ledger without rollback: %j", async ({ pending, deferIssueWarning }) => {
-    const { fixture, options, nativeRun } = setup({ count: 1 });
-    const member = fixture.assignment.claims[0];
-    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-    await main(options);
-    options.context = { ...fixture.dispatcherContext, eventName: "schedule", job: "work_queue_compaction" };
-    const publisher = { ...fixture.nativeRun(fixture.dispatcherContext), event: "schedule", path: ".github/workflows/agentics-maintenance.yml" };
-    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
-    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
-    options.now = fixture.at + fixture.policy.pools.default.reconciliation.deadline_ms;
-    options.publishWorkQueueRequest = vi.fn(async args => fixture.append(args.request.kind, args.request.parameters, args.actor, args.request.id, options.now));
-    nativeRun.status = "completed";
-    nativeRun.conclusion = "failure";
-    const configuration = vi.spyOn(require("./cancel_work_queue_closed_issue.cjs"), "readIssuesConfig").mockResolvedValue({ label: "work", title_prefix: "[work queue]" });
-    const projection = vi.spyOn(require("./work_queue_issues.cjs"), "main").mockResolvedValue({ pending: pending ? [{ reason: "unavailable" }] : [] });
-    try {
-      expect(await maintenance({ ...options, projectIssues: true, deferIssueWarning })).toMatchObject({ issue_sync_pending: pending ? [{ reason: "unavailable" }] : [] });
-      if (pending && !deferIssueWarning) {
-        expect(options.core.warning).toHaveBeenCalledWith(expect.stringContaining("Issue synchronization remains pending"));
-      } else {
-        expect(options.core.warning).not.toHaveBeenCalled();
-      }
-      expect(projection).toHaveBeenCalledOnce();
-      const args = projection.mock.calls[0][0];
-      expect(args.trustedContext).toMatchObject({ role: "reconciler", workflow: publisher.path, event: "schedule" });
-      expect(args.reconcileMirrors).toBe(true);
-      expect(args.transitionRequestIds).toBeUndefined();
-      expect(fixture.state.works.get(member.work_id).barrier).toBe("failed");
-    } finally {
-      configuration.mockRestore();
-      projection.mockRestore();
-    }
-  });
-
-  it.each(["pending", "throw"])("collects checked-ledger projection diagnostics after a %s failure", async mode => {
-    const { fixture, options, nativeRun } = setup({ count: 1 });
-    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
-    const publisher = fixture.nativeRun(fixture.dispatcherContext);
-    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
-    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
-    nativeRun.status = "completed";
-    nativeRun.conclusion = "failure";
-    const actor = { role: "reconciler", principal: "11", repository: REPOSITORY, workflow: publisher.path, run_id: String(publisher.id), run_attempt: 1 };
-    const workId = fixture.assignment.claims[0].work_id;
-    for (let index = 0; index < 17; index++) fixture.append("cancel_work", { operations: [{ kind: "WorkCancellation", work_id: workId, reason: "attempts_exhausted" }] }, actor, `terminal-${index}`);
-    const configuration = vi.spyOn(require("./cancel_work_queue_closed_issue.cjs"), "readIssuesConfig").mockResolvedValue({ label: "work" });
-    const projection = vi.spyOn(require("./work_queue_issues.cjs"), "main").mockImplementation(async () => {
-      if (mode === "throw") throw new Error("secret-batch-failure");
-      return { pending: [{ work_id: workId, reason: "reconciliation pending" }] };
-    });
-    try {
-      const result = await maintenance({ ...options, projectIssues: true, deferIssueWarning: true });
-      expect(projection).toHaveBeenCalledOnce();
-      expect(projection.mock.calls[0][0].reconcileMirrors).toBe(true);
-      expect(result.issue_sync_pending).toHaveLength(1);
-      expect(result.issue_sync_pending[0].reason).toBe(mode === "throw" ? "Issue reconciliation setup failed; inspect safe API diagnostics and the checked ledger" : "reconciliation pending");
-      expect(JSON.stringify(result.issue_sync_pending)).not.toContain("secret-batch-failure");
-      expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(true);
-    } finally {
-      configuration.mockRestore();
-      projection.mockRestore();
-    }
-  });
-
-  it.each([false, true])("settles an expired pending delivery after inline release with keep_open=%s without replay or Result", async keepOpen => {
-    const { fixture, options, nativeRun } = setup({ count: 1 });
-    const member = fixture.assignment.claims[0];
-    fixture.append(
-      "finish",
-      { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed", keep_open: keepOpen },
-      { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle }
-    );
-    await main(options);
-    expect(fixture.state.works.get(member.work_id).barrier).toBe("pending");
-    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
-    const publisher = fixture.nativeRun(fixture.dispatcherContext);
-    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
-    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
-    options.now = fixture.at + fixture.policy.pools.default.reconciliation.deadline_ms;
-    options.publishWorkQueueRequest = vi.fn(async args => fixture.append(args.request.kind, args.request.parameters, args.actor, args.request.id, options.now));
-    nativeRun.status = "completed";
-    nativeRun.conclusion = "failure";
-    const result = await maintenance(options);
-    expect(result).toMatchObject({ reconciled: 1, results: [{ released: true, delivery: { claims: { h1: { state: "delivery_failed", effects: "unknown" } } } }] });
-    const operations = fixture.transactions.flatMap(commit => commit.operations);
-    expect(operations.filter(operation => operation.kind === "DeliveryFailure")).toHaveLength(1);
-    expect(operations.some(operation => operation.kind === "Result")).toBe(false);
-    expect(fixture.state.works.get(member.work_id)).toMatchObject({ barrier: "failed", disposition: "unknown" });
-    const transactions = fixture.transactions.length;
-    expect(await maintenance(options)).toMatchObject({ reconciled: 0 });
-    expect(fixture.transactions).toHaveLength(transactions);
-    expect(options.githubClient.rest.actions.listJobsForWorkflowRunAttempt).toHaveBeenCalledTimes(1);
-  });
-
-  it("preserves released capacity and reports unresolved delivery when finalization throws", async () => {
-    const { fixture, options } = setup({ count: 1 });
-    const member = fixture.assignment.claims[0];
-    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-    await main(options);
-    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
-    const publisher = fixture.nativeRun(fixture.dispatcherContext);
-    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
-    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
-
-    const finalizer = require("./finish_work_queue_claim.cjs");
-    const finalize = vi.spyOn(finalizer, "finalizeWorkerResults").mockRejectedValue(new Error("ledger unavailable"));
-    try {
-      const result = await reconcileQueue({ ...options, expireUnverified: true });
-      expect(result.results[0]).toMatchObject({
-        state: "released",
-        released: true,
-        delivery: { claims: { h1: { state: "pending", reason: "verification_unresolved" } } },
-      });
-      const extraWork = { ...fixture.transactions[1].operations[0], graph_id: "extra", node_key: "extra", work_id: require("./work_queue_graph.cjs").nodeId("extra", "extra") };
-      fixture.append("submit", { nodes: [extraWork] }, { role: "producer", principal: "11", repository: REPOSITORY });
-      fixture.append(
-        "cancel_work",
-        { operations: [{ kind: "WorkCancellation", work_id: extraWork.work_id, reason: "attempts_exhausted" }] },
-        {
-          role: "reconciler",
-          principal: "11",
-          repository: REPOSITORY,
-          workflow: publisher.path,
-          run_id: String(publisher.id),
-          run_attempt: 1,
-        }
-      );
-      const configuration = vi.spyOn(require("./cancel_work_queue_closed_issue.cjs"), "readIssuesConfig").mockResolvedValue({ label: "work" });
-      const projection = vi.spyOn(require("./work_queue_issues.cjs"), "main").mockResolvedValue({ pending: [{ reason: "mirror pending" }] });
-      try {
-        await expect(maintenance({ ...options, projectIssues: true, deferIssueWarning: true })).rejects.toThrow("work_queue_maintenance_reconciliation_unresolved");
-        expect(projection).toHaveBeenCalledOnce();
-      } finally {
-        configuration.mockRestore();
-        projection.mockRestore();
-      }
-      expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(true);
-    } finally {
-      finalize.mockRestore();
-    }
-  });
-
-  it.each(["active", "deadline", "unavailable", "principal", "revision"])("keeps a released pending delivery unresolved for %s evidence", async kind => {
-    const { fixture, options, nativeRun } = setup({ count: 1 });
-    const member = fixture.assignment.claims[0];
-    fixture.append("finish", { dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...fixture.workerActor, dispatch_id: fixture.assignment.dispatch_id, claim_handle: member.handle });
-    await main(options);
-    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
-    const publisher = fixture.nativeRun(fixture.dispatcherContext);
-    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
-    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
-    options.now = fixture.at + fixture.policy.pools.default.reconciliation.deadline_ms - (kind === "deadline" ? 2 : 0);
-    if (kind !== "active") {
-      nativeRun.status = "completed";
-      nativeRun.conclusion = "success";
-    }
-    if (kind === "principal") nativeRun.actor = { id: "99" };
-    if (kind === "revision") nativeRun.head_sha = "b".repeat(40);
-    if (kind === "unavailable") options.githubClient.rest.actions.getWorkflowRunAttempt.mockRejectedValue(new Error("Unavailable"));
-    if (["unavailable", "principal", "revision"].includes(kind)) await expect(maintenance(options)).rejects.toThrow("work_queue_maintenance_reconciliation_unresolved");
-    else expect(await maintenance(options)).toMatchObject({ reconciled: 1, results: [{ released: true, delivery: { claims: { h1: { state: "pending" } } } }] });
-    expect(fixture.state.works.get(member.work_id)).toMatchObject({ barrier: "pending" });
-    expect(fixture.transactions.flatMap(commit => commit.operations).some(operation => ["Result", "DeliveryFailure"].includes(operation.kind))).toBe(false);
-  });
-
-  it("does not read native runs when no reservations are held", async () => {
-    const { options } = setup({ granted: false, bound: false });
-    await expect(maintenance(options)).resolves.toMatchObject({ reconciled: 0, results: [] });
-    expect(options.githubClient.rest.actions.getWorkflowRun).not.toHaveBeenCalled();
-    expect(options.githubClient.rest.actions.listJobsForWorkflowRunAttempt).not.toHaveBeenCalled();
-    expect(options.publishWorkQueueRequest).not.toHaveBeenCalled();
-  });
-
-  it.each([true, false])("releases hard-cancelled reservations only when terminal=%s", async terminal => {
-    const { fixture, options, nativeRun } = setup();
-    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
-    const publisher = fixture.nativeRun(fixture.dispatcherContext);
-    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
-    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
-    if (terminal) {
-      nativeRun.status = "completed";
-      nativeRun.conclusion = "cancelled";
-    }
-    const result = await maintenance(options);
-    expect(result.results[0].released).toBe(terminal);
-    expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(terminal);
-    expect(options.githubClient.rest.actions.listJobsForWorkflowRunAttempt).not.toHaveBeenCalled();
-  });
-
-  it.each([true, false])("recovers a renamed worker's missed binding without releasing active execution when terminal=%s", async terminal => {
-    const { fixture, options, nativeRun } = setup({ bound: false, started: true });
-    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
-    const publisher = fixture.nativeRun(fixture.dispatcherContext);
-    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
-    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
-    nativeRun.name = "Renamed worker * + [special]";
-    if (terminal) {
-      nativeRun.status = "completed";
-      nativeRun.conclusion = "cancelled";
-    }
-    options.githubClient.rest.actions.listWorkflowRuns = vi.fn().mockResolvedValue({ status: 200, data: { workflow_runs: [nativeRun] } });
-    const result = await maintenance(options);
-    expect(result.results[0].released).toBe(terminal);
-    expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id)).toMatchObject({ run: { run_id: "42", run_attempt: 1 }, released: terminal });
-    expect(options.githubClient.rest.actions.listWorkflowRuns).toHaveBeenCalledWith(expect.objectContaining({ workflow_id: WORKFLOW, event: "workflow_dispatch", head_sha: REF }));
-    expect(options.githubClient.rest.actions.getWorkflowRunAttempt).toHaveBeenCalledWith(expect.objectContaining({ run_id: "42", attempt_number: 1 }));
-    expect(options.githubClient.rest.actions.listJobsForWorkflowRunAttempt).not.toHaveBeenCalled();
-  });
-
-  it("reports unresolved native reads without releasing or cancelling the run", async () => {
-    const { options } = setup();
-    options.githubClient.rest.actions.getWorkflowRunAttempt.mockRejectedValue(new Error("private API error"));
-    await expect(maintenance(options)).rejects.toThrow("work_queue_maintenance_reconciliation_unresolved");
-    expect(options.publishWorkQueueRequest).not.toHaveBeenCalled();
-  });
-
-  it("reports ambiguous run discovery instead of silently retaining capacity", async () => {
-    const { fixture, options, nativeRun } = setup({ bound: false, started: true });
-    options.context = { ...fixture.dispatcherContext, job: "work_queue_compaction" };
-    const publisher = fixture.nativeRun(fixture.dispatcherContext);
-    options.workflowRef = `${REPOSITORY}/${publisher.path}@${REF}`;
-    options.githubClient.rest.actions.getWorkflowRun.mockResolvedValue({ status: 200, data: publisher });
-    options.githubClient.rest.actions.getWorkflowRunAttempt.mockImplementation(async ({ run_id }) => ({ status: 200, data: { ...nativeRun, id: run_id } }));
-    options.githubClient.rest.actions.listWorkflowRuns = vi.fn().mockResolvedValue({ status: 200, data: { workflow_runs: [nativeRun, { ...nativeRun, id: "43" }] } });
-    await expect(maintenance(options)).rejects.toThrow("work_queue_maintenance_reconciliation_unresolved");
-    expect(options.publishWorkQueueRequest).not.toHaveBeenCalled();
-    expect(fixture.state.dispatches.get(fixture.assignment.dispatch_id).released).toBe(false);
-  });
-});
-
-describe("privacy-preserving termination logging", () => {
-  let stderr;
-  const output = () => stderr.mock.calls.map(call => call[0]).join("");
+describe("maintenance", () => {
+  const context = { repo: { owner: "owner", repo: "repo" }, runId: 300, runAttempt: 1, payload: {} };
   beforeEach(() => {
-    vi.stubEnv("DEBUG", "work-queue:run");
-    vi.stubEnv("ACTIONS_RUNNER_DEBUG", "");
-    vi.stubEnv("RUNNER_DEBUG", "");
-    stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-  });
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
+    process.env.GITHUB_WORKFLOW_REF = "owner/repo/.github/workflows/agentics-maintenance.yml@refs/heads/main";
   });
 
-  it.each(["", "work-queue:other", "*,-work-queue:run"])("honors DEBUG=%s", async pattern => {
-    vi.stubEnv("DEBUG", pattern);
-    const { options } = setup();
-    if (pattern.startsWith("*")) options.context.eventName = "issues";
-    await main(options);
-    expect(output()).not.toContain("[work-queue:run]");
-    if (!pattern) expect(output()).toBe("");
-  });
-
-  it("emits lifecycle counts and flags without payloads or identities", async () => {
-    const canary = "private-payload-token-should-not-be-logged";
-    const { fixture, nativeRun, jobs, options } = setup({
-      configureWork: work => {
-        work.payload.plan = canary;
-      },
+  /** getWorkflowRunAttempt over fixed `run/attempt` statuses; any other attempt answers 404. */
+  const attempts = statuses =>
+    vi.fn(async ({ run_id, attempt_number }) => {
+      const status = statuses[`${run_id}/${attempt_number}`];
+      if (!status) throw Object.assign(new Error("Not Found"), { status: 404 });
+      return { data: { id: run_id, run_attempt: attempt_number, status } };
     });
-    options.context.payload.inputs.token = canary;
-    nativeRun.display_title += ` ${canary}`;
-    jobs[1].name = options.jobNames.agent = canary;
-    await main(options);
-    expect(output()).toContain("run.binding.checked candidates=1");
-    expect(output()).toContain("run.jobs.quiescent jobs=3");
-    expect(output()).toContain("run.reconcile.complete released=true claims=2");
-    for (const sensitive of [canary, fixture.assignment.dispatch_id, fixture.assignment.claims[0].work_id, fixture.assignment.claims[0].handle, REF, REPOSITORY]) expect(output()).not.toContain(sensitive);
+
+  async function runMaintenance(fake, actions) {
+    fake.githubClient.rest.actions = actions;
+    const core = fakeCore();
+    const result = await maintenance({ githubClient: fake.githubClient, context, core, policy: POLICY });
+    return { result, core, state: replayTransactionLog(fake.contents()) };
+  }
+
+  /** One reservation per dispatcher attempt of run 100, in attempt order. */
+  function reservedByAttempts(count) {
+    const nodes = Array.from({ length: count }, (_, index) => h.work(`n${index}`));
+    let log = h.submit([], nodes);
+    const dispatches = [];
+    for (let attempt = 1; attempt <= count; attempt++) {
+      const step = h.dispatchNext(log, { max_claims: 1, max_dispatches: 1 }, { ...h.dispatcher, run_attempt: attempt });
+      log = step.log;
+      dispatches.push(...step.decision.dispatches);
+    }
+    return { log, nodes, dispatches };
+  }
+
+  it("judges a launched or bound Dispatch by its exact run, never by the dispatcher attempt", async () => {
+    const { log, nodes, dispatches } = dispatched(["bound", "lost", "done", "running"]);
+    let ledger = h.bind(h.launch(log, dispatches[0], true, h.dispatcher, "7"), dispatches[0], h.workerActor("7", 1));
+    ledger = h.launch(ledger, dispatches[1], true, h.dispatcher, "8");
+    ledger = h.launch(ledger, dispatches[2], true, h.dispatcher, "9");
+    ledger = h.launch(ledger, dispatches[3], true, h.dispatcher, "10");
+    const fake = h.fakeQueueGitHub(h.ledgerText(ledger));
+    const runs = { 7: "completed", 9: "completed", 10: "in_progress" };
+    const getWorkflowRun = vi.fn(async ({ run_id }) => {
+      if (!runs[run_id]) throw Object.assign(new Error("Not Found"), { status: 404 });
+      return { data: { id: run_id, status: runs[run_id] } };
+    });
+    const getWorkflowRunAttempt = vi.fn();
+
+    const { result, state } = await runMaintenance(fake, { getWorkflowRun, getWorkflowRunAttempt });
+
+    expect(result.released).toEqual([
+      { dispatch_id: dispatches[0], reason: "run_terminal" },
+      { dispatch_id: dispatches[1], reason: "run_missing" },
+      { dispatch_id: dispatches[2], reason: "run_terminal" },
+    ]);
+    expect(result.checkpointed).toBe(false);
+    expect(getWorkflowRun.mock.calls.map(([request]) => request.run_id)).toEqual([7, 8, 9, 10]);
+    expect(getWorkflowRunAttempt).not.toHaveBeenCalled();
+    expect(nodes.map(node => state.works.get(node.work_id).state)).toEqual(["available", "available", "available", "claimed"]);
+    expect(state.dispatches.get(dispatches[3]).state).toBe("started");
   });
 
-  it("rejects duplicate bindings without exposing native identities", async () => {
-    const { fixture, options } = setup();
-    const state = fixture.state;
-    state.dispatches.set("private-duplicate-binding", structuredClone(state.dispatches.get(fixture.assignment.dispatch_id)));
-    options.readWorkQueueLog.mockResolvedValue({ sha: "head", transactions: fixture.transactions, state });
-    await expect(main(options)).rejects.toThrow("work_queue_run_binding_ambiguous");
-    expect(output()).toContain("run.binding.checked candidates=2");
-    expect(output()).toContain("run.binding.ambiguous");
-    expect(output()).not.toContain("private-duplicate-binding");
-    expect(output()).not.toContain(fixture.assignment.dispatch_id);
-    expect(options.publishWorkQueueRequest).not.toHaveBeenCalled();
+  it("keeps a reservation open while the dispatcher attempt that reserved it still runs", async () => {
+    const { log, nodes, dispatches } = dispatched(["a"]);
+    const fake = h.fakeQueueGitHub(h.ledgerText(log));
+    const before = fake.contents();
+    const getWorkflowRunAttempt = attempts({ "100/1": "in_progress" });
+    const getWorkflowRun = vi.fn();
+
+    const { result, state } = await runMaintenance(fake, { getWorkflowRun, getWorkflowRunAttempt });
+
+    expect(result.released).toEqual([]);
+    expect(getWorkflowRunAttempt).toHaveBeenCalledTimes(1);
+    expect(getWorkflowRunAttempt).toHaveBeenCalledWith(expect.objectContaining({ owner: "owner", repo: "repo", run_id: 100, attempt_number: 1 }));
+    expect(getWorkflowRun).not.toHaveBeenCalled();
+    expect(fake.contents()).toBe(before);
+    expect(state.works.get(nodes[0].work_id)).toMatchObject({ state: "claimed", attempts: 0 });
+    expect(state.dispatches.get(dispatches[0])).toMatchObject({ state: "reserved", reserved_by: { run_id: "100", run_attempt: 1 } });
   });
 
-  it("sanitizes API errors without swallowing the failure", async () => {
-    const canary = "private-error-body-token-and-stack";
-    const error = Object.assign(new Error(canary, { cause: new Error(canary) }), { status: 503, response: { data: { message: canary }, headers: { authorization: canary } } });
-    const { options } = setup();
-    options.githubClient.rest.actions.listJobsForWorkflowRunAttempt.mockRejectedValue(error);
-    await expect(main(options)).rejects.toBe(error);
-    expect(output()).toContain("run.reconcile.failed failed=true http_status=503 response_present=true response_headers_present=true github_request_id_present=false queue_control_github_api_unavailable=true");
-    expect(output()).not.toContain(canary);
-    expect(output()).not.toContain("Error:");
+  it("releases a reservation once the dispatcher attempt that reserved it completed or is gone", async () => {
+    const { log, nodes, dispatches } = reservedByAttempts(3);
+    const fake = h.fakeQueueGitHub(h.ledgerText(log));
+    // Attempt 1 completed (its launch record never landed), attempt 2 is gone, attempt 3 still runs.
+    const getWorkflowRunAttempt = attempts({ "100/1": "completed", "100/3": "queued" });
+
+    const { result, state } = await runMaintenance(fake, { getWorkflowRunAttempt });
+
+    expect(getWorkflowRunAttempt.mock.calls.map(([request]) => [request.run_id, request.attempt_number])).toEqual([
+      [100, 1],
+      [100, 2],
+      [100, 3],
+    ]);
+    expect(result.released).toEqual([
+      { dispatch_id: dispatches[0], reason: "run_terminal" },
+      { dispatch_id: dispatches[1], reason: "run_missing" },
+    ]);
+    expect(nodes.map(node => state.works.get(node.work_id))).toEqual([
+      expect.objectContaining({ state: "available", attempts: 1 }),
+      expect.objectContaining({ state: "available", attempts: 1 }),
+      expect.objectContaining({ state: "claimed", attempts: 0 }),
+    ]);
+    expect(state.dispatches.get(dispatches[2]).state).toBe("reserved");
+  });
+
+  it("judges a checkpointed reservation by the dispatcher attempt its Checkpoint records", async () => {
+    const { log, dispatches } = dispatched(["a"]);
+    const fake = h.fakeQueueGitHub(h.ledgerText([checkpointCommit(replayTransactions(log), h.reconciler, 1)]));
+    const before = fake.contents();
+    expect(JSON.parse(before).operations[0].state.dispatches[dispatches[0]].reserved_by).toEqual({ run_id: "100", run_attempt: 1 });
+
+    expect((await runMaintenance(fake, { getWorkflowRunAttempt: attempts({ "100/1": "in_progress" }) })).result.released).toEqual([]);
+    expect(fake.contents()).toBe(before);
+    expect((await runMaintenance(fake, { getWorkflowRunAttempt: attempts({ "100/1": "completed" }) })).result.released).toEqual([{ dispatch_id: dispatches[0], reason: "run_terminal" }]);
+  });
+
+  it("does not release a reservation whose launch lands between the attempt lookup and the release commit", async () => {
+    const { log, nodes, dispatches } = dispatched(["a"]);
+    const fake = h.fakeQueueGitHub(h.ledgerText(log));
+    // The reserving attempt records its launch just before it completes.
+    const launched = h.ledgerText(h.launch(log, dispatches[0]));
+    fake.state.beforeUpdate = () => fake.install(launched);
+
+    const { result, state } = await runMaintenance(fake, { getWorkflowRunAttempt: attempts({ "100/1": "completed" }) });
+
+    expect(fake.state.updates).toBe(1);
+    expect(result.released).toEqual([]);
+    expect(fake.contents()).toBe(launched);
+    expect(state.dispatches.get(dispatches[0]).state).toBe("started");
+    expect(state.works.get(nodes[0].work_id)).toMatchObject({ state: "claimed", attempts: 0 });
+  });
+
+  it("does not release a Dispatch whose worker binds between the run lookup and the release commit", async () => {
+    const { log, nodes, dispatches } = dispatched(["a"]);
+    const launched = h.launch(log, dispatches[0]);
+    const fake = h.fakeQueueGitHub(h.ledgerText(launched));
+    // Attempt 1 of run 200 ended before binding; a re-run (attempt 2) binds while
+    // maintenance publishes its release, so the first compare-and-swap loses.
+    const rebound = h.ledgerText(h.bind(launched, dispatches[0], h.workerActor("200", 2)));
+    fake.state.beforeUpdate = () => fake.install(rebound);
+    const getWorkflowRun = vi.fn(async ({ run_id }) => ({ data: { id: run_id, status: "completed" } }));
+
+    const { result, state } = await runMaintenance(fake, { getWorkflowRun });
+
+    expect(getWorkflowRun).toHaveBeenCalledTimes(1);
+    expect(fake.state.updates).toBe(1);
+    expect(result.released).toEqual([]);
+    expect(fake.contents()).toBe(rebound);
+    expect(state.transactions.some(commit => commit.request.kind === "release")).toBe(false);
+    expect(state.dispatches.get(dispatches[0])).toMatchObject({ state: "bound", run: { run_id: "200", run_attempt: 2 } });
+    expect(state.claims.get(state.dispatches.get(dispatches[0]).claims[0]).state).toBe("open");
+    expect(state.works.get(nodes[0].work_id)).toMatchObject({ state: "claimed", attempts: 0 });
+  });
+
+  it("keeps a Dispatch open when its run cannot be read", async () => {
+    const { log, dispatches } = dispatched(["a"]);
+    const fake = h.fakeQueueGitHub(h.ledgerText(h.bind(h.launch(log, dispatches[0], true, h.dispatcher, "7"), dispatches[0], h.workerActor("7", 1))));
+    const getWorkflowRun = async () => {
+      throw Object.assign(new Error("Server Error"), { status: 502 });
+    };
+    const { result, core } = await runMaintenance(fake, { getWorkflowRun });
+    expect(result.released).toEqual([]);
+    expect(core.warning).toHaveBeenCalled();
+  });
+
+  it("checkpoints a ledger longer than 512 lines into one Checkpoint line", async () => {
+    const state = newState();
+    const log = [];
+    for (let index = 0; index < 513; index++) {
+      const node = h.work(`n${index}`);
+      const commit = buildCommit(state, h.producer, newRequest("submit", h.producer, { work_ids: [node.work_id] }), [node], 1);
+      applyCommit(state, commit);
+      log.push(commit);
+    }
+    const fake = h.fakeQueueGitHub(h.ledgerText(log));
+    fake.githubClient.rest.actions = {};
+
+    const result = await maintenance({ githubClient: fake.githubClient, context, core: fakeCore(), policy: POLICY });
+
+    expect(result.checkpointed).toBe(true);
+    const lines = fake.contents().trimEnd().split("\n");
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0])).toMatchObject({ version: 4, previous: null, request: { kind: "checkpoint" }, operations: [{ kind: "Checkpoint" }] });
+    expect(replayTransactionLog(fake.contents()).works.size).toBe(513);
   });
 });

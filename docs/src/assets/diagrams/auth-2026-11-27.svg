@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 288" role="img" aria-labelledby="auth-paths-title auth-paths-desc">
+  <title id="auth-paths-title">Workflow authentication paths</title>
+  <desc id="auth-paths-desc">A workflow uses one authentication path for model inference and another for GitHub operations.</desc>
+  <defs>
+    <marker id="auth-paths-arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+      <path d="M 0 0 L 8 4 L 0 8 Z" fill="#59636e"/>
+    </marker>
+  </defs>
+  <rect width="640" height="288" fill="#ffffff"/>
+  <g fill="none" stroke="#59636e" stroke-width="1" marker-end="url(#auth-paths-arrow)">
+    <path d="M 224 128 H 260 Q 268 128 268 120 V 80 Q 268 72 276 72 H 320"/>
+    <path d="M 224 160 H 260 Q 268 160 268 168 V 208 Q 268 216 276 216 H 320"/>
+  </g>
+  <g font-family="Mona Sans, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">
+    <rect x="32" y="104" width="192" height="80" rx="4" fill="#ffffff" stroke="#0969da" stroke-width="1"/>
+    <text x="128" y="149" fill="#1f2328" font-size="16" font-weight="600" text-anchor="middle">Workflow</text>
+    <rect x="320" y="32" width="288" height="80" rx="4" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1"/>
+    <text x="336" y="64" fill="#1f2328" font-size="16" font-weight="600">AI engine authentication</text>
+    <text x="336" y="88" fill="#59636e" font-size="12">Model inference</text>
+    <rect x="320" y="176" width="288" height="80" rx="4" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1"/>
+    <text x="336" y="208" fill="#1f2328" font-size="16" font-weight="600">GitHub authentication</text>
+    <text x="336" y="232" fill="#59636e" font-size="12">API operations and safe outputs</text>
+  </g>
+</svg>

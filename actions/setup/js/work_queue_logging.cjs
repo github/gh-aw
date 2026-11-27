@@ -28,131 +28,66 @@ const GRAPHQL_ALIAS_KINDS = new Map([
   ["u", { context: "unlock", field: "graphql_unlock_alias", operation: "graphql_operation_delete_ref" }],
 ]);
 
-const CONTROL_ERROR_CODES = new Set([
-  "checkpoint_invalid",
-  "resource_limit",
-  "run_correlation_mismatch",
-  "run_binding_conflict",
-  "run_repository_mismatch",
-  "run_repository_identity_mismatch",
-  "run_event_mismatch",
-  "run_ref_mismatch",
-  "run_workflow_mismatch",
-  "run_principal_mismatch",
-  "rerun_not_authorized",
-  "work_queue_dispatch_credential_binding_required",
-  "work_queue_dispatch_credential_auth_unavailable",
-  "work_queue_dispatch_credential_client_mismatch",
-  "work_queue_dispatch_credential_identity_unavailable",
-  "work_queue_dispatch_credential_identity_unverified",
-  "work_queue_dispatch_broker_identity_unavailable",
-  "work_queue_dispatch_credential_principal_mismatch",
-  "work_queue_dispatch_credential_proof_invalid",
-  "work_queue_dispatch_credential_validator_required",
-  "work_queue_dispatch_repository_access_unavailable",
-  "work_queue_dispatch_repository_identity_mismatch",
-  "work_queue_dispatch_tag_mismatch",
-  "work_queue_dispatch_tag_preparation_failed",
-  "work_queue_assignment_mismatch",
-  "work_queue_assignment_profile_missing",
-  "work_queue_policy_proposal_mismatch",
-  "work_queue_pool_not_installed",
-  "work_queue_profile_not_approved",
-  "work_queue_worker_not_compiler_approved",
-  "work_queue_dispatch_credential_kind_invalid",
-  "work_queue_dispatch_app_metadata_missing",
-  "work_queue_dispatch_credential_metadata_conflict",
-  "queue_control_github_access_denied",
-  "queue_control_github_authentication_failed",
-  "queue_control_github_not_found",
-  "queue_control_github_rate_limited",
-  "queue_control_github_api_unavailable",
-  "queue_control_github_transport_failed",
-  "queue_control_github_request_rejected",
-  "queue_control_dispatch_ref_missing",
-  "queue_control_dispatch_inputs_mismatch",
-  "queue_control_dispatch_trigger_missing",
-]);
+const CONTROL_ERROR_EXPLANATIONS = {
+  request_invalid: "The queue request or one of its operations is malformed. Inspect the staged intent and the compiled policy environment; replay rejects requests outside the closed v4 shapes.",
+  unauthorized_operation: "This job's queue role cannot publish the requested operation. Check the workflow's tools.work-queue role; dispatchers claim Work, workers settle only their own bound Claims.",
+  actor_unauthorized: "The publishing job belongs to another repository than the queue. Queue writes come only from workflows of the queue's own repository.",
+  unsupported_protocol: "The queue ledger is not protocol v4. A dispatcher, producer or maintenance run converts a v3 ledger before any v4 dispatch.",
+  ledger_invalid: "The queue ledger failed validation. Inspect the work-queue branch history; do not delete the queue.",
+  checkpoint_invalid: "The queue checkpoint failed validation. Inspect the work-queue branch history and restore the prior content from Git; do not delete the queue.",
+  cas_exhausted: "The queue branch changed on every publication attempt. Concurrent writers are active; the next run re-plans against the new head.",
+  ledger_limit: "The ledger reached its byte bound. Run agentics-maintenance to checkpoint the queue.",
+  repository_unavailable: "The queue repository could not be read with the selected token. Check the token's contents permission on this repository.",
+  policy_missing: "The compiled work queue policy environment is missing. Recompile the workflow so GH_AW_WORK_QUEUE_POLICY is emitted.",
+  policy_invalid: "The compiled work queue policy environment is invalid. Fix .github/workflows/aw.json work_queue settings and recompile.",
+  pool_invalid: "The requested pool is not configured. Declare it in .github/workflows/aw.json work_queue.pools and recompile.",
+  work_queue_profile_not_approved: "The requested worker profile is not configured for the pool. Mark the worker workflow with tools.work-queue.worker: true and recompile.",
+  work_queue_pending_limit: "The pool already holds its configured pending_limit of available and claimed Work. Let workers drain the pool or raise work_queue.pending_limit in aw.json.",
+  work_queue_graph_limit: "The submission exceeds the bounded number of Work nodes per request. Split the graph into smaller submissions.",
+  work_queue_intent_invalid: "A staged queue intent is malformed. Inspect the work_queue_* tool calls of the agent run.",
+  work_queue_plan_intent_batch_invalid: "The staged plan is incomplete or mixed with other intents. Stage exactly one submit and one dispatch_next from the plan.",
+  work_queue_dispatch_budget_exceeded: "The dispatch request exceeds this run's dispatch budget. Lower max_dispatches or raise safe-outputs.dispatch-workflow.max.",
+  work_queue_dispatcher_intents_missing: "The dispatcher staged no queue intents. Inspect the preparation step and tool-denial logs.",
+  work_queue_control_claim_not_authorized: "The worker has no open Claim bound to this run, so it cannot submit child Work.",
+  work_queue_worker_dispatch_unsupported: "Workers cannot claim Work; only dispatcher workflows publish dispatch_next.",
+  work_queue_dispatch_ref_missing: "No dispatch ref is configured. Set safe-outputs.dispatch-workflow target-ref or run the dispatcher on a branch.",
+  work_queue_worker_not_allowlisted:
+    "No worker profile of the pool is in this dispatcher's compiled safe-outputs.dispatch-workflow allowlist. Add the worker to dispatch-workflow workflows and recompile; other profiles are never claimed or launched.",
+  work_queue_launch_unverified:
+    "This run is not the exact worker run its dispatcher recorded launching (run, workflow, event or revision differ, or no launch is recorded yet). It neither binds the Dispatch nor receives its Claims; maintenance releases an unbound Dispatch.",
+  external_admission_unverified: "An external dependency, subject or backing Issue could not be identified. Check the reference and the dependency read credentials.",
+  work_missing: "The request references Work that is not in the queue.",
+  ownership_conflict: "The Work is no longer available; another dispatch claimed or settled it first.",
+  dispatch_state_conflict: "The Dispatch already advanced past this transition.",
+  run_binding_conflict: "The Dispatch is bound to another run. Only the bound run may settle its Claims.",
+  claim_scope_invalid: "The operation is outside the bound run's Claim scope.",
+  resource_limit: "The queue operation exceeded a bounded protocol limit. Reduce the batch or payload size.",
+  assignment_limit: "The Work payload plus predecessor effects cannot fit one worker assignment. Reduce the payload or the number of predecessors.",
+  dependency_invalid: "A Work dependency is invalid: predecessors must already exist in the same graph and pool.",
+  dependency_cycle: "The submitted Work graph contains a cycle.",
+  graph_invalid: "The submitted graph is invalid: node keys must be unique and a graph stays in one pool.",
+  resource_invalid: "A GitHub resource reference is not fully identified.",
+  issue_binding_conflict: "The backing Issue already belongs to other Work.",
+  work_identity_invalid: "The Work identity does not match its graph_id and node_key.",
+  work_invalid: "The Work payload or replacement reference is invalid.",
+  staged_queue_intents_invalid: "The staged queue intents could not be read. Inspect the work_queue_* tool calls of the agent run.",
+  queue_control_github_access_denied: "GitHub denied the queue API request (HTTP 403). Inspect the rate-limit and SSO diagnostics before changing token permissions.",
+  queue_control_github_authentication_failed: "GitHub rejected the credential (HTTP 401). Check that the selected token is present and valid; never print the token.",
+  queue_control_github_not_found: "GitHub could not find the requested queue resource (HTTP 404). Check the repository and the selected token's access.",
+  queue_control_github_rate_limited: "GitHub rate-limited the queue request. The next scheduled run retries against the current ledger.",
+  queue_control_github_api_unavailable: "GitHub returned a server error. The next run re-reads the ledger before retrying.",
+  queue_control_github_transport_failed: "The GitHub client failed before receiving an HTTP response. The next run re-reads the ledger before retrying.",
+  queue_control_github_request_rejected: "GitHub rejected the queue API request (HTTP 422). Verify the worker workflow, ref and input schema.",
+  queue_control_dispatch_ref_missing: "GitHub could not find the dispatch ref. Check safe-outputs.dispatch-workflow target-ref.",
+  queue_control_dispatch_inputs_mismatch: "The worker workflow does not accept the work_queue_assignment input. Recompile and publish the worker.",
+  queue_control_dispatch_trigger_missing: "The worker workflow has no workflow_dispatch trigger. Recompile and publish the queue worker.",
+};
 
 /** @param {string} code */
 function queueControlErrorExplanation(code) {
-  switch (code) {
-    case "run_correlation_mismatch":
-      return "The native run title does not yet match the original dispatch token. Keep the reservation fenced and verify the same run through trusted reconciliation; never POST the assignment again.";
-    case "run_binding_conflict":
-    case "run_repository_mismatch":
-    case "run_repository_identity_mismatch":
-    case "run_event_mismatch":
-    case "run_ref_mismatch":
-    case "run_workflow_mismatch":
-    case "run_principal_mismatch":
-    case "rerun_not_authorized":
-      return "The native run does not match the original assignment's immutable identity. Inspect its repository, workflow, revision, principal and attempt; do not bypass the binding check or release an uncertain reservation.";
-    case "work_queue_dispatch_repository_access_unavailable":
-      return "The dispatch client cannot check the target repository. Use the authenticated GitHub client created by the compiled safe-output job.";
-    case "work_queue_dispatch_credential_binding_required":
-    case "work_queue_dispatch_credential_auth_unavailable":
-    case "work_queue_dispatch_credential_client_mismatch":
-      return "The dispatch client could not be bound to the compiler-selected token. Fix trusted client construction so credential validation and workflow dispatch use the same selected token; do not substitute the caller's credential.";
-    case "work_queue_dispatch_credential_identity_unavailable":
-    case "work_queue_dispatch_credential_identity_unverified":
-      return "The dispatch credential's GitHub identity could not be verified. Check the selected token's validity and GitHub API access; do not infer identity from the workflow's human caller.";
-    case "work_queue_dispatch_broker_identity_unavailable":
-      return "The broker did not provide a verified App identity binding. Configure an explicit dispatch-workflow GitHub App or token; do not infer the dispatch principal.";
-    case "work_queue_dispatch_credential_principal_mismatch":
-      return "The selected token belongs to a different identity than the original assignment permits. Use the approved worker credential; do not reassign the Claim or bypass the identity check.";
-    case "work_queue_dispatch_credential_proof_invalid":
-    case "work_queue_dispatch_credential_validator_required":
-      return "The assignment has no valid credential proof from the actual dispatch client. Restore the compiled credential validator and verify the original route before launching.";
-    case "work_queue_dispatch_repository_identity_mismatch":
-      return "GitHub returned a different repository than the approved target. Check the repository and API host configuration; do not broaden the assignment's scope.";
-    case "work_queue_dispatch_tag_mismatch":
-      return "The worker snapshot tag does not point to the approved immutable commit. Inspect the tag and worker revision; never overwrite the conflicting tag or launch from a moving branch.";
-    case "work_queue_dispatch_tag_preparation_failed":
-      return "The worker snapshot tag could not be prepared and verified. Check GitHub API access and contents: write on the selected dispatch credential before retrying through trusted reconciliation.";
-    case "work_queue_assignment_mismatch":
-    case "work_queue_assignment_profile_missing":
-      return "The stored assignment does not match a valid approved worker route. Inspect the original Claim and installed deployment; do not rebuild an assignment from task text or a stale snapshot.";
-    case "work_queue_policy_proposal_mismatch":
-      return "The proposed queue policy differs from the installed policy. Refresh compatible worker deployments, or use an explicit administrator policy update only after the queue is quiescent.";
-    case "work_queue_pool_not_installed":
-      return "The requested pool could not be installed on demand. Declare it in aw.json, publish new workers' Markdown and compiled locks to the default branch, and recompile the producer or dispatcher. Installed pool settings and profiles must remain unchanged; other changes require an administrator Policy update after the queue is quiescent.";
-    case "work_queue_profile_not_approved":
-      return "The requested worker profile could not be registered on demand. Publish its tools.work-queue.worker source and compiled lock to the default branch, then recompile the producer or dispatcher. Existing worker authority cannot be changed by additive registration.";
-    case "work_queue_worker_not_compiler_approved":
-      return "The worker route is not compiler-approved. New workers require a published default-branch AW worker source, matching compiled contract and active registration. Check the caller's dispatch allowlist; existing authority cannot be replaced by registration.";
-    case "checkpoint_invalid":
-    case "queue_control_checkpoint_invalid":
-      return "The queue checkpoint failed validation. Inspect the authoritative ledger and restore a valid causal history; do not delete the queue or reset its scheduling debt.";
-    case "resource_limit":
-      return "The queue operation exceeded a bounded protocol limit. Reduce the batch or assignment size; compact the ledger only through the supported command without discarding history.";
-    case "work_queue_dispatch_credential_kind_invalid":
-    case "work_queue_dispatch_app_metadata_missing":
-    case "work_queue_dispatch_credential_metadata_conflict":
-      return "The compiled dispatch credential configuration is missing or inconsistent. Recompile the dispatcher with its declared safe-outputs.dispatch-workflow workers and approved credential source.";
-    case "queue_control_github_access_denied":
-      return "GitHub denied the queue API request (HTTP 403). This status alone does not distinguish permission denial from throttling. Inspect the rate-limit and SSO diagnostics before changing credential permissions; keep the agent job read-only.";
-    case "queue_control_github_authentication_failed":
-      return "GitHub rejected the credential (HTTP 401). Check that the compiler-selected token is present, valid, and unexpired in the trusted safe-output job; never print the token.";
-    case "queue_control_github_not_found":
-      return "GitHub could not find or expose the requested queue resource (HTTP 404). Check the approved repository, worker revision, workflow path, and selected token's access.";
-    case "queue_control_github_rate_limited":
-      return "GitHub rate-limited the queue request. Respect the reported reset or retry timing, then inspect the authoritative ledger and reconcile existing reservations before retrying.";
-    case "queue_control_github_api_unavailable":
-      return "GitHub returned a server error. A write or worker launch may already have happened; inspect the ledger and reconcile the original reservation before retrying.";
-    case "queue_control_github_transport_failed":
-      return "The GitHub client failed before receiving an HTTP response; its synthetic status is not a GitHub server response. Inspect transport diagnostics and reconcile the authoritative ledger and original reservation before retrying; failure does not prove that no write or worker launch occurred.";
-    case "queue_control_dispatch_ref_missing":
-      return "GitHub could not find the worker snapshot ref. Verify that the approved immutable snapshot tag exists in the destination repository before trusted reconciliation.";
-    case "queue_control_dispatch_inputs_mismatch":
-      return "The published worker workflow does not accept the dispatch inputs. Recompile and publish the worker with its work_queue_assignment input, then reconcile the original reservation.";
-    case "queue_control_dispatch_trigger_missing":
-      return "The published worker workflow has no workflow_dispatch trigger. Recompile and publish the queue worker with that trigger, then reconcile the original reservation.";
-    case "queue_control_github_request_rejected":
-      return "GitHub rejected the queue API request (HTTP 422). Verify the compiled worker route, snapshot ref, workflow_dispatch trigger, and input schema; inspect the original reservation before retrying.";
-    default:
-      return "The queue control failed for an unclassified reason. Inspect the durable request and ledger with DEBUG=work-queue:*; raw exception details are withheld to protect credentials and task data.";
-  }
+  return Object.hasOwn(CONTROL_ERROR_EXPLANATIONS, code)
+    ? CONTROL_ERROR_EXPLANATIONS[code]
+    : "The queue control failed for an unclassified reason. Inspect the ledger with DEBUG=work-queue:*; raw exception details are withheld to protect credentials and task data.";
 }
 
 /** @param {unknown} value @param {string} key */
@@ -167,6 +102,26 @@ function ownValue(value, key) {
 /** @param {unknown} error */
 function responseHeaders(error) {
   return ownValue(ownValue(error, "response"), "headers") ?? ownValue(error, "headers");
+}
+
+/**
+ * Returns a GitHub request ID only in its five-group hex shape; anything else could be provider
+ * text or a credential. The value is returned unchanged, never trimmed or truncated.
+ * @param {unknown} value
+ * @returns {string | undefined}
+ */
+function validGitHubRequestId(value) {
+  return typeof value === "string" && value.length <= 84 && !/\s/.test(value) && /^[0-9a-f]{1,16}(?::[0-9a-f]{1,16}){4}$/i.test(value) ? value : undefined;
+}
+
+/**
+ * The validated `x-github-request-id` of a GitHub API error, preferring the response headers.
+ * Accessors and inherited headers are never read.
+ * @param {unknown} error
+ * @returns {string | undefined}
+ */
+function getGitHubRequestId(error) {
+  return validGitHubRequestId(ownValue(ownValue(ownValue(error, "response"), "headers"), "x-github-request-id")) ?? validGitHubRequestId(ownValue(ownValue(error, "headers"), "x-github-request-id"));
 }
 
 /** @param {unknown} headers @param {string} name */
@@ -271,7 +226,7 @@ function githubFailureMetadata(error) {
 function queueControlErrorCode(error, metadata) {
   for (const key of ["code", "message"]) {
     const code = ownValue(error, key);
-    if (typeof code === "string" && CONTROL_ERROR_CODES.has(code)) return code;
+    if (typeof code === "string" && Object.hasOwn(CONTROL_ERROR_EXPLANATIONS, code)) return code;
   }
   const response = ownValue(error, "response");
   const status = ownValue(error, "status") ?? ownValue(response, "status");
@@ -341,9 +296,7 @@ function createWorkQueueLogger(component) {
     if (typeof metadata.graphql_errors === "number" && metadata.graphql_errors > count) metadata.graphql_error_details_omitted = metadata.graphql_errors - count;
     const code = queueControlErrorCode(error, metadata);
     const headers = responseHeaders(error);
-    const requestId = [ownValue(ownValue(response, "headers"), "x-github-request-id"), ownValue(ownValue(error, "headers"), "x-github-request-id")].find(
-      value => typeof value === "string" && value.length <= 84 && !/\s/.test(value) && /^[0-9a-f]{1,16}(?::[0-9a-f]{1,16}){4}$/i.test(value)
-    );
+    const requestId = getGitHubRequestId(error);
     const requestDiagnostic = (Number.isInteger(status) && status >= 100 && status <= 599) || headers !== undefined || metadata.graphql_errors ? ` GitHub request ID: ${requestId ?? "unknown"}.` : "";
     diagnostic(
       event,
@@ -373,4 +326,4 @@ function createWorkQueueLogger(component) {
   return { debug, diagnostic, failure };
 }
 
-module.exports = { createWorkQueueLogger, debugEnabled, queueControlErrorCode, queueControlErrorExplanation };
+module.exports = { createWorkQueueLogger, debugEnabled, getGitHubRequestId, ownValue, queueControlErrorCode, queueControlErrorExplanation, validGitHubRequestId };

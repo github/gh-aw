@@ -29,6 +29,7 @@ func NewGeminiEngine() *GeminiEngine {
 			capabilities: EngineCapabilities{
 				ToolsAllowlist:       true,
 				MCP:                  true,
+				WebFetchFallback:     true,
 				MaxTurns:             true,
 				MaxContinuations:     false, // Gemini CLI does not support --max-autopilot-continues-style continuation mode
 				WebSearch:            false,
@@ -38,6 +39,10 @@ func NewGeminiEngine() *GeminiEngine {
 			dedicatedLLMGatewayPort: constants.GeminiLLMGatewayPort,
 		},
 	}
+}
+
+func (e *GeminiEngine) UsesWebFetchFallback(data *WorkflowData) bool {
+	return isFirewallEnabled(data)
 }
 
 // GetModelEnvVarName returns the native environment variable name that the Gemini CLI uses

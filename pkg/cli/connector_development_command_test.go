@@ -169,6 +169,7 @@ func TestConnectorDevelopmentSetup(t *testing.T) {
 }
 
 func TestConnectorDevelopmentRepoFlagHasShortAlias(t *testing.T) {
+	t.Parallel()
 	flag := NewConnectorCommand().Flags().Lookup("repo")
 	require.NotNil(t, flag)
 	require.Equal(t, "r", flag.Shorthand)

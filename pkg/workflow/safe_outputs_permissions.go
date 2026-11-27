@@ -190,6 +190,15 @@ func computePermissionsForSafeOutputs(safeOutputs *SafeOutputsConfig, excludePer
 	if dispatchRepositoryPermissions := computeDispatchRepositoryPermissions(safeOutputs, excludePerHandlerApps); dispatchRepositoryPermissions != nil {
 		permissions.Merge(dispatchRepositoryPermissions)
 	}
+	if routePermissions := computeRequestContinuationRoutePermissions(safeOutputs, excludePerHandlerApps); routePermissions != nil {
+		permissions.Merge(routePermissions)
+	}
+	if safeOutputs.workQueueApprovalReads {
+		// Dispatchers read approval Issues through the own-repository dependency client.
+		if level, exists := permissions.Get(PermissionIssues); !exists || level == PermissionNone {
+			permissions.Set(PermissionIssues, PermissionRead)
+		}
+	}
 
 	// NoOp and MissingTool don't require write permissions beyond what's already included
 	// They only need to comment if add-comment is already configured
@@ -242,7 +251,7 @@ func computeSafeOutputHandlerPermissions(safeOutputs *SafeOutputsConfig, handler
 
 	permissions = NewPermissions()
 	switch handler.Key {
-	case "close-issue", "link-sub-issue", "replace-label", "assign-milestone":
+	case "close-issue", "create-issue", "link-sub-issue", "replace-label", "assign-milestone", "set-issue-status":
 		permissions.Set(PermissionIssues, PermissionRead)
 	case "close-pull-request", "resolve-pull-request-review-thread", "mark-pull-request-as-ready-for-review",
 		"create-pull-request-review-comment", "submit-pull-request-review":
@@ -274,12 +283,13 @@ func computeSafeOutputHandlerPermissions(safeOutputs *SafeOutputsConfig, handler
 		"add-reviewer", "create-pull-request-review-comment",
 		"reply-to-pull-request-review-comment", "dismiss-pull-request-review",
 		"mark-pull-request-as-ready-for-review", "resolve-pull-request-review-thread",
-		"submit-pull-request-review", "set-issue-type", "set-issue-field":
+		"submit-pull-request-review", "set-issue-type", "set-issue-status", "set-issue-field":
 		field, _ := safeOutputPointerFieldValue(safeOutputs, handler.StructField)
 		config := field.Elem()
 		labels := config.FieldByName("RequiredLabels")
 		titlePrefix := config.FieldByName("RequiredTitlePrefix")
-		if (labels.IsValid() && labels.Len() > 0) || (titlePrefix.IsValid() && titlePrefix.String() != "") {
+		author := config.FieldByName("RequiredAuthor")
+		if (labels.IsValid() && labels.Len() > 0) || (titlePrefix.IsValid() && titlePrefix.String() != "") || (author.IsValid() && author.String() != "") {
 			permissions.Set(PermissionIssues, PermissionRead)
 		}
 	}

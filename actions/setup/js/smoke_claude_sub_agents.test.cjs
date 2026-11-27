@@ -2,7 +2,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import { describe, test, expect } from "vitest";
 import { Readable } from "node:stream";
-import { readLockFileHeaders } from "./work_queue_provisioning.cjs";
+import { readLockFileHeaders } from "./lock_file_headers.cjs";
 
 const require = createRequire(import.meta.url);
 const runs = require("./fixtures/claude_codex_subagent_runs.cjs");

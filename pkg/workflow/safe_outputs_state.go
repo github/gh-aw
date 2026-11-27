@@ -106,6 +106,7 @@ func hasAnySafeOutputEnabled(safeOutputs *SafeOutputsConfig) bool { //nolint:lar
 		safeOutputs.MissingData != nil ||
 		safeOutputs.ReportIncomplete != nil ||
 		safeOutputs.RequestContinuation != nil ||
+		safeOutputs.SetIssueStatus != nil ||
 		safeOutputs.SetIssueType != nil ||
 		safeOutputs.SetIssueField != nil ||
 		safeOutputs.NoOp != nil
@@ -172,8 +173,10 @@ func hasNonBuiltinSafeOutputsEnabled(safeOutputs *SafeOutputsConfig) bool { //no
 		safeOutputs.DispatchWorkflow != nil ||
 		safeOutputs.DispatchRepository != nil ||
 		safeOutputs.CallWorkflow != nil ||
+		safeOutputs.SetIssueStatus != nil ||
 		safeOutputs.SetIssueType != nil ||
-		safeOutputs.SetIssueField != nil // non-builtin safe output field
+		safeOutputs.SetIssueField != nil || // non-builtin safe output field
+		isRoutedRequestContinuation(safeOutputs) // a routed continuation hands off work
 }
 
 // HasSafeOutputsEnabled checks if any safe-outputs are enabled

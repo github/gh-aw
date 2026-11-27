@@ -338,6 +338,7 @@ func GenerateMaintenanceWorkflow(ctx context.Context, opts GenerateMaintenanceWo
 		copilotOrgBilling:   copilotOrgBilling,
 		compactionLedgers:   compactionLedgers,
 		hasWorkQueue:        hasWorkQueue,
+		workQueuePolicy:     workQueueRepositoryPolicyJSON(workflowDataList),
 		hasCacheMemory:      hasCacheMemory,
 		hasSteering:         hasSteering,
 		noLogo:              !shouldIncludeLockFileLogo(repoConfig, opts.NoLogo),

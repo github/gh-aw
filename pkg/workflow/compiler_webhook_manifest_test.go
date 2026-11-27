@@ -131,12 +131,9 @@ func TestWebhookManifestSerializationFailure(t *testing.T) {
 }
 
 func TestWorkQueueMetadataManifestCompilation(t *testing.T) {
-	const contract = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	data := &WorkflowData{
-		Tools: map[string]any{"work-queue": map[string]any{"worker": true}},
-		WorkQueuePolicy: &WorkQueuePolicyConfig{
-			WorkerContract: contract,
-		},
+		Tools:           map[string]any{"work-queue": map[string]any{"worker": true}},
+		WorkQueuePolicy: &WorkQueuePolicyConfig{},
 	}
 
 	var header strings.Builder
@@ -145,5 +142,4 @@ func TestWorkQueueMetadataManifestCompilation(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, manifest.WorkQueue)
 	assert.True(t, manifest.WorkQueue.Worker)
-	assert.Equal(t, contract, manifest.WorkQueue.LogicalContract)
 }

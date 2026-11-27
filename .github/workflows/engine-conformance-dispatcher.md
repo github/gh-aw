@@ -86,16 +86,17 @@ is a scheduling signal, not a new conformance requirement.
 
 Read the queue with `work_queue_read` using
 `{"pool":"engine-conformance","limit":32}`. An uninitialized queue is an empty
-backlog; the first trusted submission atomically installs Policy and Work.
-An existing policyless ledger is a failure. Surface tool failures instead of
-claiming an empty queue, and never dispatch ordinary workflows.
+backlog; the first trusted submission creates it with its Work. Surface tool
+failures instead of claiming an empty queue, and never dispatch ordinary
+workflows.
 
 The staged submission contains `{"nodes": <plan.nodes>}`. Date-keyed Work
 identities make a same-day repeat idempotent. The staged
 dispatch request contains the exact `plan.dispatch`:
 `{"pool":"engine-conformance","max_claims":3,"max_dispatches":3}`. Use only
 the advertised work-queue MCP tools or their CLI wrappers. Do not choose the
-winning Work, worker, revision, or target: the installed Policy does that.
+winning Work, worker, revision, or target: the scheduler and compiled queue
+policy do that.
 Staged intents are not evidence of native launches or successful checks.
 
 Global scheduling for the `engine-conformance` pool and its fairness keys lives

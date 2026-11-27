@@ -2,64 +2,42 @@ package workqueue
 
 import "encoding/json"
 
-const FileName = "work-queue.jsonl"
-const DefaultBranch = "work-queue"
-const Version = 3
-const MaxTimestamp int64 = 9007199254740991
-const MaxEnqueued = MaxTimestamp
-const MaxClaimsPerDispatch = 16
+const (
+	FileName      = "work-queue.jsonl"
+	DefaultBranch = "work-queue"
+	// Version is the ledger protocol version; replay rejects every other version.
+	Version = 4
+)
 
+// Actor is built from the publishing job's own context; write access to the
+// queue branch is the only authority v4 relies on.
 type Actor struct {
-	Role        string `json:"role"`
-	Principal   string `json:"principal"`
-	Repository  string `json:"repository"`
-	Workflow    string `json:"workflow,omitempty"`
-	RunID       string `json:"run_id,omitempty"`
-	RunAttempt  int    `json:"run_attempt,omitempty"`
-	DispatchID  string `json:"dispatch_id,omitempty"`
-	ClaimHandle string `json:"claim_handle,omitempty"`
+	Role       string `json:"role"`
+	Repository string `json:"repository"`
+	Workflow   string `json:"workflow,omitempty"`
+	RunID      string `json:"run_id,omitempty"`
+	RunAttempt int    `json:"run_attempt,omitempty"`
 }
 
+// Request binds an actor, a closed request kind and its parameters.
 type Request struct {
-	ID          string          `json:"id"`
-	Kind        string          `json:"kind"`
-	Parameters  json.RawMessage `json:"parameters"`
-	Fingerprint string          `json:"fingerprint"`
+	ID         string          `json:"id"`
+	Kind       string          `json:"kind"`
+	Parameters json.RawMessage `json:"parameters"`
 }
 
+// Operation is the canonical JSON of one closed ledger operation.
+type Operation = json.RawMessage
+
+// QueueCommit is one line of work-queue.jsonl. At is informational only.
 type QueueCommit struct {
-	Version     int         `json:"version"`
-	ID          string      `json:"id"`
-	Previous    *string     `json:"previous"`
-	Request     Request     `json:"request"`
-	Actor       Actor       `json:"actor"`
-	PolicyEpoch string      `json:"policy_epoch"`
-	At          int64       `json:"at"`
-	Operations  []Operation `json:"operations"`
-	Trace       *Trace      `json:"trace,omitempty"`
-}
-
-// CheckpointOperation carries a minimal projection bound to prior Git history.
-type CheckpointOperation struct {
-	Kind          string          `json:"kind"`
-	PriorGitSHA   string          `json:"prior_git_sha"`
-	PriorTip      string          `json:"prior_tip"`
-	HistorySHA256 string          `json:"history_sha256"`
-	StateSHA256   string          `json:"state_sha256"`
-	State         json.RawMessage `json:"state"`
-}
-
-type CheckpointParameters struct {
-	PriorGitSHA   string `json:"prior_git_sha"`
-	PriorTip      string `json:"prior_tip"`
-	HistorySHA256 string `json:"history_sha256"`
-	StateSHA256   string `json:"state_sha256"`
-}
-
-type Trace struct {
-	TraceID          string `json:"trace_id,omitempty"`
-	SpanID           string `json:"span_id,omitempty"`
-	PublisherAttempt int    `json:"publisher_attempt,omitempty"`
+	Version    int         `json:"version"`
+	ID         string      `json:"id"`
+	Previous   *string     `json:"previous"`
+	Request    Request     `json:"request"`
+	Actor      Actor       `json:"actor"`
+	At         int64       `json:"at"`
+	Operations []Operation `json:"operations"`
 }
 
 type Resource struct {
@@ -71,6 +49,7 @@ type Resource struct {
 	Number       string `json:"number"`
 }
 
+// Dependency is either a Work edge (WorkID) or an external Issue/Pull Request gate.
 type Dependency struct {
 	Kind      string    `json:"kind"`
 	WorkID    string    `json:"work_id,omitempty"`
@@ -79,242 +58,162 @@ type Dependency struct {
 }
 
 type Replacement struct {
-	WorkID      string `json:"work_id"`
-	Disposition string `json:"disposition"`
-	Evidence    string `json:"evidence"`
+	WorkID string `json:"work_id"`
 }
 
+// WorkContinuation is the remaining-work context a finish hands to its successor,
+// kept beside (never inside) the inherited payload.
+type WorkContinuation struct {
+	Route     string `json:"route"`
+	Message   string `json:"message"`
+	Remaining int    `json:"remaining"`
+}
+
+// WorkDefinition is the immutable Work operation.
 type WorkDefinition struct {
-	Kind             string          `json:"kind"`
-	WorkID           string          `json:"work_id"`
-	GraphID          string          `json:"graph_id"`
-	NodeKey          string          `json:"node_key"`
-	Pool             string          `json:"pool"`
-	Priority         int             `json:"priority"`
-	FairnessKey      string          `json:"fairness_key"`
-	WorkerProfile    string          `json:"worker_profile"`
-	LogicalContract  string          `json:"logical_contract,omitempty"`
-	ExecutionRef     string          `json:"execution_ref,omitempty"`
-	BatchTrustDomain string          `json:"batch_trust_domain"`
-	Payload          json.RawMessage `json:"payload"`
-	DependsOn        []Dependency    `json:"depends_on"`
-	Enqueued         int64           `json:"enqueued"`
-	ExpiresAt        *int64          `json:"expires_at,omitempty"`
-	Subject          *Resource       `json:"subject,omitempty"`
-	BackingIssue     *Resource       `json:"backing_issue,omitempty"`
-	ReplacementOf    *Replacement    `json:"replacement_of,omitempty"`
+	Kind          string            `json:"kind"`
+	WorkID        string            `json:"work_id"`
+	GraphID       string            `json:"graph_id"`
+	NodeKey       string            `json:"node_key"`
+	Pool          string            `json:"pool"`
+	Priority      int               `json:"priority"`
+	FairnessKey   string            `json:"fairness_key"`
+	WorkerProfile string            `json:"worker_profile"`
+	Payload       json.RawMessage   `json:"payload"`
+	DependsOn     []Dependency      `json:"depends_on"`
+	Subject       *Resource         `json:"subject,omitempty"`
+	BackingIssue  *Resource         `json:"backing_issue,omitempty"`
+	ReplacementOf *Replacement      `json:"replacement_of,omitempty"`
+	Continuation  *WorkContinuation `json:"continuation,omitempty"`
 }
 
-type Policy struct {
-	Authorization     string                  `json:"authorization,omitempty"`
-	Mode              string                  `json:"mode"`
-	ClassWeights      []int                   `json:"class_weights"`
-	AccountingWeights map[string]int          `json:"accounting_weights"`
-	Producers         map[string]ProducerRule `json:"producers"`
-	Projectors        []ProjectorRule         `json:"projectors,omitempty"`
-	Pools             map[string]PoolPolicy   `json:"pools"`
-	Limits            Limits                  `json:"limits"`
+type ObservationOperation struct {
+	Kind          string   `json:"kind"`
+	ObservationID string   `json:"observation_id"`
+	Resource      Resource `json:"resource"`
+	Condition     string   `json:"condition"`
+	State         string   `json:"state"`
+	StateReason   string   `json:"state_reason,omitempty"`
+	Merged        *bool    `json:"merged,omitempty"`
+	MergeCommit   string   `json:"merge_commit,omitempty"`
+	// ApprovedBy is the account ID of the writer whose close as completed approved the gate.
+	ApprovedBy string `json:"approved_by,omitempty"`
 }
 
-type ProducerRule struct {
-	Pools        []string `json:"pools"`
-	Priorities   []int    `json:"priorities"`
-	FairnessKeys []string `json:"fairness_keys"`
+type ClaimOperation struct {
+	Kind       string `json:"kind"`
+	WorkID     string `json:"work_id"`
+	ClaimID    string `json:"claim_id"`
+	DispatchID string `json:"dispatch_id"`
+	Handle     string `json:"handle"`
 }
 
-type ProjectorRule struct {
-	Principal        string     `json:"principal"`
-	Workflow         string     `json:"workflow"`
-	Ref              string     `json:"ref"`
-	Pools            []string   `json:"pools"`
-	Repositories     []string   `json:"repositories"`
-	BackingIssues    []Resource `json:"backing_issues,omitempty"`
-	CompletionPolicy string     `json:"completion_policy,omitempty"`
+type DispatchOperation struct {
+	Kind       string `json:"kind"`
+	DispatchID string `json:"dispatch_id"`
+	State      string `json:"state"`
+	RunID      string `json:"run_id"`
+	Revision   string `json:"revision"`
+}
+
+type BoundOperation struct {
+	Kind       string `json:"kind"`
+	DispatchID string `json:"dispatch_id"`
+	RunID      string `json:"run_id"`
+	RunAttempt int    `json:"run_attempt"`
+}
+
+type CompletionOperation struct {
+	Kind        string          `json:"kind"`
+	WorkID      string          `json:"work_id"`
+	ClaimID     string          `json:"claim_id"`
+	DispatchID  string          `json:"dispatch_id"`
+	ClaimHandle string          `json:"claim_handle"`
+	Effects     json.RawMessage `json:"effects"`
+}
+
+type ClaimCancellationOperation struct {
+	Kind    string `json:"kind"`
+	WorkID  string `json:"work_id"`
+	ClaimID string `json:"claim_id"`
+	Reason  string `json:"reason"`
+}
+
+type WorkCancellationOperation struct {
+	Kind    string `json:"kind"`
+	WorkID  string `json:"work_id"`
+	Reason  string `json:"reason"`
+	ClaimID string `json:"claim_id,omitempty"`
+}
+
+type ReleaseOperation struct {
+	Kind       string `json:"kind"`
+	DispatchID string `json:"dispatch_id"`
+	Reason     string `json:"reason"`
+}
+
+type CheckpointOperation struct {
+	Kind     string          `json:"kind"`
+	PriorTip string          `json:"prior_tip"`
+	State    json.RawMessage `json:"state"`
 }
 
 type IssueLinkOperation struct {
-	Kind         string   `json:"kind"`
-	WorkID       string   `json:"work_id"`
-	Resource     Resource `json:"resource"`
-	ProjectorRef string   `json:"projector_ref"`
-	ClaimID      string   `json:"claim_id,omitempty"`
+	Kind     string   `json:"kind"`
+	WorkID   string   `json:"work_id"`
+	Resource Resource `json:"resource"`
+	ClaimID  string   `json:"claim_id,omitempty"`
 }
 
 type IssueCommentOperation struct {
-	Kind             string `json:"kind"`
-	WorkID           string `json:"work_id"`
-	CommentID        string `json:"comment_id"`
-	ProjectorRef     string `json:"projector_ref"`
-	ClaimID          string `json:"claim_id,omitempty"`
-	AuthorityClaimID string `json:"authority_claim_id,omitempty"`
+	Kind      string `json:"kind"`
+	WorkID    string `json:"work_id"`
+	CommentID string `json:"comment_id"`
+	ClaimID   string `json:"claim_id,omitempty"`
 }
 
-type PoolPolicy struct {
-	DefaultProfile      string                   `json:"default_profile"`
-	Profiles            map[string]WorkerProfile `json:"profiles"`
-	LogicalLimit        int                      `json:"logical_limit"`
-	NativeLimit         int                      `json:"native_limit"`
-	PerAccountLimit     int                      `json:"per_account_limit,omitempty"`
-	AllowedRepositories []string                 `json:"allowed_repositories"`
-	MaxObservationAgeMS int64                    `json:"max_observation_age_ms"`
-	Retry               RetryPolicy              `json:"retry"`
-	Reconciliation      ReconciliationPolicy     `json:"reconciliation"`
+// Request parameters (closed per request kind).
+
+type WorkIDsParameters struct {
+	WorkIDs []string `json:"work_ids"`
 }
 
-type PoolInstallOperation struct {
-	Kind      string     `json:"kind"`
-	Pool      string     `json:"pool"`
-	Config    PoolPolicy `json:"config"`
-	ConfigRef string     `json:"config_ref,omitempty"`
-}
-
-type WorkerProfile struct {
-	LogicalContract string `json:"logical_contract,omitempty"`
-	Workflow        string `json:"workflow"`
-	Ref             string `json:"ref"`
-	Principal       string `json:"principal,omitempty"`
-	TrustDomain     string `json:"trust_domain"`
-	CredentialScope string `json:"credential_scope"`
-	EffectScope     string `json:"effect_scope"`
-	MaxClaims       int    `json:"max_claims"`
-	ShareKeys       bool   `json:"share_keys"`
-}
-
-// Deployment changes execution routes, never the installed scheduling policy.
-type DeploymentOperation struct {
-	Kind             string        `json:"kind"`
-	Pool             string        `json:"pool"`
-	WorkerProfile    string        `json:"worker_profile"`
-	ExpectedRef      string        `json:"expected_ref"`
-	ExpectedContract string        `json:"expected_contract"`
-	Profile          WorkerProfile `json:"profile"`
-	Available        bool          `json:"available"`
-	Activate         *bool         `json:"activate,omitempty"`
-	Reason           string        `json:"reason"`
-}
-
-type WorkerRevision struct {
-	Profile   WorkerProfile `json:"profile"`
-	Available bool          `json:"available"`
-}
-
-type WorkerDeployment struct {
-	CurrentRef      string                    `json:"current_ref"`
-	CurrentContract string                    `json:"current_contract"`
-	Revisions       map[string]WorkerRevision `json:"revisions"`
-}
-
-type RetryPolicy struct {
-	MaxAttempts int   `json:"max_attempts"`
-	BackoffMS   int64 `json:"backoff_ms"`
-}
-
-type ReconciliationPolicy struct {
-	MaxAttempts int   `json:"max_attempts"`
-	DeadlineMS  int64 `json:"deadline_ms"`
-}
-
-type Limits struct {
-	LedgerBytes       int64 `json:"ledger_bytes"`
-	RecoveryBytes     int64 `json:"recovery_bytes"`
-	PayloadBytes      int64 `json:"payload_bytes"`
-	GraphNodes        int   `json:"graph_nodes"`
-	Predecessors      int   `json:"predecessors"`
-	PendingNodes      int   `json:"pending_nodes"`
-	Operations        int   `json:"operations"`
-	AssignmentBytes   int64 `json:"assignment_bytes"`
-	ResultBytes       int64 `json:"result_bytes"`
-	EvidenceBytes     int64 `json:"evidence_bytes"`
-	ObservationWrites int   `json:"observation_writes"`
-}
-
-type Evidence struct {
-	Kind       string `json:"kind"`
-	Source     string `json:"source"`
-	Repository string `json:"repository"`
-	Workflow   string `json:"workflow"`
-	Ref        string `json:"ref"`
-	Principal  string `json:"principal"`
-	CheckedAt  int64  `json:"checked_at"`
-	RunID      string `json:"run_id,omitempty"`
-	RunAttempt int    `json:"run_attempt,omitempty"`
-	Status     string `json:"status,omitempty"`
-	Conclusion string `json:"conclusion,omitempty"`
-	Receipt    string `json:"receipt,omitempty"`
-	Attempts   int    `json:"attempts,omitempty"`
-	Effects    string `json:"effects,omitempty"`
-}
-
-type RunBinding struct {
-	RunID      string `json:"run_id"`
-	RunAttempt int    `json:"run_attempt"`
-	Repository string `json:"repository"`
-	Workflow   string `json:"workflow"`
-	Ref        string `json:"ref"`
-	Principal  string `json:"principal"`
-	Event      string `json:"event"`
-}
-
-// Operation stores a closed variant as raw JSON. Typed accessors keep absent,
-// null, and explicit zero distinct, unlike a struct with omitempty authority.
-type Operation = json.RawMessage
-
-type ClaimOperation struct {
-	Kind         string   `json:"kind"`
-	WorkID       string   `json:"work_id"`
-	ClaimID      string   `json:"claim_id"`
-	DispatchID   string   `json:"dispatch_id"`
-	Handle       string   `json:"handle"`
-	Observations []string `json:"observations"`
-}
-
-type Assignment struct {
-	Version       int               `json:"version"`
-	DispatchID    string            `json:"dispatch_id"`
-	RequestID     string            `json:"request_id"`
-	CommitID      string            `json:"commit_id"`
-	PolicyEpoch   string            `json:"policy_epoch"`
-	Pool          string            `json:"pool"`
-	WorkerProfile string            `json:"worker_profile"`
-	Claims        []AssignmentClaim `json:"claims"`
-}
-
-type AssignmentClaim struct {
-	Handle     string            `json:"handle"`
-	ClaimID    string            `json:"claim_id"`
-	WorkID     string            `json:"work_id"`
-	Work       json.RawMessage   `json:"work"`
-	ResultRefs []ResultReference `json:"result_refs"`
-}
-
-type ResultReference struct {
-	WorkID         string          `json:"work_id"`
-	ResultCommitID string          `json:"result_commit_id"`
-	Descriptor     json.RawMessage `json:"descriptor"`
+type DispatchProfile struct {
+	Workflow string `json:"workflow"`
 }
 
 type DispatchParameters struct {
-	WorkerProfiles []string `json:"worker_profiles,omitempty"`
-	Pool           string   `json:"pool"`
-	MaxClaims      int      `json:"max_claims"`
-	MaxDispatches  int      `json:"max_dispatches"`
-	MaxBytes       int64    `json:"max_bytes"`
+	Pool            string                     `json:"pool"`
+	MaxClaims       int                        `json:"max_claims"`
+	MaxDispatches   int                        `json:"max_dispatches"`
+	Concurrency     int                        `json:"concurrency"`
+	PerAccountLimit int                        `json:"per_account_limit"`
+	Profiles        map[string]DispatchProfile `json:"profiles"`
 }
 
-type FinishParameters struct {
-	DispatchID  string `json:"dispatch_id"`
-	ClaimHandle string `json:"claim_handle"`
-	Outcome     string `json:"outcome"`
-	KeepOpen    bool   `json:"keep_open,omitempty"`
+type DispatchIDParameters struct {
+	DispatchID string `json:"dispatch_id"`
 }
 
-type OperationsParameters struct {
+type ReleaseParameters struct {
+	DispatchID string `json:"dispatch_id"`
+	Reason     string `json:"reason"`
+}
+
+type CancelWorkParameters struct {
+	WorkIDs []string `json:"work_ids"`
+	Reason  string   `json:"reason"`
+}
+
+type CheckpointParameters struct {
+	PriorTip string `json:"prior_tip"`
+}
+
+type IssueLinkParameters struct {
 	Operations []Operation `json:"operations"`
 }
 
-type SubmitParameters struct {
-	Nodes []WorkDefinition `json:"nodes"`
-}
+// Projection records (also the checkpoint state format).
 
 type Position struct {
 	Commit    int `json:"commit"`
@@ -323,85 +222,57 @@ type Position struct {
 
 type WorkState struct {
 	WorkDefinition
-	AdmissionContract    string          `json:"admission_contract,omitempty"`
-	EffectivePriority    int             `json:"effective_priority,omitempty"`
 	State                string          `json:"state"`
 	Position             Position        `json:"position"`
-	ClaimID              string          `json:"claim_id,omitempty"`
 	Attempts             int             `json:"attempts"`
-	RetryNotBefore       int64           `json:"retry_not_before"`
+	ClaimID              string          `json:"claim_id,omitempty"`
 	CompletionID         string          `json:"completion_id,omitempty"`
-	Barrier              string          `json:"barrier"`
-	Result               json.RawMessage `json:"result,omitempty"`
-	ResultCommitID       string          `json:"result_commit_id,omitempty"`
-	Disposition          string          `json:"disposition,omitempty"`
+	Effects              json.RawMessage `json:"effects,omitempty"`
 	CancellationReason   string          `json:"cancellation_reason,omitempty"`
-	CancellationClaimID  string          `json:"cancellation_claim_id,omitempty"`
 	CancellationCommitID string          `json:"cancellation_commit_id,omitempty"`
-	IssueLink            *Resource       `json:"issue_link,omitempty"`
-	IssueSummary         string          `json:"issue_summary,omitempty"`
-	completionAt         int64
-	admissionRequestID   string
-}
-
-// SchedulingPriority leaves the admitted definition and historical Claims immutable.
-func (work *WorkState) SchedulingPriority() int {
-	if work.EffectivePriority != 0 {
-		return work.EffectivePriority
-	}
-	return work.Priority
+	IssueComment         string          `json:"issue_comment,omitempty"`
 }
 
 type ClaimState struct {
-	ClaimOperation
-	State              string `json:"state"`
-	CommitID           string `json:"commit_id"`
-	RequestID          string `json:"request_id"`
-	TerminalCommitID   string `json:"terminal_commit_id,omitempty"`
-	CancellationReason string `json:"cancellation_reason,omitempty"`
-	RetryNotBefore     int64  `json:"retry_not_before,omitempty"`
-	IssueComment       string `json:"issue_comment,omitempty"`
-	KeepOpen           bool   `json:"keep_open,omitempty"`
-	Barrier            string `json:"barrier,omitempty"`
+	ClaimID            string          `json:"claim_id"`
+	WorkID             string          `json:"work_id"`
+	DispatchID         string          `json:"dispatch_id"`
+	Handle             string          `json:"handle"`
+	State              string          `json:"state"`
+	CommitID           string          `json:"commit_id"`
+	RequestID          string          `json:"request_id"`
+	TerminalCommitID   string          `json:"terminal_commit_id,omitempty"`
+	CancellationReason string          `json:"cancellation_reason,omitempty"`
+	Effects            json.RawMessage `json:"effects,omitempty"`
+	IssueComment       string          `json:"issue_comment,omitempty"`
+}
+
+type RunBinding struct {
+	RunID      string `json:"run_id"`
+	RunAttempt int    `json:"run_attempt"`
+}
+
+// LaunchRecord is the run and head revision a dispatcher recorded launching for a Dispatch.
+type LaunchRecord struct {
+	RunID    string `json:"run_id"`
+	Revision string `json:"revision"`
 }
 
 type DispatchState struct {
-	Assignment
-	Profile             WorkerProfile `json:"profile"`
-	State               string        `json:"state"`
-	Sender              *Actor        `json:"sender,omitempty"`
-	CredentialPrincipal string        `json:"credential_principal,omitempty"`
-	Run                 *RunBinding   `json:"run,omitempty"`
-	Released            bool          `json:"released"`
-	Reason              string        `json:"reason,omitempty"`
-	LifecycleWrites     int           `json:"lifecycle_writes"`
-}
-
-type Observation struct {
-	Kind                 string   `json:"kind"`
-	ObservationID        string   `json:"observation_id"`
-	Resource             Resource `json:"resource"`
-	Condition            string   `json:"condition"`
-	State                string   `json:"state"`
-	ObservedAt           int64    `json:"observed_at"`
-	CredentialGeneration string   `json:"credential_generation"`
-	SourceUpdatedAt      *int64   `json:"source_updated_at,omitempty"`
-	ReadStatus           string   `json:"read_status"`
-	StateReason          string   `json:"state_reason,omitempty"`
-	ResourceState        string   `json:"resource_state,omitempty"`
-	Merged               *bool    `json:"merged,omitempty"`
-	MergeCommit          string   `json:"merge_commit,omitempty"`
-}
-
-type Clock struct {
-	V      string            `json:"v"`
-	Pass   map[string]string `json:"pass"`
-	Active map[string]bool   `json:"active"`
-}
-
-type PoolClocks struct {
-	Classes Clock         `json:"classes"`
-	Keys    map[int]Clock `json:"keys"`
+	DispatchID    string `json:"dispatch_id"`
+	RequestID     string `json:"request_id"`
+	CommitID      string `json:"commit_id"`
+	Pool          string `json:"pool"`
+	WorkerProfile string `json:"worker_profile"`
+	Workflow      string `json:"workflow"`
+	// ReservedBy is the dispatcher run attempt whose dispatch_next reserved the Dispatch;
+	// only it records the launch, so maintenance judges a reserved Dispatch by its state.
+	ReservedBy RunBinding    `json:"reserved_by"`
+	State      string        `json:"state"`
+	Run        *RunBinding   `json:"run"`
+	Launch     *LaunchRecord `json:"launch"`
+	// Claims holds the Dispatch's sole Claim: one Claim per Dispatch is a replay rule.
+	Claims [1]string `json:"claims"`
 }
 
 type Stats struct {
@@ -416,52 +287,49 @@ type Stats struct {
 	Nodes        int `json:"nodes"`
 }
 
+// Projection is the state derived by replaying the ledger in file order.
 type Projection struct {
-	resourceHost         string
-	timeWatermark        int64
-	expiringWorks        map[string]bool
-	SchedulingProfiles   []string                                `json:"-"`
-	Repository           string                                  `json:"repository"`
-	Tip                  string                                  `json:"tip"`
-	PolicyEpoch          string                                  `json:"policy_epoch"`
-	Policy               *Policy                                 `json:"policy"`
-	Deployments          map[string]map[string]*WorkerDeployment `json:"deployments,omitempty"`
-	Works                map[string]*WorkState                   `json:"works"`
-	Claims               map[string]*ClaimState                  `json:"claims"`
-	Dispatches           map[string]*DispatchState               `json:"dispatches"`
-	Observations         map[string]*Observation                 `json:"observations"`
-	Requests             map[string]QueueCommit                  `json:"requests"`
-	Clocks               map[string]PoolClocks                   `json:"clocks"`
-	AdmissionPaused      bool                                    `json:"admission_paused"`
-	GrantsPaused         bool                                    `json:"grants_paused"`
-	CredentialGeneration string                                  `json:"credential_generation"`
-	Stats                Stats                                   `json:"stats"`
-	LedgerBytes          int64                                   `json:"ledger_bytes"`
-	ObservationWrites    map[string]int                          `json:"observation_writes"`
-	RequestOrder         []string                                `json:"-"`
-	CheckpointReceipts   []checkpointReceipt                     `json:"-"`
-	WorkCreators         map[string]Actor                        `json:"-"`
-	ClaimExplanations    map[string]ClaimExplanation             `json:"-"`
-	SeenEpochs           map[string]bool                         `json:"-"`
-	SeenGenerations      map[string]bool                         `json:"-"`
-	ObservationIDs       map[string]*Observation                 `json:"-"`
-	TerminalBarriers     map[string]Operation                    `json:"-"`
-	DeliveryEvidence     map[string]Operation                    `json:"-"`
-	Cancellations        map[string]Operation                    `json:"-"`
+	Repository string
+	Tip        string
+	// Commits is the ordinal of the next commit, including history folded into a checkpoint.
+	Commits      int
+	Works        map[string]*WorkState
+	Claims       map[string]*ClaimState
+	Dispatches   map[string]*DispatchState
+	Observations map[string]ObservationOperation
+	Requests     map[string]struct{}
+	WorkCreators map[string]Actor
+	Transactions []QueueCommit
+	Stats        Stats
+
+	dispatchOrder []string
+	admission     *admissionIndex
 }
 
-type Selection struct {
-	WorkID       string   `json:"work_id,omitempty"`
-	Reason       string   `json:"reason"`
-	Observations []string `json:"observations"`
-	ClassPass    string   `json:"class_pass,omitempty"`
-	KeyPass      string   `json:"key_pass,omitempty"`
-}
-
+// Decision is a planned dispatch_next selection.
 type Decision struct {
-	Tip         string       `json:"tip"`
-	Operations  []Operation  `json:"operations"`
-	Assignments []Assignment `json:"assignments"`
-	Reason      string       `json:"reason"`
-	Next        Selection    `json:"next"`
+	Operations []ClaimOperation `json:"operations"`
+	Dispatches []string         `json:"dispatches"`
+	Reason     string           `json:"reason"`
+}
+
+// Assignment is the worker's view of one Dispatch.
+type Assignment struct {
+	DispatchID string            `json:"dispatch_id"`
+	Claims     []AssignmentClaim `json:"claims"`
+}
+
+type AssignmentClaim struct {
+	Handle       string            `json:"handle"`
+	ClaimID      string            `json:"claim_id"`
+	WorkID       string            `json:"work_id"`
+	Work         json.RawMessage   `json:"work"`
+	ResultRefs   []ResultReference `json:"result_refs"`
+	Continuation *WorkContinuation `json:"continuation,omitempty"`
+}
+
+type ResultReference struct {
+	WorkID         string          `json:"work_id"`
+	ResultCommitID string          `json:"result_commit_id"`
+	Descriptor     json.RawMessage `json:"descriptor"`
 }

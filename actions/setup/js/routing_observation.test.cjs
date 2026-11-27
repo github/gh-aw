@@ -95,6 +95,21 @@ describe("routingOutcome", () => {
     ["an interrupted harness attempt", { agentResult: "failure", harness: { outcome: "interrupted", failureClasses: [] } }, skip("infrastructure")],
     ["a provider 5xx", { agentResult: "failure", execution: { categories: [], errorCodes: ["503"] } }, skip("infrastructure")],
     ["an authentication failure", { agentResult: "failure", execution: { categories: ["authentication_failed"], errorCodes: [] } }, skip("infrastructure")],
+    [
+      "a category-only model endpoint mismatch with no terminal output",
+      { agentResult: "failure", output: output(["report_incomplete"], { collectorFailureCause: "missing_terminal_safe_output" }), execution: { categories: ["model_endpoint_mismatch_error"], errorCodes: [] } },
+      skip("infrastructure"),
+    ],
+    [
+      "a category-only model policy violation with no terminal output",
+      { agentResult: "failure", output: output(["report_incomplete"], { collectorFailureCause: "missing_terminal_safe_output" }), execution: { categories: ["model_policy_violation"], errorCodes: [] } },
+      skip("infrastructure"),
+    ],
+    [
+      "a model endpoint mismatch beside a confirmed limit",
+      { agentResult: "failure", output: output([]), execution: { categories: ["model_endpoint_mismatch_error", "effective_tokens_limit_exceeded"], errorCodes: [] } },
+      skip("infrastructure"),
+    ],
     ["an API challenge the harness retries could not clear", { agentResult: "failure", output: output([]), harness: { outcome: "failure", failureClasses: ["transient_error"] } }, skip("infrastructure")],
     ["an incomplete report claiming an infrastructure error", { agentResult: "failure", output: summarizeAgentOutput({ items: [{ type: "report_incomplete", reason: "infrastructure_error" }], errors: [] }) }, skip("unknown_evidence")],
     [
@@ -111,6 +126,16 @@ describe("routingOutcome", () => {
     ["a turn limit without agent output", { agentResult: "failure", output: undefined, harness: turnLimit }, { outcome: "failure" }],
     ["a turn limit beside an unclassified nonzero exit", { agentResult: "failure", output: output(["report_incomplete"], { collectorFailureCause: "driver_crash" }), harness: turnLimit }, { outcome: "failure" }],
     ["a credit limit wrapped as an authentication failure", { agentResult: "failure", output: output([]), execution: { categories: ["authentication_failed", "max_ai_credits_exceeded"], errorCodes: [] } }, { outcome: "failure" }],
+    [
+      "an effective token limit beside a model policy violation",
+      { agentResult: "failure", output: output([]), execution: { categories: ["model_policy_violation", "effective_tokens_limit_exceeded"], errorCodes: [] } },
+      { outcome: "failure" },
+    ],
+    [
+      "a permission denial limit beside a model policy violation",
+      { agentResult: "failure", output: output([]), execution: { categories: ["model_policy_violation", "permission_denied_limit_exceeded"], errorCodes: [] } },
+      { outcome: "failure" },
+    ],
     ["a turn limit beside a retried API challenge", { agentResult: "failure", output: output([]), harness: { outcome: "failure", failureClasses: ["transient_error", "max_turns"] } }, { outcome: "failure" }],
     ["a refusal that left no terminal output", { agentResult: "failure", output: output([]), refused: true }, { outcome: "failure" }],
     ["a refusal the agent recovered from", { agentResult: "failure", refused: true }, skip("unknown_evidence")],

@@ -94,7 +94,7 @@ You are a repository intelligence analyst. Produce a concise daily report for th
    - `grep "pattern"` only for targeted confirmation of a pattern or term
 7. Synthesize one report issue with the highest-signal findings only.
 
-Graft is a native CLI; invoke it as `graft --dir=/tmp/gh-aw/graft <command> [arguments...]` through bash. Safe outputs remain CLI-mounted: emit the report or noop with `safeoutputs create_issue` or `safeoutputs noop`, not native MCP calls. Do not run Graft `check`, `build`, or `mcp` during analysis.
+Graft is a native CLI; invoke each query as a separate bash call using `graft --dir=/tmp/gh-aw/graft <command> [arguments...]`, without pipes or redirections such as `2>&1 | head`. Safe outputs remain CLI-mounted: emit the report or noop with `safeoutputs create_issue` or `safeoutputs noop`, not native MCP calls. Do not run Graft `check`, `build`, or `mcp` during analysis.
 
 ## Analysis goals
 

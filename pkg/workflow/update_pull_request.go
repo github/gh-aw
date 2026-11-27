@@ -18,6 +18,7 @@ type UpdatePullRequestsConfig struct {
 	UpdateBranch           *bool   `yaml:"update-branch,omitempty"` // When true, update PR branch with latest base branch changes before applying other updates. Defaults to false.
 	UpdateBranchStacks     *bool   `yaml:"sync-stack,omitempty"`    // When true, allow stacked-PR stack-sync fallback if update-branch endpoint is unsupported. Defaults to true.
 	Operation              *string `yaml:"operation,omitempty"`     // Default operation for body updates: "append", "prepend", or "replace" (defaults to "replace")
+	RequiredAuthor         string  `yaml:"required-author,omitempty"`
 }
 
 // parseUpdatePullRequestsConfig handles update-pull-request configuration
@@ -43,5 +44,6 @@ func (c *Compiler) parseUpdatePullRequestsConfig(outputMap map[string]any) *Upda
 			}
 			// Parse required-labels and required-title-prefix filter fields
 			cfg.SafeOutputFilterConfig = ParseFilterConfig(configMap)
+			cfg.RequiredAuthor = extractStringFromMap(configMap, "required-author", updatePullRequestLog)
 		})
 }

@@ -151,8 +151,10 @@ func TestSpec_PublicAPI_DefaultBuiltInRules(t *testing.T) {
 	}{
 		{"TemplateInjectionRule", lint.TemplateInjectionRule},
 		{"PromptExpressionRule", lint.PromptExpressionRule},
+		{"PromptConditionSyntaxRule", lint.PromptConditionSyntaxRule},
 		{"SecretLeakRule", lint.SecretLeakRule},
 		{"OTLPSecretLeakRule", lint.OTLPSecretLeakRule},
+		{"OverprovisionedSecretsRule", lint.OverprovisionedSecretsRule},
 		{"ActionPinRule", lint.ActionPinRule},
 		{"VersionCheckRule", lint.VersionCheckRule},
 		{"JobTimeoutRule", lint.JobTimeoutRule},
@@ -164,7 +166,9 @@ func TestSpec_PublicAPI_DefaultBuiltInRules(t *testing.T) {
 		{"InstallScriptsRule", lint.InstallScriptsRule},
 		{"GatewayDispatchLiteralsRule", lint.GatewayDispatchLiteralsRule},
 		{"BashCasePatternRule", lint.BashCasePatternRule},
+		{"UnquotedCommandAssignmentRule", lint.UnquotedCommandAssignmentRule},
 		{"ObfuscationRule", lint.ObfuscationRule},
+		{"UnsoundContainsRule", lint.UnsoundContainsRule},
 		{"PermissionScopeRule", lint.PermissionScopeRule},
 		{"ExcessivePermissionsRule", lint.ExcessivePermissionsRule},
 		{"CustomJobDetectionRule", lint.CustomJobDetectionRule},
@@ -174,6 +178,8 @@ func TestSpec_PublicAPI_DefaultBuiltInRules(t *testing.T) {
 		{"PullRequestTargetRolesRule", lint.PullRequestTargetRolesRule},
 		{"UntrustedRolesDetectionRule", lint.UntrustedRolesDetectionRule},
 		{"PullRequestTargetCheckoutRule", lint.PullRequestTargetCheckoutRule},
+		{"BotConditionsRule", lint.BotConditionsRule},
+		{"DangerousTriggersRule", lint.DangerousTriggersRule},
 		{"NetworkScopeRule", lint.NetworkScopeRule},
 		{"PushTargetRule", lint.PushTargetRule},
 		{"AllowedLabelsRule", lint.AllowedLabelsRule},
@@ -191,12 +197,41 @@ func TestSpec_PublicAPI_DefaultBuiltInRules(t *testing.T) {
 		{"CachePoisoningRule", lint.CachePoisoningRule},
 		{"EnvironmentFileInjectionRule", lint.EnvironmentFileInjectionRule},
 		{"GraderFileIORule", lint.GraderFileIORule},
+		{"FileAccessRule", lint.FileAccessRule},
 	}
 	for _, tt := range constructors {
 		t.Run(tt.name, func(t *testing.T) {
 			rule := tt.new()
 			require.NotEmpty(t, rule.ID, "the documented %s constructor must identify its rule", tt.name)
 			assert.True(t, registered[rule.ID], "Default must register the documented %s constructor", tt.name)
+		})
+	}
+}
+
+// TestSpec_PublicAPI_UnquotedCommandAssignmentExclusions checks README.md /
+// Built-in Rules: quoted literals, command substitution, and environment
+// assignments preceding a command are intentional shell constructs.
+func TestSpec_PublicAPI_UnquotedCommandAssignmentExclusions(t *testing.T) {
+	runner, err := lint.New(lint.UnquotedCommandAssignmentRule())
+	require.NoError(t, err, "the documented assignment rule must construct a runner")
+	for _, tt := range []struct {
+		name   string
+		script string
+	}{
+		{"documented environment assignment", "x=pr echo ok"},
+		{"quoted literal", "x=\"pr\""},
+		{"command substitution", "x=$(printf '%s' pr)"},
+		{"exported quoted literal", "export x=\"pr\""},
+		{"declared quoted literal", "declare x=\"pr\""},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			diagnostics, err := runner.Run(context.Background(), lint.Input{
+				Document:           &aw.Document{},
+				SourcePath:         "workflow.md",
+				ResolvedMCPScripts: map[string]string{"example": tt.script},
+			})
+			require.NoError(t, err, "intentional shell syntax must be accepted for %s", tt.name)
+			assert.Empty(t, diagnostics, "the assignment rule must accept %s", tt.name)
 		})
 	}
 }

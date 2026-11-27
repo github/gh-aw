@@ -14,6 +14,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/internal/astutil"
 	"github.com/github/gh-aw/pkg/linters/internal/filecheck"
 	"github.com/github/gh-aw/pkg/linters/internal/nolint"
+	"github.com/github/gh-aw/pkg/linters/internal/parentmap"
 	"github.com/github/gh-aw/pkg/logger"
 )
 
@@ -24,6 +25,7 @@ var Analyzer = analyzerutil.New(
 	"goroutineresourceleak",
 	"reports goroutine resource leaks, unmatched channel operations, and loop-launched goroutines without WaitGroup synchronization",
 	run,
+	parentmap.Analyzer,
 )
 
 func run(pass *analysis.Pass) (any, error) {
@@ -34,13 +36,17 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, err
 	}
 
-	parents := buildParentMap(pass.Files)
+	fileParents, err := parentmap.Of(pass)
+	if err != nil {
+		return nil, err
+	}
 	nodeFilter := []ast.Node{(*ast.GoStmt)(nil)}
 	return analyzerutil.Preorder(pass, nodeFilter, func(n ast.Node) {
 		goStmt, ok := n.(*ast.GoStmt)
 		if !ok {
 			return
 		}
+		parents := fileParents[astutil.FileForPos(pass.Files, goStmt.Pos())]
 		checkGoroutineResourceLeak(pass, goStmt, parents, noLintIndex, generatedFiles)
 	})
 }

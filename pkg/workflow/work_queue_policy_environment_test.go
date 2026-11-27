@@ -13,24 +13,15 @@ import (
 )
 
 func TestWorkQueuePolicyEnvironmentSharedRegistryWithinActionsLimit(t *testing.T) {
-	policy := workqueue.DefaultPolicy("1", "${{ github.repository }}")
-	policy.Authorization = "aw"
-	policy.Producers = map[string]workqueue.ProducerRule{}
-	template := policy.Pools["default"]
-	profile := template.Profiles["default"]
-	profile.Principal = ""
-	profile.Ref = "${{ github.sha }}"
-	profile.LogicalContract = strings.Repeat("a", 64)
-	template.Profiles = map[string]workqueue.WorkerProfile{}
-	template.DefaultProfile = "worker-0"
-	for index := range 40 {
-		name := fmt.Sprintf("worker-%d", index)
-		profile.Workflow = ".github/workflows/" + name + ".lock.yml"
-		template.Profiles[name] = profile
+	settings, err := workqueue.ParseSettings([]byte(`{"pools":{"reports":{"concurrency":3},"engines":{"concurrency":3,"per_account_limit":1},"smoke":{},"scanning":{}}}`))
+	require.NoError(t, err)
+	// Workers are listed once, so only a large approved set exceeds one Actions value.
+	workers := make([]string, 0, 256)
+	for index := range 256 {
+		workers = append(workers, fmt.Sprintf("worker-%03d-%s", index, strings.Repeat("x", 80)))
 	}
-	for _, name := range []string{"default", "reports", "engines"} {
-		policy.Pools[name] = template
-	}
+	policy, err := workqueue.BuildPolicyEnv(settings, "${{ github.repository }}", workers)
+	require.NoError(t, err)
 	encoded, err := json.Marshal(policy)
 	require.NoError(t, err)
 	require.Greater(t, len(encoded), 21*1024)

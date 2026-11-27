@@ -26,12 +26,12 @@ func NewEditCommand() *cobra.Command {
 
 The workflow-id may be a workflow name, a Markdown filename, or a path. Changes are
 validated before writing. Workflows managed by a source: declaration can be edited
-locally; by default, future updates will merge in those local changes (use --no-merge to override).
+locally; by default, future updates will merge in those local changes (use gh aw update --no-merge to replace them with the upstream version).
 
 Edits that change nothing leave the workflow untouched. When frontmatter does change it is
 re-serialized, so YAML comments, key ordering, and quoting styles are not preserved.
 
-Connector imports use the same local/pinned imports and typed with bindings as other
+Connector imports use the same local/pinned imports and typed bindings as other
 shared workflows. Pass a YAML import object to --add-import for exact resource IDs
 and secret names, never secret values. Importing does not select capabilities:
 select narrow tools.<id> reads/native methods and staged safe-outputs separately.
@@ -54,7 +54,7 @@ Inspect the declaration with gh aw connector <id> setup before editing.`,
 	cmd.Flags().StringArray("add-skill", nil, "Append a workflow skill")
 	cmd.Flags().StringArray("remove-skill", nil, "Remove a workflow skill")
 	cmd.Flags().String("schedule", "", "Set a schedule using a fuzzy schedule or cron expression; use off to remove it")
-	cmd.Flags().Bool("dry-run", false, "Validate changes without writing or compiling")
+	cmd.Flags().Bool("dry-run", false, "Validate and print changed workflow content without writing or compiling")
 	cmd.Flags().StringP("dir", "d", "", "Workflow directory (default: $GH_AW_WORKFLOWS_DIR or .github/workflows)")
 	cmd.ValidArgsFunction = CompleteWorkflowNames
 	RegisterDirFlagCompletion(cmd, "dir")

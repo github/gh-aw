@@ -159,8 +159,6 @@ These settings independently request the `github-app` broker capability; neither
 > [!CAUTION]
 > Custom steps, jobs, and actions in a brokered job run with that job's full credential authority. This includes `pre-steps`, `steps`, `pre-agent-steps`, `post-steps`, `jobs`, and `safe-outputs.steps`. `safe-outputs.jobs` do not inherit broker authentication; they use their own configured credentials. These steps can read the brokered token. They can also use the job-wide `id-token: write` permission to request their own credentials from the broker. Cleanup only limits use after the job ends. Review this code whenever it changes. Pin third-party actions to full commit SHAs. Never let agent output or untrusted input choose code, actions, refs, or target repositories. Keep code that does not need credentials in separate jobs without `id-token: write`. See [security considerations](/gh-aw/specs/token-broker-specification/#appendix-c-security-and-privacy-considerations-normative).
 
-Work queue dispatch cannot use a brokered installation token because the broker response does not provide a verified App identity binding. Configure `safe-outputs.dispatch-workflow.github-app` or `safe-outputs.dispatch-workflow.github-token` explicitly. Dispatches without a verifiable binding are blocked before queue publication or launch.
-
 ### Imports (`imports:`)
 
 Share and reuse workflow components across multiple workflows. The `imports:` field in frontmatter (or `{{#import ...}}` in markdown) composes shared tools, steps, MCP servers, and prompts from other workflow files.
@@ -307,15 +305,14 @@ model: router/economy
 
 To narrow the main agent's choices without restricting sub-agents, add a [shortlist](/gh-aw/reference/model-routing/#a-shortlist-of-models) alongside a literal router value. To opt out of [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) without pinning a model, omit `model` and set top-level `model-routing: false`.
 
-### Adaptive Routing (`adaptive-routing:`)
-
-Set `adaptive-routing: observe` on a routed workflow that enables `tools.repo-memory` to record each run's model and effort, whether it completed its task, and what it cost, on the `memory/adaptive-routing/<workflow>` branch. The workflow keeps running the router's ordinary pick. `false` turns it off, including a repository default from `aw.json`. See [Adaptive Routing](/gh-aw/reference/adaptive-routing/).
+To record the selected model and effort, outcome, and cost without changing the router's pick, set `learning: observe` under `model-routing` and enable `tools.repo-memory`. Set `learning: false` to override an import or repository default without disabling routing. See [Adaptive Routing](/gh-aw/reference/adaptive-routing/).
 
 ```aw wrap
 model: router
+model-routing:
+  learning: observe
 tools:
   repo-memory: true
-adaptive-routing: observe
 ```
 
 ### Engine Driver (`engine.driver:`)

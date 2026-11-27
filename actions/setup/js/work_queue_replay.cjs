@@ -4,1580 +4,793 @@ const log = require("./work_queue_logging.cjs").createWorkQueueLogger("replay");
 const { iterateLines, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 
 const { createHash } = require("node:crypto");
-const { deflateRawSync, inflateRawSync } = require("node:zlib");
-const { canonical, canonicalBytes, closed, digest, fingerprint, identity, integer, parseStrictJSON, queueError, utf8Compare, validateReason } = require("./work_queue_codec.cjs");
-const { boundedBytes, checkLedgerBudget } = require("./work_queue_limits.cjs");
-const { indexesFor, trackState, untrackState, updateIndexes } = require("./work_queue_indexes.cjs");
-const { validateEffectResourceAuthority } = require("./work_queue_resource_scope.cjs");
-const { applyIssueBinding } = require("./work_queue_issue_contract.cjs");
-const { advanceExpiration, expirationView } = require("./work_queue_expiration.cjs");
-const { initializeDeployments, validateDeployment, applyDeployment, admissionProfile, obsoleteWork, serializeDeployments, restoreDeployments } = require("./work_queue_deployment.cjs");
+const { canonical, closed, digest, identity, integer, parseStrictJSON, queueError, utf8Compare } = require("./work_queue_codec.cjs");
+const { EFFECTS_BYTES, LEDGER_BYTES, OPERATIONS_PER_COMMIT, RETAINED_REQUESTS, boundedBytes } = require("./work_queue_limits.cjs");
+const { PROFILE_WORKFLOW, decimal, validateActor } = require("./work_queue_policy.cjs");
 const {
-  actorFromContext,
-  bindingAuthority,
-  claimAuthority,
-  decimal,
-  defaultPolicy,
-  dispatchPrincipal,
-  freshClocks,
-  normalizeTrustedContext,
-  poolPolicy,
-  validateActor,
-  validatePolicy,
-  validateRequestRole,
-  validateSubmissionEntitlement,
-  workerContinuationAuthority,
-} = require("./work_queue_policy.cjs");
-const { dependencyStatus, gateKey, observationSatisfies, validateGraphAdmission, validateResource, workDefinition } = require("./work_queue_graph.cjs");
-const {
-  applyScheduledClaim,
-  assignmentForDispatch,
-  assignmentOnly,
-  assignmentsForRequest,
-  diagnostics,
-  eligibility,
-  fifoCompare,
-  planDispatch,
-  planNext,
-  reservationCounts,
-  selectionOnly,
-  validateDispatchParameters,
-} = require("./work_queue_scheduler.cjs");
+  ISSUE_CONDITIONS,
+  WORK_OPTIONAL,
+  WORK_REQUIRED,
+  approvalGate,
+  backingIssueOwner,
+  continuationChild,
+  gateKey,
+  issueKey,
+  trackAdmittedWork,
+  trackBackingIssue,
+  trackWorkState,
+  validateGraphAdmission,
+  validateResource,
+  validateWork,
+  workDefinition,
+} = require("./work_queue_graph.cjs");
 
-const DELIVERY_EVIDENCE_MAX_BYTES = 32 * 1024;
+/** @type {4} */
+const PROTOCOL_VERSION = 4;
+
+const CLAIM_CANCELLATION_REASONS = ["worker_failed", "worker_terminated", "launch_failed", "run_terminal", "run_missing", "operator"];
+const WORK_CANCELLATION_REASONS = ["attempts_exhausted", "operator", "related_issue_closed", "worker_contract_obsolete"];
+const RELEASE_REASONS = ["launch_failed", "worker_terminated", "run_terminal", "run_missing", "operator"];
+// The worker revision a dispatcher recorded for its launched run: a full Git object ID.
+const LAUNCH_REVISION = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 
 const OP_FIELDS = {
-  Policy: [["kind", "epoch", "policy"], []],
-  PoolInstall: [["kind", "pool", "config"], ["config_ref"]],
-  Deployment: [["kind", "pool", "worker_profile", "expected_ref", "expected_contract", "profile", "available", "reason"], ["activate"]],
-  Control: [["kind", "control", "value", "reason"], []],
-  Work: [
-    ["kind", "work_id", "graph_id", "node_key", "pool", "priority", "fairness_key", "worker_profile", "batch_trust_domain", "payload", "depends_on", "enqueued"],
-    ["subject", "backing_issue", "replacement_of", "logical_contract", "execution_ref", "expires_at"],
-  ],
-  Claim: [["kind", "work_id", "claim_id", "dispatch_id", "handle", "observations"], []],
-  Completion: [["kind", "work_id", "claim_id", "dispatch_id", "claim_handle", "run_id", "run_attempt"], ["keep_open"]],
-  DeliveryEvidence: [["kind", "work_id", "claim_id", "dispatch_id", "claim_handle", "completion_id", "run_id", "run_attempt", "outputs", "effects"], ["controls_digest"]],
-  Result: [["kind", "work_id", "claim_id", "completion_id", "descriptor", "evidence"], []],
-  DeliveryFailure: [["kind", "work_id", "claim_id", "completion_id", "reason", "disposition", "evidence"], []],
+  Work: [WORK_REQUIRED, WORK_OPTIONAL],
   Observation: [
-    ["kind", "observation_id", "resource", "condition", "state", "observed_at", "credential_generation", "read_status"],
-    ["source_updated_at", "state_reason", "resource_state", "merged", "merge_commit"],
+    ["kind", "observation_id", "resource", "condition", "state"],
+    ["state_reason", "merged", "merge_commit", "approved_by"],
   ],
-  ClaimCancellation: [["kind", "work_id", "claim_id", "reason", "retry_not_before"], []],
-  WorkCancellation: [
-    ["kind", "work_id", "reason"],
-    ["claim_id", "version"],
-  ],
-  WorkPriority: [["kind", "work_id", "priority", "expected_priority", "reason"], []],
-  Dispatch: [
-    ["kind", "dispatch_id", "state"],
-    ["sender", "run", "evidence", "reason", "credential_principal"],
-  ],
-  Release: [["kind", "dispatch_id", "evidence"], []],
-  Checkpoint: [["kind", "prior_git_sha", "prior_tip", "history_sha256", "state_sha256", "state"], []],
-  IssueLink: [["kind", "work_id", "resource", "projector_ref"], ["claim_id"]],
-  IssueComment: [
-    ["kind", "work_id", "comment_id", "projector_ref"],
-    ["claim_id", "authority_claim_id"],
-  ],
+  Claim: [["kind", "work_id", "claim_id", "dispatch_id", "handle"], []],
+  Dispatch: [["kind", "dispatch_id", "state", "run_id", "revision"], []],
+  Bound: [["kind", "dispatch_id", "run_id", "run_attempt"], []],
+  Completion: [["kind", "work_id", "claim_id", "dispatch_id", "claim_handle", "effects"], []],
+  ClaimCancellation: [["kind", "work_id", "claim_id", "reason"], []],
+  WorkCancellation: [["kind", "work_id", "reason"], ["claim_id"]],
+  Release: [["kind", "dispatch_id", "reason"], []],
+  Checkpoint: [["kind", "prior_tip", "state"], []],
+  IssueLink: [["kind", "work_id", "resource"], ["claim_id"]],
+  IssueComment: [["kind", "work_id", "comment_id"], ["claim_id"]],
 };
 
-function poolIdentity(name) {
-  identity(name, "pool");
-  if (["__proto__", "constructor", "prototype"].includes(name)) throw queueError("policy_invalid", "reserved pool identity");
-  return name;
-}
-
-function approvedPoolProfile(state, name, profile) {
-  for (const [poolName, pool] of Object.entries(state.policy.pools)) {
-    if (!Object.hasOwn(pool.profiles, name)) continue;
-    const deployment = state.deployments?.get(poolName)?.get(name);
-    if (!deployment) {
-      if (canonical(pool.profiles[name]) === canonical(profile)) return true;
-      continue;
-    }
-    const revisions = deployment.revisions;
-    if (Object.hasOwn(revisions, profile.ref) && revisions[profile.ref].available && canonical(revisions[profile.ref].profile) === canonical(profile)) return true;
-  }
-  return false;
-}
-
-function newPoolProfile(state, name, profile, configRef) {
-  if (Object.values(state.policy.pools).some(pool => Object.hasOwn(pool.profiles, name))) return false;
-  return (
-    typeof configRef === "string" &&
-    /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(configRef) &&
-    !/^0+$/.test(configRef) &&
-    profile.ref === configRef &&
-    /^[a-f0-9]{64}$/.test(profile.logical_contract) &&
-    profile.workflow === `.github/workflows/${name}.lock.yml` &&
-    !name.includes("/") &&
-    profile.max_claims === 1 &&
-    profile.share_keys === false
-  );
-}
-
+// Request kind -> permitted operation kinds and closed parameter fields.
 const REQUEST_KINDS = {
-  policy: ["Policy"],
-  pool_install: ["PoolInstall"],
-  deployment: ["Deployment"],
-  control: ["Control", "WorkPriority"],
-  submit: ["Policy", "Work"],
-  dispatch_next: ["Observation", "Claim"],
-  finish: ["Completion", "ClaimCancellation", "WorkCancellation"],
-  observe: ["Observation"],
-  dispatch: ["Dispatch"],
-  release: ["ClaimCancellation", "WorkCancellation", "Release"],
-  result: ["Result"],
-  delivery_failure: ["DeliveryFailure"],
-  delivery_evidence: ["DeliveryEvidence"],
-  cancel_work: ["WorkCancellation"],
-  cancel_claim: ["ClaimCancellation", "WorkCancellation"],
-  checkpoint: ["Checkpoint"],
-  issue_link: ["IssueLink", "IssueComment"],
+  submit: { operations: ["Work"], parameters: ["work_ids"] },
+  dispatch_next: { operations: ["Observation", "Claim"], parameters: ["pool", "max_claims", "max_dispatches", "concurrency", "per_account_limit", "profiles"] },
+  launch: { operations: ["Dispatch", "Release", "WorkCancellation"], parameters: ["dispatch_id"] },
+  bind: { operations: ["Bound"], parameters: ["dispatch_id"] },
+  // A finish may admit one continuation Work right after each paired Completion.
+  finish: { operations: ["Completion", "ClaimCancellation", "WorkCancellation", "Work"], parameters: ["dispatch_id"] },
+  release: { operations: ["Release", "WorkCancellation"], parameters: ["dispatch_id", "reason"] },
+  cancel_work: { operations: ["WorkCancellation"], parameters: ["work_ids", "reason"] },
+  checkpoint: { operations: ["Checkpoint"], parameters: ["prior_tip"] },
+  issue_link: { operations: ["IssueLink", "IssueComment"], parameters: ["operations"] },
+  migrate: { operations: ["Work"], parameters: ["work_ids"] },
 };
 
 const OP_ROLES = {
-  Policy: ["administrator", "producer", "dispatcher"],
-  PoolInstall: ["administrator", "producer", "dispatcher"],
-  Deployment: ["administrator", "producer", "dispatcher"],
-  Control: ["administrator"],
-  Work: ["producer", "dispatcher", "worker", "administrator"],
-  Claim: ["dispatcher", "administrator", "worker"],
+  Work: ["producer", "dispatcher", "administrator", "worker"],
+  Observation: ["dispatcher", "administrator"],
+  Claim: ["dispatcher", "administrator"],
+  Dispatch: ["dispatcher", "administrator"],
+  Bound: ["worker"],
   Completion: ["worker"],
-  DeliveryEvidence: ["worker"],
-  Result: ["reconciler"],
-  DeliveryFailure: ["reconciler"],
-  Observation: ["reconciler", "dispatcher", "administrator", "worker"],
-  ClaimCancellation: ["worker", "reconciler"],
-  WorkCancellation: ["producer", "administrator", "reconciler", "worker"],
-  WorkPriority: ["administrator"],
-  Dispatch: ["dispatcher", "worker", "reconciler"],
-  Release: ["reconciler"],
-  Checkpoint: ["administrator"],
+  ClaimCancellation: ["worker"],
+  WorkCancellation: ["producer", "administrator", "reconciler", "worker", "dispatcher"],
+  Release: ["dispatcher", "reconciler", "administrator"],
+  Checkpoint: ["administrator", "reconciler"],
   IssueLink: ["projector"],
   IssueComment: ["projector"],
 };
 
-function validateEvidence(evidence) {
-  closed(evidence, ["kind", "source", "repository", "workflow", "ref", "principal", "checked_at"], ["run_id", "run_attempt", "status", "conclusion", "receipt", "attempts", "effects"], "evidence");
-  if (!["prelaunch", "nonlaunch", "terminal_run", "worker_termination", "delivery", "reconciliation"].includes(evidence.kind) || !["trusted_publisher", "github_api", "trusted_activation", "verified_receipts"].includes(evidence.source))
-    throw queueError("evidence_invalid", "unsupported evidence source/kind");
-  for (const field of ["repository", "workflow", "ref", "principal", "conclusion", "receipt"]) if (Object.hasOwn(evidence, field)) identity(evidence[field], field);
-  decimal(evidence.principal, "evidence principal", "evidence_invalid");
-  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(evidence.ref)) throw queueError("evidence_invalid", "evidence requires an immutable native revision");
-  integer(evidence.checked_at, 0, Number.MAX_SAFE_INTEGER, "evidence timestamp");
-  if (Object.hasOwn(evidence, "run_id")) decimal(evidence.run_id, "evidence run ID");
-  if (Object.hasOwn(evidence, "run_attempt") && evidence.run_attempt !== 1) throw queueError("evidence_invalid", "evidence must name native attempt 1");
-  if (Object.hasOwn(evidence, "attempts")) integer(evidence.attempts, 1, 4096, "reconciliation attempts");
-  if (Object.hasOwn(evidence, "effects") && !["none", "partial", "unknown"].includes(evidence.effects)) throw queueError("evidence_invalid", "unsupported effect disposition");
-  if (Object.hasOwn(evidence, "status") && evidence.status !== "completed") throw queueError("evidence_invalid", "only exact terminal status is evidence");
+const WORK_STATES = ["available", "claimed", "completed", "cancelled"];
+const CLAIM_STATES = ["open", "completed", "cancelled"];
+const DISPATCH_STATES = ["reserved", "started", "bound", "closed"];
+const CHECKPOINT_FIELDS = ["repository", "tip", "commits", "works", "claims", "dispatches", "observations", "requests", "work_creators"];
+const WORK_RECORD_OPTIONAL = [...WORK_OPTIONAL, "claim_id", "completion_id", "effects", "cancellation_reason", "cancellation_commit_id", "issue_comment"];
+const CLAIM_RECORD_REQUIRED = ["claim_id", "work_id", "dispatch_id", "handle", "state", "commit_id", "request_id"];
+const CLAIM_RECORD_OPTIONAL = ["terminal_commit_id", "cancellation_reason", "effects", "issue_comment"];
+const DISPATCH_RECORD_FIELDS = ["dispatch_id", "request_id", "commit_id", "pool", "worker_profile", "workflow", "reserved_by", "state", "run", "launch", "claims"];
+
+/**
+ * @typedef {{role: string, repository: string, workflow?: string, run_id?: string, run_attempt?: number}} QueueActor
+ * @typedef {{id: string, kind: string, parameters: Record<string, any>}} QueueRequest
+ * @typedef {{version: 4, id: string, previous: string | null, request: QueueRequest, actor: QueueActor, at: number, operations: Array<Record<string, any>>}} QueueCommit
+ */
+
+function sha256(text) {
+  return createHash("sha256").update(text, "utf8").digest("hex");
 }
 
-function validateRunBinding(run) {
-  closed(run, ["run_id", "run_attempt", "repository", "workflow", "ref", "principal", "event"], [], "run binding");
-  decimal(run.run_id, "native run ID");
-  for (const field of ["repository", "workflow", "ref", "principal"]) identity(run[field], field);
-  decimal(run.principal, "native run principal", "run_binding_conflict");
-  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(run.ref)) throw queueError("run_binding_conflict", "native run requires an immutable revision");
-  if (run.run_attempt !== 1 || run.event !== "workflow_dispatch") throw queueError("run_binding_conflict", "only original workflow_dispatch attempts can bind");
+/** @returns {string} */
+function requestId(actor, kind, parameters) {
+  return `request:${digest({ actor, kind, parameters })}`;
 }
 
+/** @param {string | null} previous @param {string} request */
+function commitId(previous, request) {
+  return `q_${sha256(previous ? `${previous}\n${request}` : request)}`;
+}
+
+/** Commit ID a request would receive when appended to this projection. */
+function proposedCommitId(state, request) {
+  return commitId(state.tip || null, request.id);
+}
+
+function reason(value, allowed, name) {
+  if (typeof value !== "string" || !allowed.includes(value)) throw queueError("reason_invalid", `${name} reason must be one of ${allowed.join(", ")}`);
+  return value;
+}
+
+function workIds(value) {
+  if (!Array.isArray(value) || value.length < 1 || value.length > OPERATIONS_PER_COMMIT || new Set(value).size !== value.length) throw queueError("request_invalid", "work_ids requires 1..256 unique Work identities");
+  for (const id of value) identity(id, "Work ID");
+}
+
+function validateObservation(operation) {
+  validateResource(operation.resource);
+  const conditions = operation.resource.kind === "issue" ? ISSUE_CONDITIONS : ["merged"];
+  if (!conditions.includes(operation.condition) || !["ready", "waiting", "failed", "unknown"].includes(operation.state)) throw queueError("observation_invalid", "typed condition/state is invalid");
+  if (Object.hasOwn(operation, "state_reason") && !["completed", "not_planned", "reopened"].includes(operation.state_reason)) throw queueError("observation_invalid", "invalid Issue state_reason");
+  if (Object.hasOwn(operation, "merged") && typeof operation.merged !== "boolean") throw queueError("observation_invalid", "merged must be boolean");
+  if (Object.hasOwn(operation, "merge_commit")) identity(operation.merge_commit, "merge commit");
+  if (operation.resource.kind === "issue" && (Object.hasOwn(operation, "merged") || Object.hasOwn(operation, "merge_commit"))) throw queueError("observation_invalid", "an Issue cannot carry pull request merge evidence");
+  // A ready approval names the writer who closed the Issue as completed; nothing else carries a closer.
+  const approval = operation.condition === "approved" && operation.state === "ready";
+  if (approval !== Object.hasOwn(operation, "approved_by")) throw queueError("observation_invalid", "approved_by belongs exactly to a ready approved Issue gate");
+  if (approval) decimal(operation.approved_by, "approved_by", "observation_invalid");
+  if (operation.state === "ready") {
+    if (operation.resource.kind === "pull_request" && (operation.merged !== true || !operation.merge_commit)) throw queueError("observation_invalid", "a ready pull request gate requires its merge commit");
+    if ((operation.condition === "completed" || approval) && operation.state_reason !== "completed") throw queueError("observation_invalid", "a ready completed Issue gate requires state_reason completed");
+  }
+}
+
+/** Structural validation of one closed v4 operation. */
 function validateOperation(operation) {
-  if (!operation || !Object.hasOwn(OP_FIELDS, operation.kind)) throw queueError("unsupported_protocol", "unknown queue operation");
-  closed(operation, OP_FIELDS[operation.kind][0], OP_FIELDS[operation.kind][1], operation.kind, "unsupported_protocol");
-  for (const field of ["work_id", "claim_id", "dispatch_id", "handle", "claim_handle", "completion_id", "epoch", "observation_id", "credential_generation", "read_status"])
-    if (Object.hasOwn(operation, field)) identity(operation[field], field);
-  if (operation.kind === "DeliveryEvidence") {
-    decimal(operation.run_id, "evidence run ID");
-    if (operation.run_attempt !== 1) throw queueError("evidence_invalid", "DeliveryEvidence requires native attempt 1");
-    if (!Array.isArray(operation.outputs) || operation.outputs.length > 128 || !Array.isArray(operation.effects) || operation.effects.length > 256)
-      throw queueError("evidence_invalid", "DeliveryEvidence requires at most 128 outputs and 256 effects");
-    if (Object.hasOwn(operation, "controls_digest") && (typeof operation.controls_digest !== "string" || !/^[0-9a-f]{64}$/.test(operation.controls_digest)))
-      throw queueError("evidence_invalid", "DeliveryEvidence controls_digest requires a lowercase SHA256 digest");
-    boundedBytes(operation, DELIVERY_EVIDENCE_MAX_BYTES, "DeliveryEvidence");
-    let previousIndex = -1;
-    for (const entry of operation.outputs) {
-      closed(entry, ["index", "type", "verifier"], ["receipt", "adapter"], "delivery evidence output");
-      integer(entry.index, 0, 127, "delivery evidence output index");
-      identity(entry.type, "delivery evidence output type", false, 128);
-      if (entry.index <= previousIndex) throw queueError("evidence_invalid", "DeliveryEvidence output indexes require strictly increasing order");
-      previousIndex = entry.index;
-      if (
-        !["none", "builtin", "native_creation", "asset", "code_scanning", "code_coverage", "artifact", "rest_adapter", "graphql_adapter", "git_tree_adapter", "prepared_builtin", "declared_builtin", "queue_control"].includes(entry.verifier)
-      )
-        throw queueError("evidence_invalid", "DeliveryEvidence requires a supported verifier");
-      if ((entry.verifier === "none") === Object.hasOwn(entry, "receipt")) throw queueError("evidence_invalid", "DeliveryEvidence receipts are required exactly for write verifiers");
-      if (Object.hasOwn(entry, "receipt") && (!entry.receipt || typeof entry.receipt !== "object" || Array.isArray(entry.receipt))) throw queueError("evidence_invalid", "DeliveryEvidence receipt requires an object");
-      if (Object.hasOwn(entry, "adapter")) {
-        if (typeof entry.adapter !== "string" || Buffer.byteLength(entry.adapter, "utf8") > 8192) throw queueError("evidence_invalid", "DeliveryEvidence adapter requires JSON within 8192 bytes");
-        parseStrictJSON(entry.adapter);
-      }
-    }
-    for (const effect of operation.effects) {
-      closed(effect, ["kind", "repository", "outcome"], ["id", "number", "commit", "expected"], "delivery evidence effect");
-      for (const field of ["kind", "repository", "id"]) if (Object.hasOwn(effect, field)) identity(effect[field], `delivery evidence effect ${field}`);
-      if (!["succeeded", "unknown"].includes(effect.outcome)) throw queueError("evidence_invalid", "DeliveryEvidence effect outcome requires succeeded or unknown");
-      if (Object.hasOwn(effect, "number")) integer(effect.number, 1, Number.MAX_SAFE_INTEGER, "delivery evidence effect number");
-      if (Object.hasOwn(effect, "commit") && (typeof effect.commit !== "string" || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(effect.commit)))
-        throw queueError("evidence_invalid", "DeliveryEvidence effect commit requires an immutable revision");
-      if (Object.hasOwn(effect, "expected")) closed(effect.expected, [], ["ref", "sha", "labels", "assignees"], "delivery evidence effect expectation");
-    }
+  if (!operation || typeof operation !== "object" || Array.isArray(operation) || typeof operation.kind !== "string" || !Object.hasOwn(OP_FIELDS, operation.kind)) throw queueError("request_invalid", "unknown queue operation");
+  closed(operation, OP_FIELDS[operation.kind][0], OP_FIELDS[operation.kind][1], operation.kind, "request_invalid");
+  for (const field of ["work_id", "claim_id", "dispatch_id", "handle", "claim_handle", "observation_id", "comment_id", "prior_tip"]) if (Object.hasOwn(operation, field)) identity(operation[field], field);
+  switch (operation.kind) {
+    case "Work":
+      validateWork(operation);
+      break;
+    case "Observation":
+      validateObservation(operation);
+      break;
+    case "Dispatch":
+      if (operation.state !== "started") throw queueError("request_invalid", "a Dispatch operation records only the started launch");
+      decimal(operation.run_id, "launched run ID", "request_invalid");
+      if (typeof operation.revision !== "string" || !LAUNCH_REVISION.test(operation.revision)) throw queueError("request_invalid", "a started Dispatch records the launched run's full commit revision");
+      break;
+    case "Bound":
+      decimal(operation.run_id, "bound run ID", "request_invalid");
+      integer(operation.run_attempt, 1, 4096, "bound run attempt");
+      break;
+    case "Completion":
+      if (!Array.isArray(operation.effects) || operation.effects.some(effect => !effect || typeof effect !== "object" || Array.isArray(effect))) throw queueError("request_invalid", "Completion effects must be an array of objects");
+      boundedBytes(operation.effects, EFFECTS_BYTES, "Completion effects");
+      break;
+    case "ClaimCancellation":
+      reason(operation.reason, CLAIM_CANCELLATION_REASONS, "ClaimCancellation");
+      break;
+    case "WorkCancellation":
+      reason(operation.reason, WORK_CANCELLATION_REASONS, "WorkCancellation");
+      break;
+    case "Release":
+      reason(operation.reason, RELEASE_REASONS, "Release");
+      break;
+    case "Checkpoint":
+      if (!operation.state || typeof operation.state !== "object" || Array.isArray(operation.state)) throw queueError("checkpoint_invalid", "checkpoint requires a projection state object");
+      break;
+    case "IssueLink":
+      if (validateResource(operation.resource).kind !== "issue") throw queueError("resource_invalid", "IssueLink requires an Issue");
+      break;
   }
-  if (Object.hasOwn(operation, "reason")) validateReason(operation.reason);
-  if (operation.kind === "WorkCancellation" && Object.hasOwn(operation, "version") && operation.version !== 1) throw queueError("unsupported_protocol", "checked WorkCancellation requires version 1");
-  if (Object.hasOwn(operation, "evidence")) validateEvidence(operation.evidence);
-  if (Object.hasOwn(operation, "run")) validateRunBinding(operation.run);
-  if (Object.hasOwn(operation, "sender")) validateActor(operation.sender);
-  if (Object.hasOwn(operation, "credential_principal")) {
-    decimal(operation.credential_principal, "dispatch credential principal", "run_binding_conflict");
-    if (operation.state !== "started") throw queueError("run_binding_conflict", "dispatch credential principal is immutable after launch");
-  }
-  if (["IssueLink", "IssueComment"].includes(operation.kind)) {
-    if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(operation.projector_ref)) throw queueError("projection_unauthorized", "projection requires an immutable revision");
-    if (operation.kind === "IssueLink") validateResource(operation.resource);
-    else identity(operation.comment_id, "Issue comment");
-    if (operation.authority_claim_id !== undefined) identity(operation.authority_claim_id, "authority Claim");
-  }
-  if (operation.kind === "Policy") validatePolicy(operation.policy);
-  if (operation.kind === "PoolInstall") {
-    poolIdentity(operation.pool);
-    if (!operation.config || typeof operation.config !== "object" || Array.isArray(operation.config)) throw queueError("policy_invalid", "pool installation requires a pool definition");
-  }
-  if (operation.kind === "Deployment") validateDeployment(operation);
-  if (operation.logical_contract !== undefined && !/^[a-f0-9]{64}$/.test(operation.logical_contract)) throw queueError("work_invalid", "invalid Work logical contract");
-  if (operation.execution_ref !== undefined && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(operation.execution_ref)) throw queueError("work_invalid", "Work execution pin must be immutable");
-  if (operation.kind === "Checkpoint") {
-    identity(operation.prior_tip, "prior tip");
-    if (
-      !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(operation.prior_git_sha) ||
-      !/^[a-f0-9]{64}$/.test(operation.history_sha256) ||
-      !/^[a-f0-9]{64}$/.test(operation.state_sha256) ||
-      !operation.state ||
-      typeof operation.state !== "object" ||
-      Array.isArray(operation.state)
-    )
-      throw queueError("checkpoint_invalid", "checkpoint requires bounded state, history digest and prior Git commit SHA");
-  }
-  if (operation.kind === "WorkPriority") {
-    integer(operation.priority, 1, 5, "priority");
-    integer(operation.expected_priority, 1, 5, "expected priority");
-  }
-  if (operation.kind === "Claim") {
-    if (!Array.isArray(operation.observations) || operation.observations.length > 64 || new Set(operation.observations).size !== operation.observations.length)
-      throw queueError("claim_invalid", "observations must be a bounded unique array");
-    for (const id of operation.observations) identity(id, "observation reference");
-  }
-  if (operation.kind === "Completion") {
-    decimal(operation.run_id, "completion run ID");
-    if (operation.run_attempt !== 1) throw queueError("run_binding_conflict", "Completion requires original native attempt");
-    if (Object.hasOwn(operation, "keep_open") && typeof operation.keep_open !== "boolean") throw queueError("request_invalid", "keep_open must be boolean");
-  }
-  if (operation.kind === "ClaimCancellation") integer(operation.retry_not_before, 0, Number.MAX_SAFE_INTEGER, "retry-not-before");
-  if (operation.expires_at !== undefined) integer(operation.expires_at, 0, Number.MAX_SAFE_INTEGER, "Work expiration timestamp");
-  if (operation.kind === "Control") {
-    if (!["admission_paused", "grants_paused", "credential_generation"].includes(operation.control)) throw queueError("control_invalid", "unknown Control");
-    if (operation.control === "credential_generation") identity(operation.value, "credential generation");
-    else if (typeof operation.value !== "boolean") throw queueError("control_invalid", "pause Controls require boolean values");
-  }
-  if (operation.kind === "Result" && (!operation.descriptor || typeof operation.descriptor !== "object" || Array.isArray(operation.descriptor))) throw queueError("result_invalid", "descriptor must be a JSON object");
-  if (operation.kind === "DeliveryFailure" && !["none", "partial", "unknown"].includes(operation.disposition)) throw queueError("evidence_invalid", "unknown delivery disposition");
-  if (operation.kind === "Observation") {
-    validateResource(operation.resource);
-    const conditions = operation.resource.kind === "issue" ? ["completed", "closed"] : ["merged"];
-    if (!conditions.includes(operation.condition) || !["ready", "waiting", "failed", "unknown"].includes(operation.state)) throw queueError("observation_invalid", "typed condition/state is invalid");
-    integer(operation.observed_at, 0, Number.MAX_SAFE_INTEGER, "observation timestamp");
-    if (Object.hasOwn(operation, "source_updated_at")) integer(operation.source_updated_at, 0, Number.MAX_SAFE_INTEGER, "resource update timestamp");
-    if (Object.hasOwn(operation, "state_reason") && !["completed", "not_planned", "reopened"].includes(operation.state_reason)) throw queueError("observation_invalid", "invalid Issue state_reason");
-    if (Object.hasOwn(operation, "resource_state") && !["open", "closed"].includes(operation.resource_state)) throw queueError("observation_invalid", "invalid resource state");
-    if (Object.hasOwn(operation, "merged") && typeof operation.merged !== "boolean") throw queueError("observation_invalid", "merged must be boolean");
-    if (Object.hasOwn(operation, "merge_commit")) identity(operation.merge_commit, "merge provenance");
-    if (operation.resource.kind === "issue" && (Object.hasOwn(operation, "merged") || Object.hasOwn(operation, "merge_commit"))) throw queueError("observation_invalid", "Issue cannot carry PR merge evidence");
-    if (operation.state === "ready" && !observationSatisfies(operation)) throw queueError("observation_invalid", "ready observation does not prove its typed predicate");
-  }
-  if (operation.kind === "Dispatch" && !["started", "bound", "rejected", "uncertain", "unresolved"].includes(operation.state)) throw queueError("dispatch_invalid", "unknown dispatch state");
+  return operation;
 }
 
-function validateRequest(request, actor) {
-  closed(request, ["id", "kind", "parameters", "fingerprint"], [], "request");
-  identity(request.id, "request ID");
-  if (!Object.hasOwn(REQUEST_KINDS, request.kind)) throw queueError("request_invalid", "unsupported request kind");
-  if (typeof request.fingerprint !== "string" || !/^[a-f0-9]{64}$/.test(request.fingerprint) || request.fingerprint !== fingerprint(actor, request.kind, request.parameters))
-    throw queueError("request_invalid", "semantic fingerprint does not bind actor and validated parameters");
-  if (request.kind === "submit") {
-    closed(request.parameters, ["nodes"], [], "submit parameters");
-    if (!Array.isArray(request.parameters.nodes) || !request.parameters.nodes.length || request.parameters.nodes.length > 256) throw queueError("request_invalid", "submit requires 1..256 immutable Work nodes");
-    for (const node of request.parameters.nodes) validateOperation(node);
-  } else if (request.kind === "dispatch_next") {
-    closed(request.parameters, ["pool", "max_claims", "max_dispatches", "max_bytes"], ["worker_profiles"], "dispatch parameters");
-    if (request.parameters.worker_profiles !== undefined) {
-      if (!Array.isArray(request.parameters.worker_profiles) || request.parameters.worker_profiles.length > 256 || new Set(request.parameters.worker_profiles).size !== request.parameters.worker_profiles.length)
-        throw queueError("request_invalid", "dispatch worker allowlist requires bounded unique profiles");
-      for (const name of request.parameters.worker_profiles) identity(name, "worker profile");
+function validateParameters(kind, parameters) {
+  closed(parameters, REQUEST_KINDS[kind].parameters, [], `${kind} parameters`, "request_invalid");
+  switch (kind) {
+    case "submit":
+    case "migrate":
+      workIds(parameters.work_ids);
+      break;
+    case "dispatch_next": {
+      identity(parameters.pool, "pool");
+      integer(parameters.max_claims, 1, OPERATIONS_PER_COMMIT, "max_claims");
+      integer(parameters.max_dispatches, 1, OPERATIONS_PER_COMMIT, "max_dispatches");
+      integer(parameters.concurrency, 1, 4096, "concurrency");
+      integer(parameters.per_account_limit, 0, 4096, "per_account_limit");
+      const profiles = parameters.profiles;
+      if (!profiles || typeof profiles !== "object" || Array.isArray(profiles) || !Object.keys(profiles).length || Object.keys(profiles).length > 256) throw queueError("request_invalid", "dispatch_next requires 1..256 worker profiles");
+      for (const [name, profile] of Object.entries(profiles)) {
+        identity(name, "worker profile");
+        closed(profile, ["workflow"], [], `profile ${name}`, "request_invalid");
+        if (typeof profile.workflow !== "string" || !PROFILE_WORKFLOW.test(profile.workflow)) throw queueError("request_invalid", "profile workflow must be .github/workflows/<name>.lock.yml");
+      }
+      break;
     }
-    identity(request.parameters.pool, "pool");
-    integer(request.parameters.max_claims, 1, 256, "max_claims");
-    integer(request.parameters.max_dispatches, 1, 256, "max_dispatches");
-    integer(request.parameters.max_bytes, 1, 48 * 1024, "max_bytes");
-  } else if (request.kind === "finish") {
-    closed(request.parameters, ["dispatch_id", "claim_handle", "outcome"], ["keep_open"], "finish parameters");
-    identity(request.parameters.dispatch_id, "dispatch ID");
-    identity(request.parameters.claim_handle, "Claim handle");
-    if (!["completed", "cancelled"].includes(request.parameters.outcome)) throw queueError("request_invalid", "finish outcome must be completed or cancelled");
-    if (Object.hasOwn(request.parameters, "keep_open") && typeof request.parameters.keep_open !== "boolean") throw queueError("request_invalid", "keep_open must be boolean");
-    if (request.parameters.keep_open === true && request.parameters.outcome !== "completed") throw queueError("request_invalid", "keep_open requires outcome completed");
-  } else if (request.kind === "checkpoint") {
-    closed(request.parameters, ["prior_git_sha", "prior_tip", "history_sha256", "state_sha256"], [], "checkpoint parameters", "checkpoint_invalid");
-    if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(request.parameters.prior_git_sha) || !/^[a-f0-9]{64}$/.test(request.parameters.history_sha256) || !/^[a-f0-9]{64}$/.test(request.parameters.state_sha256))
-      throw queueError("checkpoint_invalid", "invalid prior Git SHA or state/history digest");
-    identity(request.parameters.prior_tip, "prior tip");
-  } else {
-    closed(request.parameters, ["operations"], [], "operation parameters");
-    if (!Array.isArray(request.parameters.operations) || !request.parameters.operations.length || request.parameters.operations.length > 256) throw queueError("request_invalid", "request requires bounded nonempty operations");
-    for (const operation of request.parameters.operations) validateOperation(operation);
+    case "launch":
+    case "bind":
+    case "finish":
+      identity(parameters.dispatch_id, "dispatch ID");
+      break;
+    case "release":
+      identity(parameters.dispatch_id, "dispatch ID");
+      reason(parameters.reason, RELEASE_REASONS, "release");
+      break;
+    case "cancel_work":
+      workIds(parameters.work_ids);
+      reason(parameters.reason, WORK_CANCELLATION_REASONS, "cancel_work");
+      break;
+    case "checkpoint":
+      identity(parameters.prior_tip, "prior tip");
+      break;
+    case "issue_link":
+      if (!Array.isArray(parameters.operations) || parameters.operations.length < 1 || parameters.operations.length > OPERATIONS_PER_COMMIT) throw queueError("request_invalid", "issue_link requires 1..256 operations");
+      break;
   }
+}
+
+/** @returns {QueueRequest} */
+function validateRequest(request, actor) {
+  closed(request, ["id", "kind", "parameters"], [], "request", "request_invalid");
+  if (typeof request.kind !== "string" || !Object.hasOwn(REQUEST_KINDS, request.kind)) throw queueError("request_invalid", "unsupported request kind");
+  validateParameters(request.kind, request.parameters);
+  if (request.id !== requestId(actor, request.kind, request.parameters)) throw queueError("request_invalid", "request ID does not bind actor, kind and parameters");
   return request;
 }
 
-function newRequest(id, kind, actor, parameters) {
+/**
+ * @param {string} kind
+ * @param {QueueActor} actor
+ * @param {Record<string, any>} parameters
+ * @returns {QueueRequest}
+ */
+function newRequest(kind, actor, parameters) {
   validateActor(actor);
-  return validateRequest({ id, kind, parameters: structuredClone(parameters), fingerprint: fingerprint(actor, kind, parameters) }, actor);
+  const stable = parseStrictJSON(canonical(parameters));
+  return validateRequest({ id: requestId(actor, kind, stable), kind, parameters: stable }, actor);
 }
 
-function proposedCommitId(state, request) {
-  const input = state.tip ? `${state.tip}\n${request.id}` : request.id;
-  return `q_${createHash("sha256").update(input, "utf8").digest("hex")}`;
+function authorizeOperation(commit, operation) {
+  const role = commit.actor.role;
+  const kind = commit.request.kind;
+  const unauthorized = () => queueError("unauthorized_operation", `${role} cannot publish ${operation.kind} through ${kind}`);
+  if (!REQUEST_KINDS[kind].operations.includes(operation.kind)) throw queueError("request_invalid", `${kind} cannot carry ${operation.kind}`);
+  if (!OP_ROLES[operation.kind].includes(role)) throw unauthorized();
+  if (operation.kind === "WorkCancellation" && ((role === "worker" && kind !== "finish") || (role === "dispatcher" && kind !== "launch"))) throw unauthorized();
+  if (operation.kind === "Release" && role === "dispatcher" && operation.reason !== "launch_failed") throw unauthorized();
+  if (kind === "migrate" && role !== "administrator") throw unauthorized();
+  // Only a finish hands off: submit and migrate cannot mint a continuation (or, structurally, its approval gate).
+  if (operation.kind === "Work" && kind !== "finish" && Object.hasOwn(operation, "continuation")) throw queueError("request_invalid", `${kind} cannot carry a continuation`);
 }
 
+/** @returns {QueueCommit} */
 function validateCommit(commit) {
-  closed(commit, ["version", "id", "previous", "request", "actor", "policy_epoch", "at", "operations"], ["trace"], "QueueCommit");
-  if (commit.version !== 3) throw queueError("unsupported_protocol", "only closed version-3 QueueCommit records are supported");
+  if (!commit || typeof commit !== "object" || Array.isArray(commit)) throw queueError("ledger_invalid", "QueueCommit must be an object");
+  if (commit.version !== PROTOCOL_VERSION) throw queueError("unsupported_protocol", "work queue protocol v4 required; run the v3 converter");
+  closed(commit, ["version", "id", "previous", "request", "actor", "at", "operations"], [], "QueueCommit");
   identity(commit.id, "commit ID");
   if (commit.previous !== null) identity(commit.previous, "predecessor");
-  identity(commit.policy_epoch, "policy epoch");
-  integer(commit.at, 0, Number.MAX_SAFE_INTEGER, "decision timestamp");
+  integer(commit.at, 0, Number.MAX_SAFE_INTEGER, "commit time");
   validateActor(commit.actor);
   validateRequest(commit.request, commit.actor);
-  validateRequestRole(commit.actor, commit.request.kind);
-  if (!Array.isArray(commit.operations) || !commit.operations.length || commit.operations.length > 256) throw queueError("resource_limit", "QueueCommit requires 1..256 operations");
-  if (Object.hasOwn(commit, "trace")) {
-    closed(commit.trace, [], ["trace_id", "span_id", "publisher_attempt"], "trace");
-    for (const field of ["trace_id", "span_id"]) if (Object.hasOwn(commit.trace, field)) identity(commit.trace[field], field);
-    if (Object.hasOwn(commit.trace, "publisher_attempt")) integer(commit.trace.publisher_attempt, 1, 4096, "publisher attempt");
-    boundedBytes(commit.trace, 1024, "trace");
-  }
+  if (!Array.isArray(commit.operations) || commit.operations.length < 1 || commit.operations.length > OPERATIONS_PER_COMMIT) throw queueError("request_invalid", `QueueCommit requires 1..${OPERATIONS_PER_COMMIT} operations`);
   for (const operation of commit.operations) {
     validateOperation(operation);
-    if (!REQUEST_KINDS[commit.request.kind].includes(operation.kind) || !OP_ROLES[operation.kind].includes(commit.actor.role))
-      throw queueError("unauthorized_operation", `${commit.actor.role} cannot publish ${operation.kind} through ${commit.request.kind}`);
+    authorizeOperation(commit, operation);
   }
-  if (commit.request.kind === "submit") {
-    const ordinary = canonical(commit.request.parameters.nodes) === canonical(commit.operations);
-    const bootstrap = commit.operations[0]?.kind === "Policy" && commit.operations.slice(1).every(operation => operation.kind === "Work") && canonical(commit.request.parameters.nodes) === canonical(commit.operations.slice(1));
-    if (!ordinary && !bootstrap) throw queueError("request_invalid", "submission differs from validated stable semantics");
-  }
-  if (
-    commit.request.kind === "checkpoint" &&
-    (commit.operations.length !== 1 ||
-      commit.operations[0].kind !== "Checkpoint" ||
-      canonical(commit.request.parameters) !==
-        canonical({
-          prior_git_sha: commit.operations[0].prior_git_sha,
-          prior_tip: commit.operations[0].prior_tip,
-          history_sha256: commit.operations[0].history_sha256,
-          state_sha256: commit.operations[0].state_sha256,
-        }))
-  )
-    throw queueError("checkpoint_invalid", "checkpoint archive differs from stable request");
-  if (!["submit", "dispatch_next", "finish", "checkpoint"].includes(commit.request.kind) && canonical(commit.request.parameters.operations) !== canonical(commit.operations))
-    throw queueError("request_invalid", "operations differ from validated stable semantics");
-  if (canonicalBytes(commit) > 8 * 1024 * 1024) throw queueError("resource_limit", "QueueCommit exceeds parser bound");
+  if (commit.request.kind === "issue_link" && canonical(commit.request.parameters.operations) !== canonical(commit.operations)) throw queueError("request_invalid", "issue_link operations differ from its request");
+  if (commit.id !== commitId(commit.previous, commit.request.id)) throw queueError("ledger_invalid", "commit ID does not bind its predecessor and request");
   return commit;
 }
 
-function causalChain(transactions) {
-  if (!Array.isArray(transactions) || transactions.length > 1000000) throw queueError("resource_limit", "ledger commit count exceeded");
-  const byId = new Map();
-  for (const transaction of transactions) {
-    validateCommit(transaction);
-    const existing = byId.get(transaction.id);
-    if (existing && canonical(existing) !== canonical(transaction)) throw queueError("ledger_invalid", "conflicting duplicate commit ID");
-    byId.set(transaction.id, transaction);
-  }
-  if (!byId.size) return [];
-  const genesis = [...byId.values()].filter(commit => commit.previous === null);
-  if (genesis.length !== 1) throw queueError("ledger_invalid", "ledger requires exactly one genesis");
-  const next = new Map();
-  for (const commit of byId.values()) {
-    if (commit.previous === null) continue;
-    if (!byId.has(commit.previous)) throw queueError("ledger_invalid", "missing causal predecessor");
-    if (next.has(commit.previous)) throw queueError("ledger_invalid", "forked causal history");
-    next.set(commit.previous, commit);
-  }
-  const ordered = [];
-  const visited = new Set();
-  let commit = genesis[0];
-  while (commit) {
-    if (visited.has(commit.id)) throw queueError("ledger_invalid", "cyclic causal history");
-    visited.add(commit.id);
-    ordered.push(commit);
-    commit = next.get(commit.id);
-  }
-  if (visited.size !== byId.size) throw queueError("ledger_invalid", "disconnected or cyclic causal history");
-  return ordered;
-}
-
 function newState() {
-  /** @type {Array<ReturnType<typeof validateCommit>>} */
-  const transactions = [];
   return {
     repository: "",
     tip: "",
-    time_watermark: 0,
-    policy_epoch: "",
-    /** @type {ReturnType<typeof defaultPolicy> | null} */
-    policy: null,
+    // Commit ordinal of the next commit, including history folded into a checkpoint.
+    commits: 0,
+    /** @type {Map<string, any>} */
     works: new Map(),
+    /** @type {Map<string, any>} */
     claims: new Map(),
+    /** @type {Map<string, any>} */
     dispatches: new Map(),
-    deployments: new Map(),
+    /** @type {Map<string, any>} */
     observations: new Map(),
-    observationsById: new Map(),
-    requests: new Map(),
+    /** @type {Set<string>} */
+    requests: new Set(),
+    /** @type {Map<string, QueueActor>} */
     workCreators: new Map(),
-    claimExplanations: new Map(),
-    clocks: new Map(),
-    admission_paused: false,
-    grants_paused: false,
-    credential_generation: "initial",
-    observation_writes: new Map(),
-    lifecycleWrites: new Map(),
-    terminalBarriers: new Map(),
-    deliveryEvidence: new Map(),
-    cancellations: new Map(),
-    ledgerBytes: 0,
-    transactions,
-    stats: {},
+    /** @type {QueueCommit[]} */
+    transactions: [],
+    stats: { work: 0, available: 0, claimed: 0, completed: 0, cancelled: 0, claims: 0, dispatches: 0, transactions: 0, nodes: 0 },
   };
 }
 
-function quiescent(state) {
-  return [...state.works.values()].every(work => ["completed", "cancelled"].includes(work.state) && work.barrier !== "pending") && [...state.dispatches.values()].every(dispatch => dispatch.released);
+/** @typedef {ReturnType<typeof newState>} QueueState */
+
+/** Copy a projection for a speculative append; ledger commits are shared, records are not. */
+function cloneState(state) {
+  const copy = newState();
+  copy.repository = state.repository;
+  copy.tip = state.tip;
+  copy.commits = state.commits;
+  copy.works = new Map([...state.works].map(([id, work]) => [id, { ...work }]));
+  copy.claims = new Map([...state.claims].map(([id, claim]) => [id, { ...claim }]));
+  copy.dispatches = new Map([...state.dispatches].map(([id, dispatch]) => [id, { ...dispatch, claims: [dispatch.claims[0]] }]));
+  copy.observations = new Map(state.observations);
+  copy.requests = new Set(state.requests);
+  copy.workCreators = new Map(state.workCreators);
+  copy.transactions = [...state.transactions];
+  copy.stats = { ...state.stats };
+  return copy;
+}
+
+function setWorkState(state, work, next) {
+  const previous = work.state;
+  work.state = next;
+  trackWorkState(state, work, previous);
+}
+
+function requireWork(state, workId) {
+  const work = state.works.get(workId);
+  if (!work) throw queueError("work_missing", "operation references missing Work");
+  return work;
+}
+
+function requireClaim(state, claimId) {
+  const claim = state.claims.get(claimId);
+  if (!claim) throw queueError("claim_missing", "operation references a missing Claim");
+  return claim;
+}
+
+function requireDispatch(state, dispatchId) {
+  const dispatch = state.dispatches.get(dispatchId);
+  if (!dispatch) throw queueError("dispatch_missing", "operation references a missing Dispatch");
+  return dispatch;
+}
+
+/** A worker may settle only Claims of the dispatch bound to its own run attempt. */
+function boundToActor(dispatch, actor) {
+  return dispatch.state === "bound" && actor.workflow === dispatch.workflow && actor.run_id === dispatch.run.run_id && actor.run_attempt === dispatch.run.run_attempt;
+}
+
+function cancelClaim(state, claim, why, commit) {
+  const work = state.works.get(claim.work_id);
+  claim.state = "cancelled";
+  claim.terminal_commit_id = commit.id;
+  claim.cancellation_reason = why;
+  work.attempts += 1;
+  delete work.claim_id;
+  setWorkState(state, work, "available");
+}
+
+function applyClaim(state, operation, commit) {
+  const work = requireWork(state, operation.work_id);
+  if (work.state !== "available" || work.claim_id !== undefined) throw queueError("ownership_conflict", "only available Work can be claimed");
+  if (state.claims.has(operation.claim_id)) throw queueError("claim_conflict", "Claim identity already exists");
+  const profiles = commit.request.parameters.profiles;
+  if (!Object.hasOwn(profiles, work.worker_profile)) throw queueError("request_invalid", "dispatch_next parameters omit the Work's worker profile");
+  const approval = approvalGate(work);
+  if (approval && state.observations.get(gateKey(approval.resource, approval.condition))?.state !== "ready") throw queueError("approval_required", "an issue-routed continuation needs its ready approval");
+  if (state.dispatches.has(operation.dispatch_id)) throw queueError("dispatch_state_conflict", "a Dispatch carries exactly one Claim");
+  // Maintenance judges a reserved Dispatch only by the state of the dispatcher attempt that reserved it.
+  if (commit.actor.run_id === undefined) throw queueError("actor_unauthorized", "only a workflow run attempt can reserve a Dispatch");
+  const dispatch = {
+    dispatch_id: operation.dispatch_id,
+    request_id: commit.request.id,
+    commit_id: commit.id,
+    pool: work.pool,
+    worker_profile: work.worker_profile,
+    workflow: profiles[work.worker_profile].workflow,
+    reserved_by: { run_id: commit.actor.run_id, run_attempt: commit.actor.run_attempt },
+    state: "reserved",
+    run: null,
+    launch: null,
+    claims: [operation.claim_id],
+  };
+  state.dispatches.set(dispatch.dispatch_id, dispatch);
+  state.claims.set(operation.claim_id, { claim_id: operation.claim_id, work_id: work.work_id, dispatch_id: dispatch.dispatch_id, handle: operation.handle, state: "open", commit_id: commit.id, request_id: commit.request.id });
+  work.claim_id = operation.claim_id;
+  setWorkState(state, work, "claimed");
+}
+
+function applyBound(state, operation, commit) {
+  const dispatch = requireDispatch(state, operation.dispatch_id);
+  // A started or bound Dispatch still holds its open Claim: settling the Claim closes it.
+  if (!["started", "bound"].includes(dispatch.state)) throw queueError("dispatch_state_conflict", "only a started Dispatch with an open Claim can bind a run");
+  const actor = commit.actor;
+  if (actor.workflow !== dispatch.workflow || actor.run_id !== operation.run_id || actor.run_attempt !== operation.run_attempt) throw queueError("run_binding_conflict", "a worker may bind only its own run of the dispatched workflow");
+  // Only the run the dispatcher recorded launching may receive the Dispatch's Claims.
+  if (operation.run_id !== dispatch.launch.run_id) throw queueError("run_binding_conflict", "a worker may bind only the run its dispatcher launched");
+  if (dispatch.state === "bound") {
+    if (dispatch.run.run_id !== operation.run_id || operation.run_attempt < dispatch.run.run_attempt) throw queueError("run_binding_conflict", "the Dispatch is bound to another run");
+    if (operation.run_attempt === dispatch.run.run_attempt) return;
+  }
+  dispatch.state = "bound";
+  dispatch.run = { run_id: operation.run_id, run_attempt: operation.run_attempt };
+}
+
+function applyCompletion(state, operation, commit) {
+  const claim = requireClaim(state, operation.claim_id);
+  if (claim.state !== "open") throw queueError("claim_ineffective", "only an open Claim can complete");
+  const dispatch = state.dispatches.get(claim.dispatch_id);
+  if (operation.work_id !== claim.work_id || operation.dispatch_id !== claim.dispatch_id || operation.claim_handle !== claim.handle || !boundToActor(dispatch, commit.actor))
+    throw queueError("claim_scope_invalid", "Completion is outside the bound run's Claim scope");
+  const work = state.works.get(claim.work_id);
+  claim.state = "completed";
+  claim.terminal_commit_id = commit.id;
+  claim.effects = operation.effects;
+  work.effects = operation.effects;
+  work.completion_id = commit.id;
+  setWorkState(state, work, "completed");
+  dispatch.state = "closed";
+}
+
+function applyClaimCancellation(state, operation, commit) {
+  const claim = requireClaim(state, operation.claim_id);
+  if (claim.work_id !== operation.work_id) throw queueError("claim_scope_invalid", "ClaimCancellation names another Work");
+  if (claim.state === "cancelled") return;
+  if (claim.state !== "open") throw queueError("claim_ineffective", "only an open Claim can be cancelled");
+  const work = state.works.get(claim.work_id);
+  if (work.claim_id !== claim.claim_id) throw queueError("ownership_conflict", "Claim is not its Work's current owner");
+  const dispatch = state.dispatches.get(claim.dispatch_id);
+  if (commit.actor.role === "worker" && !boundToActor(dispatch, commit.actor)) throw queueError("claim_scope_invalid", "ClaimCancellation is outside the bound run's Claim scope");
+  cancelClaim(state, claim, operation.reason, commit);
+  dispatch.state = "closed";
+}
+
+function applyWorkCancellation(state, operation, commit) {
+  const work = requireWork(state, operation.work_id);
+  if (work.state === "completed") throw queueError("work_terminal", "completed Work cannot be cancelled");
+  if (work.state === "cancelled") {
+    if (work.cancellation_reason === operation.reason) return;
+    throw queueError("work_terminal", "cancelled Work keeps its original reason");
+  }
+  if (work.state === "claimed") throw queueError("ownership_conflict", "release the Dispatch before cancelling claimed Work");
+  if (operation.claim_id !== undefined) {
+    const claim = state.claims.get(operation.claim_id);
+    if (!claim || claim.work_id !== work.work_id || claim.state !== "cancelled") throw queueError("claim_scope_invalid", "WorkCancellation must name this Work's cancelled Claim");
+  }
+  work.cancellation_reason = operation.reason;
+  work.cancellation_commit_id = commit.id;
+  setWorkState(state, work, "cancelled");
+}
+
+function applyRelease(state, operation, commit) {
+  const dispatch = requireDispatch(state, operation.dispatch_id);
+  if (dispatch.state === "closed") throw queueError("dispatch_state_conflict", "Dispatch is already closed");
+  cancelClaim(state, state.claims.get(dispatch.claims[0]), operation.reason, commit);
+  dispatch.state = "closed";
+}
+
+function applyIssueLink(state, operation) {
+  const work = requireWork(state, operation.work_id);
+  if (operation.claim_id !== undefined && state.claims.get(operation.claim_id)?.work_id !== work.work_id) throw queueError("claim_scope_invalid", "IssueLink Claim belongs to another Work");
+  if (work.backing_issue) {
+    if (issueKey(work.backing_issue) === issueKey(operation.resource)) return;
+    throw queueError("issue_binding_conflict", "Work already has a backing Issue");
+  }
+  const owner = backingIssueOwner(state, operation.resource);
+  if (owner !== undefined && owner !== work.work_id) throw queueError("issue_binding_conflict", "one Work per backing Issue");
+  work.backing_issue = operation.resource;
+  trackBackingIssue(state, work);
+}
+
+function applyIssueComment(state, operation) {
+  const work = requireWork(state, operation.work_id);
+  let target = work;
+  if (operation.claim_id !== undefined) {
+    target = requireClaim(state, operation.claim_id);
+    if (target.work_id !== work.work_id) throw queueError("claim_scope_invalid", "IssueComment Claim belongs to another Work");
+  }
+  if (target.issue_comment !== undefined) {
+    if (target.issue_comment === operation.comment_id) return;
+    throw queueError("issue_binding_conflict", "Issue comment binding is immutable");
+  }
+  target.issue_comment = operation.comment_id;
 }
 
 /**
- * @param state
- * @param claimId
- * @param context
- * @param {{requireCompletion?: boolean, resource?: Record<string, string>}} [options]
+ * A finish-carried Work is the continuation of the Completion immediately before
+ * it: fresh, exactly `continuationChild` of that parent, and admitted against the
+ * projection that already counts the parent as completed.
  */
-function validateClaimAuthority(state, claimId, context, { requireCompletion = false, resource } = {}) {
-  const normalized = normalizeTrustedContext(context);
-  const authority = claimAuthority(state, claimId, actorFromContext(context), requireCompletion);
-  if (requireCompletion && authority.work.barrier !== "pending") throw queueError("claim_effects_unauthorized", "a terminal delivery barrier cannot authorize effects again");
-  const run = authority.dispatch.run;
-  if (normalized.ref !== run.ref || normalized.event !== run.event) throw queueError("run_binding_conflict", "native event/revision is not the approved bound run");
-  if (resource !== undefined) validateEffectResourceAuthority(state, authority, resource);
-  return authority;
+function admitContinuation(state, commit, index) {
+  const operation = commit.operations[index];
+  const invalid = message => queueError("request_invalid", message);
+  const paired = commit.operations[index - 1];
+  if (paired?.kind !== "Completion" || paired.dispatch_id !== commit.request.parameters.dispatch_id) throw invalid("a finish-carried Work must immediately follow its parent's Completion of the request's Dispatch");
+  if (state.works.has(operation.work_id)) throw invalid("a continuation must be fresh Work");
+  const parent = state.works.get(paired.work_id);
+  const continuation = operation.continuation;
+  if (!continuation || parent?.completion_id !== commit.id) throw invalid("a finish-carried Work must be the continuation of a Completion in this commit");
+  const approval = operation.depends_on.find(edge => edge.kind === "issue" && edge.condition === "approved")?.resource;
+  if (canonical(operation) !== canonical(continuationChild(parent, continuation, approval))) throw invalid("a continuation must inherit exactly from its parent");
+  // An automatic hop spends one unit of its parent's budget; a zero balance cannot hand off.
+  if (continuation.route === "workqueue" && parent.continuation && continuation.remaining >= parent.continuation.remaining) throw invalid("an automatic continuation must decrease its remaining budget");
+  validateGraphAdmission(state, [operation]);
 }
 
-function validateWorkerContinuation(state, context) {
-  const normalized = normalizeTrustedContext(context);
-  const authority = workerContinuationAuthority(state, actorFromContext(context));
-  if (normalized.ref !== authority.dispatch.run.ref || normalized.event !== authority.dispatch.run.event) throw queueError("run_binding_conflict", "native event/revision is not the approved bound run");
-  return authority;
-}
-
-function assertEvidence(state, dispatch, evidence, at, kind, actor) {
-  validateEvidence(evidence);
-  boundedBytes(evidence, state.policy.limits.evidence_bytes, "lifecycle evidence");
-  const profile = dispatch.profile;
-  const principal = dispatchPrincipal(dispatch);
-  if (
-    evidence.kind !== kind ||
-    evidence.checked_at > at ||
-    evidence.repository !== dispatchRepository(state, dispatch) ||
-    evidence.workflow !== profile.workflow ||
-    evidence.ref !== profile.ref ||
-    (principal !== undefined && evidence.principal !== principal) ||
-    (principal === undefined && (state.policy.authorization !== "aw" || dispatch.state !== "reserved" || kind !== "prelaunch"))
-  )
-    throw queueError("evidence_invalid", "evidence scope or timestamp does not match reservation");
-  if (kind === "terminal_run" || kind === "worker_termination" || kind === "delivery") {
-    if (!dispatch.run || evidence.run_id !== dispatch.run.run_id || evidence.run_attempt !== 1) throw queueError("evidence_invalid", "evidence does not name the exact bound native attempt");
-    if (kind === "terminal_run" && (evidence.source !== "github_api" || evidence.status !== "completed" || !evidence.conclusion)) throw queueError("evidence_invalid", "release/failure requires exact trusted terminal evidence");
-    if (kind === "delivery" && (evidence.source !== "verified_receipts" || !evidence.receipt)) throw queueError("evidence_invalid", "Result requires independently verified scoped receipts");
-  }
-  if (
-    kind === "worker_termination" &&
-    (dispatch.state !== "bound" ||
-      evidence.source !== "github_api" ||
-      !evidence.receipt ||
-      evidence.status !== undefined ||
-      evidence.conclusion !== undefined ||
-      actor?.role !== "reconciler" ||
-      actor.run_id !== dispatch.run.run_id ||
-      actor.run_attempt !== 1 ||
-      actor.repository !== evidence.repository ||
-      actor.workflow !== evidence.workflow ||
-      actor.principal !== evidence.principal)
-  )
-    throw queueError("evidence_invalid", "worker termination requires the original worker's trusted finalizer and verified job quiescence");
-  if (kind === "prelaunch" && (dispatch.state !== "reserved" || dispatch.sender || dispatch.run || evidence.source !== "trusted_publisher")) throw queueError("evidence_invalid", "prelaunch cancellation cannot race past a start marker");
-  if (kind === "nonlaunch" && (dispatch.run || evidence.source !== "github_api" || !evidence.receipt)) throw queueError("evidence_invalid", "nonlaunch requires positive API rejection evidence, never silence");
-}
-
-function dispatchRepository(state, dispatch) {
-  const grant = state.requests.get(dispatch.request_id);
-  return grant.actor.repository;
-}
-
-function applyObservation(state, operation, commit) {
-  if (commit.actor.role === "worker") {
-    const authority = workerContinuationAuthority(state, commit.actor);
-    if (!poolPolicy(state, authority.work.pool).allowed_repositories.includes(operation.resource.repository)) throw queueError("dependency_unauthorized", "worker observation is outside its original parent's pool");
-  }
-  if (operation.observed_at > commit.at || operation.credential_generation !== state.credential_generation) throw queueError("observation_invalid", "observation must bind current authorized generation and decision time");
-  boundedBytes(operation, state.policy.limits.evidence_bytes, "Observation");
-  const authorized = Object.values(state.policy.pools).some(pool => pool.allowed_repositories.includes(operation.resource.repository));
-  if (!authorized) throw queueError("dependency_unauthorized", "observation resource is not allowlisted");
-  const previous = state.observationsById.get(operation.observation_id);
-  if (previous) {
-    if (canonical(previous) !== canonical(operation)) throw queueError("observation_conflict", "observation identity is immutable");
-    return;
-  }
-  const key = gateKey(operation.resource, operation.condition);
-  const count = (state.observation_writes.get(key) ?? 0) + 1;
-  if (count > state.policy.limits.observation_writes) throw queueError("resource_limit", "external gate observation write budget exhausted");
-  state.observation_writes.set(key, count);
-  state.observationsById.set(operation.observation_id, operation);
-  state.observations.set(key, operation);
-}
-
-function applyLifecycle(state, operation, commit) {
-  if (operation.evidence) boundedBytes(operation.evidence, state.policy.limits.evidence_bytes, "evidence");
-  const work = operation.work_id && state.works.get(operation.work_id);
-  const claim = operation.claim_id && state.claims.get(operation.claim_id);
-  const dispatch = state.dispatches.get(operation.dispatch_id || claim?.dispatch_id);
+function applyOperation(state, operation, commit, ordinal, index) {
   switch (operation.kind) {
-    case "Completion": {
-      const authority = claimAuthority(state, operation.claim_id, commit.actor, false);
-      if (
-        operation.work_id !== authority.work.work_id ||
-        operation.dispatch_id !== authority.dispatch.dispatch_id ||
-        operation.claim_handle !== authority.claim.handle ||
-        operation.run_id !== authority.dispatch.run.run_id ||
-        operation.run_attempt !== 1
-      )
-        throw queueError("claim_scope_invalid", "Completion is outside native Claim scope");
-      if ((operation.keep_open === true) !== (commit.request.parameters.keep_open === true)) throw queueError("request_invalid", "Completion differs from finish keep_open intent");
-      work.state = operation.keep_open === true ? "available" : "completed";
-      state.terminalBarriers.delete(work.work_id);
-      work.completion_id = commit.id;
-      work.completion_at = commit.at;
-      work.barrier = "pending";
-      claim.state = "completed";
-      claim.terminal_commit_id = commit.id;
-      if (operation.keep_open === true) {
-        claim.keep_open = true;
-        claim.barrier = "pending";
+    case "Work":
+      if (commit.request.kind === "finish") admitContinuation(state, commit, index);
+      if (!state.works.has(operation.work_id)) {
+        const work = { ...operation, state: "available", position: { commit: ordinal, operation: index }, attempts: 0 };
+        state.works.set(work.work_id, work);
+        state.workCreators.set(work.work_id, commit.actor);
+        trackAdmittedWork(state, work);
       }
-      break;
-    }
-    case "DeliveryEvidence": {
-      const authority = claimAuthority(state, operation.claim_id, commit.actor, true);
-      if (
-        operation.work_id !== authority.work.work_id ||
-        operation.dispatch_id !== authority.dispatch.dispatch_id ||
-        operation.claim_handle !== authority.claim.handle ||
-        operation.run_id !== authority.dispatch.run.run_id ||
-        operation.completion_id !== authority.work.completion_id
-      )
-        throw queueError("claim_scope_invalid", "DeliveryEvidence is outside native Claim scope");
-      const barrier = authority.claim.keep_open ? authority.claim.barrier : authority.work.barrier;
-      if (barrier !== "pending") throw queueError("delivery_conflict", "DeliveryEvidence requires a pending delivery barrier");
-      const previous = state.deliveryEvidence.get(operation.claim_id);
-      if (previous) {
-        if (canonical(previous) !== canonical(operation)) throw queueError("delivery_conflict", "DeliveryEvidence is immutable per Completion");
-        break;
-      }
-      state.deliveryEvidence.set(operation.claim_id, operation);
-      break;
-    }
-    case "ClaimCancellation": {
-      if (claim?.state === "cancelled") {
-        const cancelled = state.cancellations.get(claim.claim_id);
-        if (!cancelled || canonical(cancelled) !== canonical(operation)) throw queueError("cancellation_conflict", "cancellation/backoff metadata is immutable");
-        break;
-      }
-      if (!claim || claim.work_id !== operation.work_id || claim.state !== "open" || work?.claim_id !== operation.claim_id) throw queueError("claim_ineffective", "only effective open Claims can be cancelled");
-      if (commit.actor.role === "worker") claimAuthority(state, claim.claim_id, commit.actor, false);
-      const retry = poolPolicy(state, work.pool).retry;
-      let backoffOrigin = commit.at;
-      if (commit.request.kind === "release") {
-        const release = commit.operations.find(candidate => candidate.kind === "Release" && candidate.dispatch_id === claim.dispatch_id);
-        if (release && ["prelaunch", "nonlaunch", "terminal_run", "worker_termination"].includes(release.evidence.kind)) {
-          assertEvidence(state, dispatch, release.evidence, commit.at, release.evidence.kind, commit.actor);
-          backoffOrigin = release.evidence.checked_at;
-        }
-      }
-      if (operation.retry_not_before < backoffOrigin + retry.backoff_ms || !Number.isSafeInteger(backoffOrigin + retry.backoff_ms)) throw queueError("retry_invalid", "retry must respect trusted bounded backoff");
-      claim.state = "cancelled";
-      claim.terminal_commit_id = commit.id;
-      claim.cancellation_reason = operation.reason;
-      claim.retry_not_before = operation.retry_not_before;
-      work.state = "available";
-      work.retry_not_before = operation.retry_not_before;
-      delete work.claim_id;
-      state.cancellations.set(claim.claim_id, operation);
-      break;
-    }
-    case "WorkCancellation":
-      if (!work || work.state === "completed" || work.barrier === "pending") throw queueError("work_terminal", "completed ownership cannot be reopened or cancelled");
-      if (operation.version === 1 && operation.reason === "worker_contract_obsolete" && work.state !== "cancelled" && !obsoleteWork(state, work))
-        throw queueError("deployment_conflict", "obsolete cancellation requires available unpinned Work with no delivery barrier and an incompatible active worker contract");
-      if (operation.claim_id) {
-        const selected = state.claims.get(operation.claim_id);
-        if (
-          !selected ||
-          selected.work_id !== work.work_id ||
-          work.claim_id !== selected.claim_id ||
-          (!(work.state === "claimed" && selected.state === "open") && !(work.state === "cancelled" && selected.state === "cancelled" && selected.terminal_commit_id === work.cancellation_commit_id))
-        )
-          throw queueError("claim_scope_invalid", "selected Claim is no longer this Work's current owner; refresh state");
-      }
-      if (commit.actor.role === "producer" && state.policy.authorization !== "aw") {
-        const rule = state.policy.producers[commit.actor.principal];
-        if (!rule || !rule.pools.includes(work.pool) || !rule.priorities.includes(work.priority) || !rule.fairness_keys.includes(work.fairness_key))
-          throw queueError("admission_unauthorized", "producer cannot cancel another accounting scope");
-      }
-      if (commit.actor.role === "worker") {
-        const scopedDispatch = state.dispatches.get(commit.actor.dispatch_id);
-        const member = scopedDispatch?.claims.find(candidate => candidate.handle === commit.actor.claim_handle);
-        const scoped = member && bindingAuthority(state, member.claim_id, commit.actor);
-        if (
-          !scoped ||
-          scoped.work.work_id !== work.work_id ||
-          scoped.claim.state !== "cancelled" ||
-          !["available", "cancelled"].includes(work.state) ||
-          work.attempts < poolPolicy(state, work.pool).retry.max_attempts ||
-          commit.request.kind !== "finish" ||
-          operation.reason !== "attempts_exhausted"
-        )
-          throw queueError("work_unauthorized", "worker can terminally cancel only its exhausted cancelled Claim scope");
-      }
-      if (work.state === "cancelled") {
-        const cancelled = state.cancellations.get(work.work_id) ?? (work.cancellation_reason === "work_expired" ? { kind: "WorkCancellation", work_id: work.work_id, reason: "work_expired" } : undefined);
-        if (!cancelled || canonical(cancelled) !== canonical(operation)) throw queueError("cancellation_conflict", "terminal cancellation metadata is immutable");
-        state.cancellations.set(work.work_id, operation);
-        break;
-      }
-      if (work.state === "claimed") {
-        const cancelled = state.claims.get(work.claim_id);
-        cancelled.state = "cancelled";
-        cancelled.terminal_commit_id = commit.id;
-        cancelled.cancellation_reason = operation.reason;
-      }
-      work.state = "cancelled";
-      work.cancellation_reason = operation.reason;
-      if (operation.claim_id) work.cancellation_claim_id = operation.claim_id;
-      work.cancellation_commit_id = commit.id;
-      state.cancellations.set(work.work_id, operation);
-      break;
-    case "Result":
-    case "DeliveryFailure": {
-      const previous = state.terminalBarriers.get(operation.claim_id) || (state.terminalBarriers.get(operation.work_id)?.claim_id === operation.claim_id ? state.terminalBarriers.get(operation.work_id) : undefined);
-      if (previous) {
-        if (canonical(previous) !== canonical(operation)) throw queueError("delivery_conflict", "terminal Result/failure descriptor and evidence are immutable");
-        break;
-      }
-      if (!claim || !work || claim.work_id !== work.work_id || claim.state !== "completed" || work.claim_id !== claim.claim_id || work.completion_id !== operation.completion_id || work.barrier !== "pending")
-        throw queueError("delivery_conflict", "Result/DeliveryFailure are exclusive terminal barriers for frozen Completion");
-      if (operation.kind === "Result") {
-        assertEvidence(state, dispatch, operation.evidence, commit.at, "delivery");
-        boundedBytes(operation.descriptor, state.policy.limits.result_bytes, "Result descriptor");
-        work.barrier = "verified";
-        work.result = operation.descriptor;
-        work.result_commit_id = commit.id;
-        if (claim.keep_open) claim.barrier = "verified";
-      } else {
-        assertEvidence(state, dispatch, operation.evidence, commit.at, "terminal_run");
-        const recovery = poolPolicy(state, work.pool).reconciliation;
-        if ((operation.evidence.attempts ?? 0) < recovery.max_attempts && commit.at - work.completion_at < recovery.deadline_ms) throw queueError("reconciliation_pending", "delivery failure requires exhausted bounded verification");
-        if (operation.disposition !== (operation.evidence.effects ?? "unknown") || (operation.disposition === "none" && !operation.evidence.receipt))
-          throw queueError("evidence_invalid", "none requires positive no-effects proof; missing receipts mean unknown");
-        work.barrier = "failed";
-        work.disposition = operation.disposition;
-        if (claim.keep_open) claim.barrier = "failed";
-      }
-      state.terminalBarriers.set(operation.work_id, operation);
-      state.deliveryEvidence.delete(operation.claim_id);
-      if (claim.keep_open) {
-        state.terminalBarriers.set(operation.claim_id, operation);
-        if (operation.kind === "Result") {
-          for (const field of ["claim_id", "completion_id", "completion_at", "result", "result_commit_id", "disposition"]) delete work[field];
-          work.barrier = "none";
-          work.attempts = 0;
-          work.retry_not_before = 0;
-        }
-      }
-      break;
-    }
+      return;
+    case "Observation":
+      state.observations.set(gateKey(operation.resource, operation.condition), operation);
+      return;
+    case "Claim":
+      return applyClaim(state, operation, commit);
     case "Dispatch": {
-      if (!dispatch || dispatch.released) throw queueError("dispatch_invalid", "dispatch reservation is absent or released");
-      const profile = dispatch.profile;
-      const writes = (state.lifecycleWrites.get(dispatch.dispatch_id) ?? 0) + 1;
-      if (writes > poolPolicy(state, dispatch.pool).reconciliation.max_attempts + 4) throw queueError("resource_limit", "dispatch reconciliation write budget exhausted");
-      if (operation.state === "started") {
-        if (state.grants_paused) throw queueError("grants_paused", "new launch markers are paused");
-        if (
-          commit.actor.role !== "dispatcher" ||
-          !commit.actor.workflow ||
-          !commit.actor.run_id ||
-          commit.actor.run_attempt < 1 ||
-          dispatch.state !== "reserved" ||
-          !operation.sender ||
-          canonical(operation.sender) !== canonical(commit.actor) ||
-          operation.run ||
-          operation.evidence
-        )
-          throw queueError("dispatch_invalid", "start marker must select exactly one authenticated approved sender");
-        dispatch.sender = operation.sender;
-        if (profile.principal === undefined) {
-          if (state.policy.authorization !== "aw" || !operation.credential_principal) throw queueError("run_binding_conflict", "AW launch requires the selected credential principal");
-        } else if (operation.credential_principal !== undefined && operation.credential_principal !== profile.principal) {
-          throw queueError("run_binding_conflict", "selected credential principal differs from approved profile");
-        }
-        if (operation.credential_principal !== undefined) dispatch.credential_principal = operation.credential_principal;
-      } else if (operation.state === "bound") {
-        if (!["started", "uncertain", "unresolved", "bound"].includes(dispatch.state) || !operation.run || operation.sender || !operation.evidence)
-          throw queueError("dispatch_invalid", "binding requires a committed start marker and exact authenticated native run evidence");
-        const run = operation.run;
-        if (run.repository !== dispatchRepository(state, dispatch) || run.workflow !== profile.workflow || run.ref !== profile.ref || run.principal !== dispatchPrincipal(dispatch))
-          throw queueError("run_binding_conflict", "native run scope differs from approved profile");
-        const evidence = operation.evidence;
-        assertEvidence(state, dispatch, evidence, commit.at, evidence.kind);
-        if (!["github_api", "trusted_activation"].includes(evidence.source) || evidence.run_id !== run.run_id || evidence.run_attempt !== 1) throw queueError("evidence_invalid", "binding needs authenticated exact native run provenance");
-        if (
-          commit.actor.role === "worker" &&
-          (commit.actor.run_id !== run.run_id ||
-            commit.actor.run_attempt !== 1 ||
-            commit.actor.repository !== run.repository ||
-            commit.actor.workflow !== run.workflow ||
-            commit.actor.principal !== run.principal ||
-            commit.actor.dispatch_id !== dispatch.dispatch_id)
-        )
-          throw queueError("run_binding_conflict", "activation may bind only its authenticated actual run");
-        if (dispatch.run && canonical(dispatch.run) !== canonical(run)) throw queueError("run_binding_conflict", "assignment already belongs to a different native run");
-        const existingBinding = indexesFor(state).runBindings.get(run.run_id);
-        if (existingBinding && existingBinding !== dispatch.dispatch_id) throw queueError("run_binding_conflict", "native run is already bound to another assignment");
-        dispatch.run = run;
-      } else if (operation.state === "rejected") {
-        if (!operation.evidence || operation.run || operation.sender) throw queueError("evidence_invalid", "rejection requires positive nonlaunch evidence");
-        assertEvidence(state, dispatch, operation.evidence, commit.at, "nonlaunch");
-        if (operation.reason !== undefined && operation.reason !== operation.evidence.receipt) throw queueError("evidence_invalid", "rejection reason must retain its nonlaunch receipt");
-      } else {
-        if (!["started", "uncertain", "unresolved"].includes(dispatch.state) || operation.run || operation.sender || !operation.reason) throw queueError("dispatch_invalid", "uncertainty cannot revoke a binding or authorize a retry");
-        if (operation.state === "unresolved") {
-          if (!operation.evidence || operation.evidence.kind !== "reconciliation" || (operation.evidence.attempts ?? 0) < poolPolicy(state, dispatch.pool).reconciliation.max_attempts)
-            throw queueError("reconciliation_pending", "unresolved requires bounded reconciliation evidence");
-          assertEvidence(state, dispatch, operation.evidence, commit.at, "reconciliation");
-        }
-      }
-      dispatch.state = operation.state;
-      if (operation.reason) dispatch.reason = operation.reason;
-      state.lifecycleWrites.set(dispatch.dispatch_id, writes);
-      dispatch.lifecycle_writes = writes;
-      break;
+      const dispatch = requireDispatch(state, operation.dispatch_id);
+      if (dispatch.state !== "reserved") throw queueError("dispatch_state_conflict", "only a reserved Dispatch can start");
+      if (commit.actor.run_id !== dispatch.reserved_by.run_id || commit.actor.run_attempt !== dispatch.reserved_by.run_attempt)
+        throw queueError("actor_unauthorized", "only the dispatcher attempt that reserved a Dispatch records its launch");
+      dispatch.state = "started";
+      dispatch.launch = { run_id: operation.run_id, revision: operation.revision };
+      return;
     }
+    case "Bound":
+      return applyBound(state, operation, commit);
+    case "Completion":
+      return applyCompletion(state, operation, commit);
+    case "ClaimCancellation":
+      return applyClaimCancellation(state, operation, commit);
+    case "WorkCancellation":
+      return applyWorkCancellation(state, operation, commit);
     case "Release":
-      if (!dispatch || dispatch.released) throw queueError("release_invalid", "native reservation may release once only");
-      assertEvidence(state, dispatch, operation.evidence, commit.at, operation.evidence.kind, commit.actor);
-      if (!["prelaunch", "nonlaunch", "terminal_run", "worker_termination"].includes(operation.evidence.kind)) throw queueError("release_invalid", "only positive nonlaunch, terminal run, or trusted worker termination evidence can release");
-      if (dispatch.claims.some(member => state.claims.get(member.claim_id).state === "open")) throw queueError("release_invalid", "settle only still-open Claims before native release");
-      dispatch.released = true;
-      break;
-    default:
-      throw queueError("unsupported_protocol", "unsupported lifecycle operation");
+      return applyRelease(state, operation, commit);
+    case "IssueLink":
+      return applyIssueLink(state, operation);
+    case "IssueComment":
+      return applyIssueComment(state, operation);
+    case "Checkpoint":
+      throw queueError("checkpoint_invalid", "a Checkpoint must be the sole first line of the log");
   }
 }
 
-function finishOperations(state, request, actor, at) {
-  const { dispatch_id, claim_handle, outcome } = request.parameters;
-  const dispatch = state.dispatches.get(dispatch_id);
-  const member = dispatch?.claims.find(member => member.handle === claim_handle);
-  if (!member) throw queueError("claim_scope_invalid", "finish selector is not in immutable assignment");
-  bindingAuthority(state, member.claim_id, actor);
-  const claim = state.claims.get(member.claim_id);
-  if (outcome === "completed" && claim.state === "completed" && (claim.keep_open === true) !== (request.parameters.keep_open === true)) throw queueError("completion_conflict", "keep_open differs from durable Completion");
-  if ((outcome === "completed" && claim.state === "completed") || (outcome === "cancelled" && claim.state === "cancelled")) return [];
-  const authority = claimAuthority(state, member.claim_id, actor, false);
-  if (outcome === "completed")
-    return [
-      { kind: "Completion", work_id: member.work_id, claim_id: member.claim_id, dispatch_id, claim_handle, run_id: authority.dispatch.run.run_id, run_attempt: 1, ...(request.parameters.keep_open === true ? { keep_open: true } : {}) },
-    ];
-  const retry = poolPolicy(state, authority.work.pool).retry;
-  /** @type {Array<{kind: string, work_id: string, claim_id: string, reason: string, retry_not_before: number} | {kind: string, work_id: string, reason: string}>} */
-  const operations = [{ kind: "ClaimCancellation", work_id: member.work_id, claim_id: member.claim_id, reason: "worker_cancelled", retry_not_before: at + retry.backoff_ms }];
-  if (authority.work.attempts >= retry.max_attempts) operations.push({ kind: "WorkCancellation", work_id: member.work_id, reason: "attempts_exhausted" });
-  return operations;
-}
-
-function workerControlScope(state, commit) {
-  if (commit.actor.role !== "worker" || !["submit", "dispatch_next", "observe"].includes(commit.request.kind)) return;
-  const authority = workerContinuationAuthority(state, commit.actor);
-  if (commit.request.kind === "submit") {
-    for (const node of commit.request.parameters.nodes) validateSubmissionEntitlement(state, node, commit.actor);
+/**
+ * Apply one validated commit to the projection in place. Replay never reads `at`.
+ * @param {QueueState} state
+ * @param {QueueCommit} commit
+ */
+function applyCommit(state, commit) {
+  validateCommit(commit);
+  if (commit.operations.some(operation => operation.kind === "Checkpoint")) throw queueError("checkpoint_invalid", "a Checkpoint must be the sole first line of the log");
+  if (commit.previous !== (state.tip || null)) throw queueError("ledger_invalid", "commit does not extend the causal tip");
+  if (!state.tip) {
+    if (commit.actor.role === "worker") throw queueError("actor_unauthorized", "a worker cannot create the queue genesis");
+    state.repository = commit.actor.repository;
+  } else if (commit.actor.repository !== state.repository) throw queueError("actor_unauthorized", "foreign queue repository");
+  if (state.requests.has(commit.request.id)) throw queueError("request_reused", "request is already committed");
+  if (commit.request.kind === "migrate" && !state.transactions.every(prior => prior.request.kind === "migrate")) throw queueError("request_invalid", "migrate commits must form the log genesis");
+  // submit/migrate admit their batch up front (forward references); a finish admits
+  // each continuation right after its paired Completion.
+  if (commit.request.kind !== "finish") {
+    const fresh = new Map();
+    for (const operation of commit.operations) if (operation.kind === "Work" && !state.works.has(operation.work_id)) fresh.set(operation.work_id, [...(fresh.get(operation.work_id) ?? []), operation]);
+    if (fresh.size) validateGraphAdmission(state, [...fresh.values()].flat());
   }
-  if (commit.request.kind === "dispatch_next" && commit.request.parameters.pool !== authority.work.pool) throw queueError("claim_scope_invalid", "worker dispatch control is restricted to its parent's pool");
-  if (commit.request.kind === "observe")
-    for (const operation of commit.request.parameters.operations)
-      if (!poolPolicy(state, authority.work.pool).allowed_repositories.includes(operation.resource.repository)) throw queueError("dependency_unauthorized", "worker observation is outside its original parent's pool");
-}
-
-function validateRequestContext(state, request, actor) {
-  validateRequest(request, actor);
-  validateRequestRole(actor, request.kind);
-  workerControlScope(state, { actor, request });
-  if (request.kind === "dispatch_next") validateDispatchParameters(request.parameters, state);
-  if (request.kind === "submit") validateGraphAdmission(state, request.parameters.nodes, actor);
-}
-
-function replayTransactions(transactions, asOf) {
-  if (asOf !== undefined) integer(asOf, 0, Number.MAX_SAFE_INTEGER, "replay timestamp");
-  const state = replayOrdered(causalChain(transactions));
-  if (asOf !== undefined) {
-    advanceExpiration(state, asOf);
-    projectViews(state);
-  }
+  const ordinal = state.commits;
+  commit.operations.forEach((operation, index) => applyOperation(state, operation, commit, ordinal, index));
+  state.requests.add(commit.request.id);
+  state.tip = commit.id;
+  state.commits += 1;
+  state.transactions.push(commit);
   return state;
 }
 
-function checkpointSnapshot(state, lastAt, retainPolicyHistory = true) {
-  const projection = serializeProjection(state);
-  projection.clocks = Object.fromEntries(
-    Object.entries(projection.clocks).filter(([, clocks]) => clocks.classes.v !== "0" || Object.keys(clocks.classes.pass).length > 0 || Object.values(clocks.keys).some(clock => clock.v !== "0" || Object.keys(clock.pass).length > 0))
-  );
-  const object = map => Object.fromEntries(map);
-  const receipts = [...state.requests.values()].map(commit => {
-    const claims = commit.operations.filter(operation => operation.kind === "Claim");
-    const checkpointPriorTip = commit.checkpoint_prior_tip ?? commit.operations.find(operation => operation.kind === "Checkpoint")?.prior_tip;
-    const events =
-      commit.checkpoint_events ??
-      commit.operations.map(operation => {
-        if (operation.kind === "Deployment" || (retainPolicyHistory && ["Policy", "PoolInstall"].includes(operation.kind))) return structuredClone(operation);
-        const fields = [
-          "kind",
-          "version",
-          "work_id",
-          "logical_contract",
-          "execution_ref",
-          "claim_id",
-          "dispatch_id",
-          "credential_principal",
-          "claim_handle",
-          "completion_id",
-          "state",
-          "reason",
-          "disposition",
-          "control",
-          "value",
-          "observation_id",
-          "observations",
-          "run",
-          "run_id",
-          "run_attempt",
-          "keep_open",
-          "evidence",
-          "trace",
-        ];
-        const event = Object.fromEntries(Object.entries(operation).filter(([field, value]) => fields.includes(field) && (field !== "state" || typeof value === "string") && (field !== "observations" || value.length > 0)));
-        if (event.evidence) {
-          const { receipt, ...evidence } = event.evidence;
-          event.evidence = evidence;
-        }
-        return event;
-      });
-    return {
-      id: commit.id,
-      previous: commit.previous,
-      request_id: commit.request.id,
-      kind: commit.request.kind,
-      ...(commit.request.kind === "checkpoint" ? { prior_tip: checkpointPriorTip } : {}),
-      fingerprint: commit.request.fingerprint,
-      parameters_digest: commit.compacted_parameters_digest ?? digest(commit.request.parameters),
-      ...(commit.request.kind === "dispatch_next" ? { dispatch_parameters: commit.request.parameters } : {}),
-      actor: commit.actor,
-      policy_epoch: commit.policy_epoch,
-      at: commit.at,
-      events,
-      claim_explanations: claims.map(claim => {
-        const explanation = state.claimExplanations.get(claim.claim_id);
-        if (!explanation) throw queueError("checkpoint_invalid", "claim inspection provenance is missing");
-        return explanation;
-      }),
-    };
-  });
-  const completionTimes = Object.fromEntries([...state.works].filter(([, work]) => work.completion_id).map(([id, work]) => [id, work.completion_at]));
-  return {
-    ...projection,
-    requests: receipts,
-    seen_epochs: object([...state.seen_epochs].map(epoch => [epoch, true])),
-    seen_generations: object([...state.seen_generations].map(generation => [generation, true])),
-    observation_ids: object(state.observationsById),
-    terminal_barriers: object(state.terminalBarriers),
-    ...(state.deliveryEvidence.size ? { delivery_evidence: object(state.deliveryEvidence) } : {}),
-    cancellations: object(state.cancellations),
-    completion_times: completionTimes,
-    last_at: lastAt,
-  };
-}
-
-function restoreCheckpointState(checkpoint) {
-  const op = checkpoint.operations[0];
-  const invalid = () => queueError("checkpoint_invalid", "checkpoint state does not bind a valid prior projection");
-  if (checkpoint.previous !== null || checkpoint.actor.role !== "administrator" || checkpoint.request.kind !== "checkpoint") throw invalid();
-  const wire = op.state;
-  const snapshot = expandCheckpointSnapshot(structuredClone(wire));
-  closed(
-    snapshot,
-    [
-      "repository",
-      "tip",
-      "policy_epoch",
-      "policy",
-      "works",
-      "claims",
-      "dispatches",
-      "observations",
-      "requests",
-      "clocks",
-      "admission_paused",
-      "grants_paused",
-      "credential_generation",
-      "stats",
-      "ledger_bytes",
-      "observation_writes",
-      "seen_epochs",
-      "seen_generations",
-      "observation_ids",
-      "terminal_barriers",
-      "cancellations",
-      "completion_times",
-      "last_at",
-    ],
-    ["deployments", "delivery_evidence"],
-    "checkpoint state",
-    "checkpoint_invalid"
-  );
-  if (digest(snapshot) !== op.state_sha256 || snapshot.tip !== op.prior_tip || snapshot.repository !== checkpoint.actor.repository || snapshot.policy_epoch !== checkpoint.policy_epoch || checkpoint.at < snapshot.last_at) {
-    throw invalid();
+function projectStats(state) {
+  const stats = { work: state.works.size, available: 0, claimed: 0, completed: 0, cancelled: 0, claims: state.claims.size, dispatches: 0, transactions: state.commits, nodes: state.works.size };
+  const gates = new Set();
+  for (const work of state.works.values()) {
+    stats[work.state]++;
+    for (const edge of work.depends_on) if (edge.kind !== "work") gates.add(`${work.graph_id}\n${gateKey(edge.resource, edge.condition)}`);
   }
-  validatePolicy(snapshot.policy);
-  const object = value => value && typeof value === "object" && !Array.isArray(value);
-  for (const key of ["works", "claims", "dispatches", "observations", "clocks", "observation_writes", "seen_epochs", "seen_generations", "observation_ids", "terminal_barriers", "cancellations", "completion_times"])
-    if (!object(snapshot[key])) throw invalid();
-  if (Object.hasOwn(snapshot, "delivery_evidence") && !object(snapshot.delivery_evidence)) throw invalid();
-  if (
-    !Array.isArray(snapshot.requests) ||
-    snapshot.requests.length !== snapshot.stats?.transactions ||
-    Object.keys(snapshot.works).length !== snapshot.stats.work ||
-    Object.keys(snapshot.claims).length !== snapshot.stats.claims ||
-    snapshot.seen_epochs[snapshot.policy_epoch] !== true ||
-    snapshot.seen_generations[snapshot.credential_generation] !== true
-  )
-    throw invalid();
-  const state = newState();
-  state.repository = snapshot.repository;
-  state.policy_epoch = snapshot.policy_epoch;
-  state.policy = snapshot.policy;
-  state.tip = checkpoint.id;
-  state.time_watermark = snapshot.last_at;
-  state.admission_paused = snapshot.admission_paused;
-  state.grants_paused = snapshot.grants_paused;
-  state.credential_generation = snapshot.credential_generation;
-  state.works = new Map(Object.entries(snapshot.works).map(([id, work]) => [id, { ...work, ...(Object.hasOwn(snapshot.completion_times, id) ? { completion_at: snapshot.completion_times[id] } : {}) }]));
-  state.claims = new Map(Object.entries(snapshot.claims));
-  state.dispatches = new Map(Object.entries(snapshot.dispatches));
-  restoreDeployments(state, snapshot.deployments);
-  const deploymentState = { policy: state.policy, deployments: new Map() };
-  initializeDeployments(deploymentState);
-  for (const receipt of snapshot.requests) {
-    if (receipt.policy_epoch !== state.policy_epoch) continue;
-    for (const operation of receipt.events ?? []) {
-      if (operation.kind !== "Deployment") continue;
-      if (receipt.kind !== "deployment" || !["administrator", "producer", "dispatcher"].includes(receipt.actor.role)) throw invalid();
-      applyDeployment(deploymentState, operation);
-    }
-  }
-  if (canonical(serializeDeployments(deploymentState)) !== canonical(serializeDeployments(state))) throw invalid();
-  state.observations = new Map(Object.entries(snapshot.observations));
-  state.workCreators = new Map();
-  state.observationsById = new Map(Object.entries(snapshot.observation_ids));
-  state.observation_writes = new Map(Object.entries(snapshot.observation_writes));
-  state.terminalBarriers = new Map(Object.entries(snapshot.terminal_barriers));
-  state.deliveryEvidence = new Map(Object.entries(snapshot.delivery_evidence ?? {}));
-  state.cancellations = new Map(Object.entries(snapshot.cancellations));
-  state.lifecycleWrites = new Map([...state.dispatches].map(([id, dispatch]) => [id, dispatch.lifecycle_writes]));
-  state.clocks = new Map(
-    Object.entries(snapshot.clocks).map(([pool, clocks]) => {
-      const decodeClock = (clock, numeric = false) => {
-        if (!clock || !/^(?:0|[1-9][0-9]*)$/.test(clock.v) || !object(clock.pass) || !object(clock.active)) throw invalid();
-        for (const pass of Object.values(clock.pass)) if (!/^(?:0|[1-9][0-9]*)$/.test(pass)) throw invalid();
-        return {
-          virtual: BigInt(clock.v),
-          passes: new Map(Object.entries(clock.pass).map(([key, pass]) => [numeric ? Number(key) : key, BigInt(pass)])),
-          active: new Set(Object.keys(clock.active).map(key => (numeric ? Number(key) : key))),
-        };
-      };
-      return [pool, { classes: decodeClock(clocks.classes, true), keys: new Map(Object.entries(clocks.keys).map(([key, clock]) => [Number(key), decodeClock(clock)])) }];
-    })
-  );
-  state.requests = new Map();
-  state.historicalTransactions = [];
-  state.claimExplanations = new Map();
-  const commitIDs = new Set();
-  for (const receipt of snapshot.requests) {
-    closed(
-      receipt,
-      ["id", "previous", "request_id", "kind", "fingerprint", "parameters_digest", "actor", "policy_epoch", "at", "events", "claim_explanations"],
-      ["prior_tip", "dispatch_parameters"],
-      "checkpoint receipt",
-      "checkpoint_invalid"
-    );
-    identity(receipt.id, "checkpoint receipt commit");
-    if (receipt.previous !== null) identity(receipt.previous, "checkpoint receipt predecessor");
-    identity(receipt.request_id, "checkpoint receipt request");
-    validateActor(receipt.actor);
-    validateRequestRole(receipt.actor, receipt.kind);
-    if (
-      state.requests.has(receipt.request_id) ||
-      commitIDs.has(receipt.id) ||
-      receipt.actor.repository !== state.repository ||
-      (receipt.kind === "checkpoint") !== Object.hasOwn(receipt, "prior_tip") ||
-      !/^[a-f0-9]{64}$/.test(receipt.fingerprint) ||
-      !/^[a-f0-9]{64}$/.test(receipt.parameters_digest) ||
-      (receipt.kind === "dispatch_next") !== Object.hasOwn(receipt, "dispatch_parameters") ||
-      !Number.isSafeInteger(receipt.at) ||
-      receipt.at < 0 ||
-      !Array.isArray(receipt.events) ||
-      !Array.isArray(receipt.claim_explanations) ||
-      receipt.events.some(operation => !operation || typeof operation.kind !== "string")
-    )
-      throw invalid();
-    const claims = receipt.events.filter(operation => operation.kind === "Claim");
-    if (receipt.claim_explanations.length !== claims.length) throw invalid();
-    for (const operation of receipt.events) {
-      if (operation.kind === "Work") {
-        if (!Object.hasOwn(snapshot.works, operation.work_id) || state.workCreators.has(operation.work_id)) throw invalid();
-        state.workCreators.set(operation.work_id, receipt.actor);
-      }
-    }
-    commitIDs.add(receipt.id);
-    const prior = {
-      version: 3,
-      id: receipt.id,
-      previous: receipt.previous,
-      request: { id: receipt.request_id, kind: receipt.kind, fingerprint: receipt.fingerprint, parameters: receipt.dispatch_parameters ?? null },
-      compacted_parameters_digest: receipt.parameters_digest,
-      ...(receipt.prior_tip === undefined ? {} : { checkpoint_prior_tip: receipt.prior_tip }),
-      actor: receipt.actor,
-      policy_epoch: receipt.policy_epoch,
-      at: receipt.at,
-      operations: receipt.events,
-      checkpoint_events: receipt.events,
-    };
-    for (const [index, claim] of claims.entries()) {
-      const explanation = receipt.claim_explanations[index];
-      if (explanation.claim_id !== claim.claim_id || explanation.commit_id !== receipt.id || explanation.request_id !== receipt.request_id || explanation.work_id !== claim.work_id) throw invalid();
-      state.claimExplanations.set(claim.claim_id, { ...explanation });
-    }
-    state.requests.set(receipt.request_id, prior);
-    state.time_watermark = Math.max(state.time_watermark, receipt.at);
-    state.historicalTransactions.push(prior);
-  }
-  const nodeFields = [
-    "kind",
-    "work_id",
-    "graph_id",
-    "node_key",
-    "pool",
-    "priority",
-    "fairness_key",
-    "worker_profile",
-    "batch_trust_domain",
-    "payload",
-    "depends_on",
-    "enqueued",
-    "expires_at",
-    "subject",
-    "backing_issue",
-    "replacement_of",
-    "logical_contract",
-    "execution_ref",
-  ];
-  for (const [index, receipt] of snapshot.requests.entries()) {
-    const prior = state.requests.get(receipt.request_id);
-    if (receipt.kind === "submit") {
-      const nodes = [...state.works.values()].filter(work => work.position?.commit === index).sort((a, b) => a.position.operation - b.position.operation);
-      const firstOperation = index === 0 && receipt.previous === null && receipt.events[0]?.kind === "Policy" ? 1 : 0;
-      if (!nodes.length || nodes.some((node, offset) => node.position.operation !== offset + firstOperation)) throw invalid();
-      prior.request.parameters = { nodes: nodes.map(work => Object.fromEntries(nodeFields.filter(field => Object.hasOwn(work, field)).map(field => [field, work[field]]))) };
-    }
-    if (["submit", "dispatch_next"].includes(receipt.kind) && (digest(prior.request.parameters) !== receipt.parameters_digest || fingerprint(receipt.actor, receipt.kind, prior.request.parameters) !== receipt.fingerprint)) throw invalid();
-  }
-  const installedPolicy = state.policy;
-  if (!installedPolicy) throw invalid();
-  if (state.workCreators.size !== state.works.size) throw invalid();
-  for (const [id, work] of state.works) {
-    if (
-      work.work_id !== id ||
-      !Number.isSafeInteger(work.position?.commit) ||
-      work.position.commit < 0 ||
-      work.position.commit >= snapshot.requests.length ||
-      snapshot.requests[work.position.commit].kind !== "submit" ||
-      !Number.isSafeInteger(work.attempts) ||
-      work.attempts < 0 ||
-      (work.state === "claimed" && (!work.claim_id || state.claims.get(work.claim_id)?.state !== "open")) ||
-      (work.completion_id && !Object.hasOwn(snapshot.completion_times, id))
-    )
-      throw invalid();
-    if (work.state !== "completed" && work.state !== "cancelled") {
-      const pool = installedPolicy.pools[work.pool];
-      if (!pool?.profiles[work.worker_profile] || work.attempts > pool.retry.max_attempts) throw invalid();
-      const deployment = state.deployments.get(work.pool)?.get(work.worker_profile);
-      if (
-        deployment &&
-        (!Object.entries(deployment.revisions).some(([ref, revision]) => revision.profile.logical_contract === work.admission_contract && (!work.execution_ref || work.execution_ref === ref)) ||
-          (work.logical_contract && work.logical_contract !== work.admission_contract))
-      )
-        throw invalid();
-    }
-  }
-  const completions = new Map();
-  for (const receipt of snapshot.requests)
-    for (const event of receipt.events)
-      if (event.kind === "Completion") {
-        if (completions.has(event.claim_id)) throw invalid();
-        if (Object.hasOwn(event, "keep_open") && typeof event.keep_open !== "boolean") throw invalid();
-        const parameters = { dispatch_id: event.dispatch_id, claim_handle: event.claim_handle, outcome: "completed", ...(event.keep_open === true ? { keep_open: true } : {}) };
-        if (receipt.kind !== "finish" || fingerprint(receipt.actor, "finish", parameters) !== receipt.fingerprint) throw invalid();
-        completions.set(event.claim_id, { event, commit_id: receipt.id });
-      }
-  for (const [id, claim] of state.claims) {
-    if (claim.claim_id !== id || !state.works.has(claim.work_id) || !state.dispatches.has(claim.dispatch_id)) throw invalid();
-    const completion = completions.get(id);
-    if (completion && ((claim.keep_open === true) !== (completion.event.keep_open === true) || claim.terminal_commit_id !== completion.commit_id)) throw invalid();
-    if (claim.keep_open) {
-      if (claim.keep_open !== true || !completion || claim.state !== "completed" || !["pending", "verified", "failed"].includes(claim.barrier)) throw invalid();
-      if (claim.barrier === "pending") {
-        const work = state.works.get(claim.work_id);
-        if (work.claim_id !== id || work.barrier !== "pending" || work.completion_id !== claim.terminal_commit_id) throw invalid();
-      } else {
-        const terminal = state.terminalBarriers.get(id);
-        if (!terminal || terminal.claim_id !== id || terminal.completion_id !== claim.terminal_commit_id || terminal.kind !== (claim.barrier === "verified" ? "Result" : "DeliveryFailure")) throw invalid();
-      }
-    }
-  }
-  for (const [id, evidence] of state.deliveryEvidence) {
-    validateOperation(evidence);
-    const claim = state.claims.get(id);
-    const work = state.works.get(evidence.work_id);
-    const dispatch = state.dispatches.get(evidence.dispatch_id);
-    if (
-      evidence.kind !== "DeliveryEvidence" ||
-      evidence.claim_id !== id ||
-      !claim ||
-      claim.state !== "completed" ||
-      claim.work_id !== evidence.work_id ||
-      claim.dispatch_id !== evidence.dispatch_id ||
-      claim.handle !== evidence.claim_handle ||
-      !work ||
-      work.claim_id !== id ||
-      work.completion_id !== evidence.completion_id ||
-      (claim.keep_open ? claim.barrier : work.barrier) !== "pending" ||
-      dispatch?.run?.run_id !== evidence.run_id
-    )
-      throw invalid();
-  }
-  const checkpointStarts = new Map();
-  for (const receipt of snapshot.requests)
-    for (const event of receipt.events)
-      if (event.kind === "Dispatch" && event.state === "started" && event.credential_principal !== undefined) {
-        if (checkpointStarts.has(event.dispatch_id)) throw invalid();
-        checkpointStarts.set(event.dispatch_id, { receipt, event });
-      }
-  for (const [id, dispatch] of state.dispatches) {
-    if (dispatch.dispatch_id !== id || state.requests.get(dispatch.request_id)?.id !== dispatch.commit_id) throw invalid();
-    if (dispatch.profile.logical_contract) {
-      const deployment = state.deployments.get(dispatch.pool)?.get(dispatch.worker_profile);
-      const revision = deployment?.revisions[dispatch.profile.ref];
-      if (!dispatch.released && (!revision || canonical(revision.profile) !== canonical(dispatch.profile))) throw invalid();
-      for (const member of dispatch.claims) if (state.works.get(member.work_id)?.admission_contract !== dispatch.profile.logical_contract) throw invalid();
-    }
-    if (dispatch.profile.principal !== undefined && dispatch.credential_principal === undefined) continue;
-    if (dispatch.profile.principal !== undefined) decimal(dispatch.profile.principal, "checkpoint profile principal", "checkpoint_invalid");
-    if (dispatch.credential_principal !== undefined) decimal(dispatch.credential_principal, "checkpoint credential principal", "checkpoint_invalid");
-    if (dispatch.profile.principal !== undefined && dispatch.credential_principal !== undefined && dispatch.profile.principal !== dispatch.credential_principal) throw invalid();
-    if (dispatch.run && dispatch.run.principal !== dispatchPrincipal(dispatch)) throw invalid();
-    if (dispatch.state === "reserved") {
-      if (dispatch.sender || dispatch.run || dispatch.credential_principal !== undefined) throw invalid();
-      continue;
-    }
-    decimal(dispatchPrincipal(dispatch), "checkpoint launch principal", "checkpoint_invalid");
-    if (!dispatch.sender) throw invalid();
-    const start = checkpointStarts.get(id);
-    if (!start || start.event.credential_principal !== dispatch.credential_principal || canonical(start.receipt.actor) !== canonical(dispatch.sender)) throw invalid();
-  }
-  if (state.requests.has(checkpoint.request.id)) throw invalid();
-  state.seen_epochs = new Set(Object.keys(snapshot.seen_epochs));
-  state.seen_generations = new Set(Object.keys(snapshot.seen_generations));
-  state.requests.set(checkpoint.request.id, checkpoint);
-  state.transactions = [checkpoint];
-  state.ledgerBytes = canonicalBytes(checkpoint) + 1;
-  const policy = state.policy;
-  if (!policy || state.ledgerBytes + require("./work_queue_limits.cjs").recoveryHeadroom(state) > policy.limits.ledger_bytes + policy.limits.recovery_bytes) throw invalid();
-  advanceExpiration(state, checkpoint.at);
+  for (const dispatch of state.dispatches.values()) if (dispatch.state !== "closed") stats.dispatches++;
+  stats.nodes += gates.size;
+  state.stats = stats;
   return state;
 }
 
-function expandCheckpointSnapshot(wire) {
-  const invalid = () => queueError("checkpoint_invalid", "checkpoint state does not bind a valid prior projection");
-  closed(
-    wire,
-    [
-      "repository",
-      "tip",
-      "policy_epoch",
-      "policy",
-      "works",
-      "claims",
-      "dispatches",
-      "observations",
-      "requests_compressed",
-      "clocks",
-      "admission_paused",
-      "grants_paused",
-      "credential_generation",
-      "stats",
-      "ledger_bytes",
-      "observation_writes",
-      "seen_epochs",
-      "seen_generations",
-      "observation_ids",
-      "terminal_barriers",
-      "cancellations",
-      "completion_times",
-      "last_at",
-    ],
-    ["deployments", "delivery_evidence"],
-    "checkpoint state",
-    "checkpoint_invalid"
-  );
-  if (typeof wire.requests_compressed !== "string" || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(wire.requests_compressed)) throw invalid();
-  try {
-    const requestsText = inflateRawSync(Buffer.from(wire.requests_compressed, "base64"), { maxOutputLength: 64 << 20 }).toString("utf8");
-    // Exact canonical equality also rejects duplicate keys and lossy numbers.
-    const requests = JSON.parse(requestsText);
-    if (!Array.isArray(requests) || canonical(requests) !== requestsText) throw invalid();
-    const { requests_compressed: _, ...projection } = wire;
-    return { ...projection, requests };
-  } catch {
-    throw invalid();
-  }
+function isCheckpointCommit(commit) {
+  return Array.isArray(commit?.operations) && commit.operations[0]?.kind === "Checkpoint";
 }
 
-function replayOrdered(ordered) {
-  if (!ordered.length) throw queueError("policy_missing", "existing queue has no policy genesis");
-  let state = newState();
-  trackState(state);
-  let epochs = new Set();
-  let generations = new Set(["initial"]);
-  let offset = 0;
-  if (ordered[0].operations[0]?.kind === "Checkpoint") {
-    untrackState(state);
-    state = restoreCheckpointState(ordered[0]);
-    trackState(state);
-    offset = state.historicalTransactions.length + 1;
-    epochs = new Set(state.seen_epochs);
-    generations = new Set(state.seen_generations);
-    ordered = ordered.slice(1);
-  }
-  for (let ordinal = 0; ordinal < ordered.length; ordinal++) {
-    const commit = ordered[ordinal];
-    advanceExpiration(state, commit.at);
-    if (ordinal === 0 && !offset) state.repository = commit.actor.repository;
-    const priorRequest = state.requests.get(commit.request.id);
-    if (priorRequest) throw queueError("request_reused", priorRequest.request.fingerprint === commit.request.fingerprint ? "committed request cannot appear in another commit" : "request identity has different semantics");
-    const bootstrap =
-      ordinal === 0 &&
-      !offset &&
-      commit.request.kind === "submit" &&
-      ["producer", "dispatcher"].includes(commit.actor.role) &&
-      commit.operations[0]?.kind === "Policy" &&
-      commit.operations.length > 1 &&
-      commit.operations.slice(1).every(operation => operation.kind === "Work") &&
-      canonical(commit.request.parameters.nodes) === canonical(commit.operations.slice(1));
-    if (ordinal === 0 && !offset && !bootstrap && (commit.operations.length !== 1 || commit.operations[0].kind !== "Policy" || commit.request.kind !== "policy" || commit.actor.role !== "administrator"))
-      throw queueError("policy_missing", "genesis must install exactly one mandatory Policy");
-    if (state.policy && commit.actor.repository !== state.repository) throw queueError("actor_unauthorized", "foreign queue repository origin");
-    const policies = commit.operations.filter(operation => operation.kind === "Policy");
-    if (policies.length) {
-      if (
-        policies.length !== 1 ||
-        (!bootstrap && commit.operations.length !== 1) ||
-        (bootstrap && (commit.operations[0] !== policies[0] || commit.actor.role === "administrator")) ||
-        (!bootstrap && state.policy && commit.actor.role !== "administrator") ||
-        commit.policy_epoch !== policies[0].epoch ||
-        epochs.has(policies[0].epoch) ||
-        (state.policy && !quiescent(state))
-      )
-        throw queueError("policy_not_quiescent", "Policy epoch changes require a drained queue and new immutable identity");
-      epochs.add(policies[0].epoch);
-      state.policy = policies[0].policy;
-      if (state.policy?.authorization === "aw") {
-        for (const pool of Object.values(state.policy.pools))
-          for (const profile of Object.values(pool.profiles)) if (profile.effect_scope !== commit.actor.repository) throw queueError("policy_invalid", "AW-managed effect scope must be the queue repository");
-      }
-      state.policy_epoch = policies[0].epoch;
-      initializeDeployments(state);
-      state.clocks = freshClocks(state.policy);
-      state.observation_writes = new Map();
-    } else if (!state.policy || commit.policy_epoch !== state.policy_epoch) throw queueError("policy_invalid", "commit does not bind authoritative installed epoch");
-    if (!state.policy) throw queueError("policy_missing", "existing queue has no policy genesis");
-    state.scheduling_profiles = commit.request.kind === "dispatch_next" ? commit.request.parameters.worker_profiles : undefined;
-    if (commit.operations.length > state.policy.limits.operations) throw queueError("resource_limit", "operation count exceeds installed policy");
-    workerControlScope(state, commit);
-    if (commit.request.kind === "finish" && canonical(finishOperations(state, commit.request, commit.actor, commit.at)) !== canonical(commit.operations)) throw queueError("request_invalid", "finish differs from exact scoped outcome");
-    const newWork = commit.operations.filter(operation => operation.kind === "Work");
-    if (newWork.length) validateGraphAdmission(state, newWork, commit.actor);
-    let expected;
-    let claimIndex = 0;
-    for (let index = 0; index < commit.operations.length; index++) {
-      const operation = commit.operations[index];
-      switch (operation.kind) {
-        case "Checkpoint":
-          throw queueError("checkpoint_invalid", "checkpoint must be the sole root transaction");
-        case "Policy":
-          break;
-        case "PoolInstall": {
-          poolIdentity(operation.pool);
-          if (Object.hasOwn(operation, "config_ref") && (typeof operation.config_ref !== "string" || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(operation.config_ref) || /^0+$/.test(operation.config_ref)))
-            throw queueError("policy_invalid", "pool configuration provenance requires an immutable default revision");
-          const installedPolicy = state.policy;
-          if (!installedPolicy || installedPolicy.authorization !== "aw") throw queueError("policy_invalid", "pool installation requires an AW-managed Policy");
-          const installed = Object.hasOwn(installedPolicy.pools, operation.pool) ? installedPolicy.pools[operation.pool] : undefined;
-          if (installed) {
-            const { profiles: oldProfiles, ...oldBoundary } = installed;
-            const { profiles: newProfiles, ...newBoundary } = operation.config;
-            if (
-              canonical(oldBoundary) !== canonical(newBoundary) ||
-              Object.entries(oldProfiles).some(([name, profile]) => !Object.hasOwn(newProfiles, name) || canonical(newProfiles[name]) !== canonical(profile)) ||
-              Object.keys(newProfiles).length <= Object.keys(oldProfiles).length
-            )
-              throw queueError("policy_invalid", "pool installation must only add profiles, preserving installed pool authority and economics");
-          }
-          const policy = structuredClone(installedPolicy);
-          Object.defineProperty(policy.pools, operation.pool, { value: structuredClone(operation.config), enumerable: true, configurable: true, writable: true });
-          validatePolicy(policy);
-          const authorizedRepositories = new Set(Object.values(installedPolicy.pools).flatMap(pool => pool.allowed_repositories));
-          if (operation.config.allowed_repositories.some(repository => !authorizedRepositories.has(repository))) throw queueError("policy_invalid", "PoolInstall cannot expand the installed repository allowlist");
-          if (Object.values(operation.config.profiles).some(profile => profile.effect_scope !== state.repository || Object.hasOwn(profile, "principal")))
-            throw queueError("policy_invalid", "automatically installed AW pools must preserve repository-scoped authority");
-          for (const [name, profile] of Object.entries(operation.config.profiles)) {
-            if (installed && Object.hasOwn(installed.profiles, name)) continue;
-            if (!approvedPoolProfile(state, name, profile) && !newPoolProfile(state, name, profile, operation.config_ref))
-              throw queueError("policy_invalid", "pool profiles require registered worker revision authority or a new default-revision AW worker");
-          }
-          state.policy = policy;
-          initializeDeployments(state, [operation.pool]);
-          break;
-        }
-        case "Deployment":
-          applyDeployment(state, operation);
-          break;
-        case "Control":
-          if (!state.policy) throw queueError("policy_missing", "existing queue has no policy genesis");
-          if (operation.control === "admission_paused") state.admission_paused = operation.value;
-          if (operation.control === "grants_paused") state.grants_paused = operation.value;
-          if (operation.control === "credential_generation") {
-            if (operation.value !== state.credential_generation && generations.has(operation.value)) throw queueError("credential_generation_reused", "credential cutover cannot revive a stale observation generation");
-            generations.add(operation.value);
-            state.credential_generation = operation.value;
-          }
-          boundedBytes(operation, state.policy.limits.evidence_bytes, "Control");
-          break;
-        case "Work":
-          if (!state.works.has(operation.work_id)) {
-            const contract = admissionProfile(state, operation).logical_contract;
-            state.works.set(operation.work_id, {
-              ...operation,
-              ...(contract ? { admission_contract: contract } : {}),
-              state: "available",
-              position: { commit: ordinal + offset, operation: index },
-              attempts: 0,
-              retry_not_before: 0,
-              barrier: "none",
-            });
-            state.workCreators.set(operation.work_id, commit.actor);
-          }
-          break;
-        case "IssueLink":
-        case "IssueComment":
-          applyIssueBinding(state, operation, commit);
-          break;
-        case "WorkPriority": {
-          const work = state.works.get(operation.work_id);
-          if (!work) throw queueError("work_missing", "priority change references missing Work");
-          if (work.state !== "available" || work.claim_id) throw queueError("ownership_terminal", "reprioritization requires available Work; immutable assignments cannot change");
-          if ((work.effective_priority ?? work.priority) !== operation.expected_priority) throw queueError("priority_conflict", "priority changed since selection; refresh state");
-          work.effective_priority = operation.priority;
-          break;
-        }
-        case "Observation":
-          if (expected) throw queueError("packing_invalid", "dispatch observations must precede its deterministic Claim prefix");
-          applyObservation(state, operation, commit);
-          break;
-        case "Claim": {
-          if (!expected) {
-            validateDispatchParameters(commit.request.parameters, state);
-            expected = planDispatch(state, commit.request.parameters, { requestId: commit.request.id, commitId: commit.id, at: commit.at, precedingOperations: index });
-          }
-          if (canonical(operation) !== canonical(expected.operations[claimIndex])) throw queueError("selection_invalid", "Claim/order/group/handle does not match deterministic fair packing");
-          const work = state.works.get(operation.work_id);
-          const selection = planNext(state, commit.request.parameters.pool, commit.at);
-          const priority = work.effective_priority ?? work.priority;
-          const clocks = state.clocks.get(work.pool);
-          const classPassPrior = clocks?.classes.passes.get(priority)?.toString() ?? "0";
-          const keyPassPrior = clocks?.keys.get(priority)?.passes.get(work.fairness_key)?.toString() ?? "0";
-          const capacityBefore = reservationCounts(state, work.pool, work.fairness_key);
-          const position = { commit: ordinal + offset, operation: index };
-          applyScheduledClaim(state, operation, selection, commit);
-          state.claimExplanations.set(operation.claim_id, {
-            tip: state.tip,
-            at: commit.at,
-            status: "committed_claim_prefix",
-            before_tip: state.tip,
-            position,
-            request_id: commit.request.id,
-            commit_id: commit.id,
-            policy_epoch: commit.policy_epoch,
-            claim_id: operation.claim_id,
-            dispatch_id: operation.dispatch_id,
-            claim_handle: operation.handle,
-            work_id: work.work_id,
-            pool: work.pool,
-            priority,
-            fairness_key: work.fairness_key,
-            work_position: work.position,
-            selection: {
-              work_id: selection.work_id,
-              reason: "selected",
-              observations: selection.observations,
-              class_pass: selection.class_pass,
-              key_pass: selection.key_pass,
-            },
-            class_pass_prior: classPassPrior,
-            key_pass_prior: keyPassPrior,
-            capacity_before: { logical: capacityBefore.logical, native: capacityBefore.native, account: capacityBefore.account },
-            capacity_after: reservationCounts(state, work.pool, work.fairness_key),
-          });
-          claimIndex++;
-          break;
-        }
-        default:
-          applyLifecycle(state, operation, commit);
-      }
-      updateIndexes(state, operation);
-    }
-    // Operations may admit Work or make it expirable by cancelling a Claim or
-    // verifying retained delivery; the pre-operation pass cannot cover these changes.
-    advanceExpiration(state, commit.at);
-    if (expected && claimIndex !== expected.operations.length) throw queueError("packing_invalid", "Claim commit omitted an admissible member of the fair prefix");
-    if (!expected && commit.request.kind === "dispatch_next") throw queueError("request_invalid", "no-grant evaluation cannot consume a stable request identity");
-    // Retry exhaustion cannot leave an immediately retryable poison head.
-    for (const operation of commit.operations)
-      if (operation.kind === "ClaimCancellation") {
-        const work = state.works.get(operation.work_id);
-        if (work.attempts >= poolPolicy(state, work.pool).retry.max_attempts && work.state !== "cancelled") throw queueError("retry_exhausted", "exhausted Claim must be followed by explicit WorkCancellation");
-      }
-    state.requests.set(commit.request.id, commit);
-    state.tip = commit.id;
-    state.transactions.push(commit);
-    const bytes = canonicalBytes(commit) + 1;
-    checkLedgerBudget(
-      state,
-      bytes,
-      commit.operations.some(operation => operation.kind === "Work" || operation.kind === "Claim"),
-      commit.operations.some(operation => ["Observation", "IssueLink", "IssueComment"].includes(operation.kind))
-    );
-    state.ledgerBytes += bytes;
-    state.scheduling_profiles = undefined;
-  }
-  if (!state.policy) throw queueError("policy_missing", "existing queue has no policy genesis");
-  projectViews(state);
-  state.seen_epochs = epochs;
-  state.seen_generations = generations;
-  for (const explanation of state.claimExplanations.values()) explanation.tip = state.tip;
-  untrackState(state);
-  return Object.assign(state, { policy: state.policy });
-}
-
-function projectViews(state) {
-  const ordered = [...state.works.values()].sort(fifoCompare);
-  state.work = Object.fromEntries(ordered.map(work => [work.work_id, work.state]));
-  state.winner = Object.fromEntries(ordered.map(work => [work.work_id, work.claim_id ?? null]));
-  state.claim = Object.fromEntries([...state.claims].map(([id, claim]) => [id, claim.state]));
-  state.available = ordered.filter(work => work.state === "available").map(work => work.work_id);
-  const vertices = new Set(ordered.map(work => `work:${work.work_id}`));
-  for (const work of ordered) for (const edge of work.depends_on) if (edge.kind !== "work") vertices.add(`${work.graph_id}:${gateKey(edge.resource, edge.condition)}`);
-  state.stats = {
-    work: ordered.length,
-    available: ordered.filter(work => work.state === "available").length,
-    claimed: ordered.filter(work => work.state === "claimed").length,
-    completed: ordered.filter(work => work.state === "completed").length,
-    cancelled: ordered.filter(work => work.state === "cancelled").length,
-    claims: state.claims.size,
-    dispatches: [...state.dispatches.values()].filter(dispatch => !dispatch.released).length,
-    transactions: state.transactions.length + (state.historicalTransactions?.length ?? 0),
-    nodes: vertices.size,
-  };
-}
-
+/** Serialize a projection in the canonical checkpoint `state` format. */
 function serializeProjection(state) {
-  const mapObject = map => Object.fromEntries([...map].sort(([a], [b]) => utf8Compare(String(a), String(b))));
   return {
     repository: state.repository,
     tip: state.tip,
-    policy_epoch: state.policy_epoch,
-    policy: state.policy,
-    ...(state.deployments?.size ? { deployments: serializeDeployments(state) } : {}),
-    works: Object.fromEntries(
-      [...state.works].map(([id, work]) => {
-        const { completion_at, ...wire } = work;
-        return [id, wire];
-      })
-    ),
-    claims: mapObject(state.claims),
-    dispatches: mapObject(state.dispatches),
-    observations: mapObject(state.observations),
-    requests: mapObject(
-      new Map(
-        [...state.requests].map(([id, commit]) => {
-          const { compacted_parameters_digest, checkpoint_prior_tip, checkpoint_events, ...wire } = commit;
-          return [id, wire];
-        })
-      )
-    ),
-    clocks: Object.fromEntries([...state.clocks].map(([pool, clock]) => [pool, diagnostics(clock)])),
-    admission_paused: state.admission_paused,
-    grants_paused: state.grants_paused,
-    credential_generation: state.credential_generation,
-    stats: state.stats,
-    ledger_bytes: state.ledgerBytes,
-    observation_writes: mapObject(state.observation_writes),
+    commits: state.commits,
+    works: Object.fromEntries(state.works),
+    claims: Object.fromEntries(state.claims),
+    dispatches: Object.fromEntries(state.dispatches),
+    observations: Object.fromEntries(state.observations),
+    requests: [...state.requests].sort(utf8Compare),
+    work_creators: Object.fromEntries(state.workCreators),
   };
+}
+
+function terminalWork(work) {
+  return work.state === "completed" || work.state === "cancelled";
+}
+
+/**
+ * The part of a projection a Checkpoint carries: what a future valid commit can still read.
+ * Non-terminal Work keeps its `work` predecessors (their effects feed result_refs); a terminal
+ * Work stays only as such a predecessor or while its backing Issue awaits the projector's
+ * terminal IssueComment. Claims, Dispatches, creators and gate Observations follow the
+ * retained Work. Requests keep the dedupe window: the most recent RETAINED_REQUESTS of the
+ * log being folded, never the previous checkpoint's inherited ones.
+ */
+function checkpointProjection(state) {
+  const works = new Map();
+  for (const work of state.works.values()) {
+    if (!terminalWork(work)) {
+      works.set(work.work_id, work);
+      for (const edge of work.depends_on) if (edge.kind === "work") works.set(edge.work_id, state.works.get(edge.work_id));
+    } else if (work.backing_issue && work.issue_comment === undefined) works.set(work.work_id, work);
+  }
+  const observations = new Map();
+  for (const work of works.values()) {
+    for (const edge of work.depends_on) {
+      if (edge.kind === "work") continue;
+      const key = gateKey(edge.resource, edge.condition);
+      const observation = state.observations.get(key);
+      if (observation) observations.set(key, observation);
+    }
+  }
+  const claims = new Map([...state.claims].filter(([, claim]) => works.has(claim.work_id)));
+  return {
+    repository: state.repository,
+    tip: state.tip,
+    commits: state.commits,
+    works,
+    claims,
+    dispatches: new Map([...state.dispatches].filter(([, dispatch]) => claims.has(dispatch.claims[0]))),
+    observations,
+    requests: state.transactions.slice(-RETAINED_REQUESTS).map(commit => commit.request.id),
+    workCreators: new Map([...works.keys()].map(id => [id, state.workCreators.get(id)])),
+  };
+}
+
+function plainObject(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function recordEffects(effects) {
+  if (!Array.isArray(effects) || effects.some(effect => !plainObject(effect))) throw queueError("checkpoint_invalid", "checkpoint effects must be an array of objects");
+}
+
+/**
+ * Restore a checkpoint into fresh mutable records (like `cloneState`), so replaying the same
+ * commit objects again, or serializing them afterwards, still sees the checkpoint as written.
+ * @param {QueueCommit} commit @returns {QueueState}
+ */
+function restoreCheckpointState(commit) {
+  validateCommit(commit);
+  const invalid = message => queueError("checkpoint_invalid", message);
+  if (commit.previous !== null || commit.request.kind !== "checkpoint" || commit.operations.length !== 1) throw invalid("a checkpoint must be the sole operation of a root commit");
+  const operation = commit.operations[0];
+  const snapshot = operation.state;
+  closed(snapshot, CHECKPOINT_FIELDS, [], "checkpoint state", "checkpoint_invalid");
+  if (snapshot.repository !== commit.actor.repository || snapshot.tip !== operation.prior_tip || commit.request.parameters.prior_tip !== operation.prior_tip) throw invalid("checkpoint does not bind its repository and prior tip");
+  if (!Number.isSafeInteger(snapshot.commits) || snapshot.commits < 1) throw invalid("checkpoint requires its commit ordinal");
+  for (const field of ["works", "claims", "dispatches", "observations", "work_creators"]) if (!plainObject(snapshot[field])) throw invalid(`checkpoint ${field} must be an object`);
+  if (!Array.isArray(snapshot.requests) || new Set(snapshot.requests).size !== snapshot.requests.length) throw invalid("checkpoint requests must be unique");
+  if (snapshot.requests.length > RETAINED_REQUESTS) throw invalid(`checkpoint requests exceed the ${RETAINED_REQUESTS} retained request window`);
+  for (const id of snapshot.requests) identity(id, "checkpoint request");
+  const state = newState();
+  state.repository = snapshot.repository;
+  for (const [id, record] of Object.entries(snapshot.works)) {
+    closed(record, [...WORK_REQUIRED, "state", "position", "attempts"], WORK_RECORD_OPTIONAL, "checkpoint Work", "checkpoint_invalid");
+    for (const field of ["claim_id", "completion_id", "cancellation_commit_id", "issue_comment"]) if (Object.hasOwn(record, field)) identity(record[field], field);
+    if (Object.hasOwn(record, "cancellation_reason")) reason(record.cancellation_reason, WORK_CANCELLATION_REASONS, "Work");
+    if (Object.hasOwn(record, "effects")) recordEffects(record.effects);
+    validateWork(workDefinition(record));
+    closed(record.position, ["commit", "operation"], [], "checkpoint Work position", "checkpoint_invalid");
+    if (record.work_id !== id || !WORK_STATES.includes(record.state) || !Number.isSafeInteger(record.attempts) || record.attempts < 0) throw invalid("checkpoint Work record is inconsistent");
+    integer(record.position.commit, 0, snapshot.commits - 1, "Work position commit");
+    integer(record.position.operation, 0, OPERATIONS_PER_COMMIT - 1, "Work position operation");
+    if ((record.state === "claimed") !== Object.hasOwn(record, "claim_id") && record.state !== "completed") throw invalid("only claimed or completed Work names a Claim");
+    if ((record.state === "completed") !== Object.hasOwn(record, "completion_id") || (record.state === "completed") !== Object.hasOwn(record, "effects")) throw invalid("completed Work carries its completion");
+    if ((record.state === "cancelled") !== Object.hasOwn(record, "cancellation_reason")) throw invalid("cancelled Work carries its reason");
+    state.works.set(id, { ...record });
+  }
+  // A retained non-terminal Work still reads its predecessors; a terminal one never will.
+  for (const work of state.works.values()) {
+    if (!terminalWork(work) && work.depends_on.some(edge => edge.kind === "work" && !state.works.has(edge.work_id))) throw invalid("a checkpoint keeps every predecessor of non-terminal Work");
+  }
+  for (const [id, record] of Object.entries(snapshot.claims)) {
+    closed(record, CLAIM_RECORD_REQUIRED, CLAIM_RECORD_OPTIONAL, "checkpoint Claim", "checkpoint_invalid");
+    for (const field of ["handle", "commit_id", "request_id", "terminal_commit_id", "issue_comment"]) if (Object.hasOwn(record, field)) identity(record[field], field);
+    if (Object.hasOwn(record, "cancellation_reason")) reason(record.cancellation_reason, CLAIM_CANCELLATION_REASONS, "Claim");
+    if (Object.hasOwn(record, "effects")) recordEffects(record.effects);
+    const work = state.works.get(record.work_id);
+    if (record.claim_id !== id || !CLAIM_STATES.includes(record.state) || !work || !plainObject(snapshot.dispatches[record.dispatch_id])) throw invalid("checkpoint Claim record is inconsistent");
+    if ((record.state === "open") !== (work.state === "claimed" && work.claim_id === id)) throw invalid("open Claims and claimed Work must agree");
+    state.claims.set(id, { ...record });
+  }
+  for (const [id, record] of Object.entries(snapshot.dispatches)) {
+    closed(record, DISPATCH_RECORD_FIELDS, [], "checkpoint Dispatch", "checkpoint_invalid");
+    for (const field of ["request_id", "commit_id", "pool", "worker_profile"]) identity(record[field], field);
+    if (record.dispatch_id !== id || !DISPATCH_STATES.includes(record.state) || !Array.isArray(record.claims) || !PROFILE_WORKFLOW.test(record.workflow)) throw invalid("checkpoint Dispatch record is inconsistent");
+    if (record.claims.length !== 1) throw invalid("a checkpoint Dispatch carries exactly one Claim");
+    const claim = state.claims.get(record.claims[0]);
+    if (typeof record.claims[0] !== "string" || claim?.dispatch_id !== id) throw invalid("checkpoint Dispatch members are inconsistent");
+    const work = state.works.get(claim.work_id);
+    if (record.pool !== work.pool || record.worker_profile !== work.worker_profile) throw invalid("a checkpoint Dispatch must match its Work's pool and profile");
+    closed(record.reserved_by, ["run_id", "run_attempt"], [], "checkpoint reserved_by", "checkpoint_invalid");
+    decimal(record.reserved_by.run_id, "checkpoint reserving run ID", "checkpoint_invalid");
+    integer(record.reserved_by.run_attempt, 1, 4096, "checkpoint reserving run attempt");
+    if (record.run !== null) {
+      closed(record.run, ["run_id", "run_attempt"], [], "checkpoint run", "checkpoint_invalid");
+      decimal(record.run.run_id, "checkpoint run ID", "checkpoint_invalid");
+      integer(record.run.run_attempt, 1, 4096, "checkpoint run attempt");
+    }
+    if ((record.state === "bound") !== (record.run !== null) && record.state !== "closed") throw invalid("only bound Dispatches carry a run");
+    if (record.launch !== null) {
+      closed(record.launch, ["run_id", "revision"], [], "checkpoint launch", "checkpoint_invalid");
+      decimal(record.launch.run_id, "checkpoint launched run ID", "checkpoint_invalid");
+      if (typeof record.launch.revision !== "string" || !LAUNCH_REVISION.test(record.launch.revision)) throw invalid("checkpoint launch revision is malformed");
+    }
+    if ((record.state === "reserved") !== (record.launch === null) && record.state !== "closed") throw invalid("only started or bound Dispatches carry their launch");
+    if (record.run !== null && record.launch?.run_id !== record.run.run_id) throw invalid("a bound run must be the launched run");
+    if ((record.state !== "closed") !== (claim.state === "open")) throw invalid("a checkpoint Dispatch is closed exactly when its Claim is settled");
+    state.dispatches.set(id, { ...record, reserved_by: { ...record.reserved_by }, claims: [claim.claim_id] });
+  }
+  // Every Claim, settled or open, must be its Dispatch's sole member, so no two Claims share one.
+  for (const claim of state.claims.values()) if (state.dispatches.get(claim.dispatch_id)?.claims[0] !== claim.claim_id) throw invalid("checkpoint Claims must each own their Dispatch");
+  for (const [key, observation] of Object.entries(snapshot.observations)) {
+    validateOperation(observation);
+    if (observation.kind !== "Observation" || gateKey(observation.resource, observation.condition) !== key) throw invalid("checkpoint Observation key is inconsistent");
+    state.observations.set(key, observation);
+  }
+  for (const [id, actor] of Object.entries(snapshot.work_creators)) {
+    if (!state.works.has(id)) throw invalid("checkpoint Work creator names missing Work");
+    state.workCreators.set(id, validateActor(actor));
+  }
+  if (state.workCreators.size !== state.works.size) throw invalid("every checkpoint Work requires its creator");
+  state.requests = new Set(snapshot.requests);
+  state.requests.add(commit.request.id);
+  state.tip = commit.id;
+  state.commits = snapshot.commits + 1;
+  state.transactions = [commit];
+  return state;
+}
+
+/**
+ * Replay a v4 log in causal (file) order. A Checkpoint may only be line 1.
+ * @param {unknown[]} transactions
+ * @returns {QueueState}
+ */
+function replayTransactions(transactions) {
+  if (!Array.isArray(transactions)) throw queueError("ledger_invalid", "transactions must be an array");
+  let state = newState();
+  for (const [index, commit] of transactions.entries()) {
+    // prettier-ignore
+    if (index === 0 && isCheckpointCommit(commit)) state = restoreCheckpointState(/** @type {QueueCommit} */ (commit));
+    else applyCommit(state, /** @type {QueueCommit} */ (commit));
+  }
+  return projectStats(state);
+}
+
+/** Validate and append one commit to a copy of the projection. */
+function appendCommit(state, commit) {
+  const next = cloneState(state);
+  applyCommit(next, commit);
+  return projectStats(next);
 }
 
 function* boundedTransactionLines(contents) {
@@ -1586,18 +799,18 @@ function* boundedTransactionLines(contents) {
     const line = rawLine.slice(0, -1);
     lineNumber++;
     if (!line.trim()) throw queueError("ledger_invalid", "empty or truncated log record");
-    if (Buffer.byteLength(line, "utf8") > 8 * 1024 * 1024) throw queueError("resource_limit", `commit line ${lineNumber} exceeds parser bound`);
+    if (Buffer.byteLength(line, "utf8") > LEDGER_BYTES) throw queueError("resource_limit", `commit line ${lineNumber} exceeds the ledger bound`);
     yield rawLine;
   }
 }
 
 function parseTransactionRecords(contents) {
-  if (typeof contents !== "string" || Buffer.byteLength(contents, "utf8") > 80 * 1024 * 1024) throw queueError("resource_limit", "ledger exceeds cold parser bound");
+  if (typeof contents !== "string" || Buffer.byteLength(contents, "utf8") > LEDGER_BYTES) throw queueError("resource_limit", "ledger exceeds its byte bound");
   if (!contents || !contents.endsWith("\n")) throw queueError("ledger_invalid", "queue log must be nonempty and newline terminated");
   const records = [];
   for (const event of iterateJsonlEvents(boundedTransactionLines(contents))) {
     // Preserve duplicate-key, numeric, Unicode and nesting checks on original bytes.
-    records.push(parseStrictJSON(event.rawLine));
+    records.push(parseStrictJSON(event.rawLine, { maxBytes: LEDGER_BYTES }));
   }
   return records;
 }
@@ -1618,212 +831,87 @@ function serializeTransactionLog(transactions) {
   return ordered.length ? ordered.map(commit => canonical(commit)).join("\n") + "\n" : "";
 }
 
-function compactTransactions(transactions, priorGitSHA, actor, at) {
-  return checkpointTransactions(transactions, priorGitSHA, actor, at, false);
+/**
+ * Build the next commit for a request. `at` is informational only.
+ * @param {QueueState} state
+ * @param {QueueActor} actor
+ * @param {QueueRequest} request
+ * @param {Array<Record<string, any>>} operations
+ * @param {number} [at]
+ * @returns {QueueCommit}
+ */
+function buildCommit(state, actor, request, operations, at = Date.now()) {
+  const previous = state.tip || null;
+  return { version: PROTOCOL_VERSION, id: commitId(previous, request.id), previous, request, actor, at, operations };
 }
 
-function checkpointState(validated, priorGitSHA, actor, at, legacy, retainPolicyHistory) {
-  let lastAt = validated.time_watermark;
-  if (legacy) {
-    if ([...validated.works.values()].some(work => work.expires_at !== undefined)) throw queueError("checkpoint_invalid", "deadline-bearing history requires the committed time watermark");
-    lastAt = validated.transactions.at(-1).at;
-  }
-  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(priorGitSHA) || actor?.role !== "administrator" || actor.repository !== validated.repository || !Number.isSafeInteger(at) || at < lastAt || at > Number.MAX_SAFE_INTEGER)
-    throw queueError("checkpoint_invalid", "checkpoint requires an administrator, valid time and prior Git commit SHA");
-  return checkpointSnapshot(validated, lastAt, retainPolicyHistory);
-}
-
-function checkpointTransactions(transactions, priorGitSHA, actor, at, legacy, retainPolicyHistory = true, validated = replayTransactions(transactions)) {
-  if (priorGitSHA === undefined) return validated.transactions;
-  if (at === undefined) at = Math.max(Date.now(), validated.time_watermark);
-  const history = validated.transactions.map(transaction => canonical(transaction) + "\n").join("");
-  const history_sha256 = createHash("sha256").update(history, "utf8").digest("hex");
-  const state = checkpointState(validated, priorGitSHA, actor, at, legacy, retainPolicyHistory);
-  const state_sha256 = digest(state);
-  const requests_compressed = deflateRawSync(Buffer.from(canonical(state.requests), "utf8")).toString("base64");
-  const { requests: _, ...projection } = state;
-  const compressedState = { ...projection, requests_compressed };
-  const parameters = { prior_git_sha: priorGitSHA, prior_tip: validated.tip, history_sha256, state_sha256 };
-  const operation = { kind: "Checkpoint", ...parameters, state: compressedState };
-  const requestId = `checkpoint_${createHash("sha256").update(`${validated.tip}\n${priorGitSHA}`, "utf8").digest("hex")}`;
-  const request = newRequest(requestId, "checkpoint", actor, parameters);
-  const checkpoint = {
-    version: 3,
-    id: `q_${createHash("sha256").update(requestId, "utf8").digest("hex")}`,
+/**
+ * A checkpoint commit replaces the whole log: it is a root carrying `checkpointProjection`.
+ * @param {QueueState} state
+ * @param {QueueActor} actor
+ * @param {number} [at]
+ * @returns {QueueCommit}
+ */
+function checkpointCommit(state, actor, at = Date.now()) {
+  if (!state.tip) throw queueError("checkpoint_invalid", "an empty queue has nothing to checkpoint");
+  const request = newRequest("checkpoint", actor, { prior_tip: state.tip });
+  // The snapshot must not alias live records that later appends to `state` mutate in place.
+  const commit = {
+    version: PROTOCOL_VERSION,
+    id: commitId(null, request.id),
     previous: null,
     request,
     actor,
-    policy_epoch: validated.policy_epoch,
     at,
-    operations: [operation],
+    operations: [{ kind: "Checkpoint", prior_tip: state.tip, state: structuredClone(serializeProjection(checkpointProjection(state))) }],
   };
-  replayTransactions([checkpoint]);
-  return [checkpoint];
+  restoreCheckpointState(/** @type {QueueCommit} */ commit);
+  return /** @type {QueueCommit} */ commit;
 }
 
-function prepareCheckpoint(source, priorGitSHA, actor, at) {
-  const transactions = Array.isArray(source) ? source : source?.transactions;
-  if (!Array.isArray(transactions) || !transactions.length) throw queueError("checkpoint_invalid", "checkpoint requires a validated nonempty queue");
-  const ordered = causalChain(transactions);
-  const root = ordered[0];
-  const administrator = actor ?? { role: "administrator", principal: root.actor.principal, repository: root.actor.repository };
-  return compactTransactions(transactions, priorGitSHA, administrator, at ?? replayOrdered(ordered).time_watermark);
+/** A Dispatch's sole Claim while it is open, otherwise `undefined`. */
+function openClaim(state, dispatch) {
+  const claim = state.claims.get(dispatch.claims[0]);
+  return claim?.state === "open" ? claim : undefined;
 }
 
-// Only history verification may reproduce the pre-expiration final-timestamp
-// hash. New checkpoints always use the committed watermark.
-function reconstructCheckpoint(transactions, priorGitSHA, actor, at, expectedStateSHA) {
-  const validated = replayTransactions(transactions);
-  const root = validated.transactions[0];
-  const administrator = actor ?? { role: "administrator", principal: root.actor.principal, repository: root.actor.repository };
-  for (const retainPolicyHistory of [true, false]) {
-    for (const legacy of [false, true]) {
-      try {
-        const checkpoint = checkpointTransactions(transactions, priorGitSHA, administrator, at, legacy, retainPolicyHistory, validated);
-        if (checkpoint[0].operations[0].state_sha256 === expectedStateSHA) return checkpoint;
-      } catch (error) {
-        if (error?.code !== "checkpoint_invalid") throw error;
-      }
-    }
-  }
-  throw queueError("checkpoint_invalid", "checkpoint does not match its Git parent history");
-}
-
-function replayCheckpointSource(contents, priorGitSHA, root) {
-  const state = replayTransactionLog(contents);
-  const checkpoint = root.operations[0];
-  const invalid = () => queueError("checkpoint_invalid", "checkpoint does not match its Git parent history");
-  const lines = state.transactions.map(transaction => canonical(transaction) + "\n");
-  if (priorGitSHA !== checkpoint.prior_git_sha || state.tip !== checkpoint.prior_tip || createHash("sha256").update(lines.join(""), "utf8").digest("hex") !== checkpoint.history_sha256) throw invalid();
-  for (const retainPolicyHistory of [true, false]) {
-    for (const legacy of [false, true]) {
-      try {
-        if (digest(checkpointState(state, priorGitSHA, root.actor, root.at, legacy, retainPolicyHistory)) === checkpoint.state_sha256) return { state, lines };
-      } catch (error) {
-        if (error?.code !== "checkpoint_invalid") throw error;
-      }
-    }
-  }
-  throw invalid();
-}
-
-function appendCommit(transactions, commit) {
-  log.debug("commit.append.start", { transactions: transactions.length });
-  validateCommit(commit);
-  const ordered = causalChain(transactions);
-  if (ordered.some(transaction => transaction.request.id === commit.request.id)) {
-    const before = replayOrdered(ordered);
-    const prior = before.requests.get(commit.request.id);
-    if (prior.request.fingerprint !== commit.request.fingerprint || canonical(prior.actor) !== canonical(commit.actor)) throw queueError("request_reused", "stable request identity has different validated meaning");
-    log.debug("commit.append.reused");
-    return { transactions: before.transactions, state: before, commit: prior, idempotent: true };
-  }
-  if (commit.previous !== (ordered.at(-1)?.id ?? null)) throw queueError("ledger_invalid", "append does not extend checked causal tip");
-  if (ordered.some(transaction => transaction.id === commit.id)) throw queueError("ledger_invalid", "conflicting duplicate commit ID");
-  if (ordered.length >= 1000000) throw queueError("resource_limit", "ledger commit count exceeded");
-  const state = replayOrdered([...ordered, commit]);
-  log.debug("commit.append.complete", { transactions: state.transactions.length, operations: commit.operations.length });
-  return { transactions: state.transactions, state, commit, idempotent: false };
-}
-
-function generateRequestOperations(state, request, actor, at, commitId, observations = []) {
-  state = expirationView(state, at);
-  validateRequestContext(state, request, actor);
-  if (request.kind === "dispatch_next") return observations.length ? planDispatchWithObservations(state, request, actor, at, commitId, observations) : planDispatch(state, request.parameters, { requestId: request.id, commitId, at });
-  if (request.kind === "submit") {
-    const nodes = request.parameters.nodes;
-    if (nodes.every(node => state.works.has(node.work_id))) {
-      const index = state.works.get(nodes[0].work_id).position.commit;
-      return {
-        operations: [],
-        idempotent: true,
-        reason: "already_submitted",
-        commit: index < (state.historicalTransactions?.length ?? 0) ? state.historicalTransactions[index] : state.transactions[index - (state.historicalTransactions?.length ?? 0)],
-      };
-    }
-    return { operations: nodes };
-  }
-  if (request.kind === "finish") {
-    const operations = finishOperations(state, request, actor, at);
-    return { operations, idempotent: !operations.length, ...(!operations.length ? { reason: "already_finished" } : {}) };
-  }
-  return { operations: request.parameters.operations };
-}
-
-function planDispatchWithObservations(state, request, actor, at, commitId, observations) {
-  validateRequestContext(state, request, actor);
-  if (request.kind !== "dispatch_next" || !Array.isArray(observations)) throw queueError("request_invalid", "atomic observed dispatch requires dispatch_next and an observation array");
-  const working = { ...state, observations: new Map(state.observations), observationsById: new Map(state.observationsById), observation_writes: new Map(state.observation_writes) };
-  const commit = { at, actor };
-  for (const observation of observations) {
-    validateOperation(observation);
-    if (observation.kind !== "Observation" || !OP_ROLES.Observation.includes(actor.role)) throw queueError("unauthorized_operation", "only trusted dependency evidence may precede a grant");
-    applyObservation(working, observation, commit);
-  }
-  const decision = planDispatch(working, request.parameters, { requestId: request.id, commitId, at, precedingOperations: observations.length });
-  return { ...decision, tip: state.tip, operations: decision.operations.length ? [...observations, ...decision.operations] : [] };
-}
-
-function explainWork(state, workId, at) {
-  const work = state.works.get(workId);
-  if (!work) throw queueError("work_missing", "requested Work does not exist");
-  const next = Object.hasOwn(state.policy.pools, work.pool) ? selectionOnly(planNext(state, work.pool, at)) : { reason: "policy_epoch_retired", observations: [] };
-  const dependency = dependencyStatus(state, work, at);
-  return {
-    work_id: workId,
-    state: work.state,
-    barrier: work.barrier,
-    position: work.position,
-    readiness: dependency,
-    scheduling: eligibility(state, work, at),
-    retry_not_before: work.retry_not_before,
-    attempts: work.attempts,
-    next,
-    capacity: reservationCounts(state, work.pool, work.fairness_key),
-  };
-}
-
-function unsupportedDirectClaim() {
-  throw queueError("unsupported_protocol", "direct Work selectors and standalone queue facts are unsupported; use a checked dispatch_next request");
+/** The committed transaction that carried a request, when still in the log. */
+function committedRequest(state, id) {
+  if (!state.requests.has(id)) return undefined;
+  return state.transactions.find(commit => commit.request.id === id) ?? null;
 }
 
 module.exports = {
+  CLAIM_CANCELLATION_REASONS,
+  LAUNCH_REVISION,
+  OP_FIELDS,
+  OP_ROLES,
+  PROTOCOL_VERSION,
+  RELEASE_REASONS,
+  REQUEST_KINDS,
+  WORK_CANCELLATION_REASONS,
   appendCommit,
-  assignmentForDispatch,
-  assignmentsForRequest,
-  applyTransactions: appendCommit,
-  causalChain,
-  claimOldestAvailableWork: unsupportedDirectClaim,
-  compactTransactions,
-  createWorkTransaction: unsupportedDirectClaim,
-  explainWork,
-  finishOperations,
-  generateRequestOperations,
+  applyCommit,
+  buildCommit,
+  checkpointCommit,
+  cloneState,
+  commitId,
+  committedRequest,
   newRequest,
   newState,
-  oldestAvailableWork: unsupportedDirectClaim,
+  openClaim,
   parseTransactionLog,
   parseTransactionRecords,
-  planDispatchWithObservations,
-  prepareCheckpoint,
-  reconstructCheckpoint,
-  replayCheckpointSource,
+  projectStats,
   proposedCommitId,
-  planNext,
-  poolIdentity,
-  quiescent,
-  replayTransactions,
   replayTransactionLog,
+  replayTransactions,
+  requestId,
+  restoreCheckpointState,
   serializeProjection,
   serializeTransactionLog,
-  validateClaimAuthority,
   validateCommit,
-  validateEvidence,
   validateOperation,
   validateRequest,
-  validateRequestContext,
-  validateRunBinding,
-  validateWorkerContinuation,
-  validateTransaction: validateCommit,
   workDefinition,
 };

@@ -44,16 +44,7 @@ const mockGithub = {
   },
 };
 
-const queueAssignment = {
-  version: 3,
-  dispatch_id: "d1",
-  request_id: "request1",
-  commit_id: "commit1",
-  policy_epoch: "e1",
-  pool: "default",
-  worker_profile: "worker",
-  claims: [{ handle: "h1", claim_id: "c1", work_id: "w1", work: { task: "test", inputs: { labels: ["bug"] } }, result_refs: [] }],
-};
+const queueAssignment = { version: 4, dispatch_id: "d1" };
 
 describe("generate_aw_info.cjs", () => {
   let main;
@@ -777,7 +768,7 @@ describe("generate_aw_info.cjs", () => {
     }
   });
 
-  it.each([null, [], "claim", { work_id: "", claim_id: "c", work: {} }, { ...queueAssignment, claims: [] }, { ...queueAssignment, claims: [{ ...queueAssignment.claims[0], work: [] }] }, { ...queueAssignment, unexpected: true }])(
+  it.each([null, [], "claim", { work_id: "", claim_id: "c", work: {} }, { ...queueAssignment, claims: [] }, { ...queueAssignment, version: 3 }, { ...queueAssignment, dispatch_id: "" }, { ...queueAssignment, unexpected: true }])(
     "rejects a malformed current assignment without publishing context",
     async work_queue_assignment => {
       vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
@@ -843,9 +834,9 @@ describe("generate_aw_info.cjs", () => {
     }
   });
 
-  it("preserves a declared worker's original multi-Claim assignment without injecting authority fields", async () => {
+  it("preserves a declared worker's dispatch reference without injecting authority fields", async () => {
     const previousRole = process.env.GH_AW_WORK_QUEUE_ROLE;
-    const assignment = { ...queueAssignment, claims: [...queueAssignment.claims, { handle: "h2", claim_id: "claim2", work_id: "work2", work: {}, result_refs: [] }] };
+    const assignment = queueAssignment;
     const caller = { repo: "org/repo", run_id: "123", workflow_id: "caller" };
     try {
       vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
@@ -893,11 +884,10 @@ describe("generate_aw_info.cjs", () => {
     expect(mockCore.warning).toHaveBeenCalledWith("aw_context contains nested objects for keys: work_queue_assignment. Ignoring aw_context.");
   });
 
-  it.each([1, 2])("validates a standalone %i-Claim activation without fabricating caller provenance", async count => {
+  it("validates a standalone worker activation without fabricating caller provenance", async () => {
     vi.stubEnv("GH_AW_WORK_QUEUE_ENABLED", "true");
     vi.stubEnv("GH_AW_WORK_QUEUE_ROLE", "worker");
-    const assignment = { ...queueAssignment, claims: Array.from({ length: count }, (_, i) => ({ ...queueAssignment.claims[0], handle: `h${i + 1}`, claim_id: `c${i + 1}`, work_id: `w${i + 1}` })) };
-    await main(mockCore, { ...mockContext, payload: { inputs: { work_queue_assignment: JSON.stringify(assignment) } } });
+    await main(mockCore, { ...mockContext, payload: { inputs: { work_queue_assignment: JSON.stringify(queueAssignment) } } });
     expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8"))).not.toHaveProperty("context");
     expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", "{}");
     expect(mockCore.warning).not.toHaveBeenCalled();
@@ -951,6 +941,37 @@ describe("generate_aw_info.cjs", () => {
     expect(awInfo.context).toEqual(validContext);
     expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", JSON.stringify(validContext));
     expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("aw_context"));
+  });
+
+  it("accepts and preserves validated inherited issue_status context", async () => {
+    const validContext = {
+      repo: "org/repo",
+      run_id: "12345",
+      workflow_id: "org/repo/.github/workflows/dispatcher.yml@refs/heads/main",
+      item_type: "issue",
+      item_number: "42",
+      issue_status: {
+        snapshot: { id: 2, name: "Todo", category: "planned" },
+        event: { id: 2, name: "Todo", category: "planned" },
+        previous: { id: 1, name: "Backlog", category: "backlog" },
+      },
+    };
+    await main(mockCore, { ...mockContext, payload: { inputs: { aw_context: JSON.stringify(validContext) } } });
+    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).context).toEqual(validContext);
+    expect(mockCore.setOutput).toHaveBeenCalledWith("aw_context", JSON.stringify(validContext));
+    expect(mockCore.warning).not.toHaveBeenCalledWith(expect.stringContaining("aw_context"));
+  });
+
+  it("rejects malformed inherited issue_status without accepting arbitrary nested data", async () => {
+    const contextWithInvalidStatus = {
+      repo: "org/repo",
+      run_id: "12345",
+      workflow_id: "org/repo/.github/workflows/dispatcher.yml@refs/heads/main",
+      issue_status: { snapshot: { id: 2, name: "Todo", category: "planned", injected: "untrusted" } },
+    };
+    await main(mockCore, { ...mockContext, payload: { inputs: { aw_context: JSON.stringify(contextWithInvalidStatus) } } });
+    expect(JSON.parse(fs.readFileSync(awInfoPath, "utf8")).context).toBeUndefined();
+    expect(mockCore.warning).toHaveBeenCalledWith(expect.stringContaining("invalid issue_status"));
   });
 
   it("should accept aw_context object from repository_dispatch client_payload", async () => {

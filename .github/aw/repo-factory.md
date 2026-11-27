@@ -12,13 +12,12 @@ Interactive mode is default; explicit `auto` asks no questions.
 
 ## 1. Understand the repository first
 
-Before changes, read root/relevant nested `AGENTS.md`, `README.md`,
-architecture/contributing/development docs, manifests, build config, tests,
-Actions/GH-AW workflows, skills and recent relevant PRs/issues. Check visibility,
-permissions and secret *names* only. Separate facts from
-inferred goals: mission, tech, success criteria, risks, priorities, automation
-and security/compatibility/performance/cost/maintenance limits. Base choices on
-this profile. In `auto`, infer conservatively. Reuse workflows.
+Before changes, inspect relevant `AGENTS.md`, `README.md`, architecture and
+contributing docs, manifests, build config, tests, workflows, skills, recent
+PRs/issues, visibility, permissions and secret *names* only. Separate repository
+facts from inferred mission, success criteria, risks, priorities, automation and
+security/compatibility/performance/cost/maintenance limits. Base choices on this
+profile; infer conservatively in `auto`. Reuse workflows.
 
 Load [creation guidance](create-agentic-workflow.md), its required references,
 and any target `.github/aw/instructions.md`.
@@ -70,9 +69,10 @@ mandatory within Researchers.
   prefetches diffs/context, selects relevant skills and gives bounded,
   nonduplicative feedback. For ADR checks, see
   [Design Decision Gate](../workflows/design-decision-gate.md).
-- **Finisher:** adapt PR Sous-Chef; deterministically filter stalled PRs, failed
-  checks and unresolved feedback, then coordinate bounded repairs without
-  bypassing protections or capacity.
+- **Finisher:** adapt PR Sous-Chef to filter stalled PRs, failed checks and
+  unresolved feedback; coordinate bounded repairs without bypassing
+  protections/capacity. See [PR Finisher guidance](pr-finisher.md) and
+  [example](../workflows/pr-finisher.md).
 
 Lifecycle: Researchers → issues → Dispatcher → coding agents → PRs → Reviewers →
 Finisher. Separate selection from execution. Weekdays UTC gate new coding; CI, reviews

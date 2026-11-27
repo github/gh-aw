@@ -1693,13 +1693,18 @@ The following exported types were verified against source (`pkg/workflow/*.go`) 
 | `WorkQueueClaimAdapter`, `WorkQueueGraphQL`, `WorkQueueGitTree`, `WorkQueueRestRequest`, `WorkQueueRestVerifier` | struct | Work-queue claim adapter binding custom output to a verified effect |
 | `WorkQueueIssuesConfig`, `WorkQueueMemoryConfig`, `WorkQueuePolicyConfig` | struct | Work-queue issues, memory, and policy configuration (policy is a proposal; the installed ledger policy grants authority) |
 
-### Additional exported declarations (verified 2026-11-13)
+### Additional exported declarations (verified 2026-11-26)
 
 | Area | Exported symbols | Description |
 |------|------------------|-------------|
 | Connector declarations and credentials | `DevelopmentConnector`, `LoadDevelopmentConnector`, `ConnectorWebhookSource`, `ConnectorGitHubApp`, `ConnectorToken`, `ConnectorGitHubOIDC`, `ConnectorOperationOptions`, `ConnectorRegistration`, `WorkflowConnector` | Compiler-resolved connector declarations, source policy, credential adapters, and workflow-owned operation controls. Selection remains phase-scoped. |
 | Durable and engine helpers | `DurableExecutionProvider`, `GetDurableExecutionPlan`, `GetInternalLogsDir`, `GetPluginInstallationSteps`, `GetLogParserScriptSource`, `GetPostConfigPluginInstallationSteps`, `EngineDurableDefinition`, `DurableConfig`, `DurableExecutionPlan`, `DurableRestoreStepName`, `PiSessionDirectory`, `DynamicWorkflowsEnabled`, `ResolveEffectiveEngineConfig` | Engine capabilities and helpers for durable execution, plugin setup, log capture, session restoration, and resolving effective engine configuration. |
-| Compiler controls | `SetSkipDefaultCheckout`, `SetDefaultPushToken`, `SetDynamicPushToken`, `SetRequireSelfHostedRunners`, `SetLockFileLogo`, `DefaultModelRoutingWorkflowCount`, `IsNoEmit`, `SetReadOnly`, `SetDryRun`, `SetEnvironmentOverride`, `IncrementExperimentalWarningCount`, `GetExperimentalWarningCount`, `SetConfiguredModelValidator` | Compiler mutators and accessors for checkout credentials, runner requirements, output mode, environment overrides, dry-run state, and optional model validation. |
+| Compiler controls | `SetSkipDefaultCheckout`, `SetDefaultPushToken`, `SetDynamicPushToken`, `SetRequireSelfHostedRunners`, `SetLockFileLogo`, `DefaultModelRoutingWorkflowCount`, `IsNoEmit`, `SetReadOnly`, `SetDryRun`, `SetEnvironmentOverride`, `IncrementExperimentalWarningCount`, `GetExperimentalWarningCount`, `SetConfiguredModelValidator`, `GetDiagnostics`, `CompilerDiagnostic` | Compiler mutators and accessors for checkout credentials, runner requirements, output mode, environment overrides, optional model validation, and structured diagnostics. `GetDiagnostics` returns a copy. |
+| Dynamic secret references | `CollectDynamicSecretReferences`, `ExtractDynamicSecretReferencesFromValue` | Finds dynamic `secrets[...]` references in YAML content or an individual expression value. |
+| Experiment storage | `ExperimentsStorageBroker` | Selects broker-backed experiment assignment and reporting storage. |
+| Request continuation | `RequestContinuationInputName`, `RequestContinuationRouteDispatch`, `RequestContinuationRouteIssue`, `RequestContinuationRouteWorkqueue` | Names the continuation dispatch input and its supported routing destinations. |
+| OpenTelemetry attribute keys | `OTelAttrCicdPipelineName`, `OTelAttrCicdPipelineRunID`, `OTelAttrCicdPipelineRunUrlFull`, `OTelAttrCicdPipelineTaskName`, `OTelAttrDeploymentEnvironmentName`, `OTelAttrErrorType`, `OTelAttrGenAiAgentName`, `OTelAttrGenAiProviderName`, `OTelAttrGenAiTokenModality`, `OTelAttrGenAiUsageCacheWriteInputTokens`, `OTelAttrGhAwSafeOutputGateBinding`, `OTelAttrGhAwSafeOutputGateExecutor`, `OTelAttrGhAwSafeOutputGatePhase`, `OTelAttrGhAwSafeOutputGateReasonCode`, `OTelAttrGhAwSafeOutputGateRequirementSource`, `OTelAttrGhAwSafeOutputGateState`, `OTelAttrServerAddress`, `OTelAttrVcsProviderName`, `OTelAttrVcsRefHeadName`, `OTelAttrVcsRefHeadRevision`, `OTelAttrVcsRepositoryUrlFull` | Stable OpenTelemetry semantic-convention and gh-aw safe-output gate attribute keys. |
+| Test-only release lookup | `SetEngineReleaseTimeLookupForTesting` | Replaces the engine release-time lookup for deterministic tests and returns a restore function; not for production use. |
 | Grader and security configuration | `BuiltinGraderRegistry`, `BuiltinGraderIDs`, `HasGraders`, `EnabledGraderIDs`, `CustomGraderIDs`, `DefaultGraderIDs`, `AddSecurityAdvisoryCommentConfig`, `CreateSecurityAdvisoryConfig`, `ContentsIsNone`, `RepoProtectedFilesConfig`, `TokenBrokerConfig`, `IsReportAsIssueEnabled`, `IsLockFileLogoEnabled` | Grader registry and selection helpers, security safe-output configuration, protected-file settings, token-broker selection, and permission or reporting checks. |
 | Workflow metadata and webhooks | `GHAWManifestWorkQueue`, `GHAWMarkdownMetadata`, `GHAWMarkdownMetadataRecord`, `WebhookDispatch`, `WebhookFilter`, `WebhookCondition`, `WebhookContext`, `WebhookBatch`, `WebhookPayloadProjection`, `WebhookPayloadProjectionPolicy`, `WebhookCommandFilter`, `WebhookActivityNormalization` | Manifest and authored-metadata records plus bounded webhook matching, projection, batching, and activity-normalization declarations. |
 | Work-queue and MCP integration | `WorkQueueAssignmentInputName`, `WorkQueueClaimInputName`, `RenderWorkQueueMCP`, `RenderLedgerMCP`, `MCPScriptParamItems` | Agent input names and MCP rendering helpers for immutable queue snapshots and participant-scoped intent. |
@@ -1790,39 +1795,26 @@ MCP activity, work-queue accounting, and token working-set measurements:
 `OTelAttrGhAwTrackerID`, `OTelAttrGhAwTriggerCommentID`,
 `OTelAttrGhAwTriggerItemNumber`, `OTelAttrGhAwTriggerItemType`,
 `OTelAttrGhAwTriggerLabel`, `OTelAttrGhAwTurns`, `OTelAttrGhAwWarningCount`,
-`OTelAttrGhAwWorkQueueAdmissionPaused`,
-`OTelAttrGhAwWorkQueueCapacityLogicalLimit`,
-`OTelAttrGhAwWorkQueueCapacityLogicalSaturatedPools`,
-`OTelAttrGhAwWorkQueueCapacityNativeLimit`,
-`OTelAttrGhAwWorkQueueCapacityNativeSaturatedPools`,
-`OTelAttrGhAwWorkQueueClaimsOpen`, `OTelAttrGhAwWorkQueueCommittedClaim`,
+`OTelAttrGhAwWorkQueueClaimsOpen`, `OTelAttrGhAwWorkQueueCommittedBound`,
+`OTelAttrGhAwWorkQueueCommittedClaim`,
 `OTelAttrGhAwWorkQueueCommittedClaimCancellation`,
 `OTelAttrGhAwWorkQueueCommittedCompletion`,
-`OTelAttrGhAwWorkQueueCommittedDeliveryFailure`,
 `OTelAttrGhAwWorkQueueCommittedDispatch`,
-`OTelAttrGhAwWorkQueueCommittedRelease`,
-`OTelAttrGhAwWorkQueueCommittedResult`, `OTelAttrGhAwWorkQueueCommittedWork`,
+`OTelAttrGhAwWorkQueueCommittedRelease`, `OTelAttrGhAwWorkQueueCommittedWork`,
 `OTelAttrGhAwWorkQueueCommittedWorkCancellation`,
-`OTelAttrGhAwWorkQueueDeliveryFailed`, `OTelAttrGhAwWorkQueueDeliveryPending`,
-`OTelAttrGhAwWorkQueueErrorType`, `OTelAttrGhAwWorkQueueGrantsPaused`,
-`OTelAttrGhAwWorkQueueInitialized`, `OTelAttrGhAwWorkQueueObservedAtUnixMs`,
+`OTelAttrGhAwWorkQueueDispatchesBound`,
+`OTelAttrGhAwWorkQueueDispatchesReserved`,
+`OTelAttrGhAwWorkQueueDispatchesStarted`, `OTelAttrGhAwWorkQueueErrorType`,
 `OTelAttrGhAwWorkQueueOperation`, `OTelAttrGhAwWorkQueueOutcome`,
 `OTelAttrGhAwWorkQueuePublicationAmbiguous`,
 `OTelAttrGhAwWorkQueuePublicationAttempts`,
 `OTelAttrGhAwWorkQueuePublicationCommits`,
 `OTelAttrGhAwWorkQueuePublicationConflict`,
 `OTelAttrGhAwWorkQueuePublicationRecovered`, `OTelAttrGhAwWorkQueueQueueID`,
-`OTelAttrGhAwWorkQueueReason`, `OTelAttrGhAwWorkQueueReconciliationChecked`,
-`OTelAttrGhAwWorkQueueReconciliationUnresolved`,
-`OTelAttrGhAwWorkQueueRequestKind`, `OTelAttrGhAwWorkQueueReservationsActive`,
-`OTelAttrGhAwWorkQueueReservationsUnbound`,
-`OTelAttrGhAwWorkQueueReservationsUncertain`,
-`OTelAttrGhAwWorkQueueReservationsUnresolved`,
+`OTelAttrGhAwWorkQueueReason`, `OTelAttrGhAwWorkQueueRequestKind`,
 `OTelAttrGhAwWorkQueueSnapshotPresent`, `OTelAttrGhAwWorkQueueWorkAvailable`,
 `OTelAttrGhAwWorkQueueWorkCancelled`, `OTelAttrGhAwWorkQueueWorkClaimed`,
-`OTelAttrGhAwWorkQueueWorkCompleted`, `OTelAttrGhAwWorkQueueWorkExpired`,
-`OTelAttrGhAwWorkQueueWorkOldestAvailableAgeMs`,
-`OTelAttrGhAwWorkQueueWorkRetryDelayed`, `OTelAttrGhAwWorkQueueWorkTotal`,
+`OTelAttrGhAwWorkQueueWorkCompleted`, `OTelAttrGhAwWorkQueueWorkTotal`,
 `OTelAttrGhAwWorkflowCallID`, `OTelAttrGhAwWorkflowCallParentID`,
 `OTelAttrGhAwWorkflowRunConclusion`,
 `OTelAttrGhAwWorkingSetCumulativeInputTokens`,

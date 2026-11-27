@@ -69,6 +69,8 @@ safe-outputs:
   create-issue:
     expires: 2d
     title-prefix: "[Parent] "
+    planning-status: Backlog
+    allowed-statuses: [Backlog]
     max: 5
     group: true
   link-sub-issue:
@@ -237,7 +239,7 @@ Your discussion should include:
 - Use temporary IDs (format: `aw_` + 3-8 alphanumeric characters) when creating parent issues
 - When creating parent issues, include references to all related sub-issues in the body
 - Link all related issues as sub-issues immediately after creating the parent issue
-{{else}}
+{{#else}}
 # Issue Arborist 🌳
 
 You are the Issue Arborist. Pre-downloaded issue data is at `/tmp/gh-aw/agent/issues-data/issues.json` (last 100 open issues). Your goal:

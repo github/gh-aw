@@ -115,6 +115,12 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | `Metadata` | struct | Pagination metadata for MCP registry list responses. |
 | `OutdatedDependency` | struct | A Go module dependency with a newer version available, including current/latest versions and age. |
 | `SecurityAdvisory` | struct | A security vulnerability (GHSA/CVE) affecting a dependency, with severity and patched versions. |
+| `RoutingHistoryListEntry` | struct | Summary of one workflow's adaptive-routing history in an unfiltered routing-status response. |
+| `RoutingObservation` | struct | Unified-session verdict and optional reason indicating whether a routed run counts as evidence. |
+| `RoutingPairStatus` | struct | Evidence and evaluation metrics for one model/effort pair within a routing scope. |
+| `RoutingRecentRuns` | struct | Summary of recent routing-history entries, including counted and excluded runs. |
+| `RoutingScopeStatus` | struct | Incumbent, last role, and pair evidence for one routing scope. |
+| `RoutingStatus` | struct | JSON response for `gh aw routing status`, containing workflow, history, scope, and recent-run state. |
 | `SetupAuthOptions` | struct | Options for checking `gh` authentication status during repository setup. |
 | `SetupRepositoryCheckOptions` | struct | Options for validating repository access and ownership during setup. |
 | `TrialOptions` | struct | Configuration for running workflow trials, including repo context, timeout, and repeat count. |
@@ -192,6 +198,7 @@ The `cli` package is intentionally large and command-oriented. The tables below 
 | `NewConnectorsCommand` | `func() *cobra.Command` | Constructs commands for validating and inspecting connector definitions and hosting frozen plans. |
 | `NewConnectorCommand` | `func() *cobra.Command` | Constructs the id-first setup and local-test interface for AW Markdown connectors. |
 | `NewValueCommand` | `func() *cobra.Command` | Constructs the longitudinal value report command. |
+| `NewRoutingCommand` | `func() *cobra.Command` | Constructs the adaptive-routing status and reset commands. |
 | `RetrieveEpisodeLogs` | `func(ctx context.Context, opts EpisodeRetrievalOptions) (LogsData, error)` | Collects canonical workflow-run members using compact artifacts and the standard log report builder. |
 | `ValidateDevelopmentCompileFlags` | `func(dev bool, flags map[string]bool) error` | Rejects explicit development-compile opt-outs while allowing omitted defaults. |
 
@@ -449,7 +456,7 @@ The `cli` package exports many types used across its command implementations. Th
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `ZizmorImage` | `"ghcr.io/zizmorcore/zizmor:1.32.0@sha256:3014cc8f68f663935f69b3c3e0e41f5ce102b268d97db13db0f62208747f860d"` | Default image for Zizmor security scanner. |
+| `ZizmorImage` | `"ghcr.io/zizmorcore/zizmor:1.33.1@sha256:ecd3ffe6158de1322e05a044ed43749bee12b1dccb7e1a7859bc6ac4b2a1c516"` | Default image for Zizmor security scanner. |
 | `PoutineImage` | `"ghcr.io/boostsecurityio/poutine:1.1.6@sha256:722a8e0999b583c1540fe2974e691032b2d9d21b9256a17965132b6bfd0081b0"` | Default image for Poutine supply-chain scanner. |
 | `ActionlintImage` | `"rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667"` | Default image for Actionlint workflow linter. |
 | `RunnerGuardImage` | `"ghcr.io/vigilant-llc/runner-guard:3.1.5@sha256:2df426ef96d21f1622e05b21329f26bd263fc46110609cefb6afe43457613ac0"` | Default image for Runner Guard sandbox. |

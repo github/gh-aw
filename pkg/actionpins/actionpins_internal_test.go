@@ -1104,6 +1104,15 @@ func TestApplyActionPinMapping(t *testing.T) {
 	}
 }
 
+func TestApplyActionPinMapping_NilContext(t *testing.T) {
+	t.Parallel()
+
+	gotRepo, gotVersion := applyActionPinMapping("actions/checkout", "v4", nil)
+
+	assert.Equal(t, "actions/checkout", gotRepo)
+	assert.Equal(t, "v4", gotVersion)
+}
+
 // TestApplyContainerPinMapping verifies the redirect, miss, invalid-value, and
 // deduplication behaviour of ApplyContainerPinMapping.
 func TestApplyContainerPinMapping(t *testing.T) {

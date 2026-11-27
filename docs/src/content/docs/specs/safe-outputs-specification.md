@@ -8,9 +8,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.31.1<br>
+**Version**: 1.35.0<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-23<br>
+**Publication Date**: 2026-11-26<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -37,6 +37,7 @@ This specification follows World Wide Web Consortium (W3C) formatting convention
 6. [Universal Feature Interpretation](#6-universal-feature-interpretation)
 7. [Safe Output Type Definitions](#7-safe-output-type-definitions)
 8. [Protocol Exchange Patterns](#8-protocol-exchange-patterns)
+   - [Request-Continuation Routes](#85-request-continuation-routes)
 9. [Content Integrity Mechanisms](#9-content-integrity-mechanisms)
 10. [Execution Guarantees](#10-execution-guarantees)
 11. [Cache Memory Integrity](#11-cache-memory-integrity)
@@ -4165,6 +4166,7 @@ authoritative credential, resource, typed-input, staging, and migration contract
 4. **Branch Update**: When `update_branch` is true (agent-supplied or configured), the processor updates the pull request branch with the latest base branch changes before applying other updates. If the endpoint reports that updating a stacked pull request branch is unsupported, the processor falls back to a stack sync unless `sync-stack: false`.
 5. **Field Gating**: `title: false` or `body: false` configuration disables updating that field.
 6. **Staged Mode**: In staged mode, the processor previews the update without calling the GitHub API.
+7. **Filter Evaluation**: Before any update mutation, the processor MUST fetch the live pull request and require every configured `required-author`, `required-labels`, and `required-title-prefix` filter. `required-author` comparisons MUST be case-insensitive against the live GitHub author login. An `app/<slug>` value MUST match a GitHub API user whose type is `Bot` and whose login is `<slug>[bot]`. If the author is absent or any filter does not match, the processor MUST return an unsuccessful skipped result and MUST NOT invoke an update API.
 
 **Configuration Parameters**:
 
@@ -4177,13 +4179,14 @@ authoritative credential, resource, typed-input, staging, and migration contract
 - `operation`: Default body operation (default: `replace`)
 - `update-branch`: Update the PR branch before other updates (default: `false`)
 - `sync-stack`: Allow the stacked-PR stack-sync fallback (default: `true`)
+- `required-author`: GitHub login that must have opened the pull request; comparisons are case-insensitive, and `app/<slug>` requires a GitHub App bot with login `<slug>[bot]`
 - `required-labels`, `required-title-prefix`: Only update pull requests matching all required labels and the title prefix
 
 **Security Requirements**:
 
 - `title` and `body` undergo full sanitization and length limits (title 256 characters, body 65536 characters)
 - Target authorization is enforced at runtime; agent-supplied pull request numbers are ignored unless `target` is `"*"`
-- Required-label and title-prefix filters are evaluated against the live pull request before any mutation
+- `required-author`, required-label, and title-prefix filters MUST be evaluated against the live pull request before any mutation; an absent or mismatched author MUST cause the operation to be skipped without invoking an update API
 - Cross-repo validation against `allowed-repos`
 
 **Required Permissions**:
@@ -4608,7 +4611,7 @@ or review bodies to returned or persisted decision evidence.
 1. **Required Message**: `message` is required on every call and is not read from git. Existing local commits keep their own commit messages.
 2. **Branch Selection**: `branch` names the local branch holding the commits. When omitted, the branch is inferred from the current git `HEAD`.
 3. **Target Resolution**: The target pull request is resolved from `target`, with `pull_request_number` and `repo` honored only where the target configuration permits.
-4. **Filter Evaluation**: When `title-prefix` or `required-labels` is configured, the target pull request MUST satisfy them before any push.
+4. **Filter Evaluation**: When `required-author`, `title-prefix`, or `required-labels` is configured, the handler MUST fetch the live target pull request and require every configured filter before any push. `required-author` comparisons MUST be case-insensitive against the live GitHub author login. An `app/<slug>` value MUST match a GitHub API user whose type is `Bot` and whose login is `<slug>[bot]`. If the author is absent or any filter does not match, the handler MUST return failure and MUST NOT push.
 5. **Append-Only Push**: Local commits are applied on top of the existing pull request head. Force-push and history rewriting MUST be rejected.
 6. **Size Limit**: A patch or bundle larger than `max-patch-size` (default 4096 KB) MUST fail the item.
 7. **No Changes**: When there is nothing to push, the outcome follows `if-no-changes` (`warn` by default, `error`, or `ignore`).
@@ -4617,6 +4620,7 @@ or review bodies to returned or persisted decision evidence.
 **Security Requirements**:
 
 - The privileged handler MUST NOT accept concurrency-control or head-pinning parameters from the agent; the pull request head is pinned by the handler.
+- The handler MUST evaluate `required-author` against the live pull request author before any branch write. An absent or mismatched author MUST cause failure before push; `app/<slug>` MUST require API user type `Bot` and login `<slug>[bot]`, compared case-insensitively.
 - Patch or bundle size MUST be validated against `max-patch-size` before it is applied.
 - A pull request title that does not start with the configured `title-prefix` MUST be rejected.
 - Cross-repository pushes MUST be restricted to repositories permitted by the configured target-repo settings.
@@ -4650,6 +4654,7 @@ or review bodies to returned or persisted decision evidence.
 - `target-repo`: Upstream repository containing the pull request
 - `head-repo`: Optional expected head repository for fork-backed pull requests. When omitted, the expected head repository is `target-repo`
 - `allowed-repos`: Cross-repository allowlist applied to both `target-repo` and `head-repo`
+- `required-author`: GitHub login that must have opened the pull request; comparisons are case-insensitive, and `app/<slug>` requires a GitHub App bot with login `<slug>[bot]`
 - `head-github-token`: Optional credential for `head-repo` branch writes
 - `head-github-app`: Optional GitHub App configuration to mint an ephemeral credential for `head-repo` branch writes at runtime; takes precedence over `head-github-token` when both are specified
 - `allow-full-history-fetch`: Literal boolean, default `false`, independently scoped to this handler. Permits potentially unbounded bundle prerequisite recovery; does not enable downloads for optional validation baselines.
@@ -5588,7 +5593,7 @@ or review bodies to returned or persisted decision evidence.
 - `required-title-prefix`: Title prefix the target MUST have for the operation to proceed
 - `target-repo`: Cross-repository target
 - `allowed-repos`: Cross-repository allowlist
-- `issue-intent`: Controls whether intent metadata is forwarded (default: enabled)
+- `issue-intent`: Experimental, disabled by default. Set `true` to forward intent metadata.
 - `unassign-first` (boolean, default: false): If true, unassigns all current assignees before assigning new ones. Useful for reassigning issues from one user to another.
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue/pull request number
 
@@ -5763,7 +5768,7 @@ or review bodies to returned or persisted decision evidence.
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 5)
-- `issue-intent`: Controls whether intent metadata is forwarded (default: enabled)
+- `issue-intent`: Experimental, disabled by default. Set `true` to forward intent metadata.
 - `allowed`: Optional allowlist of issue type names
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue number
 - `required-labels`: Labels that must all be present on the issue
@@ -5800,6 +5805,95 @@ or review bodies to returned or persisted decision evidence.
 
 - `issues: write` - Issue type operations
 - `metadata: read` - Repository metadata (automatically granted)
+
+---
+
+#### Type: set_issue_status
+
+**Purpose**: Set a native GitHub issue planning status, distinct from open/closed
+state and Projects fields.
+
+GitHub's native issue planning status API is in public preview and is subject to
+change. Availability varies by target repository.
+
+**Default Max**: 5
+
+**Cross-Repository Support**: Yes
+
+**Mandatory**: No
+
+The tool requires `status` (a nonempty status name or positive integer ID).
+Optional `issue_number` and `repo` follow the same runtime target authorization
+and repository restrictions as `set_issue_type`. `duplicate_of` identifies a
+same-repository duplicate target. Common safe-output provenance fields apply.
+
+**Operational Semantics**:
+
+1. The handler MUST enforce `max`, repository authorization, triggering/fixed/
+   agent-selected target restrictions, and required labels/title prefix before
+   mutation. Temporary IDs MUST NOT bypass these controls.
+2. The handler MUST resolve the requested status using the destination
+   repository's available planning statuses. Names match case-insensitively
+   after trimming surrounding whitespace;
+   numeric IDs MUST belong to that repository. `allowed`, when configured,
+   restricts the resolved status by name or ID. Clearing is unsupported.
+3. Missing preview support, unavailable statuses, ambiguous names, unknown
+   categories, and API errors MUST fail closed, without a state-only fallback.
+   The implementation MUST NOT assume that status IDs are universal.
+4. The handler MUST read current issue state, not trust event snapshots.
+   An already-selected status is a no-op, not an applied mutation.
+5. Categories `backlog`, `planned`, and `started` describe open issues;
+   `completed`, `not_planned`, and `duplicate` describe closed issues.
+   Open-to-closed changes require `allow-close: true`; closed-to-open changes
+   require `allow-reopen: true`. Changing a closed issue's close reason requires
+   both. These permissions default to false and MUST NOT be inferred from other
+   enabled outputs. Duplicate requires an explicit valid duplicate target.
+   The canonical duplicate relationship MUST be verified from service evidence
+   before skipping or reporting success; changing the canonical target requires
+   both lifecycle permissions. Relationship identity MUST be retained in
+   execution snapshots and checked during outcome evaluation.
+6. Staged mode MUST NOT mutate. Runtime authorization and status validation
+   MUST still apply to the preview.
+7. Applied effects MUST be backed by service-returned status evidence.
+   Missing or mismatched status evidence MUST NOT be reported as a verified
+   successful status mutation. Verification, manifests, audit, and outcome
+   evaluation MUST distinguish requested, skipped, staged, failed, and applied
+   effects.
+
+Outcome retention compares stable status IDs/categories, issue state, and close
+reason against the recorded before/after snapshots. Renaming a status alone
+MUST NOT count as reversal. Missing execution evidence or unavailable current
+status MUST NOT establish retention or rejection. Retention and delivery-rule
+fallbacks MUST NOT be described as verified human adoption.
+
+**Creation**: `create-issue.planning-status` supplies the default initial status;
+`allowed-statuses` restricts both the default and `create_issue.planning_status`.
+Resolution and validation MUST precede issue creation. Only open categories are
+accepted. The selected status MUST be included in the creation request, rather
+than creating first and attempting a separate transition. Existing behavior is
+unchanged when no initial planning status is requested.
+
+**Compatibility**: `update-issue.status` continues to mean `open` or `closed`.
+Status writes require `issues: write`; discovery and current-state reads require
+`issues: read`. Repository preview enrollment, archived/locked restrictions,
+and actual token permissions remain enforced by GitHub.
+
+**Trigger and Context Contract**: `on.issues.status-ids` and
+`status-categories` require explicit `types` containing `status_changed`.
+Filters MUST run before agent activation and use captured `event.status`,
+never `issue.status` or mutable display names. Values within a dimension are
+alternatives and dimensions combine conjunctively. Missing/malformed captured
+status MUST fail a configured filter; other selected activity types remain
+unaffected. Agent context MUST preserve status ID/name/category, including
+captured/previous/snapshot distinctions and null status.
+
+Delivery is not exactly once or ordered. Filters MUST NOT imply deduplication
+or freshness. Current-state reads reduce stale-event effects but do not provide
+atomic compare-and-set. Unrestricted `issues` listeners also receive automatic
+`status_changed` events; authors SHOULD select explicit activity types to avoid
+extra activations. MCP reads/searches MUST preserve native status information
+when supplied by the server, without requiring the preview for legacy reads.
+Work Queue and Repo Factory integration are outside this contract.
 
 ---
 
@@ -5852,7 +5946,7 @@ or review bodies to returned or persisted decision evidence.
 **Configuration Parameters**:
 
 - `max`: Operation limit (default: 5)
-- `issue-intent`: Controls whether intent metadata is forwarded (default: enabled)
+- `issue-intent`: Experimental, disabled by default. Set `true` to forward intent metadata.
 - `allowed-fields`: Optional allowlist of custom issue field names
 - `target`: `"triggering"` (default), `"*"`, or a fixed issue number
 - `required-labels`: Labels that must all be present on the issue
@@ -6204,10 +6298,12 @@ safe-outputs:
 
 **Configuration Parameters**:
 
-- `max`: Operation limit (default: 10)
+- `max`: Operation limit (default: 1)
+- `project`: Required in object configuration; selects project URL/token setup. It does not supply the required `project` field in agent messages.
 - `body-footer`: Deterministic footer appended to each update
 - `mentions`: Mention policy applied to the body
 - `staged`: Staged mode override
+- `null`: Enables this safe output with default configuration.
 
 **Security Requirements**:
 
@@ -7264,6 +7360,59 @@ output types retain their declared input and publication constraints.
 - Parse each line independently
 - Ignore empty lines
 - Validate `type` field presence
+
+### 8.5 Request-Continuation Routes
+
+A workflow MAY opt in to routed `request_continuation` handling by configuring
+`safe-outputs.request-continuation.route` as `workqueue`, `issue`, or
+`dispatch`. An advisory `request-continuation` request without a route remains
+advisory and MUST retain its existing behavior.
+
+A routed request MUST produce at most one continuation per producing run
+attempt. Publication MUST be authorized only when `continuation_evidence` is
+bound to the producing artifact and run attempt, and the required evidence
+collection is clean. Missing, ambiguous, or non-clean evidence MUST prevent
+routed publication.
+
+The continuation message MUST be valid UTF-8 and no more than 16,384 UTF-8
+bytes. For `workqueue` and `dispatch`, `max-depth` MUST be an integer from 1
+through 16; when omitted, it defaults to 1. A route MUST NOT create a
+continuation beyond the configured depth. The `issue` route MUST NOT accept
+`max-depth`; each approval releases one successor without an automatic hop
+budget.
+
+#### 8.5.1 Workqueue route
+
+For `route: workqueue`, the request MUST target an assignment-bound queue
+worker. The worker's finish commit MUST record the parent's `Completion` and
+one dependent successor Work in the same ledger commit. The successor MUST
+inherit the parent's graph, pool, priority, fairness key, worker profile, and
+payload, and MUST receive the continuation message as
+`assignment.claims[i].continuation`.
+
+The route MUST NOT admit more than one successor for the routed request.
+
+#### 8.5.2 Issue route
+
+For `route: issue`, the request MUST target a queue worker. The publisher MUST
+open exactly one approval Issue in the queue repository for the successor. The
+successor MUST remain unschedulable until that exact approval Issue is closed
+with completed status by a user authorized to write, maintain, or administer
+the repository. Each approval MUST release exactly one successor.
+
+#### 8.5.3 Dispatch route
+
+For `route: dispatch`, the processor MUST dispatch the named compiled local
+workflow on the repository's default branch. The dispatch MUST carry the
+bounded `gh_aw_continuation` input, and the receiving workflow MUST declare
+that string input. The processor MUST NOT dispatch a pull-request head or any
+other uncompiled PR-head workflow.
+
+If the dispatch POST outcome is uncertain, the processor MUST report the
+outcome as unknown and MUST NOT resend the dispatch automatically.
+
+Inbound continuation data MUST be treated as untrusted and MUST be sanitized
+before exposure to prompts or tools.
 
 ---
 
@@ -8445,6 +8594,29 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 - **v0.40.1**: append-only status comment behavior was documented for smoke workflow execution.
 - **Earlier changelog entry**: status comments were decoupled from default AI reaction behavior; explicit `on.status-comment` configuration is required when status comments are desired.
 - **Earlier changelog entry**: `command` trigger was renamed to `slash_command` with deprecation compatibility.
+
+**Version 1.35.0** (2026-11-26):
+
+- **Added**: Optional `required-author` filters for `update_pull_request` and `push_to_pull_request_branch`, including case-insensitive GitHub author matching and `app/<slug>` GitHub App bot matching.
+- **Specified**: Live-author validation MUST occur before update or push mutations, with mismatches skipped for `update_pull_request` and rejected before push for `push_to_pull_request_branch`.
+
+**Version 1.34.0** (2026-11-26):
+
+- **Specified**: `set_issue_status` target authorization, allowed planning statuses, current-state evidence, lifecycle permissions, duplicate relationship verification, and read-only staged previews.
+- **Specified**: Initial native planning status validation and verification for `create_issue`.
+- **Updated**: Publication metadata to 1.34.0.
+
+**Version 1.33.0** (2026-11-25):
+
+- **Specified**: `create_project_status_update` defaults to one update across configuration parsing, runtime validation, and handler execution. Object configuration requires `project` for project/token setup, while each agent message must independently include its own `project` field; `null` enables the defaults.
+- **Updated**: Publication metadata to 1.33.0.
+
+**Version 1.32.0** (2026-11-24):
+
+- **Added**: Section 8.5, "Request-Continuation Routes," defining opt-in
+  `workqueue`, `issue`, and `dispatch` routing, evidence binding, depth and
+  message bounds, approval gating, default-branch dispatch, untrusted-input
+  sanitization, and unknown-outcome handling.
 
 **Version 1.31.1** (2026-11-23):
 

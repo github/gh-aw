@@ -8,9 +8,86 @@ import (
 	"testing"
 	"time"
 
+	"github.com/github/gh-aw/pkg/testutil"
 	"github.com/github/gh-aw/pkg/workflow/aw"
+	workflowlint "github.com/github/gh-aw/pkg/workflow/lint"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCompilerLintResolvedMCPShellScripts(t *testing.T) {
+	document, err := aw.Parse("---\nmcp-scripts:\n  local:\n    run: QUERY_COMMAND=pr\n---\nPrompt.\n")
+	require.NoError(t, err)
+	data := &WorkflowData{
+		SourceDocument: document,
+		MCPScripts: &MCPScriptsConfig{Tools: map[string]*MCPScriptToolConfig{
+			"imported": {Run: "QUERY_COMMAND=pr"},
+			"local":    {Run: `QUERY_COMMAND="pr"`},
+		}},
+	}
+	input := NewCompiler().compilerLintInput(data, nil, "test.md")
+	runner, err := workflowlint.Default().Select("unquoted-command-assignment")
+	require.NoError(t, err)
+	diagnostics, err := runner.Run(t.Context(), input)
+	require.NoError(t, err)
+	require.Len(t, diagnostics, 1)
+	require.Equal(t, "mcp-scripts.imported.run", diagnostics[0].Path)
+}
+
+func TestCompilerLintResolvedAgentSandbox(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "workflow.md")
+	shared := filepath.Join(dir, "shared.md")
+	require.NoError(t, os.WriteFile(shared, []byte("---\n---\n"), 0o600))
+	for _, tt := range []struct {
+		name    string
+		sandbox string
+		want    bool
+	}{
+		{name: "default with imports", want: true},
+		{name: "explicitly disabled", sandbox: "features: {dangerously-disable-sandbox-agent: true}\nsandbox: {agent: false}\n"},
+		{name: "explicitly enabled", sandbox: "sandbox: awf\n", want: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			content := "---\non: workflow_dispatch\nstrict: false\nimports: [shared.md]\ncheckout: false\ntools: {github: false}\n" + tt.sandbox + "---\nInstall into /usr/local/bin. Run docker build.\n"
+			require.NoError(t, os.WriteFile(source, []byte(content), 0o600))
+			compiler := NewCompiler(WithLint(true), WithNoEmit(true))
+			compiler.gitRoot = dir
+			compiler.SetSkipValidation(true)
+			output := testutil.CaptureStderr(t, func() {
+				require.NoError(t, compiler.CompileWorkflow(source))
+			})
+			for _, fragment := range []string{"mounts read-only", "hides the Docker socket"} {
+				if tt.want {
+					require.Contains(t, output, fragment)
+				} else {
+					require.NotContains(t, output, fragment)
+				}
+			}
+		})
+	}
+}
+
+func TestCompilerLintImportedMCPShellScripts(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "workflow.md")
+	shared := filepath.Join(dir, "shared.md")
+	require.NoError(t, os.WriteFile(source, []byte("---\non: workflow_dispatch\nimports: [shared.md]\ncheckout: false\ntools: {github: false}\n---\nPrompt.\n"), 0o600))
+	for _, assignment := range []string{"QUERY_COMMAND=pr", `QUERY_COMMAND="pr"`} {
+		require.NoError(t, os.WriteFile(shared, []byte("---\nmcp-scripts:\n  query:\n    description: Query\n    run: '"+assignment+"'\n---\n"), 0o600))
+		compiler := NewCompiler(WithLint(true), WithNoEmit(true))
+		compiler.gitRoot = dir
+		compiler.SetSkipValidation(true)
+		output := testutil.CaptureStderr(t, func() {
+			require.NoError(t, compiler.CompileWorkflow(source))
+		})
+		if assignment == "QUERY_COMMAND=pr" {
+			require.Contains(t, output, "[unquoted-command-assignment]")
+			require.Contains(t, output, "at mcp-scripts.query.run (script line 1)")
+		} else {
+			require.NotContains(t, output, "[unquoted-command-assignment]")
+		}
+	}
+}
 
 func TestCompilerLintEnabledAndOptOut(t *testing.T) {
 	t.Parallel()

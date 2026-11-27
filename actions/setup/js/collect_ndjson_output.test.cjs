@@ -243,6 +243,34 @@ describe("collect_ndjson_output.cjs", () => {
       expect(output.collectorFailureCause).toBe("missing_terminal_safe_output");
       expect(output.items.some(item => item.type === "report_incomplete")).toBe(true);
     }),
+    it("rejects oversized or field-carrying routed requests before truncation and keeps advisory limits", async () => {
+      const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+      const oversized = "😀".repeat(4097);
+      const lines = [
+        { type: "request_continuation", message: oversized },
+        { type: "request_continuation", message: "Continue", route: "dispatch", remaining: 15 },
+        { type: "request_continuation", message: "   " },
+        { type: "request_continuation", message: "Summarize page 2" },
+      ];
+      fs.writeFileSync(testFile, lines.map(line => JSON.stringify(line)).join("\n"));
+      process.env.GH_AW_SAFE_OUTPUTS = testFile;
+      fs.writeFileSync(process.env.GH_AW_VALIDATION_CONFIG_PATH, JSON.stringify({ request_continuation: { defaultMax: 4, fields: { message: { required: true, type: "string", sanitize: true, maxLength: 65536 } } } }));
+      fs.writeFileSync(process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH, JSON.stringify({ request_continuation: { max: 4, route: "dispatch" } }));
+
+      await eval(`(async () => { ${collectScript}; await main(); })()`);
+
+      let output = JSON.parse(fs.readFileSync(path.join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME), "utf8"));
+      expect(output.items.filter(item => item.type === "request_continuation").map(item => item.message)).toEqual(["Summarize page 2"]);
+      expect(output.errors).toEqual([expect.stringMatching(/^Line 1: .*exceeds 16384 UTF-8 bytes/), expect.stringMatching(/^Line 2: .*agent-supplied field\(s\): remaining, route/), expect.stringMatching(/^Line 3: /)]);
+
+      // The advisory form keeps its existing validation for the same input.
+      fs.writeFileSync(testFile, JSON.stringify({ type: "request_continuation", message: oversized }));
+      fs.writeFileSync(process.env.GH_AW_SAFE_OUTPUTS_CONFIG_PATH, JSON.stringify({ request_continuation: { max: 1 } }));
+      await eval(`(async () => { ${collectScript}; await main(); })()`);
+      output = JSON.parse(fs.readFileSync(path.join(TMP_GH_AW_PATH, AGENT_OUTPUT_FILENAME), "utf8"));
+      expect(output.items.some(item => item.type === "request_continuation")).toBe(true);
+      expect(output.errors).toEqual([]);
+    }),
     it("should fail with infra error when safeoutputs gateway-empty flag exists and outputs file is missing", async () => {
       const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "collect-gateway-empty-"));
       const missingFile = path.join(tempDir, "nonexistent-outputs.jsonl");
@@ -1763,6 +1791,18 @@ describe("collect_ndjson_output.cjs", () => {
           const outputCall = mockCore.setOutput.mock.calls.find(call => "output" === call[0]),
             parsedOutput = JSON.parse(outputCall[1]);
           expect(parsedOutput.items[0].body).toBe("This fixes #123 and closes #456, also resolves #789");
+        }),
+        it.each(["invalid", 0])("neutralizes bot triggers when max-bot-mentions is %s", async maxBotMentions => {
+          const testFile = "/tmp/gh-aw/test-ndjson-output.txt";
+          fs.writeFileSync(testFile, JSON.stringify({ type: "noop", message: "fixes #123" }));
+          process.env.GH_AW_SAFE_OUTPUTS = testFile;
+          fs.writeFileSync("/tmp/gh-aw/safeoutputs/config.json", JSON.stringify({ "max-bot-mentions": maxBotMentions, noop: true }));
+
+          await eval(`(async () => { ${collectScript}; await main(); })()`);
+
+          const outputCall = mockCore.setOutput.mock.calls.find(call => call[0] === "output");
+          const parsedOutput = JSON.parse(outputCall[1]);
+          expect(parsedOutput.items[0].message).toBe("`fixes #123`");
         }),
         it("should remove ANSI escape sequences", async () => {
           const testFile = "/tmp/gh-aw/test-ndjson-output.txt",

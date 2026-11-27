@@ -422,13 +422,10 @@ jobs:
         # List all test dependencies to ensure they're in the cache
         # This will fail fast if any dependencies are missing
         echo "Checking test dependencies for all packages..."
-        if go list -test -deps ./... >/dev/null 2>&1; then
+        if go list -test -deps ./... >/dev/null; then
           echo "✅ All test dependencies are available"
         else
           echo "❌ Failed to resolve test dependencies"
-          echo ""
-          echo "Attempting to show which dependencies are missing:"
-          go list -test -deps ./... 2>&1 || true
           exit 1
         fi
 
@@ -1695,8 +1692,15 @@ jobs:
       # Enforce selected production custom analyzers without blocking on unrelated
       # legacy custom analyzer findings in tests or other analyzer families.
       # Note: -test=false intentionally scopes this gate to production code only.
-    - name: Run custom linters
-      run: make golint-custom LINTER_FLAGS="-errstringmatch -panicinlibrarycode -manualmutexunlock -osexitinlibrary -rawloginlib -logfatallibrary -regexpcompileinfunction -fprintlnsprintf -strconvparseignorederror -jsonmarshalignoredeerror -uncheckedtypeassertion -fmterrorfnoverbs -tolowerequalfold -httpnoctx -httprespbodyclose -httpstatuscode -timeafterleak -errortypeassertion -execcommandwithoutcontext -sprintfint -stringsindexcontains -stringscountcontains -bytesbufferstring -ioutildeprecated -mapclearloop -mapdeletecheck -sprintfbool -appendoneelement -timenowsub -stringsjoinone -writebytestring -lenstringsplit -stringreplaceminusone -osgetenvlibrary -ossetenvlibrary -stringsindexhasprefix -contextcancelnotdeferred -ctxbackground -wgdonenotdeferred -goroutinemissingrecover -trimleftright -walkfuncerrshadow -uncheckedflushreturn -bytescomparestring -nilctxpassed -stringbytesroundtrip -fileclosenotdeferred -timesleepnocontext -sprintferrorsnew -globwalkignorederror -appendbytestring -slicemakezerolength -sortslice -deferinloop -regexpdynamicpattern -generatedyamlheredoc -test=false"
+      # Analyzers are split into fast/slow tiers (pkg/linters/tiers.go) so each
+      # step has its own time budget and slow analyzers cannot starve the rest.
+    - name: Run custom linters (fast tier)
+      timeout-minutes: 8
+      run: make golint-custom LINTER_TIER=fast LINTER_FLAGS="-errstringmatch -panicinlibrarycode -manualmutexunlock -osexitinlibrary -regexpcompileinfunction -fprintlnsprintf -strconvparseignorederror -jsonmarshalignoredeerror -fmterrorfnoverbs -httpnoctx -httprespbodyclose -httpstatuscode -timeafterleak -errortypeassertion -execcommandwithoutcontext -sprintfint -stringsindexcontains -stringscountcontains -bytesbufferstring -mapclearloop -mapdeletecheck -sprintfbool -appendoneelement -timenowsub -stringsjoinone -writebytestring -lenstringsplit -stringreplaceminusone -osgetenvlibrary -ossetenvlibrary -stringsindexhasprefix -contextcancelnotdeferred -ctxbackground -wgdonenotdeferred -trimleftright -walkfuncerrshadow -uncheckedflushreturn -bytescomparestring -nilctxpassed -stringbytesroundtrip -fileclosenotdeferred -timesleepnocontext -sprintferrorsnew -globwalkignorederror -appendbytestring -slicemakezerolength -sortslice -deferinloop -regexpdynamicpattern -generatedyamlheredoc -test=false"
+
+    - name: Run custom linters (slow tier)
+      timeout-minutes: 8
+      run: make golint-custom LINTER_TIER=slow LINTER_FLAGS="-rawloginlib -logfatallibrary -uncheckedtypeassertion -tolowerequalfold -ioutildeprecated -goroutinemissingrecover -test=false"
 
     - name: Check console stderr formatting
       run: make golint-custom LINTER_FLAGS="-consolestderr -test=false"
@@ -1724,8 +1728,13 @@ jobs:
           fi
         done < "$log_file"
 
-    - name: Run custom linters (wasm)
-      run: GOOS=js GOARCH=wasm make golint-custom LINTER_FLAGS="-errstringmatch -panicinlibrarycode -manualmutexunlock -osexitinlibrary -rawloginlib -logfatallibrary -regexpcompileinfunction -fprintlnsprintf -strconvparseignorederror -jsonmarshalignoredeerror -uncheckedtypeassertion -fmterrorfnoverbs -tolowerequalfold -httpnoctx -httprespbodyclose -httpstatuscode -timeafterleak -errortypeassertion -execcommandwithoutcontext -sprintfint -stringsindexcontains -stringscountcontains -bytesbufferstring -ioutildeprecated -mapclearloop -mapdeletecheck -sprintfbool -appendoneelement -timenowsub -stringsjoinone -writebytestring -lenstringsplit -stringreplaceminusone -osgetenvlibrary -ossetenvlibrary -stringsindexhasprefix -contextcancelnotdeferred -ctxbackground -wgdonenotdeferred -goroutinemissingrecover -trimleftright -walkfuncerrshadow -uncheckedflushreturn -bytescomparestring -nilctxpassed -stringbytesroundtrip -fileclosenotdeferred -timesleepnocontext -sprintferrorsnew -globwalkignorederror -appendbytestring -slicemakezerolength -sortslice -deferinloop -regexpdynamicpattern -generatedyamlheredoc -test=false" LINTER_PACKAGES="./pkg/console ./pkg/parser ./pkg/styles ./pkg/tty ./pkg/workflow"
+    - name: Run custom linters (wasm, fast tier)
+      timeout-minutes: 8
+      run: GOOS=js GOARCH=wasm make golint-custom LINTER_TIER=fast LINTER_FLAGS="-errstringmatch -panicinlibrarycode -manualmutexunlock -osexitinlibrary -regexpcompileinfunction -fprintlnsprintf -strconvparseignorederror -jsonmarshalignoredeerror -fmterrorfnoverbs -httpnoctx -httprespbodyclose -httpstatuscode -timeafterleak -errortypeassertion -execcommandwithoutcontext -sprintfint -stringsindexcontains -stringscountcontains -bytesbufferstring -mapclearloop -mapdeletecheck -sprintfbool -appendoneelement -timenowsub -stringsjoinone -writebytestring -lenstringsplit -stringreplaceminusone -osgetenvlibrary -ossetenvlibrary -stringsindexhasprefix -contextcancelnotdeferred -ctxbackground -wgdonenotdeferred -trimleftright -walkfuncerrshadow -uncheckedflushreturn -bytescomparestring -nilctxpassed -stringbytesroundtrip -fileclosenotdeferred -timesleepnocontext -sprintferrorsnew -globwalkignorederror -appendbytestring -slicemakezerolength -sortslice -deferinloop -regexpdynamicpattern -generatedyamlheredoc -test=false" LINTER_PACKAGES="./pkg/console ./pkg/parser ./pkg/styles ./pkg/tty ./pkg/workflow"
+
+    - name: Run custom linters (wasm, slow tier)
+      timeout-minutes: 8
+      run: GOOS=js GOARCH=wasm make golint-custom LINTER_TIER=slow LINTER_FLAGS="-rawloginlib -logfatallibrary -uncheckedtypeassertion -tolowerequalfold -ioutildeprecated -goroutinemissingrecover -test=false" LINTER_PACKAGES="./pkg/console ./pkg/parser ./pkg/styles ./pkg/tty ./pkg/workflow"
 
     - name: Check console stderr formatting (wasm)
       run: GOOS=js GOARCH=wasm make golint-custom LINTER_FLAGS="-consolestderr -test=false" LINTER_PACKAGES="./pkg/console ./pkg/parser ./pkg/styles ./pkg/tty ./pkg/workflow"

@@ -428,6 +428,20 @@ function sanitizeUrlProtocols(s) {
  * @returns {string} The string with unknown domains redacted
  */
 function sanitizeUrlDomains(s, allowed) {
+  if (typeof s !== "string") {
+    return "";
+  }
+  if (!Array.isArray(allowed)) {
+    allowed = [];
+  }
+  allowed = allowed
+    .filter(domain => typeof domain === "string")
+    .map(domain => domain.trim().toLowerCase())
+    .filter(domain => {
+      const base = domain.startsWith("*.") ? domain.slice(2) : domain;
+      return base && !base.startsWith(".") && !base.endsWith(".");
+    });
+
   // Strip userinfo (user:password@) from HTTPS URLs before any domain filtering
   // so that credentials are never passed to the allowlist check or preserved
   // in the output for an allowed domain. Protocol-relative URLs (//host/path)
@@ -1406,6 +1420,9 @@ const MAX_BOT_TRIGGER_REFERENCES = 10;
  * @returns {string} The string with excess bot triggers neutralized
  */
 function neutralizeBotTriggers(s, maxBotMentions = MAX_BOT_TRIGGER_REFERENCES) {
+  if (!Number.isSafeInteger(maxBotMentions) || maxBotMentions < 0) {
+    maxBotMentions = 0;
+  }
   const pattern = /\b(fixes?|closes?|resolves?|fix|close|resolve)\s+#(\w+)/gi;
   let count = 0;
   const wrapInCodeSpan = createRenderSafeCodeSpanWrapper(s);
@@ -1570,6 +1587,10 @@ function getCurrentRepoSlug() {
  * @returns {string} The string with unauthorized references neutralized
  */
 function neutralizeGitHubReferences(s, allowedRepos) {
+  if (typeof s !== "string") {
+    return "";
+  }
+
   // If no restrictions configured (null), allow all references
   if (allowedRepos === null) {
     return s;
@@ -1579,7 +1600,14 @@ function neutralizeGitHubReferences(s, allowedRepos) {
   const wrapInCodeSpan = createRenderSafeCodeSpanWrapper(s);
 
   // Expand the special "repo" keyword to the current repo slug and build a Set for isRepoAllowed()
-  const allowedSet = new Set(allowedRepos.map(r => (r === "repo" ? currentRepo : r)));
+  const allowedSet = new Set(
+    (Array.isArray(allowedRepos) ? allowedRepos : [])
+      .filter(repo => typeof repo === "string" && repo.trim())
+      .map(repo => {
+        const normalizedRepo = repo.trim().toLowerCase();
+        return normalizedRepo === "repo" ? currentRepo : normalizedRepo;
+      })
+  );
 
   return applyToNonCodeRegions(s, (segment, regionBefore = "", regionAfter = "") => {
     // Match #123 and owner/repo#456 outside matched code regions.
@@ -1616,9 +1644,12 @@ function neutralizeGitHubReferences(s, allowedRepos) {
  * @returns {string} The truncated content
  */
 function applyTruncation(content, maxLength, maxLines) {
-  maxLength = maxLength || 524288;
+  if (typeof content !== "string" || !content) {
+    return "";
+  }
+  maxLength = typeof maxLength === "number" && Number.isSafeInteger(maxLength) && maxLength > 0 ? maxLength : 524288;
   const lines = content.split("\n");
-  maxLines = maxLines || 65000;
+  maxLines = typeof maxLines === "number" && Number.isSafeInteger(maxLines) && maxLines > 0 ? maxLines : 65000;
 
   // If content has too many lines, truncate by lines (primary limit)
   if (lines.length > maxLines) {

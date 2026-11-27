@@ -22,18 +22,14 @@
 package cli
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 
 	"github.com/github/gh-aw/pkg/gitutil"
-	"github.com/github/gh-aw/pkg/stringutil"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
@@ -42,29 +38,10 @@ import (
 
 var compileOrchestrationLog = logger.New("cli:compile_pipeline")
 
-// Batch tool entry points are exposed as package-level function variables so
-// tests can override them to verify the batch pipeline invokes every enabled
-// scanner in order, without short-circuiting, and without depending on the
-// underlying external tool binaries/Docker images being available.
-var (
-	runBatchActionlintOnFiles   = RunActionlintOnFiles
-	runBatchZizmorOnFiles       = RunZizmorOnFiles
-	runBatchDryRunZizmorOnFiles = func(files []string, verbose, strict bool) error {
-		return runZizmorOnFilesWithOptions(files, verbose, strict, zizmorResultOptions{dryRun: true})
-	}
-	runBatchPoutineOnDirectory                = RunPoutineOnDirectory
-	runBatchRunnerGuardOnDirectory            = RunRunnerGuardOnDirectory
-	runBatchSyftOnLockFiles                   = RunSyftOnLockFiles
-	runBatchGrypeOnLockFiles                  = RunGrypeOnLockFiles
-	runBatchGrantOnLockFiles                  = RunGrantOnLockFiles
-	runBatchYamllintOnFiles                   = RunYamllintOnFiles
-	runBatchShellcheckOnLockFilesAndResources = RunShellcheckOnLockFilesAndResources
-)
-
 const fallbackCompilationErrorMessage = "compilation failed (no detailed error message available)"
 
 // compileSpecificFiles compiles a specific list of workflow files
-func compileSpecificFiles( //nolint:largefunc // Orchestrates the full targeted compile pipeline.
+func compileSpecificFiles(
 	ctx context.Context,
 	compiler *workflow.Compiler,
 	config CompileConfig,
@@ -80,163 +57,20 @@ func compileSpecificFiles( //nolint:largefunc // Orchestrates the full targeted 
 	compiler.SetBatchMode(batchMode)
 	compiler.SetQuiet(batchMode)
 
-	// Enable validation automatically when force-refresh-action-pins is used
-	// to verify all resolved action SHAs are valid
-	shouldValidate := config.Validate || config.ForceRefreshActionPins
-	if config.ForceRefreshActionPins && !config.Validate {
-		compileOrchestrationLog.Print("Automatically enabling action SHA validation due to --force-refresh-action-pins")
+	stage := compilePipelineStage{compiler: compiler, config: config, stats: stats, results: validationResults}
+	if err := stage.compile(ctx, config.MarkdownFiles, true); err != nil {
+		return stage.workflows, err
 	}
-
-	var workflowDataList []*workflow.WorkflowData
-	var compiledCount int
-	var errorCount int
-	var lockFilesForActionlint []string
-	var lockFilesForZizmor []string
-	var lockFilesForDirTools []string // lock files for directory-based tools (poutine, runner-guard)
-	var lockFilesForSyft []string     // lock files for syft container image SBOM scanning
-	var lockFilesForGrype []string    // lock files for grype container image vulnerability scanning
-	var lockFilesForGrant []string    // lock files for grant container image license scanning
-	var strictGrantErr error
-	var lockFilesForYamllint []string   // lock files for yamllint YAML linter
-	var lockFilesForShellcheck []string // lock files for shellcheck run step linting
-	var shellcheckResources []workflow.ShellScriptResource
-	var compiledLockFiles []string // every lock file actually emitted, regardless of which lint tools are enabled
-
-	// Compile each specified file
-	for _, markdownFile := range config.MarkdownFiles {
-		// Respect context cancellation between files (e.g. Ctrl+C)
-		select {
-		case <-ctx.Done():
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
-			return workflowDataList, ctx.Err()
-		default:
-		}
-
-		stats.Total++
-
-		// Initialize validation result
-		result := ValidationResult{
-			Workflow: markdownFile,
-			Valid:    true,
-			Errors:   []ValidationIssue{},
-			Warnings: []ValidationIssue{},
-		}
-
-		// Resolve workflow ID or file path to actual file path
-		compileOrchestrationLog.Printf("Resolving workflow file: %s", markdownFile)
-		resolvedFile, err := resolveWorkflowFile(markdownFile, config.Verbose)
-		if err != nil {
-			// Don't print error here - it will be displayed in the compilation summary
-			// The error is stored in ValidationResult for JSON output and returned for main to display
-			errorCount++
-			stats.Errors++
-			trackWorkflowFailure(stats, markdownFile, 1, []string{err.Error()})
-			result.Valid = false
-			result.Errors = append(result.Errors, ValidationIssue{
-				Type:    "resolution_error",
-				Message: err.Error(),
-			})
-			*validationResults = append(*validationResults, result)
-			writeMCPCompileProgress(config.MCPProgressFile, *validationResults)
-			continue
-		}
-		compileOrchestrationLog.Printf("Resolved to: %s", resolvedFile)
-
-		// Update result with resolved file name
-		result.Workflow = filepath.Base(resolvedFile)
-
-		// Compile regular workflow file (disable per-file security tools)
-		fileResult := compileWorkflowFile(
-			ctx, compiler, resolvedFile, compileWorkflowFileOptions{
-				verbose:        config.Verbose,
-				jsonOutput:     config.JSONOutput,
-				noEmit:         config.NoEmit,
-				strict:         config.Strict,
-				validate:       shouldValidate,
-				failOnWarnings: config.DryRun,
-				// zizmor, poutine, actionlint disabled per-file (batched instead)
-			},
-		)
-
-		if !fileResult.success {
-			// Collect error messages from validation result for display in summary
-			var errMsgs []string
-			for _, verr := range fileResult.validationResult.Errors {
-				errMsgs = append(errMsgs, verr.Message)
-			}
-			if len(errMsgs) == 0 {
-				errMsgs = []string{fallbackCompilationErrorMessage}
-			}
-			errorCount++
-			stats.Errors += len(errMsgs)
-			trackWorkflowFailure(stats, resolvedFile, len(errMsgs), errMsgs)
-		} else {
-			compiledCount++
-			stats.Succeeded++
-			if fileResult.workflowData != nil {
-				workflowDataList = append(workflowDataList, fileResult.workflowData)
-			}
-
-			// Collect lock files for batch security tools
-			if !config.NoEmit && fileResult.lockFile != "" {
-				if _, err := os.Stat(fileResult.lockFile); err == nil {
-					compiledLockFiles = append(compiledLockFiles, fileResult.lockFile)
-					if config.Actionlint {
-						lockFilesForActionlint = append(lockFilesForActionlint, fileResult.lockFile)
-					}
-					if config.Zizmor {
-						lockFilesForZizmor = append(lockFilesForZizmor, fileResult.lockFile)
-					}
-					if config.Poutine || config.RunnerGuard {
-						lockFilesForDirTools = append(lockFilesForDirTools, fileResult.lockFile)
-					}
-					if config.Grype {
-						lockFilesForGrype = append(lockFilesForGrype, fileResult.lockFile)
-					}
-					if config.Grant {
-						lockFilesForGrant = append(lockFilesForGrant, fileResult.lockFile)
-					}
-					if config.Syft {
-						lockFilesForSyft = append(lockFilesForSyft, fileResult.lockFile)
-					}
-					if config.Yamllint {
-						lockFilesForYamllint = append(lockFilesForYamllint, fileResult.lockFile)
-					}
-					if config.shellcheckEnabled() {
-						lockFilesForShellcheck = append(lockFilesForShellcheck, fileResult.lockFile)
-						shellcheckResources = append(shellcheckResources, fileResult.workflowData.ShellScriptResources()...)
-					}
-				}
-			}
-		}
-
-		if len(*validationResults) == 0 {
-			appendMCPCachedModelInventoryWarning(config, &fileResult.validationResult)
-		}
-		*validationResults = append(*validationResults, fileResult.validationResult)
-		writeMCPCompileProgress(config.MCPProgressFile, *validationResults)
-	}
-
-	workflowDir := ""
 	if config.DryRun {
-		workflowDir = config.dryRunWorkflowDir
+		stage.batch.workflowDir = config.dryRunWorkflowDir
 	}
-	strictGrantErr, batchToolErr := runBatchExternalTools(ctx, config, batchToolsOptions{
-		workflowDir:            workflowDir,
-		lockFilesForActionlint: lockFilesForActionlint,
-		lockFilesForZizmor:     lockFilesForZizmor,
-		lockFilesForDirTools:   lockFilesForDirTools,
-		lockFilesForSyft:       lockFilesForSyft,
-		lockFilesForGrype:      lockFilesForGrype,
-		lockFilesForGrant:      lockFilesForGrant,
-		lockFilesForYamllint:   lockFilesForYamllint,
-		lockFilesForShellcheck: lockFilesForShellcheck,
-		shellcheckResources:    shellcheckResources,
-	}, stats, validationResults)
+	strictGrantErr, batchToolErr := runBatchExternalTools(ctx, config, stage.batch, stats, validationResults)
+	return stage.finishSpecific(ctx, strictGrantErr, batchToolErr)
+}
 
-	if strictGrantErr != nil || batchToolErr != nil {
-		errorCount++
-	}
+func (stage *compilePipelineStage) finishSpecific(ctx context.Context, strictGrantErr, batchToolErr error) ([]*workflow.WorkflowData, error) {
+	compiler, config, stats, validationResults := stage.compiler, stage.config, stage.stats, stage.results
+	workflowDataList := stage.workflows
 
 	// Get warning count from compiler
 	stats.Warnings = compiler.GetWarningCount()
@@ -252,7 +86,7 @@ func compileSpecificFiles( //nolint:largefunc // Orchestrates the full targeted 
 
 	// Post-processing
 	if !config.NoEmit {
-		if err := runPostProcessing(ctx, compiler, workflowDataList, compiledLockFiles, config, compiledCount); err != nil {
+		if err := runPostProcessing(ctx, compiler, workflowDataList, stage.compiledLockFiles, config, stage.successes); err != nil {
 			return workflowDataList, err
 		}
 	}
@@ -264,24 +98,11 @@ func compileSpecificFiles( //nolint:largefunc // Orchestrates the full targeted 
 		return workflowDataList, err
 	}
 
-	// Return error if any compilations failed
-	// Don't return the detailed error message here since it's already printed in the summary
-	// Returning a simple error prevents duplication in the output
-	if errorCount > 0 {
-		if strictGrantErr != nil {
-			return workflowDataList, strictGrantErr
-		}
-		if batchToolErr != nil {
-			return workflowDataList, batchToolErr
-		}
-		return workflowDataList, errors.New("compilation failed")
-	}
-
-	return workflowDataList, developmentErr
+	return workflowDataList, compilationResultError(stage.failures, strictGrantErr, batchToolErr, developmentErr)
 }
 
 // compileAllFilesInDirectory compiles all workflow files in a directory
-func compileAllFilesInDirectory( //nolint:largefunc // Orchestrates the full directory compile pipeline.
+func compileAllFilesInDirectory(
 	ctx context.Context,
 	compiler *workflow.Compiler,
 	config CompileConfig,
@@ -289,36 +110,9 @@ func compileAllFilesInDirectory( //nolint:largefunc // Orchestrates the full dir
 	stats *CompilationStats,
 	validationResults *[]ValidationResult,
 ) ([]*workflow.WorkflowData, error) {
-	// Find git root for consistent behavior
-	gitRoot, err := gitutil.FindGitRoot()
+	gitRoot, workflowsDir, mdFiles, err := findDirectoryWorkflows(workflowDir, config.Verbose)
 	if err != nil {
-		return nil, fmt.Errorf("compile without arguments requires being in a git repository: %w", err)
-	}
-	compileOrchestrationLog.Printf("Found git root: %s", gitRoot)
-
-	// Compile all markdown files in the specified workflow directory
-	workflowsDir := filepath.Join(gitRoot, workflowDir)
-	if _, err := os.Stat(workflowsDir); errors.Is(err, fs.ErrNotExist) {
-		return nil, fmt.Errorf("the %s directory does not exist in git root (%s)", workflowDir, gitRoot)
-	}
-
-	compileOrchestrationLog.Printf("Scanning for markdown files in %s", workflowsDir)
-	if config.Verbose {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Scanning for markdown files in "+workflowsDir))
-	}
-
-	// Find and filter markdown files (shared helper keeps logic in one place)
-	mdFiles, err := getMarkdownWorkflowFiles(workflowsDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find markdown files: %w", err)
-	}
-	mdFiles, err = filterMarkdownFilesWithFrontmatter(mdFiles)
-	if err != nil {
-		return nil, fmt.Errorf("failed to filter markdown files: %w", err)
-	}
-
-	if len(mdFiles) == 0 {
-		return nil, fmt.Errorf("no workflow markdown files found in %s (workflow files must start with a frontmatter opener on the first line)", workflowsDir)
+		return nil, err
 	}
 	if err := prepareDryRunScannerBaseline(ctx, &config, mdFiles, workflowsDir, compiler); err != nil {
 		return nil, err
@@ -333,7 +127,6 @@ func compileAllFilesInDirectory( //nolint:largefunc // Orchestrates the full dir
 	compiler.SetBatchMode(batchMode)
 	compiler.SetQuiet(batchMode)
 
-	// Handle purge logic: collect existing files before compilation
 	var purgeData *purgeTrackingData
 	if config.Purge {
 		purgeData, err = collectPurgeData(workflowsDir, mdFiles, config.Verbose)
@@ -342,153 +135,63 @@ func compileAllFilesInDirectory( //nolint:largefunc // Orchestrates the full dir
 		}
 	}
 
-	// Enable validation automatically when force-refresh-action-pins is used
-	// to verify all resolved action SHAs are valid
-	shouldValidate := config.Validate || config.ForceRefreshActionPins
-	if config.ForceRefreshActionPins && !config.Validate {
-		compileOrchestrationLog.Print("Automatically enabling action SHA validation due to --force-refresh-action-pins")
+	stage := compilePipelineStage{compiler: compiler, config: config, stats: stats, results: validationResults}
+	if err := stage.compile(ctx, mdFiles, false); err != nil {
+		return stage.workflows, err
 	}
-
-	// Compile each file
-	var workflowDataList []*workflow.WorkflowData
-	var successCount int
-	var errorCount int
-	var lockFilesForActionlint []string
-	var lockFilesForZizmor []string
-	var lockFilesForDirTools []string // lock files for directory-based tools (poutine, runner-guard)
-	var lockFilesForSyft []string     // lock files for syft container image SBOM scanning
-	var lockFilesForGrype []string    // lock files for grype container image vulnerability scanning
-	var lockFilesForGrant []string    // lock files for grant container image license scanning
-	var strictGrantErr error
-	var lockFilesForYamllint []string   // lock files for yamllint YAML linter
-	var lockFilesForShellcheck []string // lock files for shellcheck run step linting
-	var shellcheckResources []workflow.ShellScriptResource
-	var workflowValidationResultIndexes []int
-
-	for _, file := range mdFiles {
-		// Respect context cancellation between files (e.g. Ctrl+C)
-		select {
-		case <-ctx.Done():
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Operation cancelled"))
-			return workflowDataList, ctx.Err()
-		default:
-		}
-
-		stats.Total++
-
-		// Compile regular workflow file (disable per-file security tools)
-		fileResult := compileWorkflowFile(
-			ctx, compiler, file, compileWorkflowFileOptions{
-				verbose:        config.Verbose,
-				jsonOutput:     config.JSONOutput,
-				noEmit:         config.NoEmit,
-				strict:         config.Strict,
-				validate:       shouldValidate,
-				failOnWarnings: config.DryRun,
-				// zizmor, poutine, actionlint disabled per-file (batched instead)
-			},
-		)
-
-		if !fileResult.success {
-			// Collect error messages from validation result
-			var errMsgs []string
-			for _, verr := range fileResult.validationResult.Errors {
-				errMsgs = append(errMsgs, verr.Message)
-			}
-			if len(errMsgs) == 0 {
-				errMsgs = []string{fallbackCompilationErrorMessage}
-			}
-			errorCount++
-			stats.Errors += len(errMsgs)
-			trackWorkflowFailure(stats, file, len(errMsgs), errMsgs)
-		} else {
-			successCount++
-			stats.Succeeded++
-			if fileResult.workflowData != nil {
-				workflowDataList = append(workflowDataList, fileResult.workflowData)
-				workflowValidationResultIndexes = append(workflowValidationResultIndexes, len(*validationResults))
-			}
-
-			// Collect lock files for batch security tools
-			if !config.NoEmit && fileResult.lockFile != "" {
-				if _, err := os.Stat(fileResult.lockFile); err == nil {
-					if config.Actionlint {
-						lockFilesForActionlint = append(lockFilesForActionlint, fileResult.lockFile)
-					}
-					if config.Zizmor {
-						lockFilesForZizmor = append(lockFilesForZizmor, fileResult.lockFile)
-					}
-					if config.Poutine || config.RunnerGuard {
-						lockFilesForDirTools = append(lockFilesForDirTools, fileResult.lockFile)
-					}
-					if config.Syft {
-						lockFilesForSyft = append(lockFilesForSyft, fileResult.lockFile)
-					}
-					if config.Grype {
-						lockFilesForGrype = append(lockFilesForGrype, fileResult.lockFile)
-					}
-					if config.Grant {
-						lockFilesForGrant = append(lockFilesForGrant, fileResult.lockFile)
-					}
-					if config.Yamllint {
-						lockFilesForYamllint = append(lockFilesForYamllint, fileResult.lockFile)
-					}
-					if config.shellcheckEnabled() {
-						lockFilesForShellcheck = append(lockFilesForShellcheck, fileResult.lockFile)
-						shellcheckResources = append(shellcheckResources, fileResult.workflowData.ShellScriptResources()...)
-					}
-				}
-			}
-		}
-
-		*validationResults = append(*validationResults, fileResult.validationResult)
-		writeMCPCompileProgress(config.MCPProgressFile, *validationResults)
-	}
-
-	dryRunWorkflowDir := ""
+	stage.batch.workflowDir = workflowsDir
 	if config.DryRun {
-		dryRunWorkflowDir = config.dryRunWorkflowDir
+		stage.batch.workflowDir = firstNonEmpty(config.dryRunWorkflowDir, workflowsDir)
 	}
-	strictGrantErr, batchToolErr := runBatchExternalTools(ctx, config, batchToolsOptions{
-		workflowDir:            firstNonEmpty(dryRunWorkflowDir, workflowsDir),
-		lockFilesForActionlint: lockFilesForActionlint,
-		lockFilesForZizmor:     lockFilesForZizmor,
-		lockFilesForDirTools:   lockFilesForDirTools,
-		lockFilesForSyft:       lockFilesForSyft,
-		lockFilesForGrype:      lockFilesForGrype,
-		lockFilesForGrant:      lockFilesForGrant,
-		lockFilesForYamllint:   lockFilesForYamllint,
-		lockFilesForShellcheck: lockFilesForShellcheck,
-		shellcheckResources:    shellcheckResources,
-	}, stats, validationResults)
+	strictGrantErr, batchToolErr := runBatchExternalTools(ctx, config, stage.batch, stats, validationResults)
+	return stage.finishDirectory(ctx, gitRoot, workflowsDir, mdFiles, purgeData, strictGrantErr, batchToolErr)
+}
 
+func findDirectoryWorkflows(workflowDir string, verbose bool) (string, string, []string, error) {
+	// Find git root for consistent behavior
+	gitRoot, err := gitutil.FindGitRoot()
+	if err != nil {
+		return "", "", nil, fmt.Errorf("compile without arguments requires being in a git repository: %w", err)
+	}
+	compileOrchestrationLog.Printf("Found git root: %s", gitRoot)
+
+	// Compile all markdown files in the specified workflow directory
+	workflowsDir := filepath.Join(gitRoot, workflowDir)
+	if _, err := os.Stat(workflowsDir); errors.Is(err, fs.ErrNotExist) {
+		return "", "", nil, fmt.Errorf("the %s directory does not exist in git root (%s)", workflowDir, gitRoot)
+	}
+
+	compileOrchestrationLog.Printf("Scanning for markdown files in %s", workflowsDir)
+	if verbose {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr("Scanning for markdown files in "+workflowsDir))
+	}
+
+	// Find and filter markdown files (shared helper keeps logic in one place)
+	mdFiles, err := getMarkdownWorkflowFiles(workflowsDir)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to find markdown files: %w", err)
+	}
+	mdFiles, err = filterMarkdownFilesWithFrontmatter(mdFiles)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("failed to filter markdown files: %w", err)
+	}
+
+	if len(mdFiles) == 0 {
+		return "", "", nil, fmt.Errorf("no workflow markdown files found in %s (workflow files must start with a frontmatter opener on the first line)", workflowsDir)
+	}
+	return gitRoot, workflowsDir, mdFiles, nil
+}
+
+func (stage *compilePipelineStage) finishDirectory(ctx context.Context, gitRoot, workflowsDir string, mdFiles []string, purgeData *purgeTrackingData, strictGrantErr, batchToolErr error) ([]*workflow.WorkflowData, error) {
+	compiler, config, stats, validationResults := stage.compiler, stage.config, stage.stats, stage.results
+	workflowDataList, successCount, errorCount := stage.workflows, stage.successes, stage.failures
 	if strictGrantErr != nil || batchToolErr != nil {
 		errorCount++
 	}
 
-	// Emit recommendation when many slash commands are present without centralized strategy.
-	displayCentralizedSlashCommandRecommendation(compiler, workflowDataList, config.JSONOutput)
-
-	duplicateNameWarnings, err := appendDuplicateWorkflowNameWarnings(workflowDataList, workflowValidationResultIndexes, validationResults)
-	if err != nil {
+	if err := stage.reportDirectoryNotices(); err != nil {
 		return workflowDataList, err
 	}
-	if !config.JSONOutput {
-		for _, warning := range duplicateNameWarnings {
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(warning.Message))
-		}
-	}
-
-	// Get warning count from compiler
-	stats.Warnings = compiler.GetWarningCount() + len(duplicateNameWarnings)
-
-	displayBatchCompilationNotices(compiler, config)
-
-	// Display schedule warnings
-	displayScheduleWarnings(compiler, config.JSONOutput)
-
-	// Display safe update warnings (emitted as prompts for the calling agent)
-	displaySafeUpdateWarnings(compiler, config.JSONOutput)
 
 	if config.Verbose {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessageStderr(fmt.Sprintf("Successfully compiled %d out of %d workflow files", successCount, len(mdFiles))))
@@ -518,645 +221,18 @@ func compileAllFilesInDirectory( //nolint:largefunc // Orchestrates the full dir
 		return workflowDataList, err
 	}
 
-	// Return error if any compilations failed
-	if errorCount > 0 {
-		if strictGrantErr != nil {
-			return workflowDataList, strictGrantErr
-		}
-		if batchToolErr != nil {
-			return workflowDataList, batchToolErr
-		}
-		return workflowDataList, errors.New("compilation failed")
-	}
-
-	return workflowDataList, developmentErr
+	return workflowDataList, compilationResultError(stage.failures, strictGrantErr, batchToolErr, developmentErr)
 }
 
-func writeMCPCompileProgress(progressPath string, results []ValidationResult) {
-	if progressPath == "" {
-		return
+func compilationResultError(failures int, strictGrantErr, batchToolErr, developmentErr error) error {
+	if strictGrantErr != nil {
+		return strictGrantErr
 	}
-	sanitizedResults := make([]ValidationResult, 0, len(results))
-	for _, result := range results {
-		sanitizedErrors := make([]ValidationIssue, 0, len(result.Errors))
-		for _, issue := range result.Errors {
-			issue.Message = boundMCPCompileDiagnostic(issue.Message)
-			sanitizedErrors = append(sanitizedErrors, issue)
-		}
-		result.Errors = sanitizedErrors
-		sanitizedWarnings := make([]ValidationIssue, 0, len(result.Warnings))
-		for _, issue := range result.Warnings {
-			issue.Message = boundMCPCompileDiagnostic(issue.Message)
-			sanitizedWarnings = append(sanitizedWarnings, issue)
-		}
-		result.Warnings = sanitizedWarnings
-		sanitizedResults = append(sanitizedResults, result)
+	if batchToolErr != nil {
+		return batchToolErr
 	}
-	output, err := formatValidationOutput(sanitizedResults)
-	if err != nil {
-		compileOrchestrationLog.Printf("Failed to format MCP compile progress: %v", err)
-		return
+	if failures > 0 {
+		return errors.New("compilation failed")
 	}
-	if err := writeSensitiveFile(progressPath, []byte(output)); err != nil {
-		compileOrchestrationLog.Printf("Failed to publish MCP compile progress: %v", err)
-	}
-}
-
-type batchToolsOptions struct {
-	reportResult           func(string, int, error)
-	filterResult           func(string, error) error
-	dryRunZizmor           bool
-	workflowDir            string
-	lockFilesForActionlint []string
-	lockFilesForZizmor     []string
-	lockFilesForDirTools   []string
-	lockFilesForSyft       []string
-	lockFilesForGrype      []string
-	lockFilesForGrant      []string
-	lockFilesForYamllint   []string
-	lockFilesForShellcheck []string
-	shellcheckResources    []workflow.ShellScriptResource
-}
-
-func (opts batchToolsOptions) recordResult(tool string, inputs int, err error) error {
-	if opts.filterResult != nil {
-		err = opts.filterResult(tool, err)
-	}
-	if opts.reportResult != nil {
-		opts.reportResult(tool, inputs, err)
-	}
-	return err
-}
-
-// runBatchExternalTools executes all enabled batch analysis tools sequentially without short-circuiting
-// when individual tools report findings or errors.
-func runBatchLinters(ctx context.Context, config CompileConfig, opts batchToolsOptions) error {
-	var firstErr error
-
-	if config.Actionlint && !config.NoEmit {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		err := runBatchActionlintOnFiles(ctx, opts.lockFilesForActionlint, config.Verbose && !config.JSONOutput, config.Strict)
-		err = opts.recordResult("actionlint", len(opts.lockFilesForActionlint), err)
-		if err != nil {
-			if config.Strict && firstErr == nil {
-				firstErr = err
-			}
-		}
-	}
-
-	if config.Zizmor && !config.NoEmit {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		var err error
-		if opts.dryRunZizmor || config.DryRun && config.dryRunBaseline != nil {
-			err = runBatchDryRunZizmorOnFiles(opts.lockFilesForZizmor, config.Verbose && !config.JSONOutput, config.Strict)
-		} else {
-			err = runBatchZizmorOnFiles(opts.lockFilesForZizmor, config.Verbose && !config.JSONOutput, config.Strict)
-		}
-		err = opts.recordResult("zizmor", len(opts.lockFilesForZizmor), err)
-		if err != nil {
-			if firstErr == nil {
-				firstErr = err
-			}
-		}
-	}
-
-	return firstErr
-}
-
-func runBatchDirScanners(ctx context.Context, config CompileConfig, opts batchToolsOptions) error {
-	var firstErr error
-
-	if config.Poutine && !config.NoEmit {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		workflowDir := opts.workflowDir
-		if workflowDir == "" && len(opts.lockFilesForDirTools) > 0 {
-			workflowDir = filepath.Dir(opts.lockFilesForDirTools[0])
-		}
-		err := runBatchDirectoryTool("poutine", workflowDir, config.Verbose && !config.JSONOutput, config.Strict, runBatchPoutineOnDirectory)
-		err = opts.recordResult("poutine", len(opts.lockFilesForDirTools), err)
-		if err != nil {
-			if config.Strict && firstErr == nil {
-				firstErr = err
-			}
-		}
-	}
-
-	if config.RunnerGuard && !config.NoEmit {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		workflowDir := opts.workflowDir
-		if workflowDir == "" && len(opts.lockFilesForDirTools) > 0 {
-			workflowDir = filepath.Dir(opts.lockFilesForDirTools[0])
-		}
-		err := runBatchDirectoryTool("runner-guard", workflowDir, config.Verbose && !config.JSONOutput, config.Strict, runBatchRunnerGuardOnDirectory)
-		err = opts.recordResult("runner-guard", len(opts.lockFilesForDirTools), err)
-		if err != nil {
-			if config.Strict && firstErr == nil {
-				firstErr = err
-			}
-		}
-	}
-
-	return firstErr
-}
-
-func runBatchContainerScanners(
-	ctx context.Context,
-	config CompileConfig,
-	opts batchToolsOptions,
-	stats *CompilationStats,
-	validationResults *[]ValidationResult,
-) (strictGrantErr error, containerErr error) {
-	if config.Syft && !config.NoEmit {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		err := runBatchSyftOnLockFiles(opts.lockFilesForSyft, config.Verbose && !config.JSONOutput, config.Strict)
-		err = opts.recordResult("syft", len(opts.lockFilesForSyft), err)
-		if err != nil {
-			if config.Strict && containerErr == nil {
-				containerErr = err
-			}
-		}
-	}
-
-	if config.Grype && !config.NoEmit {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		err := runBatchGrypeOnLockFiles(opts.lockFilesForGrype, config.Verbose && !config.JSONOutput, config.Strict)
-		err = opts.recordResult("grype", len(opts.lockFilesForGrype), err)
-		if err != nil {
-			if config.Strict && containerErr == nil {
-				containerErr = err
-			}
-		}
-	}
-
-	if config.Grant && !config.NoEmit {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		err := runBatchGrantOnLockFiles(opts.lockFilesForGrant, config.Verbose && !config.JSONOutput, config.Strict)
-		err = opts.recordResult("grant", len(opts.lockFilesForGrant), err)
-		if err != nil {
-			if config.Strict {
-				if !config.DryRun {
-					stats.Errors++
-					*validationResults = append(*validationResults, ValidationResult{
-						Workflow: "grant",
-						Valid:    false,
-						Errors: []ValidationIssue{{
-							Type:    "grant_error",
-							Message: err.Error(),
-						}},
-					})
-				}
-				if strictGrantErr == nil {
-					strictGrantErr = err
-				}
-			}
-		}
-	}
-
-	return strictGrantErr, containerErr
-}
-
-func runBatchScriptLinters(ctx context.Context, config CompileConfig, opts batchToolsOptions) error {
-	var firstErr error
-
-	if config.Yamllint && !config.NoEmit {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		err := runBatchYamllintOnFiles(opts.lockFilesForYamllint, config.Verbose && !config.JSONOutput, config.Strict)
-		err = opts.recordResult("yamllint", len(opts.lockFilesForYamllint), err)
-		if err != nil {
-			if config.Strict && firstErr == nil {
-				firstErr = err
-			}
-		}
-	}
-
-	if config.shellcheckEnabled() && !config.NoEmit {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		err := runBatchShellcheckOnLockFilesAndResources(ctx, opts.lockFilesForShellcheck, opts.shellcheckResources, config.Verbose && !config.JSONOutput, config.Strict)
-		err = opts.recordResult("shellcheck", len(opts.lockFilesForShellcheck)+len(opts.shellcheckResources), err)
-		if err != nil {
-			if config.Strict && firstErr == nil {
-				firstErr = err
-			}
-		}
-	}
-
-	return firstErr
-}
-
-func runBatchExternalTools(
-	ctx context.Context,
-	config CompileConfig,
-	opts batchToolsOptions,
-	stats *CompilationStats,
-	validationResults *[]ValidationResult,
-) (strictGrantErr error, batchToolErr error) {
-	scannerResults := make(map[string]error)
-	ctx = context.WithValue(ctx, compileScannerReporterKey{}, func(tool string, err error) {
-		scannerResults[tool] = err
-	})
-	previousReport := opts.reportResult
-	if config.DryRun {
-		if config.dryRunBaseline != nil {
-			opts.filterResult = func(tool string, err error) error {
-				diff, filteredErr := config.dryRunBaseline.filter(tool, err)
-				if config.dryRunReport != nil && diff != nil {
-					check := config.dryRunReport.Scanners[tool]
-					check.Differential = diff
-					config.dryRunReport.Scanners[tool] = check
-				}
-				return filteredErr
-			}
-		}
-		opts.reportResult = func(tool string, inputs int, err error) {
-			recordDryRunScannerResult(config.dryRunReport, tool, inputs, err)
-			appendDryRunScannerResult(tool, scannerResults[tool], err, stats, validationResults)
-			if previousReport != nil {
-				previousReport(tool, inputs, err)
-			}
-		}
-	} else {
-		opts.reportResult = func(tool string, inputs int, err error) {
-			diagnostics, reported := scannerResults[tool]
-			if !reported {
-				diagnostics = err
-			}
-			// Grant already emits its strict batch result.
-			if tool != "grant" || !config.Strict {
-				appendCompileScannerResult(tool, diagnostics, config.Strict && err != nil, stats, validationResults)
-			}
-			if previousReport != nil {
-				previousReport(tool, inputs, err)
-			}
-		}
-	}
-	if err := runBatchLinters(ctx, config, opts); err != nil && batchToolErr == nil {
-		batchToolErr = err
-	}
-
-	if err := runBatchDirScanners(ctx, config, opts); err != nil && batchToolErr == nil {
-		batchToolErr = err
-	}
-
-	sGrantErr, containerErr := runBatchContainerScanners(ctx, config, opts, stats, validationResults)
-	if sGrantErr != nil && strictGrantErr == nil {
-		strictGrantErr = sGrantErr
-	}
-	if containerErr != nil && batchToolErr == nil {
-		batchToolErr = containerErr
-	}
-
-	if err := runBatchScriptLinters(ctx, config, opts); err != nil && batchToolErr == nil {
-		batchToolErr = err
-	}
-
-	return strictGrantErr, batchToolErr
-}
-
-func appendDuplicateWorkflowNameWarnings(workflowDataList []*workflow.WorkflowData, validationResultIndexes []int, validationResults *[]ValidationResult) ([]ValidationIssue, error) {
-	workflowIDsByName := make(map[string][]string)
-	for _, workflowData := range workflowDataList {
-		if workflowData != nil && workflowData.Name != "" {
-			workflowIDsByName[workflowData.Name] = append(workflowIDsByName[workflowData.Name], workflowData.WorkflowID)
-		}
-	}
-
-	warningsByName := make(map[string]ValidationIssue)
-	for name, workflowIDs := range workflowIDsByName {
-		if len(workflowIDs) > 1 {
-			slices.Sort(workflowIDs)
-			warningsByName[name] = ValidationIssue{
-				Type:    "duplicate_workflow_name",
-				Message: fmt.Sprintf("Duplicate workflow name %q in %s; GitHub displays them as the same agentic workflow", name, strings.Join(workflowIDs, ", ")),
-			}
-		}
-	}
-
-	var warnings []ValidationIssue
-	reportedNames := make(map[string]struct{})
-	for workflowIndex, workflowData := range workflowDataList {
-		if workflowData == nil || workflowData.Name == "" {
-			continue
-		}
-
-		warning, duplicate := warningsByName[workflowData.Name]
-		if !duplicate {
-			continue
-		}
-
-		if _, reported := reportedNames[workflowData.Name]; !reported {
-			warnings = append(warnings, warning)
-			reportedNames[workflowData.Name] = struct{}{}
-		}
-
-		if workflowIndex < 0 || workflowIndex >= len(validationResultIndexes) {
-			return nil, fmt.Errorf("missing validation result index for workflow %q", workflowData.WorkflowID)
-		}
-		resultIndex := validationResultIndexes[workflowIndex]
-		results := *validationResults
-		if resultIndex < 0 || resultIndex >= len(results) {
-			return nil, fmt.Errorf("validation result index %d for workflow %q is out of range", resultIndex, workflowData.WorkflowID)
-		}
-		result := &results[resultIndex]
-		result.Warnings = append(result.Warnings, warning)
-	}
-
-	return warnings, nil
-}
-
-func displayBatchCompilationNotices(compiler *workflow.Compiler, config CompileConfig) {
-	if config.JSONOutput || config.Verbose {
-		return
-	}
-
-	featureUsage := compiler.GetExperimentalFeatureUsage()
-	if len(featureUsage) > 0 {
-		type featureCount struct {
-			name  string
-			count int
-		}
-		features := make([]featureCount, 0, len(featureUsage))
-		for message, count := range featureUsage {
-			features = append(features, featureCount{
-				name:  strings.TrimPrefix(message, "Using experimental feature: "),
-				count: count,
-			})
-		}
-		slices.SortFunc(features, func(a, b featureCount) int {
-			if a.count != b.count {
-				return cmp.Compare(b.count, a.count)
-			}
-			return cmp.Compare(a.name, b.name)
-		})
-
-		fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr("Experimental features in use:"))
-		for _, feature := range features {
-			fmt.Fprintln(os.Stderr, console.FormatListItemStderr(fmt.Sprintf("%s: %s", feature.name, formatWorkflowCount(feature.count))))
-		}
-	}
-
-	if count := compiler.DefaultModelRoutingWorkflowCount(); count > 0 {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(workflow.DefaultModelRoutingBatchNotice(count)))
-	}
-
-	if compiler.CopilotRequestsTipNeeded() {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(
-			"Copilot token-based inference may be available: add permissions.copilot-requests: write. "+
-				"To suppress this tip when using a PAT, set permissions.copilot-requests: none. "+
-				"See https://github.github.com/gh-aw/reference/billing/",
-		))
-	}
-}
-
-// purgeTrackingData holds data needed for purge operations
-type purgeTrackingData struct {
-	existingLockFiles    []string
-	existingInvalidFiles []string
-	expectedLockFiles    []string
-}
-
-// collectPurgeData collects existing files for purge operations
-func collectPurgeData(workflowsDir string, mdFiles []string, verbose bool) (*purgeTrackingData, error) {
-	return collectPurgeDataWithPatterns(workflowsDir, mdFiles, verbose, "*.lock.yml", "*.invalid.yml")
-}
-
-// collectPurgeDataWithPatterns is the testable implementation of collectPurgeData.
-// lockPattern and invalidPattern are appended to workflowsDir for the glob calls.
-func collectPurgeDataWithPatterns(workflowsDir string, mdFiles []string, verbose bool, lockPattern, invalidPattern string) (*purgeTrackingData, error) {
-	data := &purgeTrackingData{}
-
-	// Find all existing files
-	var err error
-	data.existingLockFiles, err = filepath.Glob(filepath.Join(workflowsDir, lockPattern))
-	if err != nil {
-		return nil, fmt.Errorf("failed to glob existing .lock.yml files in %s: %w", workflowsDir, err)
-	}
-	data.existingInvalidFiles, err = filepath.Glob(filepath.Join(workflowsDir, invalidPattern))
-	if err != nil {
-		return nil, fmt.Errorf("failed to glob existing .invalid.yml files in %s: %w", workflowsDir, err)
-	}
-
-	// Create expected files list
-	for _, mdFile := range mdFiles {
-		lockFile := stringutil.MarkdownToLockFile(mdFile)
-		data.expectedLockFiles = append(data.expectedLockFiles, lockFile)
-	}
-
-	if verbose {
-		if len(data.existingLockFiles) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d existing .lock.yml files", len(data.existingLockFiles))))
-		}
-		if len(data.existingInvalidFiles) > 0 {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessageStderr(fmt.Sprintf("Found %d existing .invalid.yml files", len(data.existingInvalidFiles))))
-		}
-	}
-
-	return data, nil
-}
-
-// runPurgeOperations runs all purge operations
-func runPurgeOperations(workflowsDir string, data *purgeTrackingData, verbose bool) {
-	// Errors from purge operations are logged but don't stop compilation
-	_ = purgeOrphanedLockFiles(workflowsDir, data.expectedLockFiles, verbose)
-	_ = purgeInvalidFiles(workflowsDir, verbose)
-}
-
-// runPostProcessing runs post-processing for specific files compilation
-func runPostProcessing(
-	ctx context.Context,
-	compiler *workflow.Compiler,
-	workflowDataList []*workflow.WorkflowData,
-	compiledLockFiles []string,
-	config CompileConfig,
-	successCount int,
-) error {
-	// Get action cache
-	actionCache := compiler.GetSharedActionCache()
-
-	// Update .gitattributes (errors are non-fatal)
-	_ = updateGitAttributes(successCount, actionCache, config.Verbose)
-
-	// Generate Dependabot manifests and reconcile compiler-managed ignore entries if requested.
-	if config.Dependabot && !config.NoEmit {
-		if gitRoot, err := gitutil.FindGitRoot(); err == nil {
-			absWorkflowDir := filepath.Join(gitRoot, config.WorkflowDir)
-			if err := generateDependabotManifestsWrapper(ctx, compiler, workflowDataList, absWorkflowDir, config.ForceOverwrite, config.Strict); err != nil {
-				if config.Strict {
-					return err
-				}
-			}
-			if err := compiler.ReconcileManagedDependabotIgnoresInRepo(gitRoot); err != nil {
-				if config.Strict {
-					return err
-				}
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to reconcile compiler-managed Dependabot ignore entries: %v", err)))
-			}
-		}
-	}
-
-	// Reconcile the implicit action-failure expiry marker so specific-file
-	// compiles agree with what a full directory compile would produce.
-	// Maintenance workflow generation itself is skipped for specific-file
-	// compiles because it requires parsing every workflow in the directory to
-	// check for expires fields; only reconcile when using the default
-	// workflow directory (custom --dir compiles and --no-emit compiles are
-	// left untouched).
-	if !config.NoEmit && config.usesDefaultWorkflowDir() && len(compiledLockFiles) > 0 {
-		if gitRoot, err := gitutil.FindGitRoot(); err == nil {
-			absWorkflowDir := getAbsoluteWorkflowDir(getWorkflowsDir(), gitRoot)
-			repoConfig, err := workflow.LoadRepoConfig(gitRoot)
-			if err != nil {
-				repoConfig = nil
-			}
-			workflow.DisableDefaultActionFailureExpiryMarkersIfUnenforced(compiledLockFiles, absWorkflowDir, repoConfig)
-		}
-	}
-
-	// Prune stale gh-aw-actions entries before saving
-	pruneStaleActionCacheEntries(compiler, actionCache)
-
-	// Save action cache (errors are logged but non-fatal)
-	_ = saveActionCache(actionCache, config.Verbose)
-
-	return nil
-}
-
-// runPostProcessingForDirectory runs post-processing for directory compilation
-func runPostProcessingForDirectory(
-	ctx context.Context,
-	compiler *workflow.Compiler,
-	workflowDataList []*workflow.WorkflowData,
-	config CompileConfig,
-	workflowsDir string,
-	gitRoot string,
-	successCount int,
-	errorCount int,
-) error {
-	// Get action cache
-	actionCache := compiler.GetSharedActionCache()
-
-	// Update .gitattributes (errors are non-fatal)
-	_ = updateGitAttributes(successCount, actionCache, config.Verbose)
-
-	// Generate Dependabot manifests if requested
-	if config.Dependabot && !config.NoEmit {
-		absWorkflowDir := getAbsoluteWorkflowDir(workflowsDir, gitRoot)
-		if err := generateDependabotManifestsWrapper(ctx, compiler, workflowDataList, absWorkflowDir, config.ForceOverwrite, config.Strict); err != nil {
-			if config.Strict {
-				return err
-			}
-		}
-	}
-
-	// Reconcile compiler-managed Dependabot ignore entries for compiler-emitted action refs.
-	if config.Dependabot && !config.NoEmit {
-		if err := compiler.ReconcileManagedDependabotIgnoresInRepo(gitRoot); err != nil {
-			if config.Strict {
-				return err
-			}
-			fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(fmt.Sprintf("Failed to reconcile compiler-managed Dependabot ignore entries: %v", err)))
-		}
-	}
-
-	// Generate maintenance workflow if needed.
-	// Skip maintenance workflow generation when using custom --dir option.
-	// Keep invoking generators for empty workflowDataList so stale generated files are cleaned up.
-	if !config.NoEmit && config.usesDefaultWorkflowDir() {
-		absWorkflowDir := getAbsoluteWorkflowDir(workflowsDir, gitRoot)
-		if err := generateMaintenanceWorkflowWrapper(ctx, compiler, workflowDataList, absWorkflowDir, gitRoot, config.Verbose, config.Strict, config.NoLogo); err != nil {
-			if config.Strict {
-				return err
-			}
-		}
-		if err := generateWorkQueueEventWorkflowWrapper(ctx, workflowDataList, absWorkflowDir, gitRoot, config.Strict, config.NoLogo); err != nil {
-			if config.Strict {
-				return err
-			}
-		}
-		if err := generateCentralSlashCommandWorkflowWrapper(ctx, workflowDataList, absWorkflowDir, gitRoot, config.Strict, config.NoLogo); err != nil {
-			if config.Strict {
-				return err
-			}
-		}
-	}
-
-	// Prune stale gh-aw-actions entries before saving
-	pruneStaleActionCacheEntries(compiler, actionCache)
-
-	// Prune orphaned entries — entries for action versions no longer referenced
-	// by any workflow in the directory (e.g. old pins left after a version bump).
-	// Safe to call only after a full-directory compilation with zero compile errors.
-	pruneOrphanedActionCacheEntries(compiler, actionCache, errorCount)
-
-	// Save action cache (errors are logged but non-fatal)
-	_ = saveActionCache(actionCache, config.Verbose)
-
-	return nil
-}
-
-// outputResults outputs compilation results in the requested format
-func outputResults(
-	stats *CompilationStats,
-	validationResults *[]ValidationResult,
-	config CompileConfig,
-) error {
-	if !config.DryRun && len(config.modelValidationWarnings) > 0 {
-		issues := modelInventoryWarnings(config)
-		*validationResults = append(*validationResults, ValidationResult{
-			Scope: "batch", Workflow: "models", Valid: true, Errors: []ValidationIssue{}, Warnings: issues,
-		})
-		stats.Warnings += len(issues)
-		if !config.JSONOutput {
-			for _, issue := range issues {
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessageStderr(issue.Message))
-			}
-		}
-	}
-	appendDryRunCompileReport(config, stats, validationResults)
-
-	// Collect and display stats if requested
-	if config.Stats && !config.NoEmit && !config.JSONOutput {
-		var statsList []*WorkflowStats
-		if len(config.MarkdownFiles) > 0 {
-			statsList = collectWorkflowStatisticsWrapper(config.MarkdownFiles)
-		}
-		displayStatsTable(statsList)
-		displayScheduleCalendar(statsList)
-	}
-
-	// Output JSON if requested
-	if config.JSONOutput {
-		jsonStr, err := formatValidationOutput(*validationResults)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintln(os.Stdout, jsonStr)
-	} else if !config.Stats {
-		// Print summary for text output (skip if stats mode)
-		printCompilationSummary(stats, config.ShowAllErrors)
-	}
-
-	// Display actionlint summary if enabled
-	if config.Actionlint && !config.NoEmit && !config.JSONOutput {
-		displayActionlintSummary()
-	}
-
-	return nil
+	return developmentErr
 }

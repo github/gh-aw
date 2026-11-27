@@ -1,7 +1,7 @@
 export const invariants = [
   "TypeOK",
   "ImmutableMembership",
-  "HomogeneousBatch",
+  "SingleClaimDispatch",
   "PolicyRequired",
   "BranchProvisioning",
   "ScopedIntents",
@@ -15,7 +15,6 @@ export const invariants = [
 
 const defaults = {
   Worker: "monster",
-  Batch: true,
   Installed: true,
   NoWrites: false,
   OutputMin: 1,
@@ -44,15 +43,15 @@ const witness = (name, overrides = {}) => ({
 });
 
 export const cases = [
-  safety("monster-batch"),
-  safety("miner-singleton", { Worker: "miner", Batch: false, OutputMax: 1 }),
-  safety("refiner-batch", { Worker: "refiner" }),
+  safety("monster"),
+  safety("miner", { Worker: "miner", OutputMax: 1 }),
+  safety("refiner", { Worker: "refiner" }),
   safety("mixed-profiles", { Worker: "mixed" }),
   safety("no-policy", { Installed: false }),
   safety("no-write", { NoWrites: true, OutputMin: 0 }),
   negative("scope", "ScopedIntents"),
   negative("membership", "ImmutableMembership"),
-  negative("mixed", "HomogeneousBatch", { Worker: "mixed" }),
+  negative("group", "SingleClaimDispatch"),
   negative("policy", "PolicyRequired", { Installed: false }),
   negative("completion", "EffectRequiresCompletion"),
   negative("result", "ResultRequiresReadback"),
@@ -61,8 +60,8 @@ export const cases = [
   negative("dag", "NoAutomaticDAG"),
   witness("warning-clean"),
   witness("completion-only"),
-  witness("six-outputs"),
-  witness("quality-not-gate", { Worker: "miner", Batch: false, OutputMax: 1 }),
+  witness("three-outputs"),
+  witness("quality-not-gate", { Worker: "miner", OutputMax: 1 }),
   witness("tool-failure"),
   witness("result", { Worker: "refiner" }),
   witness("no-write", { NoWrites: true, OutputMin: 0 }),

@@ -1,120 +1,134 @@
 // @ts-check
 import { describe, expect, it, vi } from "vitest";
-import { dependencyKey, isFreshObservation, predicate, resolveDependencies, resolveExternalEdges } from "./work_queue_dependency_resolver.cjs";
-import { gateKey } from "./work_queue_graph.cjs";
+import { allowedScope, approvalPredicate, dependencyKey, predicate, resolveDependencies, resolveExternalEdges } from "./work_queue_dependency_resolver.cjs";
 
-const resource = { kind: "issue", host: "github.com", repository: "foreign/design", number: "7", condition: "completed", repository_id: "20", resource_id: "30" };
-const scope = { host: "github.com", repository: "foreign/design", access_generation: "g1" };
-function setup(data = { id: 30, number: 7, state: "closed", state_reason: "completed", updated_at: "2026-10-05T00:00:00Z" }) {
-  const client = { rest: { repos: { get: vi.fn().mockResolvedValue({ data: { id: 20, full_name: "foreign/design" } }) }, issues: { get: vi.fn().mockResolvedValue({ data }) }, pulls: { get: vi.fn().mockResolvedValue({ data }) } } };
-  return { client, scopes: [scope], getClient: vi.fn().mockResolvedValue(client), now: 1000 };
+const scopes = [{ host: "github.com", repository: "owner/repo" }];
+const issue = { kind: "issue", host: "github.com", repository: "owner/repo", number: "5", condition: "completed" };
+
+function client({ repository = { full_name: "owner/repo", id: 1 }, data = { id: 55, number: 5, state: "closed", state_reason: "completed" } } = {}) {
+  return {
+    rest: {
+      repos: { get: vi.fn(async () => ({ status: 200, data: repository })) },
+      issues: { get: vi.fn(async () => ({ status: 200, data })) },
+      pulls: { get: vi.fn(async () => ({ status: 200, data })) },
+    },
+  };
 }
 
-describe("typed trusted external dependency observations", () => {
-  it("deduplicates resource reads including distinct predicates and does not return write authority", async () => {
-    const options = setup();
-    const result = await resolveDependencies([resource, resource, { ...resource, condition: "closed" }], options);
-    expect(result.reads).toBe(2);
-    expect(result.observations).toHaveLength(2);
-    expect(result.observations[0]).toMatchObject({ state: "ready", access_generation: "g1", observed_at: 1000, resource });
-    expect(result.observations[0]).not.toHaveProperty("dispatch");
-    expect(options.client.rest.issues.get).toHaveBeenCalledTimes(1);
-    expect(options.client.rest.issues.get.mock.calls[0][0].request).toEqual({ retries: 0, timeout: 15000 });
+describe("external dependency resolver", () => {
+  it("maps Issue and pull request reads to v4 Observation fields", () => {
+    expect(predicate(issue, { state: "closed", state_reason: "completed" })).toEqual({ state: "ready", state_reason: "completed" });
+    expect(predicate(issue, { state: "closed", state_reason: "not_planned" })).toEqual({ state: "failed", state_reason: "not_planned" });
+    expect(predicate(issue, { state: "open" })).toEqual({ state: "waiting", state_reason: "reopened" });
+    expect(predicate({ ...issue, condition: "closed" }, { state: "closed", state_reason: null })).toEqual({ state: "ready" });
+    const pull = { ...issue, kind: "pull_request", condition: "merged" };
+    expect(predicate(pull, { merged: true, merge_commit_sha: "a".repeat(40) })).toEqual({ state: "ready", merged: true, merge_commit: "a".repeat(40) });
+    expect(predicate(pull, { merged: true, merge_commit_sha: null })).toEqual({ state: "unknown", merged: true });
+    expect(predicate(pull, { merged: false, state: "closed" })).toEqual({ state: "failed", merged: false });
+    expect(() => predicate(issue, { state: "closed", pull_request: {} })).toThrow(/type_mismatch/);
   });
 
-  it("rejects foreign access without an explicit credential-bound allowlist", async () => {
-    const options = setup();
-    await expect(resolveDependencies([resource], { ...options, scopes: [] })).rejects.toThrow("external_not_allowlisted");
-    expect(options.getClient).not.toHaveBeenCalled();
-    expect((await resolveDependencies([resource], { ...options, getClient: async () => null })).observations[0]).toMatchObject({ state: "unknown", read_status: "external_read_credentials_missing" });
+  it("resolves identities and a ready Observation within the allowed scopes", async () => {
+    const reader = client();
+    const { results, reads } = await resolveDependencies([issue], { scopes, getClient: async () => reader });
+    const result = results.get(dependencyKey(issue));
+    const binding = { kind: "issue", host: "github.com", repository: "owner/repo", repository_id: "1", resource_id: "55", number: "5" };
+    expect(result.binding).toEqual(binding);
+    expect(result.observation).toEqual({ kind: "Observation", observation_id: expect.stringMatching(/^observation:[a-f0-9]{64}$/), resource: binding, condition: "completed", state: "ready", state_reason: "completed" });
+    expect(reads).toBe(2);
+    expect(await resolveExternalEdges([{ kind: "issue", resource: binding, condition: "completed" }], { scopes, getClient: async () => reader })).toEqual([result.observation]);
   });
 
-  it("deduplicates approved renamed coordinates by immutable IDs while preserving admission bindings", async () => {
-    const options = setup();
-    const renamed = { ...resource, repository: "foreign/renamed" };
-    const renamedScope = { ...scope, repository: renamed.repository };
-    options.scopes.push(renamedScope);
-    options.client.rest.repos.get.mockResolvedValue({ data: { id: 20, full_name: renamed.repository } });
-    const result = await resolveDependencies([resource, renamed], options);
-    expect(result.reads).toBe(2);
-    expect(result.observations).toHaveLength(1);
-    expect(result.bindings.get(dependencyKey(resource))).toMatchObject(renamed);
-    expect(isFreshObservation(result.observations[0], resource, scope, options.now, 1000)).toBe(true);
-    expect(dependencyKey({ ...resource, resource_id: "31" })).not.toBe(dependencyKey(resource));
-    expect(dependencyKey({ ...resource, resource_id: undefined })).not.toBe(dependencyKey({ ...resource, resource_id: undefined, repository_id: "21" }));
-    await expect(resolveDependencies([{ ...resource, number: "8" }, renamed], options)).rejects.toThrow("external_identity_mismatch");
-    expect((await resolveDependencies([{ ...resource, resource_id: "31" }, renamed], options)).observations.map(observation => observation.state)).toEqual(["failed", "ready"]);
+  it("reports unreadable or mismatched references without throwing", async () => {
+    const failing = { rest: { repos: { get: async () => Promise.reject(Object.assign(new Error("Not Found"), { status: 404 })) } } };
+    const missing = await resolveDependencies([issue], { scopes, getClient: async () => failing });
+    expect(missing.results.get(dependencyKey(issue))).toEqual({ resource: issue, error: "external_not_found" });
+    const foreign = await resolveDependencies([{ ...issue, repository: "other/repo" }], { scopes, getClient: async () => client() });
+    expect([...foreign.results.values()][0].error).toBe("external_not_allowlisted");
+    const mismatch = await resolveDependencies([{ ...issue, resource_id: "9" }], { scopes, getClient: async () => client() });
+    expect([...mismatch.results.values()][0].error).toBe("external_identity_mismatch");
+    expect(await resolveExternalEdges([{ kind: "issue", resource: { ...issue, repository_id: "1", resource_id: "55" }, condition: "completed" }], { scopes, getClient: async () => failing })).toEqual([]);
   });
 
-  it("uses shared stable gate identities without granting access through unapproved display aliases", async () => {
-    expect(dependencyKey(resource)).toBe(gateKey(resource, resource.condition));
-    expect(dependencyKey({ ...resource, repository: "foreign/renamed", number: "99" })).toBe(gateKey(resource, resource.condition));
-    expect(dependencyKey({ ...resource, condition: "closed" })).not.toBe(dependencyKey(resource));
-    const options = setup();
-    await expect(resolveDependencies([resource, { ...resource, repository: "unauthorized/alias" }], options)).rejects.toThrow("external_not_allowlisted");
-    expect(options.getClient).not.toHaveBeenCalled();
+  it("validates reference shape and scope", () => {
+    expect(allowedScope(issue, scopes)).toBe(scopes[0]);
+    expect(() => allowedScope({ ...issue, condition: "merged" }, scopes)).toThrow(/condition/);
+    expect(() => allowedScope({ ...issue, number: "0" }, scopes)).toThrow();
+    expect(() => allowedScope({ ...issue, repository: "other/repo" }, scopes)).toThrow(/not_allowlisted/);
+  });
+});
+
+describe("continuation approval gate", () => {
+  const approved = { ...issue, condition: "approved" };
+  const writer = { login: "octo-writer", id: 4242, type: "User" };
+  const closedBy = (closer, extra = {}) => ({ id: 55, number: 5, state: "closed", state_reason: "completed", closed_by: closer, ...extra });
+  const permission = (level, user = writer, extra = {}) => vi.fn(async () => ({ status: 200, data: { permission: level, user: { login: user.login, id: user.id }, ...extra } }));
+  const approvalClient = (data, lookup = permission("write")) => {
+    const reader = client({ data });
+    reader.rest.repos.getCollaboratorPermissionLevel = lookup;
+    return reader;
+  };
+
+  it.each([
+    ["open", { state: "open" }, { state: "waiting", state_reason: "reopened" }],
+    ["closed as not planned", { state: "closed", state_reason: "not_planned", closed_by: writer }, { state: "failed", state_reason: "not_planned" }],
+    ["an unrecognized close reason", { state: "closed", state_reason: "duplicate", closed_by: writer }, { state: "unknown" }],
+    ["no closer", { state: "closed", state_reason: "completed" }, { state: "unknown" }],
+    ["a bot closer", closedBy({ login: "app[bot]", id: 9, type: "Bot" }), { state: "failed", state_reason: "completed" }],
+    ["a malformed closer ID", closedBy({ ...writer, id: 0 }), { state: "unknown" }],
+  ])("does not approve %s without a permission read", async (_name, data, expected) => {
+    const lookup = vi.fn();
+    expect(await approvalPredicate(data, lookup)).toEqual(expected);
+    expect(lookup).not.toHaveBeenCalled();
   });
 
-  it("checks immutable resource and repository IDs, API type and transfer destinations", async () => {
+  it.each(["write", "maintain", "admin"])("approves a %s User close as completed with the closer's account ID", async level => {
+    const lookup = vi.fn(async () => ({ permission: level === "maintain" ? "write" : level, role_name: level, user: { login: "Octo-Writer", id: 4242 } }));
+    expect(await approvalPredicate(closedBy(writer), lookup)).toEqual({ state: "ready", state_reason: "completed", approved_by: "4242" });
+    expect(lookup).toHaveBeenCalledWith("octo-writer");
+  });
+
+  it("fails read/triage closers and custom roles without a writer base role", async () => {
     for (const data of [
-      { id: 31, number: 7 },
-      { id: 30, number: 8 },
-      { id: 30, number: 7, pull_request: {} },
+      { permission: "read", role_name: "triage" },
+      { permission: "read", role_name: "read" },
+      { permission: "admin", role_name: "Security Champions" },
     ]) {
-      expect((await resolveDependencies([resource], setup(data))).observations[0].state).toBe("failed");
-    }
-    const options = setup();
-    options.client.rest.repos.get.mockResolvedValue({ data: { id: 20, full_name: "unauthorized/design" } });
-    expect((await resolveDependencies([resource], options)).observations[0]).toMatchObject({ state: "failed", read_status: "external_redirect_not_allowlisted" });
-    options.scopes.push({ ...scope, repository: "unauthorized/design", access_generation: "g2" });
-    expect((await resolveDependencies([resource], options)).observations[0]).toMatchObject({ state: "failed", read_status: "external_redirect_not_allowlisted" });
-    options.client.rest.repos.get.mockResolvedValue({ status: 403, data: { id: 20, full_name: resource.repository } });
-    expect((await resolveDependencies([resource], options)).observations[0]).toMatchObject({ state: "unknown", read_status: "external_access_denied" });
-  });
-
-  it("requires completed Issue reasons and actual PR merge provenance", () => {
-    expect(predicate(resource, { state: "closed", state_reason: "not_planned" }).state).toBe("failed");
-    expect(predicate(resource, { state: "closed" }).state).toBe("unknown");
-    expect(predicate(resource, { state: "open" })).toEqual({ state: "waiting", read_status: "external_reopened" });
-    const pr = { ...resource, kind: "pull_request", condition: "merged" };
-    expect(predicate(pr, { state: "closed", merged: false }).state).toBe("failed");
-    expect(predicate(pr, { state: "closed", merged: true }).state).toBe("unknown");
-    expect(predicate(pr, { merged: true, merged_at: "2026-10-05T00:00:00Z", merge_commit_sha: "a".repeat(40) }).state).toBe("ready");
-    expect(predicate(pr, { merged: true, merged_at: "2026-10-05T00:00:00Z", merge_commit_sha: "a".repeat(64) }).state).toBe("ready");
-    expect(predicate(pr, { merged: true, merged_at: "invalid", merge_commit_sha: "a".repeat(40) }).state).toBe("unknown");
-  });
-
-  it("uses pulls API for Pull Requests rather than Issues compatibility data", async () => {
-    const options = setup({ id: 30, number: 7, state: "closed", merged: true, merged_at: "2026-10-05T00:00:00Z", merge_commit_sha: "a".repeat(40), base: { repo: { id: 20 } } });
-    expect((await resolveDependencies([{ ...resource, kind: "pull_request", condition: "merged" }], options)).observations[0].state).toBe("ready");
-    expect(options.client.rest.pulls.get).toHaveBeenCalledTimes(1);
-    expect(options.client.rest.issues.get).not.toHaveBeenCalled();
-  });
-
-  it("records explicit unknown for denied/missing/unavailable reads, never success", async () => {
-    for (const status of [401, 403, 404, 429, 500]) {
-      const options = setup();
-      options.client.rest.issues.get.mockRejectedValue(Object.assign(new Error("private details must not be retained"), { status }));
-      const observation = (await resolveDependencies([resource], options)).observations[0];
-      expect(observation.state).toBe("unknown");
-      expect(JSON.stringify(observation)).not.toContain("private details");
+      expect(await approvalPredicate(closedBy(writer), async () => ({ ...data, user: { login: writer.login, id: writer.id } }))).toEqual({ state: "failed", state_reason: "completed" });
     }
   });
 
-  it("bounds reads and requires fresh current-generation observations", async () => {
-    expect((await resolveDependencies([resource], { ...setup(), maxReads: 1 })).observations[0]).toMatchObject({ state: "unknown", read_status: "external_read_budget_exhausted" });
-    const observation = { resource, state: "ready", observed_at: 900, access_generation: "g1" };
-    expect(isFreshObservation(observation, resource, scope, 1000, 100)).toBe(true);
-    expect(isFreshObservation(observation, resource, scope, 1001, 100)).toBe(false);
-    expect(isFreshObservation(observation, resource, { ...scope, access_generation: "g2" }, 1000, 100)).toBe(false);
-    expect(isFreshObservation({ ...observation, invalidated: true }, resource, scope, 1000, 100)).toBe(false);
+  it("leaves an indeterminate permission read unknown", async () => {
+    const denied = async () => Promise.reject(Object.assign(new Error("Forbidden"), { status: 403 }));
+    expect(await approvalPredicate(closedBy(writer), denied)).toEqual({ state: "unknown" });
+    expect(await approvalPredicate(closedBy(writer), async () => ({ permission: "write", user: { login: "someone-else", id: 4242 } }))).toEqual({ state: "unknown" });
+    expect(await approvalPredicate(closedBy(writer), async () => ({ permission: "write" }))).toEqual({ state: "unknown" });
   });
 
-  it("builds bounded durable canonical Observation operations rather than an authority sidecar", async () => {
-    const { condition, ...identity } = resource;
-    const result = await resolveExternalEdges([{ kind: "issue", resource: identity, condition }], setup());
-    expect(result.operations[0]).toMatchObject({ kind: "Observation", observation_id: expect.stringMatching(/^observation:[a-f0-9]{64}$/), resource: identity, condition, credential_generation: "g1", state: "ready" });
-    expect(result.operations[0].resource).not.toHaveProperty("condition");
-    expect(result.operations[0]).not.toHaveProperty("access_generation");
+  it("records approved_by and counts the permission read in the read budget", async () => {
+    const lookup = permission("write");
+    const reader = approvalClient(closedBy(writer), lookup);
+    const { results, reads } = await resolveDependencies([approved], { scopes, getClient: async () => reader });
+    expect(reads).toBe(3);
+    expect(lookup.mock.calls[0][0]).toMatchObject({ owner: "owner", repo: "repo", username: "octo-writer" });
+    expect(results.get(dependencyKey(approved)).observation).toMatchObject({ condition: "approved", state: "ready", state_reason: "completed", approved_by: "4242" });
+    const exhausted = await resolveDependencies([approved], { scopes, getClient: async () => approvalClient(closedBy(writer)), maxReads: 2 });
+    expect([...exhausted.results.values()][0]).toMatchObject({ error: "external_read_budget_exhausted" });
+  });
+
+  it("keeps ordinary completed gates on their original predicate without a collaborator lookup", async () => {
+    const lookup = permission("write");
+    const reader = approvalClient(closedBy({ login: "app[bot]", id: 9, type: "Bot" }), lookup);
+    const { results, reads } = await resolveDependencies([issue], { scopes, getClient: async () => reader });
+    expect(results.get(dependencyKey(issue)).observation).toMatchObject({ condition: "completed", state: "ready" });
+    expect(reads).toBe(2);
+    expect(lookup).not.toHaveBeenCalled();
+    expect(dependencyKey(issue)).not.toBe(dependencyKey(approved));
+  });
+
+  it("never approves a pull request or a mismatched Issue identity", async () => {
+    await expect(approvalPredicate(closedBy(writer, { pull_request: {} }), permission("write"))).rejects.toThrow(/type_mismatch/);
+    const wrong = await resolveDependencies([{ ...approved, repository_id: "1", resource_id: "56" }], { scopes, getClient: async () => approvalClient(closedBy(writer)) });
+    expect([...wrong.results.values()][0]).toEqual(expect.objectContaining({ error: "external_identity_mismatch" }));
   });
 });

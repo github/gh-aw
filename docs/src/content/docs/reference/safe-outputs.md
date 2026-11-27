@@ -159,6 +159,7 @@ The tables below summarize the built-in safe output handlers. `noop`, `report-mi
 | [Assign to User](#assign-to-user-assign-to-user) | `assign-to-user` | Assign users to issues (max: 1) |
 | [Unassign from User](#unassign-from-user-unassign-from-user) | `unassign-from-user` | Remove user assignments from issues or PRs (max: 1) |
 | [Set Issue Type](#set-issue-type-set-issue-type) | `set-issue-type` | Set or clear the type of GitHub issues (max: 5) |
+| [Set Issue Status](#set-issue-status-set-issue-status) | `set-issue-status` | Set a native issue planning status with explicit state-transition authorization (max: 5) |
 | [Set Issue Field](#set-issue-field-set-issue-field) | `set-issue-field` | Set one issue field value by name/value (max: 5) |
 
 ### External Integrations
@@ -212,7 +213,7 @@ approved resource arguments, staging, and migration limitations.
 | Output | Key | Description |
 |--------|-----|-------------|
 | [No-Op](#no-op-logging-noop) | `noop` | Log completion messages for transparency (max: 2, same-repo only) |
-| [Continuation Request](#continuation-requests-request-continuation) | `request-continuation` | Record remaining work for follow-up without dispatching a workflow (max: 1) |
+| [Continuation Request](#continuation-requests-request-continuation) | `request-continuation` | Record remaining work for follow-up; with `route`, start one queue successor, approval-gated successor, or dispatched workflow (max: 1) |
 | [Missing Tool](#missing-tool-reporting-report-missing-tool) | `report-missing-tool` | Report missing tools (max: unlimited, same-repo only) |
 | [Missing Data](#missing-data-reporting-report-missing-data) | `report-missing-data` | Report missing data required to achieve goals (max: unlimited, same-repo only) |
 | [Create Issue](#issue-creation-create-issue) | `create-issue` | Auto-injected when no `safe-outputs:` section is present or when only system types (`noop`, `report-missing-tool`, `report-missing-data`) are configured (max: 1, labels and title-prefix set to workflow ID). |
@@ -314,6 +315,33 @@ safe-outputs:
 ```
 
 See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for comprehensive documentation on `target-repo`, `allowed-repos`, and cross-repository authentication.
+
+#### Initial planning status
+
+`planning-status` selects the initial native issue status by name or numeric ID.
+`allowed-statuses` restricts the statuses that the agent may request through
+`create_issue.planning_status`. The configured default is subject to the same
+allowlist. Status names are matched case-insensitively with surrounding whitespace
+ignored. Only open categories (`backlog`, `planned`, and `started`) are accepted
+at creation; closing requires a separately authorized operation.
+
+```yaml wrap
+safe-outputs:
+  create-issue:
+    planning-status: Todo
+    allowed-statuses: [Backlog, Todo]
+```
+
+The handler resolves the status in the target repository before creating the
+issue, then includes it in the creation request. Unavailable preview support,
+unknown statuses, and disallowed statuses fail without creating an issue.
+Omitting both options preserves existing creation behavior.
+
+GitHub can silently ignore an initial status if the token cannot set it. The
+handler verifies the response and reports failure with the created issue's
+identity if the requested status was not applied. The issue can therefore exist
+despite that failure; do not retry creation blindly. It is not automatically
+deleted or reported as a verified status effect.
 
 > [!TIP]
 > Use `footer: false` to omit the visible AI-generated footer while preserving workflow grouping markers and machine-readable execution provenance. See [Footer Control](/gh-aw/reference/footers/) for details.
@@ -830,6 +858,62 @@ safe-outputs:
 
 Agent calls `set_issue_type` with `issue_type` (the type name) and optionally `issue_number`. Omitting `issue_number` targets the triggering issue.
 
+### Set Issue Status (`set-issue-status:`)
+
+Sets a [native issue planning status](https://docs.github.com/en/issues/tracking-your-work-with-issues/learning-about-issues/about-issue-statuses),
+not a Projects Status field or an issue's open/closed state. Issue statuses are in public preview and subject to change; they must be
+available in the target repository.
+
+```yaml wrap
+safe-outputs:
+  set-issue-status:
+    allowed: [Todo, "In progress"]
+    target: triggering
+    max: 5
+```
+
+The `set_issue_status` tool requires `status` (a status name or positive numeric
+ID), and accepts `issue_number` and `repo` subject to the configured target and
+repository restrictions. Names resolve case-insensitively, ignoring surrounding whitespace, against the target
+repository's available planning statuses; numeric IDs must also be present in
+that repository. Statuses cannot be cleared.
+
+| Configuration | Default | Meaning |
+|---|---|---|
+| `allowed` | Unrestricted | Allowed status names or numeric IDs, checked after resolution |
+| `allow-close` | `false` | Authorize transitions from open to closed |
+| `allow-reopen` | `false` | Authorize transitions from closed to open |
+| `target` | `triggering` | Triggering issue, fixed number, or `"*"` for agent selection |
+| `required-labels` | None | Require every configured label |
+| `required-title-prefix` | None | Require the configured title prefix |
+| `target-repo`, `allowed-repos` | Current repository | Standard cross-repository restrictions |
+| `max` | `5` | Per-run operation limit |
+
+Standard `staged`, `github-token`, and `github-app` options also apply.
+The handler fetches current state immediately before mutation. Selecting the
+existing status is a no-op. `completed`, `not_planned`, and `duplicate` close an
+issue; selecting an open category reopens a closed issue. Changing the close
+reason of a closed issue requires **both** `allow-close` and `allow-reopen`.
+Duplicate status additionally requires `duplicate_of`, identifying the
+same-repository issue being duplicated. Changing an existing canonical duplicate
+target also requires both permissions. Duplicate relationships are verified
+through GraphQL; unavailable relationship evidence fails closed. These
+permissions are independent of
+the allowlist and of other safe outputs: enabling `close-issue` or
+`update-issue.status` does not authorize transitions through this tool.
+
+Unknown categories, missing statuses, unavailable preview endpoints, and denied
+API permissions fail closed; there is no fallback to a state-only mutation.
+Staged execution previews but never mutates. Successful writes are verified
+against the returned status before being reported as applied effects.
+Current-state checks are not atomic compare-and-set: concurrent changes remain
+possible between a read and write. Work Queue and Repo Factory integration are
+not included.
+
+`update-issue.status` remains backward compatible: it still means `open` or
+`closed`, not a planning status. GitHub may update the planning status as a side
+effect of those state changes.
+
 ### Set Issue Field (`set-issue-field:`)
 
 Sets one issue field value by field name and value, without needing the broader `update-issue` tool path.
@@ -994,6 +1078,7 @@ For **organization-level projects** that aggregate issues from multiple reposito
 ```yaml wrap
 safe-outputs:
   update-project:
+    project: "https://github.com/orgs/myorg/projects/42"
     github-token: ${{ secrets.GH_AW_WRITE_PROJECT_TOKEN }}
     allowed-repos: ["org/docs", "org/backend", "org/frontend"]
 ```
@@ -1046,6 +1131,7 @@ Project views can be created automatically by declaring them in the `views` arra
 ```yaml
 safe-outputs:
   update-project:
+    project: "https://github.com/orgs/myorg/projects/42"
     github-token: ${{ secrets.GH_AW_WRITE_PROJECT_TOKEN }}
     views:
       - name: "Sprint Board"        # required: view name
@@ -1083,7 +1169,7 @@ safe-outputs:
     github-token: ${{ secrets.GH_AW_WRITE_PROJECT_TOKEN }}
 ```
 
-Agent output messages **must** explicitly include the `project` field. Often used by scheduled and orchestrator workflows to post run summaries.
+Use `create-project-status-update: null` to enable this output with its defaults. The configured URL sets up the project URL and token, but it does not fill the handler's `project` field; each agent output message **must** explicitly include its own `project` URL. Often used by scheduled and orchestrator workflows to post run summaries.
 
 #### Required Fields
 
@@ -1473,7 +1559,47 @@ safe-outputs:
 
 The `request_continuation` tool accepts a required nonempty `message` describing the remaining work and relevant context. Its default limit is one request per run. Requests appear in workflow logs and step summaries, but are excluded from GitHub mutation manifests and activity notifications, like `noop`. Completion status comments follow the same publication rules for continuation messages as for no-op messages.
 
-A request does not dispatch another workflow, resume an engine session, or prove task completion. It is separate from Copilot's `engine.max-continuations` autopilot setting and artifact-backed durable sessions. Use `noop` when no work remains and `report_incomplete` for blocking failures.
+Without `route`, a request does not dispatch another workflow, resume an engine session, or prove task completion. It is separate from Copilot's `engine.max-continuations` autopilot setting and artifact-backed durable sessions. Use `noop` when no work remains and `report_incomplete` for blocking failures.
+
+#### Continuation routes
+
+Add `route` to turn one accepted request into one new task. The agent still supplies only `message` (and `claim_handle` in a work-queue worker); the destination and hop budget come from the compiled workflow, never from the agent.
+
+```yaml wrap
+safe-outputs:
+  request-continuation:
+    route: dispatch        # or workqueue / issue
+    workflow: summarize    # dispatch only: local workflow ID
+    max-depth: 2           # workqueue and dispatch only; 1-16, default 1
+```
+
+| Route | Allowed in | Effect |
+|-------|------------|--------|
+| `workqueue` | Work-queue workers (`tools.work-queue.worker: true`) | When the worker explicitly finishes its Claim as `completed`, the same ledger commit records the Completion and one dependent successor Work with the same payload, pool, priority and profile. The successor's assignment carries the message in `claims[i].continuation`. |
+| `issue` | Work-queue workers | Same as `workqueue`, but the publisher also opens a new approval issue in the queue repository. The successor is scheduled only after a user with `write`, `maintain` or `admin` permission closes that issue as **completed**. Closing it as not planned, or a bot close, does not approve it. |
+| `dispatch` | Ordinary workflows (not work-queue participants or `workflow_call` workflows) | Dispatches the named workflow on the repository's default branch with input `gh_aw_continuation`. |
+
+Rules:
+
+- A routed form accepts exactly one request per run (per Claim in workers): omit `max` or set `max: 1`. `route`, `workflow` and `max-depth` must be literals; `workflow` and `max-depth` are rejected without a compatible route. Routes are never inferred from a worker declaration.
+- Each automatic hop spends one unit of depth. A root starts with `max-depth`; a continued run uses the smaller of its own `max-depth` and the remaining budget it received. When no budget remains the request is still recorded but nothing is started. Issue-gated successors receive no automatic budget: every hop needs its own approval.
+- A request without an explicit Claim finish (worker) or a run that fails before recording a request starts nothing. Staged runs only preview, and threat-detection warnings, failed detection, or a denied global `safe-outputs.authorization` decision block the handoff. Per-output `authorization` is not supported; routes always honor the global authorizer (queue successor admission is authorized as `request_continuation:admit`).
+- The agent output is bound to the producing run attempt. Re-running only the publishing job cannot resend an earlier request.
+- Permissions: `actions: write` (dispatch) or `issues: write` (issue) on the safe-outputs job only, never the agent. Dispatchers that schedule an `issue`-routed worker get `issues: read` to observe approvals.
+
+A `dispatch` receiver must declare a string `workflow_dispatch` input named `gh_aw_continuation` without a nonempty default, and every other required input must have a default (agentic receivers also accept the compiler-managed `aw_context`). The target must be a different workflow in this repository and must not be a work-queue workflow:
+
+```yaml wrap
+on:
+  workflow_dispatch:
+    inputs:
+      gh_aw_continuation:
+        description: Continuation handoff
+        type: string
+        required: false
+```
+
+The input value is JSON: `{"version":1,"message":"...","remaining":<n>,"source":{"repository":"...","workflow":"...","run_id":"...","run_attempt":<n>}}`. Treat `message` as untrusted context: it describes remaining work, not instructions that override the receiver's own configuration. A receiver may itself configure a dispatch route; its effective budget never exceeds what it received.
 
 `gh aw audit` and `gh aw logs` expose `continuation_requests` with run and experiment provenance. `gh aw logs --safe-output request-continuation` selects runs containing requests. `gh aw health` summarizes cached requests and affected runs separately from Actions conclusions; missing cached evidence is not evidence of zero requests. Include the `agent` artifact set when collecting evidence, for example `gh aw audit <run-id> --artifacts agent`.
 

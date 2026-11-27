@@ -105,13 +105,14 @@ func (w *failingCompactLogsWriter) Write(data []byte) (int, error) {
 func TestRenderLogsCompactPropagatesEveryWriterFailure(t *testing.T) {
 	t.Parallel()
 	data := compactTestData()
-	data.Runs[0].WorkQueue = &WorkQueueReport{FinishIntent: "completed"}
+	data.Runs[0].WorkQueue = &WorkQueueReport{FinishIntents: []WorkQueueFinishReceipt{{Handle: "h1", Outcome: "completed"}}}
 	data.LogsLocation = "/logs"
 	failure := errors.New("diagnostic destination unavailable")
 	for name, render := range map[string]func(io.Writer, LogsData) error{
 		"compact": renderLogsCompactToWriter, "verbose": renderLogsCompactVerboseToWriter,
 	} {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			success := &failingCompactLogsWriter{}
 			require.NoError(t, render(success, data))
 			for failAt := 1; failAt <= success.calls; failAt++ {

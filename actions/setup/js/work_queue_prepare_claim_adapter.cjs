@@ -15,8 +15,10 @@ async function prepareAdapterContext(options) {
   const adapter = validateAdapter(options.adapter);
   const index = Number(options.index);
   if (!Number.isSafeInteger(index) || index < 0 || index > 15) throw new Error(ERR_VALIDATION + ": Claim adapter slot must be within the original bounded assignment");
-  const member = assignment.claims[index];
-  if (!member) return { active: false };
+  // An assignment has one member, prepared by slot zero. Slots 1–15 exist only in
+  // older compiled workflows and stay inactive; they are never redirected to slot zero.
+  const member = assignment.claims[0];
+  if (index !== 0 || !member) return { active: false };
   return withClaimExecution({ assignment, claim_handle: member.handle, authorize: options.authorize }, async () => {
     const messages = [];
     for (const input of options.messages || []) {
@@ -25,7 +27,7 @@ async function prepareAdapterContext(options) {
         if (message.type === options.type && message.claim_handle === member.handle) messages.push(message);
       } catch {
         // Invalid messages remain errors at authoritative ingestion. They never
-        // become executable custom input or prevent valid sibling preparation.
+        // become executable custom input or prevent valid preparation.
       }
     }
     if (!messages.length) return { active: false, claim_handle: member.handle };

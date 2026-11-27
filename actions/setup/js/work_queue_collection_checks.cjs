@@ -5,8 +5,6 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { main, MAX_BYTES, MAX_LINES } = require("./collect_work_queue_intents.cjs");
-const { readClaimControlMessages } = require("./work_queue_control_delivery.cjs");
-const { verifyClaimDelivery } = require("./work_queue_delivery.cjs");
 
 function fixture(callback) {
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-work-queue-collection-"));
@@ -119,55 +117,6 @@ function registerTests({ describe, it }) {
         );
         assert.equal(fs.readFileSync(protectedPath, "utf8"), "untouched");
       });
-    });
-
-    it("accounts for per-Claim staged controls instead of falsely proving a no-write Result", async () => {
-      /** @type {string | undefined} */
-      let directory;
-      /** @type {ReturnType<typeof readClaimControlMessages> | undefined} */
-      let control;
-      fixture(options => {
-        directory = options.root;
-        const assignment = {
-          version: 3,
-          dispatch_id: "d",
-          request_id: "r",
-          commit_id: "c",
-          policy_epoch: "p",
-          pool: "default",
-          worker_profile: "default",
-          claims: ["h1", "h2"].map(handle => ({ handle, claim_id: `c:${handle}`, work_id: `w:${handle}`, work: { kind: "data" }, result_refs: [] })),
-        };
-        const filename = path.join(options.sourceDir, "work-queue.intents.jsonl");
-        fs.writeFileSync(
-          filename,
-          [
-            '{"version":3,"intent_id":"valid","kind":"submit","parameters":{"nodes":[]},"claim_handle":"h1"}',
-            '{"version":3,"intent_id":"invalid","kind":"submit","parameters":{},"claim_handle":null}',
-            '{"version":3,"intent_id":"missing","kind":"dispatch_next","parameters":{}}',
-          ].join("\n")
-        );
-        control = readClaimControlMessages(assignment, filename);
-        assert.equal(control.messages.length, 1);
-        assert.equal(control.messages[0].claim_handle, "h1");
-        assert.equal(control.errors.length, 2);
-      });
-      assert.ok(directory);
-      assert.ok(control);
-      assert.equal(fs.existsSync(directory), false);
-      const assignment = {
-        version: 3,
-        dispatch_id: "d",
-        request_id: "r",
-        commit_id: "c",
-        policy_epoch: "p",
-        pool: "default",
-        worker_profile: "default",
-        claims: ["h1", "h2"].map(handle => ({ handle, claim_id: `c:${handle}`, work_id: `w:${handle}`, work: { effect_contract: { kind: "none" } }, result_refs: [] })),
-      };
-      const authorize = async request => ({ authorized: true, claim_handle: request.claim_handle });
-      assert.equal((await verifyClaimDelivery({ assignment, claim_handle: "h1", messages: control.messages, authorize })).verification, "unknown");
-      assert.equal((await verifyClaimDelivery({ assignment, claim_handle: "h2", authorize })).verification, "verified");
     });
 
     it("rejects directories, byte overflow and count overflow before trusted ingestion", () => {

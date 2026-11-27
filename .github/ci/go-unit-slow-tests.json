@@ -4,7 +4,6 @@
   "tests": [
     { "name": "TestRepositoryAgenticWorkflows", "package": "pkg/workflow/lint", "shard": "repository", "elapsed_seconds": 130.67 },
     { "name": "TestRepositoryWorkflowsCompileWithoutEmitting", "package": "pkg/workflow", "shard": "repository", "elapsed_seconds": 57.81 },
-    { "name": "TestLastAttemptCompletionCanSpendReservedClosureBytes", "package": "pkg/workqueue", "shard": "cli-parser-workqueue", "elapsed_seconds": 50.39 },
     { "name": "TestLinearAutomaticLookupFrozenHosts", "package": "pkg/workflow", "shard": "workflow-readers", "elapsed_seconds": 35.79 },
     { "name": "TestAzureBoundedReadersBundledNode", "package": "pkg/workflow", "shard": "workflow-azure", "elapsed_seconds": 25.72 },
     { "name": "TestCompileJSONOptionalScannerFindings", "package": "pkg/cli", "shard": "cli-parser-workqueue", "elapsed_seconds": 22 },

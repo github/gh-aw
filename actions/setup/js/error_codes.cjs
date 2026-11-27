@@ -63,14 +63,8 @@ const ERR_MODEL_PIN_REFLECT_REQUIRED = "ERR_MODEL_PIN_REFLECT_REQUIRED";
 /** @type {string} Work-queue Claim scope validation failures */
 const ERR_WORK_QUEUE_CLAIM_SCOPE = "ERR_WORK_QUEUE_CLAIM_SCOPE";
 
-/** @type {string} Work-queue delivery verifier missing independent readback */
-const ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED = "ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED";
-
 /** @type {string} Safe-output tool deep-copy failures */
 const ERR_SAFE_OUTPUT_TOOL_COPY_FAILED = "ERR_SAFE_OUTPUT_TOOL_COPY_FAILED";
-
-/** @type {string} Work-queue reconciliation failures */
-const ERR_WORK_QUEUE_RECONCILIATION = "ERR_WORK_QUEUE_RECONCILIATION";
 
 /** @type {string} Safe-output MCP gateway configuration failures */
 const ERR_SAFE_OUTPUTS_GATEWAY_CONFIG = "ERR_SAFE_OUTPUTS_GATEWAY_CONFIG";
@@ -122,9 +116,7 @@ module.exports = {
   ERR_GRADER_SESSION_INVALID,
   ERR_MODEL_PIN_REFLECT_REQUIRED,
   ERR_WORK_QUEUE_CLAIM_SCOPE,
-  ERR_WORK_QUEUE_DELIVERY_READBACK_REQUIRED,
   ERR_SAFE_OUTPUT_TOOL_COPY_FAILED,
-  ERR_WORK_QUEUE_RECONCILIATION,
   ERR_SAFE_OUTPUTS_GATEWAY_CONFIG,
   SAFE_OUTPUT_E001,
   SAFE_OUTPUT_E002,

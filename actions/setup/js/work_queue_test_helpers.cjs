@@ -1,85 +1,276 @@
 "use strict";
 
-const { newRequest, replayTransactions } = require("./work_queue_replay.cjs");
-const { defaultPolicy } = require("./work_queue_policy.cjs");
-const { newWork } = require("./work_queue_graph.cjs");
+const { appendCommit, buildCommit, cloneState, newRequest, replayTransactions } = require("./work_queue_replay.cjs");
+const { gateKey, nodeId } = require("./work_queue_graph.cjs");
 const { planDispatch } = require("./work_queue_scheduler.cjs");
+const { createHash } = require("node:crypto");
+const { canonical } = require("./work_queue_codec.cjs");
+const { registerQueueLedgerClient } = require("./work_queue_git_transport.cjs");
+const { readWorkQueuePolicyEnv } = require("./work_queue_policy.cjs");
 
-const administrator = { role: "administrator", principal: "1001", repository: "owner/repo" };
-const producer = { ...administrator, role: "producer" };
-const dispatcher = { ...administrator, role: "dispatcher", workflow: ".github/workflows/dispatcher.lock.yml", run_id: "100", run_attempt: 1 };
-const reconciler = { ...administrator, role: "reconciler" };
+const repository = "owner/repo";
+const WORKER_WORKFLOW = ".github/workflows/worker.lock.yml";
+const administrator = { role: "administrator", repository };
+const producer = { role: "producer", repository, workflow: ".github/workflows/producer.lock.yml", run_id: "10", run_attempt: 1 };
+const dispatcher = { role: "dispatcher", repository, workflow: ".github/workflows/dispatcher.lock.yml", run_id: "100", run_attempt: 1 };
+const reconciler = { role: "reconciler", repository, workflow: ".github/workflows/agentics-maintenance.yml", run_id: "300", run_attempt: 1 };
+const projector = { role: "projector", repository, workflow: ".github/workflows/dispatcher.lock.yml", run_id: "100", run_attempt: 1 };
+const PROFILES = { worker: { workflow: WORKER_WORKFLOW } };
+/** The head_sha of every launched test worker run. */
+const WORKER_REVISION = "c".repeat(40);
 
-function context(actor, extra = {}) {
-  return { ...actor, authenticated: true, roles: [actor.role], ...extra };
+/** A worker actor for one run attempt. */
+function workerActor(runId = "200", runAttempt = 1, workflow = WORKER_WORKFLOW) {
+  return { role: "worker", repository, workflow, run_id: runId, run_attempt: runAttempt };
 }
 
-function commit(previous, id, kind, actor, parameters, operations, at = 100, epoch = "initial") {
-  return { version: 3, id, previous, request: newRequest(`request-${id}`, kind, actor, parameters), actor, policy_epoch: epoch, at, operations };
+/** A v4 Work operation in graph "graph", pool "default", profile "worker". */
+function work(key, overrides = {}) {
+  const graphId = overrides.graph_id ?? "graph";
+  return { kind: "Work", work_id: nodeId(graphId, key), graph_id: graphId, node_key: key, pool: "default", priority: 3, fairness_key: "", worker_profile: "worker", payload: { task: key }, depends_on: [], ...overrides };
 }
 
-function genesis(policy = defaultPolicy({ repository: "owner/repo", principal: "1001" })) {
-  const operations = [{ kind: "Policy", epoch: "initial", policy }];
-  return commit(null, "genesis", "policy", administrator, { operations }, operations, 0);
-}
-
-function submission(log, names, { at = 1, graph = "graph", transform = (node, index) => node, id = "submit" } = {}) {
+/** Append a validated commit for `kind`/`parameters`/`operations` to a log. */
+function commit(log, actor, kind, parameters, operations, at = 1) {
   const state = replayTransactions(log);
-  const nodes = names.map((name, index) => transform(newWork({ task: name }, graph, name, "default", state.policy, at), index));
-  return commit(state.tip, id, "submit", producer, { nodes }, nodes, at, state.policy_epoch);
+  const next = buildCommit(state, actor, newRequest(kind, actor, parameters), operations, at);
+  appendCommit(state, next);
+  return [...log, next];
 }
 
-function grant(log, { max_claims = 1, max_dispatches = 1, max_bytes = 49152, at = 10, id = "grant" } = {}) {
-  const state = replayTransactions(log);
-  const parameters = { pool: "default", max_claims, max_dispatches, max_bytes };
-  const requestId = `request-${id}`;
-  const decision = planDispatch(state, parameters, { requestId, commitId: id, at });
-  return { ...decision, commit: commit(state.tip, id, "dispatch_next", dispatcher, parameters, decision.operations, at, state.policy_epoch) };
+function submit(log, works, actor = producer) {
+  return commit(log, actor, "submit", { work_ids: works.map(node => node.work_id) }, works);
 }
 
-function operationCommit(log, id, kind, operations, actor = reconciler, at = 20) {
+function dispatchParameters(overrides = {}) {
+  return { pool: "default", max_claims: 16, max_dispatches: 16, concurrency: 16, per_account_limit: 0, profiles: PROFILES, ...overrides };
+}
+
+/** Plan (after applying `observations`) and commit one dispatch_next; returns the log and decision. */
+function dispatchNext(log, overrides = {}, actor = dispatcher, observations = []) {
+  const parameters = dispatchParameters(overrides);
+  const request = newRequest("dispatch_next", actor, parameters);
   const state = replayTransactions(log);
-  return commit(state.tip, id, kind, actor, { operations }, operations, at, state.policy_epoch);
+  const observed = cloneState(state);
+  for (const observation of observations) observed.observations.set(gateKey(observation.resource, observation.condition), observation);
+  const decision = planDispatch(observed, parameters, request.id);
+  const operations = [...observations, ...decision.operations];
+  if (!operations.length) return { log, decision };
+  const next = buildCommit(state, actor, request, operations, 1);
+  appendCommit(state, next);
+  return { log: [...log, next], decision };
+}
+
+/** The dispatcher attempt that reserved a Dispatch: the only actor replay lets record its launch. */
+function reservingDispatcher(log, dispatchId) {
+  const reservedBy = replayTransactions(log).dispatches.get(dispatchId)?.reserved_by;
+  return reservedBy ? { ...dispatcher, ...reservedBy } : dispatcher;
+}
+
+/** Record a launch: `Dispatch{started}` naming the launched run (default: workerActor()'s run "200"), or a launch_failed Release. */
+function launch(log, dispatchId, started = true, actor = reservingDispatcher(log, dispatchId), runId = "200", revision = WORKER_REVISION) {
+  return commit(
+    log,
+    actor,
+    "launch",
+    { dispatch_id: dispatchId },
+    started ? [{ kind: "Dispatch", dispatch_id: dispatchId, state: "started", run_id: runId, revision }] : [{ kind: "Release", dispatch_id: dispatchId, reason: "launch_failed" }]
+  );
+}
+
+function bind(log, dispatchId, actor = workerActor()) {
+  return commit(log, actor, "bind", { dispatch_id: dispatchId }, [{ kind: "Bound", dispatch_id: dispatchId, run_id: actor.run_id, run_attempt: actor.run_attempt }]);
+}
+
+/** Finish every open Claim of a Dispatch: "completed" or "failed" per handle (default completed). */
+function finish(log, dispatchId, actor = workerActor(), outcomes = {}, effects = []) {
+  const state = replayTransactions(log);
+  const dispatch = state.dispatches.get(dispatchId);
+  const operations = [];
+  for (const claim of dispatch.claims.map(id => state.claims.get(id)).filter(member => member.state === "open")) {
+    if ((outcomes[claim.handle] ?? "completed") === "completed") operations.push({ kind: "Completion", work_id: claim.work_id, claim_id: claim.claim_id, dispatch_id: dispatchId, claim_handle: claim.handle, effects });
+    else operations.push({ kind: "ClaimCancellation", work_id: claim.work_id, claim_id: claim.claim_id, reason: "worker_failed" });
+  }
+  return commit(log, actor, "finish", { dispatch_id: dispatchId }, operations);
+}
+
+function release(log, dispatchId, reason = "run_missing", actor = reconciler, extra = []) {
+  return commit(log, actor, "release", { dispatch_id: dispatchId, reason }, [{ kind: "Release", dispatch_id: dispatchId, reason }, ...extra]);
+}
+
+/** Canonical JSONL text of a log. */
+function ledgerText(log) {
+  return log.map(entry => canonical(entry) + "\n").join("");
+}
+
+/** The Actions API view of a launched worker run: a workflow_dispatch run of the worker at WORKER_REVISION. */
+function workflowRun(runId, overrides = {}) {
+  return { id: Number(runId), path: WORKER_WORKFLOW, event: "workflow_dispatch", head_sha: WORKER_REVISION, run_attempt: 1, repository: { full_name: repository }, ...overrides };
 }
 
 /**
- * @template {object} Extras
- * @param state
- * @param dispatch
- * @param kind
- * @param at
- * @param {Extras} [extra]
+ * In-memory Actions API. `createWorkflowDispatch` creates run `nextRunId` (then +1) of the
+ * posted workflow and returns it as `return_run_details` does; `getWorkflowRun` serves `runs`.
  */
-function evidence(state, dispatch, kind, at, extra) {
-  const profile = state.policy.pools[dispatch.pool].profiles[dispatch.worker_profile];
-  return Object.assign({ kind, source: "github_api", repository: "owner/repo", workflow: profile.workflow, ref: profile.ref, principal: profile.principal, checked_at: at }, extra);
+function fakeActions({ runs = new Map(), nextRunId = 200, revision = WORKER_REVISION } = {}) {
+  const posts = [];
+  const actions = {
+    createWorkflowDispatch: async input => {
+      posts.push(input);
+      const id = String(nextRunId++);
+      runs.set(id, workflowRun(id, { path: `.github/workflows/${input.workflow_id}`, head_sha: revision }));
+      return { status: 200, data: { workflow_run_id: Number(id) } };
+    },
+    getWorkflowRun: async ({ run_id }) => {
+      const run = runs.get(String(run_id));
+      if (!run) throw Object.assign(new Error("Not Found"), { status: 404 });
+      return { status: 200, data: run };
+    },
+  };
+  return { actions, runs, posts };
 }
 
-function bind(log, dispatchId, { id = "binding", at = 30, runId = "200" } = {}) {
-  let state = replayTransactions(log);
-  const start = operationCommit(log, `start-${id}`, "dispatch", [{ kind: "Dispatch", dispatch_id: dispatchId, state: "started", sender: dispatcher }], dispatcher, at - 1);
-  const started = [...log, start];
-  state = replayTransactions(started);
-  const dispatch = state.dispatches.get(dispatchId);
-  const profile = state.policy.pools[dispatch.pool].profiles[dispatch.worker_profile];
-  const run = { run_id: runId, run_attempt: 1, repository: "owner/repo", workflow: profile.workflow, ref: profile.ref, principal: profile.principal, event: "workflow_dispatch" };
-  const binding = operationCommit(started, id, "dispatch", [{ kind: "Dispatch", dispatch_id: dispatchId, state: "bound", run, evidence: evidence(state, dispatch, "reconciliation", at, { run_id: runId, run_attempt: 1 }) }], reconciler, at);
-  return [...started, binding];
+/**
+ * In-memory GitHub Git-data API holding the queue branch. `install(text)` moves the
+ * head (a concurrent writer); `state.beforeUpdate` runs before the next ref update;
+ * `state.ambiguousOnce` loses one successful update response.
+ * @param {string | undefined} [initialContents]
+ */
+function fakeQueueGitHub(initialContents = undefined, { branch = "work-queue", repository: fullName = repository } = {}) {
+  let serial = 0;
+  const blobs = new Map();
+  const trees = new Map();
+  const commits = new Map();
+  const refs = new Map();
+  /** @type {{beforeUpdate: null | (() => unknown), ambiguousOnce: boolean, updates: number, writes: number}} */
+  const state = { beforeUpdate: null, ambiguousOnce: false, updates: 0, writes: 0 };
+  const id = prefix => createHash("sha1").update(`${prefix}-${++serial}`).digest("hex");
+  const missing = () => Object.assign(new Error("Not Found"), { status: 404 });
+  function install(contents, parents = refs.has(branch) ? [refs.get(branch)] : []) {
+    const blob = id("blob");
+    const tree = id("tree");
+    const commit = id("commit");
+    blobs.set(blob, contents);
+    trees.set(tree, blob);
+    commits.set(commit, { tree, parents });
+    refs.set(branch, commit);
+    return commit;
+  }
+  if (initialContents !== undefined) install(initialContents);
+  const contents = () => (refs.has(branch) ? blobs.get(trees.get(commits.get(refs.get(branch)).tree)) : undefined);
+  const actionsApi = fakeActions();
+  const githubClient = {
+    graphql: async () => ({ repository: { nameWithOwner: fullName, isEmpty: false } }),
+    rest: {
+      repos: { get: async () => ({ data: { full_name: fullName, default_branch: "main", size: 1 } }) },
+      actions: actionsApi.actions,
+      git: {
+        getRef: async ({ ref }) => {
+          if (ref === "heads/main") return { data: { object: { sha: "a".repeat(40) } } };
+          const sha = refs.get(ref.slice("heads/".length));
+          if (!sha) throw missing();
+          return { data: { object: { sha } } };
+        },
+        getCommit: async ({ commit_sha }) => {
+          if (!commits.has(commit_sha)) throw missing();
+          return { data: { sha: commit_sha, tree: { sha: commits.get(commit_sha).tree }, parents: commits.get(commit_sha).parents.map(sha => ({ sha })) } };
+        },
+        getTree: async ({ tree_sha }) => ({ data: { truncated: false, tree: [{ path: "work-queue.jsonl", type: "blob", mode: "100644", sha: trees.get(tree_sha) }] } }),
+        getBlob: async ({ file_sha }) => {
+          const text = blobs.get(file_sha);
+          return { data: { encoding: "base64", content: Buffer.from(text, "utf8").toString("base64"), size: Buffer.byteLength(text, "utf8") } };
+        },
+        createBlob: async ({ content }) => {
+          const sha = id("blob");
+          blobs.set(sha, content);
+          return { data: { sha } };
+        },
+        createTree: async ({ tree }) => {
+          const sha = id("tree");
+          trees.set(sha, tree[0].sha);
+          return { data: { sha } };
+        },
+        createCommit: async ({ tree, parents }) => {
+          const sha = id("commit");
+          commits.set(sha, { tree, parents });
+          return { data: { sha } };
+        },
+        createRef: async ({ ref, sha }) => {
+          const name = ref.slice("refs/heads/".length);
+          if (refs.has(name)) throw Object.assign(new Error("Reference already exists"), { status: 422 });
+          refs.set(name, sha);
+          state.writes++;
+          return { data: {} };
+        },
+        updateRef: async ({ ref, sha, force }) => {
+          state.updates++;
+          if (force !== false) throw new Error("queue ref updates must not force");
+          if (state.beforeUpdate) {
+            const callback = state.beforeUpdate;
+            state.beforeUpdate = null;
+            await callback();
+          }
+          const name = ref.slice("heads/".length);
+          if (!commits.get(sha).parents.includes(refs.get(name))) throw Object.assign(new Error("Update is not a fast forward"), { status: 422 });
+          refs.set(name, sha);
+          state.writes++;
+          if (state.ambiguousOnce) {
+            state.ambiguousOnce = false;
+            throw Object.assign(new Error("Transport response lost"), { status: 502 });
+          }
+          return { data: {} };
+        },
+      },
+    },
+  };
+  registerQueueLedgerClient(githubClient, githubClient);
+  return { githubClient, state, refs, commits, contents, install, runs: actionsApi.runs, posts: actionsApi.posts };
 }
 
-function workerActor(state, dispatchId, handle = "h1") {
-  const dispatch = state.dispatches.get(dispatchId);
-  const run = dispatch.run;
-  return { role: "worker", principal: run.principal, repository: run.repository, workflow: run.workflow, run_id: run.run_id, run_attempt: 1, dispatch_id: dispatchId, claim_handle: handle };
+/**
+ * The policy a checked-in dispatcher lock compiles into its trusted controls step, with
+ * `${{ github.repository }}` bound to `repository` and decoded by the real runtime reader.
+ * @param {string} name dispatcher workflow ID
+ * @param {string} repository
+ * @returns {import("./work_queue_policy.cjs").PolicyEnv}
+ */
+function compiledDispatcherPolicy(name, repository) {
+  // Loaded here, not at import: the repository-level adapter provisions a Go tool.
+  const repositoryRoot = require("node:path").join(__dirname, "../../..");
+  const { readDocumentMetadata } = require(require("node:path").join(repositoryRoot, "scripts/markdown_metadata_test_adapter.cjs"));
+  const source = require("node:fs").readFileSync(require("node:path").join(repositoryRoot, `.github/workflows/${name}.lock.yml`), "utf8");
+  const steps = readDocumentMetadata(source).value?.jobs?.safe_outputs?.steps ?? [];
+  const controls = steps.find(step => step?.id === "work_queue_controls");
+  if (!controls?.env) throw new Error(`${name}.lock.yml has no work_queue_controls step`);
+  const environment = Object.fromEntries(Object.entries(controls.env).map(([key, value]) => [key, typeof value === "string" ? value.replaceAll("${{ github.repository }}", repository) : value]));
+  const policy = readWorkQueuePolicyEnv(environment);
+  if (!policy) throw new Error(`${name}.lock.yml compiles no work queue policy`);
+  return policy;
 }
 
-function finish(log, dispatchId, handle, outcome, { id = `finish-${handle}`, at = 40, keep_open = false } = {}) {
-  const { finishOperations } = require("./work_queue_replay.cjs");
-  const state = replayTransactions(log);
-  const actor = workerActor(state, dispatchId, handle);
-  const parameters = { dispatch_id: dispatchId, claim_handle: handle, outcome, ...(keep_open ? { keep_open: true } : {}) };
-  const request = newRequest(`request-${id}`, "finish", actor, parameters);
-  return commit(state.tip, id, "finish", actor, parameters, finishOperations(state, request, actor, at), at, state.policy_epoch);
-}
-
-module.exports = { administrator, bind, commit, context, dispatcher, evidence, finish, genesis, grant, operationCommit, producer, reconciler, submission, workerActor };
+module.exports = {
+  PROFILES,
+  WORKER_REVISION,
+  WORKER_WORKFLOW,
+  administrator,
+  bind,
+  commit,
+  compiledDispatcherPolicy,
+  dispatchNext,
+  dispatchParameters,
+  dispatcher,
+  fakeActions,
+  fakeQueueGitHub,
+  finish,
+  launch,
+  ledgerText,
+  producer,
+  projector,
+  reconciler,
+  release,
+  repository,
+  submit,
+  work,
+  workerActor,
+  workflowRun,
+};

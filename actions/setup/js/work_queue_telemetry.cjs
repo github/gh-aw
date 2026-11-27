@@ -3,94 +3,36 @@
 
 const { AsyncLocalStorage } = require("node:async_hooks");
 const { createHash } = require("node:crypto");
-const { workExpired } = require("./work_queue_expiration.cjs");
 const { queueControlErrorCode } = require("./work_queue_logging.cjs");
 
 /** @typedef {Record<string, string | number | boolean>} Attributes */
-/** @type {AsyncLocalStorage<{attributes: Attributes, snapshot?: {state: object, at: number}}>} */
+/** @type {AsyncLocalStorage<{attributes: Attributes, snapshot?: {state: object}}>} */
 const activeOperation = new AsyncLocalStorage();
 const PREFIX = "gh-aw.work_queue.";
-const OUTCOMES = new Set(["activation_pending", "bound", "released", "rejected", "reserved", "cancellation_requested", "launch_unresolved", "run_binding_conflict", "staged_preview"]);
-const REASONS = new Set([
-  "selected",
-  "no_work",
-  "no_eligible_work",
-  "capacity_blocked",
-  "native_capacity_blocked",
-  "grants_paused",
-  "already_submitted",
-  "dispatch_budget_blocked",
-  "assignment_bytes_blocked",
-  "claim_budget_reached",
-  "operation_budget_reached",
-  "operation_budget_blocked",
-  "prefix_complete",
-]);
-const REQUESTS = new Set(["policy", "pool_install", "deployment", "control", "submit", "dispatch_next", "finish", "observe", "dispatch", "release", "result", "delivery_failure", "cancel_work", "cancel_claim", "checkpoint", "issue_link"]);
-const TRANSITIONS = new Set(["Work", "Claim", "Completion", "ClaimCancellation", "WorkCancellation", "Result", "DeliveryFailure", "Release", "Dispatch"]);
-const QUEUE_ERRORS = new Set(["ledger_invalid", "checkpoint_invalid", "resource_limit", "repository_unavailable", "queue_missing", "policy_missing", "branch_invalid", "unsupported_protocol"]);
+const OUTCOMES = new Set(["started", "launch_failed", "bound", "released", "settled", "blocked"]);
+const REASONS = new Set(["no_work", "no_eligible_work", "capacity_blocked", "account_capacity_blocked", "claim_budget_reached", "prefix_complete"]);
+const REQUESTS = new Set(["submit", "dispatch_next", "launch", "bind", "finish", "release", "cancel_work", "checkpoint", "issue_link", "migrate"]);
+const TRANSITIONS = new Set(["Work", "Claim", "Dispatch", "Bound", "Completion", "ClaimCancellation", "WorkCancellation", "Release"]);
+const QUEUE_ERRORS = new Set(["ledger_invalid", "checkpoint_invalid", "resource_limit", "ledger_limit", "repository_unavailable", "branch_invalid", "unsupported_protocol", "cas_exhausted"]);
 
-function snapshotAttributes(state, at) {
+/** Counts of the committed projection; never a decision input. */
+function snapshotAttributes(state) {
   /** @type {Record<string, number>} */
   const attributes = {
-    observed_at_unix_ms: at,
     "work.total": state.works.size,
     "work.available": 0,
     "work.claimed": 0,
     "work.completed": 0,
     "work.cancelled": 0,
-    "work.expired": 0,
-    "work.retry_delayed": 0,
-    "work.oldest_available_age_ms": 0,
-    "delivery.pending": 0,
-    "delivery.failed": 0,
     "claims.open": 0,
-    "reservations.active": 0,
-    "reservations.unbound": 0,
-    "reservations.uncertain": 0,
-    "reservations.unresolved": 0,
-    "capacity.logical_limit": 0,
-    "capacity.native_limit": 0,
-    "capacity.logical_saturated_pools": 0,
-    "capacity.native_saturated_pools": 0,
+    "dispatches.reserved": 0,
+    "dispatches.started": 0,
+    "dispatches.bound": 0,
   };
-  const logical = new Map();
-  const native = new Map();
-  const time = Math.max(at, state.time_watermark ?? 0);
-  for (const work of state.works.values()) {
-    const expired = workExpired(work, time) || work.cancellation_reason === "work_expired";
-    const ownership = expired ? "cancelled" : work.state;
-    if (Object.hasOwn(attributes, `work.${ownership}`)) attributes[`work.${ownership}`]++;
-    if (expired) attributes["work.expired"]++;
-    if (ownership === "available") {
-      if (work.retry_not_before > time) attributes["work.retry_delayed"]++;
-      attributes["work.oldest_available_age_ms"] = Math.max(Number(attributes["work.oldest_available_age_ms"]), Math.max(0, time - work.enqueued));
-    }
-    if (["pending", "failed"].includes(work.barrier)) attributes[`delivery.${work.barrier}`]++;
-  }
-  for (const claim of state.claims.values()) {
-    if (claim.state === "open") {
-      attributes["claims.open"]++;
-      const pool = state.works.get(claim.work_id).pool;
-      logical.set(pool, (logical.get(pool) || 0) + 1);
-    }
-    // keep_open completions have Claim-local barriers, independent of Work.
-    if (claim.keep_open && ["pending", "failed"].includes(claim.barrier)) attributes[`delivery.${claim.barrier}`]++;
-  }
-  for (const dispatch of state.dispatches.values()) {
-    if (dispatch.released) continue;
-    attributes["reservations.active"]++;
-    if (!dispatch.run) attributes["reservations.unbound"]++;
-    if (["uncertain", "unresolved"].includes(dispatch.state)) attributes[`reservations.${dispatch.state}`]++;
-    native.set(dispatch.pool, (native.get(dispatch.pool) || 0) + 1);
-  }
-  for (const [pool, policy] of Object.entries(state.policy?.pools || {})) {
-    attributes["capacity.logical_limit"] += policy.logical_limit;
-    attributes["capacity.native_limit"] += policy.native_limit;
-    if ((logical.get(pool) || 0) >= policy.logical_limit) attributes["capacity.logical_saturated_pools"]++;
-    if ((native.get(pool) || 0) >= policy.native_limit) attributes["capacity.native_saturated_pools"]++;
-  }
-  return { ...attributes, initialized: !!state.policy, admission_paused: state.admission_paused === true, grants_paused: state.grants_paused === true };
+  for (const work of state.works.values()) if (Object.hasOwn(attributes, `work.${work.state}`)) attributes[`work.${work.state}`]++;
+  for (const claim of state.claims.values()) if (claim.state === "open") attributes["claims.open"]++;
+  for (const dispatch of state.dispatches.values()) if (Object.hasOwn(attributes, `dispatches.${dispatch.state}`)) attributes[`dispatches.${dispatch.state}`]++;
+  return attributes;
 }
 
 function increment(current, key, amount = 1) {
@@ -110,10 +52,10 @@ function publicationRecovery(kind) {
 }
 
 function captureResult(current, result) {
-  if (result?.state?.works instanceof Map) current.snapshot = { state: result.state, at: Date.now() };
-  if (result?.publishedNow === true) {
+  if (result?.state?.works instanceof Map) current.snapshot = { state: result.state };
+  if (result?.committed === true && result.recovered !== true) {
     increment(current, "publication.commits");
-    for (const operation of result.operations || []) {
+    for (const operation of result.commit?.operations || []) {
       if (TRANSITIONS.has(operation.kind)) increment(current, `committed.${operation.kind}`);
     }
   }
@@ -127,12 +69,7 @@ function captureOutcome(current, result) {
   const outcome = result?.state;
   if (OUTCOMES.has(outcome)) {
     current.attributes[`${PREFIX}outcome`] = outcome;
-    isError = ["rejected", "launch_unresolved", "run_binding_conflict"].includes(outcome);
-  }
-  if (Array.isArray(result?.results)) {
-    current.attributes[`${PREFIX}reconciliation.checked`] = result.results.length;
-    current.attributes[`${PREFIX}reconciliation.unresolved`] = result.results.filter(item => ["launch_unresolved", "run_binding_conflict"].includes(item.state)).length;
-    isError ||= Number(current.attributes[`${PREFIX}reconciliation.unresolved`]) > 0;
+    isError = outcome === "blocked";
   }
   return isError;
 }
@@ -141,7 +78,6 @@ function captureOutcome(current, result) {
 function telemetryErrorType(error) {
   const code = error !== null && typeof error === "object" ? Object.getOwnPropertyDescriptor(error, "code")?.value : undefined;
   if (typeof code === "string" && QUEUE_ERRORS.has(code)) return code;
-  if (error instanceof Error && error.message.startsWith("publication_unresolved:")) return "publication_unresolved";
   return queueControlErrorCode(error);
 }
 
@@ -163,7 +99,7 @@ async function observeQueueOperation(operation, options, execute) {
     return result;
   }
   const startMs = Date.now();
-  /** @type {{attributes: Attributes, snapshot?: {state: object, at: number}}} */
+  /** @type {{attributes: Attributes, snapshot?: {state: object}}} */
   const current = {
     attributes: {
       [`${PREFIX}operation`]: operation,
@@ -195,7 +131,7 @@ async function observeQueueOperation(operation, options, execute) {
           .digest("hex");
         current.attributes[`${PREFIX}snapshot.present`] = !!current.snapshot;
         if (current.snapshot) {
-          for (const [key, value] of Object.entries(snapshotAttributes(current.snapshot.state, current.snapshot.at))) current.attributes[`${PREFIX}${key}`] = value;
+          for (const [key, value] of Object.entries(snapshotAttributes(current.snapshot.state))) current.attributes[`${PREFIX}${key}`] = value;
         }
         await require("./otlp.cjs").logSpan(`work_queue.${operation}`, current.attributes, { startMs, endMs, isError });
       } catch {

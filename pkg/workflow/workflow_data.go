@@ -177,6 +177,7 @@ type WorkflowData struct {
 	MCPScripts                     *MCPScriptsConfig               // mcp-scripts configuration for custom MCP tools
 	Enclaves                       EnclavesConfig                  // AWF-owned private repository enclave executors
 	LabelNames                     []string                        // label names that must match for pull_request_target labeled events (on.labels)
+	IssueStatusFilter              *IssueStatusFilterConfig        // captured issues.status_changed transition filters
 	Roles                          []string                        // permission levels required to trigger workflow
 	Bots                           []string                        // allow list of bot identifiers that can trigger workflow
 	RateLimit                      *RateLimitConfig                // rate limiting configuration for workflow triggers
@@ -184,7 +185,7 @@ type WorkflowData struct {
 	DriveMemoryConfig              *DriveMemoryConfig              // parsed drive-memory configuration
 	CommentMemoryConfig            *CommentMemoryConfig            // parsed tools.comment-memory configuration
 	RepoMemoryConfig               *RepoMemoryConfig               // parsed repo-memory configuration
-	AdaptiveRouting                string                          // "observe" when push_routing_history records the run in the routing history, else ""
+	RoutingLearningMode            string                          // "observe" when push_routing_history records the run in the routing history, else ""
 	Runtimes                       map[string]any                  // runtime version overrides from frontmatter
 	ToolsTimeout                   string                          // timeout for tool/MCP operations: numeric string (seconds) or GitHub Actions expression (empty = use engine default)
 	ToolsStartupTimeout            string                          // timeout for MCP server startup: numeric string (seconds) or GitHub Actions expression (empty = use engine default)

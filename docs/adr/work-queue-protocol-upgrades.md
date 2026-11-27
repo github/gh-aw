@@ -1,7 +1,10 @@
 # Extension to ADR-64955: Current-Only Work Queue Commits
 
+> [!NOTE]
+> Superseded by work queue protocol v4 ([specification](../src/content/docs/specs/work-queue-specification.md), [pull request #79748](https://github.com/github/gh-aw/pull/79748)). v4 keeps the rule that readers never fabricate authority from older records, but replaces explicit quiescence and re-initialization with a one-time [conversion from version 3](../src/content/docs/specs/work-queue-specification.md#15-conversion-from-version-3): the first v4 dispatcher, producer, administrator or reconciler run converts a version-3 ledger whose head is a Checkpoint, carrying its available Work in FIFO order; a version-3 ledger without a Checkpoint converts to an empty log. Afterwards only version 4 commits are accepted, and the assignment input is `{"version":4,"dispatch_id":…}` with Claims read from the activation snapshot. The version-3 contract link below points at the last revision that contained it.
+
 **Date**: 2026-10-02
-**Status**: Draft
+**Status**: Superseded
 **Deciders**: gh-aw maintainers (review pending)
 
 ---
@@ -17,7 +20,7 @@ invent policy, causal positions, accounting debt, and launch authority.
 ### Decision
 
 Replace upgrade-on-load with one closed version-3 `QueueCommit` contract in
-[`transactions.tsp`](../../specs/work-queue/transactions.tsp). Every authoritative
+[`transactions.tsp`](https://github.com/github/gh-aw/blob/dd75ba585ad44bf1ad0bc4280341b3901bd41d72/specs/work-queue/transactions.tsp). Every authoritative
 mutation uses the same causal `work-queue.jsonl` chain. Both native engines
 validate the contract before replay/publication; neither accepts policy-less
 facts, unversioned records, unknown versions, or automatic codemods.

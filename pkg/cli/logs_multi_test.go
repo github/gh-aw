@@ -552,6 +552,7 @@ func TestCountLimitedLogsTargetResultPreservesDateRangeContinuation(t *testing.T
 }
 
 func TestMergeLogsTargetResultsPropagatesCountLimitReached(t *testing.T) {
+	t.Parallel()
 	processedRuns, _, _, countLimitReached, _, errs := mergeLogsTargetResults([]logsTargetResult{
 		{target: logsWorkflowTarget{workflowName: "limited"}, result: workflowLogsResult{countLimitReached: true}},
 		{target: logsWorkflowTarget{workflowName: "complete"}, result: workflowLogsResult{countLimitReached: false}},
@@ -563,6 +564,7 @@ func TestMergeLogsTargetResultsPropagatesCountLimitReached(t *testing.T) {
 }
 
 func TestMergeLogsTargetResultsPreservesPartialRunsFromFailedTarget(t *testing.T) {
+	t.Parallel()
 	run := ProcessedRun{Run: WorkflowRun{DatabaseID: 42}}
 	processedRuns, _, _, _, _, errs := mergeLogsTargetResults([]logsTargetResult{{
 		target: logsWorkflowTarget{workflowName: "partial"},
@@ -695,6 +697,29 @@ func TestAppendProcessedWorkflowRunsPreservesNewestPrefixOnCancellation(t *testi
 	startedMu.Lock()
 	assert.ElementsMatch(t, []int64{1, 2}, started, "the queued third run must be cleared when the prefix fills the count")
 	startedMu.Unlock()
+}
+
+func TestProcessWorkflowRunBatchDeadlineDuringLastChunk(t *testing.T) {
+	originalProcess := processConcurrentRunDownload
+	t.Cleanup(func() { processConcurrentRunDownload = originalProcess })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+	processConcurrentRunDownload = func(ctx context.Context, run WorkflowRun, _ concurrentRunDownloadParams, _ *atomic.Int64, _ *console.ProgressBar) (DownloadResult, error) {
+		<-ctx.Done()
+		return DownloadResult{RunAnalysis: RunAnalysis{Run: run}, Skipped: true, Error: ctx.Err()}, nil
+	}
+
+	runs, count, consumed, timedOut, _ := processWorkflowRunBatch(ctx, workflowRunBatch{
+		runs: []WorkflowRun{{DatabaseID: 42, WorkflowPath: ".github/workflows/example.lock.yml"}},
+	}, nil, processWorkflowRunBatchOptions{count: 1, maxConcurrentDownloads: 1})
+	assert.Empty(t, runs)
+	assert.Zero(t, count)
+	assert.False(t, consumed)
+	assert.True(t, timedOut)
+	continuation := buildContinuationIfNeeded(runs, timedOut, false, false, false, continuationOptions{previousBeforeRunID: 43})
+	require.NotNil(t, continuation)
+	assert.Equal(t, int64(43), continuation.BeforeRunID)
 }
 
 func TestConcurrentRunDownloadsRecoverWorkerPanic(t *testing.T) {

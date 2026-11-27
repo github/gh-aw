@@ -2028,6 +2028,39 @@ func TestBuildAWFConfigJSON_DomainDeduplication(t *testing.T) {
 	assert.Equal(t, 1, count, "github.com should appear exactly once after deduplication")
 }
 
+func TestBuildAWFConfigJSON_LocalhostOmitsIPv6Loopback(t *testing.T) {
+	config := AWFCommandConfig{
+		EngineName:     "copilot",
+		AllowedDomains: "github.com,localhost,127.0.0.1,::1",
+		WorkflowData: &WorkflowData{
+			EngineConfig: &EngineConfig{ID: "copilot"},
+			NetworkPermissions: &NetworkPermissions{
+				Firewall: &FirewallConfig{Enabled: true},
+			},
+		},
+	}
+
+	jsonStr, err := BuildAWFConfigJSON(config)
+	require.NoError(t, err)
+
+	var parsed struct {
+		Network struct {
+			AllowDomains []string `json:"allowDomains"`
+		} `json:"network"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(jsonStr), &parsed))
+
+	assert.Contains(t, parsed.Network.AllowDomains, "localhost")
+	assert.Contains(t, parsed.Network.AllowDomains, "127.0.0.1")
+	assert.NotContains(t, parsed.Network.AllowDomains, "::1")
+
+	config.AllowedDomains = "github.com,::1"
+	jsonStr, err = BuildAWFConfigJSON(config)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal([]byte(jsonStr), &parsed))
+	assert.NotContains(t, parsed.Network.AllowDomains, "::1")
+}
+
 // TestBuildAWFConfigJSON_SchemaCompliance validates that BuildAWFConfigJSON always produces
 // JSON that conforms to the embedded AWF config schema. This test provides coverage for the
 // validateAWFConfigJSON path, which is triggered at compile time when --validate is used

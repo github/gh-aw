@@ -1,5 +1,7 @@
 // @ts-check
 "use strict";
+const fs = require("fs");
+const path = require("path");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("effects");
 
 const { assertClaimAuthorized, currentClaimHandle, recordClaimEffect, claimIdentity, assertClaimIdentity, currentClaimResourceEffects } = require("./work_queue_claim_scope.cjs");
@@ -8,6 +10,7 @@ const { canonicalResourceTarget, nativeDecimalIdentity, resolveRepositoryTarget,
 const { expectedGitHubHost, isTrustedGitHubApiUrl } = require("./work_queue_host.cjs");
 
 const READ_METHODS = new Set(["get", "list", "getSarif", "getAnalysis", "getComment", "getCommit", "getRef", "getTree", "getBlob", "getArtifact", "getBranch", "getByUsername", "getWorkflowRun", "getWorkflowRunAttempt", "compareCommits"]);
+const DEFAULT_EFFECTS_PATH = "/tmp/gh-aw/work-queue.effects.jsonl";
 /** @type {WeakMap<object, {identity: ReturnType<typeof claimIdentity>, options: Record<string, unknown>}>} */
 const claimClients = new WeakMap();
 const NODE_QUERY = `query WorkQueueEffectTargets($ids: [ID!]!) {
@@ -705,4 +708,41 @@ function graphEffectIdentity(query, variables, response) {
   return digest({ query, variables, response });
 }
 
-module.exports = { wrapClaimEffectClient, withClaimEffectClients, graphEffectIdentity };
+/** Staged git objects are not visible effects; their ref update is. */
+const INTERNAL_EFFECT_KINDS = new Set(["git_blob", "git_tree", "git_commit"]);
+
+function effectsPath() {
+  return process.env.GH_AW_WORK_QUEUE_EFFECTS || DEFAULT_EFFECTS_PATH;
+}
+
+/**
+ * One effects-file line per succeeded visible effect:
+ * `{claim_handle, kind: <safe-output type>, resource: {repository, number?, id?, commit?, status?}}`.
+ * @param {Record<string, any>} effect
+ */
+function effectLine(effect) {
+  const resource = {
+    repository: effect.repository ?? null,
+    ...(effect.number ? { number: effect.number } : {}),
+    ...(effect.id ? { id: String(effect.id) } : {}),
+    ...(effect.commit ? { commit: effect.commit } : {}),
+    ...(effect.status ? { status: effect.status } : {}),
+  };
+  return { claim_handle: effect.claim_handle, kind: effect.output_type ?? effect.kind, resource };
+}
+
+/**
+ * Append a Claim's succeeded effects (recorded by `recordClaimEffect`) to the effects
+ * file that the finish step folds into its Completion. Returns the lines written.
+ * @param {ReadonlyArray<Record<string, any>>} effects
+ * @param {string} [filename]
+ */
+function appendClaimEffects(effects, filename = effectsPath()) {
+  const lines = effects.filter(effect => effect.outcome === "succeeded" && !INTERNAL_EFFECT_KINDS.has(effect.kind)).map(effect => canonical(effectLine(effect)) + "\n");
+  if (!lines.length) return 0;
+  fs.mkdirSync(path.dirname(filename), { recursive: true });
+  fs.appendFileSync(filename, lines.join(""));
+  return lines.length;
+}
+
+module.exports = { DEFAULT_EFFECTS_PATH, appendClaimEffects, effectsPath, wrapClaimEffectClient, withClaimEffectClients, graphEffectIdentity };

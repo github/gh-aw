@@ -35,10 +35,13 @@ func InspectEffectiveAuthorization(data *WorkflowData) []AuthorizationRoute {
 		}
 		builtin := false
 		executor, staged := inspectAuthorizationCustomExecutor(config, base)
+		if name == requestContinuationAdmitAuthorization {
+			executor = "queue"
+		}
 		staged = staged || templatableBoolIsTrue(config.Staged) || coverage == "staged"
 		for _, handler := range safeOutputHandlers {
 			if handler.ToolName == base {
-				builtin = handler.Builtin
+				builtin = safeOutputHandlerBuiltin(config, handler)
 				if field, ok := safeOutputPointerFieldValue(config, handler.StructField); ok && !field.IsNil() {
 					staged = staged || templatableBoolIsTrue(safeOutputHandlerStaged(field))
 				}

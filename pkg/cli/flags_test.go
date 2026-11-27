@@ -6,7 +6,70 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestMinuteTimeoutFlags(t *testing.T) {
+	t.Parallel()
+	commands := []struct {
+		name         string
+		newCommand   func() *cobra.Command
+		defaultValue int
+	}{
+		{"logs", NewLogsCommand, 0},
+		{"forecast", NewForecastCommand, 0},
+		{"trial", func() *cobra.Command { return NewTrialCommand(validateEngineStub) }, 30},
+	}
+	for _, command := range commands {
+		t.Run(command.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := command.newCommand()
+			got, err := cmd.Flags().GetInt("timeout")
+			require.NoError(t, err)
+			assert.Equal(t, command.defaultValue, got)
+
+			for _, test := range []struct {
+				input string
+				want  int
+			}{
+				{"5", 5},
+				{"+5", 5},
+				{"0xA", 10},
+				{"0b1010", 10},
+				{"0o12", 10},
+				{"012", 10},
+				{"1_0", 10},
+				{"5m", 5},
+				{"1h", 60},
+				{"1h30m", 90},
+				{"120s", 2},
+				{"1.5h", 90},
+				{"0", 0},
+				{"0m", 0},
+				{"-1", -1},
+				{"-1m", -1},
+			} {
+				t.Run(test.input, func(t *testing.T) {
+					cmd := command.newCommand()
+					require.NoError(t, cmd.ParseFlags([]string{"--timeout", test.input}))
+					got, err := cmd.Flags().GetInt("timeout")
+					require.NoError(t, err)
+					assert.Equal(t, test.want, got)
+				})
+			}
+			for _, input := range []string{"invalid", "5minutes", "30s", "90s", "1.5m", "999999999999999999999999", "999999999h"} {
+				t.Run(input, func(t *testing.T) {
+					cmd := command.newCommand()
+					require.ErrorContains(t, cmd.ParseFlags([]string{"--timeout", input}), "must be an integer number of minutes or a whole-minute duration")
+					got, err := cmd.Flags().GetInt("timeout")
+					require.NoError(t, err)
+					assert.Equal(t, command.defaultValue, got, "invalid input must not change the default")
+				})
+			}
+		})
+	}
+}
 
 // TestShortFlagConsistency tests that short flags are consistently defined
 // across commands where they should be present.

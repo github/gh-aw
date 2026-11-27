@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 const require = createRequire(import.meta.url);
 const scope = require("./work_queue_claim_scope.cjs");
 const { prepareAdapterContext } = require("./work_queue_prepare_claim_adapter.cjs");
-const { createClaimAdapterHandler } = require("./work_queue_claim_adapters.cjs");
+const { createClaimAdapterHandler, preparedAdapterPath } = require("./work_queue_claim_adapters.cjs");
 const { assertGitPushAuthorized } = require("./work_queue_git_effects.cjs");
 const bundle = require("./generate_git_bundle.cjs");
 const patch = require("./git_patch_utils.cjs");
@@ -68,23 +68,20 @@ function directory() {
   return root;
 }
 
-function assignment(count = 2) {
+function assignment(dispatch = "original-dispatch", ordinal = 1) {
   return {
-    version: 3,
-    dispatch_id: "original-dispatch",
-    request_id: "original-request",
-    commit_id: "original-commit",
-    policy_epoch: "original-policy",
-    pool: "original-pool",
-    worker_profile: "original-profile",
-    claims: Array.from({ length: count }, (_, index) => ({
-      handle: `h${index + 1}`,
-      claim_id: `claim:${index + 1}`,
-      work_id: `work:${index + 1}`,
-      work: { checkout: `checkout-${index + 1}`, input: `input-${index + 1}` },
-      result_refs: [],
-    })),
+    dispatch_id: dispatch,
+    claims: [{ handle: "h1", claim_id: `claim-${ordinal}`, work_id: `work-${ordinal}`, work: { checkout: `checkout-${ordinal}`, input: `input-${ordinal}` }, result_refs: [] }],
   };
+}
+
+/** Two valid singleton dispatches that both reuse handle h1 for different Claims. */
+const dispatches = () => [assignment("original-dispatch", 1), assignment("second-dispatch", 2)];
+
+function twoMemberAssignment() {
+  const [first] = assignment().claims;
+  const [second] = assignment("original-dispatch", 2).claims;
+  return { dispatch_id: "original-dispatch", claims: [first, { ...second, handle: "h2" }] };
 }
 
 const adapter = { mode: "prepared", "effect-type": "update_issue", "target-repo": "owner/repo", "field-map": { item_number: "number", body: "content" } };
@@ -138,131 +135,160 @@ describe("disabled queue git parity at legacy boundaries", () => {
   });
 });
 
-describe.each([1, 2])("original %i-Claim artifact and preparation routing", count => {
-  it("binds each work, checkout and artifact namespace without shrinking the assignment", async () => {
-    const original = assignment(count);
+describe("singleton Claim slot-zero artifact and preparation routing", () => {
+  it("prepares in slot zero and consumes the downloaded artifact at the manager's slot-zero path", async () => {
+    const original = assignment();
+    const [member] = original.claims;
     const root = directory();
-    const inputs = original.claims.map((member, index) => ({ type: "custom", ...(count > 1 ? { claim_handle: member.handle } : {}), number: index + 41, content: member.work.input }));
+    const input = { type: "custom", number: 41, content: member.work.input };
+    const authorize = async request => {
+      expect(request.assignment).toEqual(original);
+      expect(request.claim_handle).toBe(member.handle);
+      return allow(request);
+    };
+    const prepared = await prepareAdapterContext({ assignment: original, adapter, index: 0, type: "custom", messages: [input], authorize, artifactRoot: root });
+    expect(prepared.messages).toEqual([{ ...input, claim_handle: member.handle }]);
+    expect(JSON.parse(fs.readFileSync(prepared.assignmentFile, "utf8"))).toEqual(original);
+    fs.writeFileSync(prepared.outputFile, JSON.stringify({ version: 3, claim_handle: member.handle, type: "custom", messages: [{ input: prepared.messages[0], payload: { number: 41, content: member.work.input } }] }));
+    // The preparer uploads <root>/claims/; the trusted job downloads it into claim-adapters/<type>/0/claims/.
+    const trusted = directory();
+    fs.cpSync(path.join(root, "claims"), path.join(trusted, "claim-adapters", "custom", "0", "claims"), { recursive: true });
     const observed = [];
-    const filenames = [];
-    for (const [index, member] of original.claims.entries()) {
-      const authorize = async request => {
-        expect(request.assignment).toEqual(original);
-        expect(request.assignment.claims[index].work.checkout).toBe(member.work.checkout);
-        expect(request.claim_handle).toBe(member.handle);
-        return allow(request);
-      };
-      const prepared = await prepareAdapterContext({ assignment: original, adapter, index, type: "custom", messages: inputs, authorize, artifactRoot: root });
-      expect(prepared.messages).toEqual([{ ...inputs[index], claim_handle: member.handle }]);
-      expect(JSON.parse(fs.readFileSync(prepared.assignmentFile, "utf8"))).toEqual(original);
-      fs.writeFileSync(
-        prepared.outputFile,
-        JSON.stringify({ version: 3, claim_handle: member.handle, type: "custom", messages: [{ input: prepared.messages[0], payload: { number: inputs[index].number, content: inputs[index].content } }] })
-      );
-      await scope.withClaimExecution({ assignment: original, claim_handle: member.handle, authorize }, async () => {
-        const loadEffectHandler = vi.fn(async () => async message => {
-          observed.push(message);
-          return { success: true };
-        });
-        const handler = await createClaimAdapterHandler({ adapter, filename: prepared.outputFile, loadEffectHandler });
-        expect(loadEffectHandler).not.toHaveBeenCalled();
-        expect(await handler(inputs[index])).toEqual({ success: true });
-        expect(loadEffectHandler).toHaveBeenCalledTimes(1);
-        filenames.push(bundle.getBundlePathForBranch("same-branch"), patch.getPatchPathForBranch("same-branch"));
+    await scope.withClaimExecution({ assignment: original, claim_handle: member.handle, authorize }, async () => {
+      const loadEffectHandler = vi.fn(async () => async message => {
+        observed.push(message);
+        return { success: true };
       });
-    }
-    expect(observed).toEqual(inputs.map((input, index) => ({ type: "update_issue", claim_handle: original.claims[index].handle, repo: "owner/repo", item_number: input.number, body: input.content })));
-    expect(new Set(filenames).size).toBe(count * 2);
+      const filename = preparedAdapterPath(path.join(trusted, "claim-adapters", "custom", "0"), scope.currentClaimHandle(), "custom");
+      const handler = await createClaimAdapterHandler({ adapter, filename, loadEffectHandler });
+      expect(loadEffectHandler).not.toHaveBeenCalled();
+      expect(await handler(input)).toEqual({ success: true });
+      expect(loadEffectHandler).toHaveBeenCalledTimes(1);
+    });
+    expect(observed).toEqual([{ type: "update_issue", claim_handle: member.handle, repo: "owner/repo", item_number: 41, body: member.work.input }]);
+  });
+
+  it("keeps older compiled slots 1-15 inactive for a valid singleton and rejects out-of-range slots", async () => {
+    const original = assignment();
+    const root = directory();
+    const authorize = vi.fn(allow);
+    const messages = [{ type: "custom", number: 41, content: "input-1" }];
+    for (const index of [1, 15]) expect(await prepareAdapterContext({ assignment: original, adapter, index, type: "custom", messages, authorize, artifactRoot: root })).toEqual({ active: false });
+    for (const index of [-1, 16, "x", undefined]) await expect(prepareAdapterContext({ assignment: original, adapter, index, type: "custom", messages, authorize, artifactRoot: root })).rejects.toThrow(/slot/);
+    expect(authorize).not.toHaveBeenCalled();
+    expect(fs.readdirSync(root)).toEqual([]);
   });
 });
 
 describe("prepared adapter rejection ordering", () => {
-  it("does not authorize or prepare empty, ambiguous or foreign-only input", async () => {
+  it("does not authorize or prepare empty, foreign-only, contradictory, mistyped or two-member input", async () => {
     const original = assignment();
     const root = directory();
     const authorize = vi.fn(async () => {
       throw new Error("empty preparation cannot access credentials");
     });
-    for (const messages of [[], [{ type: "custom", number: 42 }], [{ type: "custom", claim_handle: "foreign" }], [{ type: "other", claim_handle: "h1" }]]) {
+    for (const messages of [[], [{ type: "custom", claim_handle: "foreign" }], [{ type: "custom", claim_handle: "h2", number: 42 }], [{ type: "custom", number: 42, work_id: "work:2" }], [{ type: "other", claim_handle: "h1" }]]) {
       expect(await prepareAdapterContext({ assignment: original, adapter, index: 0, type: "custom", messages, authorize, artifactRoot: root })).toEqual({ active: false, claim_handle: "h1" });
+    }
+    const messages = [
+      { type: "custom", claim_handle: "h1", number: 42 },
+      { type: "custom", claim_handle: "h2", number: 43 },
+    ];
+    for (const index of [0, 1]) {
+      await expect(prepareAdapterContext({ assignment: twoMemberAssignment(), adapter, index, type: "custom", messages, authorize, artifactRoot: root })).rejects.toThrow(/exactly one open Claim/);
     }
     expect(authorize).not.toHaveBeenCalled();
     expect(fs.readdirSync(root)).toEqual([]);
   });
 
-  it("rejects missing/foreign selectors, contradictory identities, missing artifacts and terminal Claims before loading effects", async () => {
-    const original = assignment();
+  it("rejects foreign selectors, contradictory identities, cross-dispatch factories, missing artifacts and terminal Claims before loading effects", async () => {
+    const [original, second] = dispatches();
     const loadEffectHandler = vi.fn(async () => {
       throw new Error("invalid input cannot acquire effect credentials");
     });
     const authorize = vi.fn(allow);
+    let factory;
     await scope.withClaimExecution({ assignment: original, claim_handle: "h1", authorize }, async () => {
       const handler = await createClaimAdapterHandler({ adapter, filename: path.join(directory(), "missing.json"), loadEffectHandler });
-      for (const message of [{ type: "custom" }, { type: "custom", claim_handle: "foreign" }, { type: "custom", claim_handle: "h2" }, { type: "custom", claim_handle: "h1", work_id: "work:2" }])
-        await expect(handler(message)).rejects.toThrow(/claim_handle|cannot escape|work_id/);
+      factory = handler;
+      for (const message of [
+        { type: "custom", claim_handle: "foreign" },
+        { type: "custom", claim_handle: "h2" },
+        { type: "custom", claim_handle: "h1", work_id: "work:2" },
+        { type: "custom", claim_id: "claim-2" },
+      ])
+        await expect(handler(message)).rejects.toThrow(/foreign|conflicts/);
       expect(authorize).not.toHaveBeenCalled();
+      await expect(handler({ type: "custom" })).rejects.toThrow();
       await expect(handler({ type: "custom", claim_handle: "h1" })).rejects.toThrow();
     });
-    await scope.withClaimExecution({ assignment: original, claim_handle: "h1", authorize: async request => ({ claim_handle: request.claim_handle, authorized: false, state: "result", suppressed: true }) }, async () => {
+    authorize.mockClear();
+    await scope.withClaimExecution({ assignment: second, claim_handle: "h1", authorize }, async () => {
+      await expect(factory({ type: "custom", claim_handle: "h1" })).rejects.toThrow(/original immutable Claim identity/);
+    });
+    expect(authorize).not.toHaveBeenCalled();
+    await scope.withClaimExecution({ assignment: original, claim_handle: "h1", authorize: async request => ({ claim_handle: request.claim_handle, authorized: false, state: "completed", suppressed: true }) }, async () => {
       const handler = await createClaimAdapterHandler({ adapter, filename: "unreadable", loadEffectHandler });
-      await expect(handler({ type: "custom", claim_handle: "h1" })).rejects.toThrow(/already settled/);
+      await expect(handler({ type: "custom", claim_handle: "h1" })).rejects.toThrow(/already completed/);
     });
     expect(loadEffectHandler).not.toHaveBeenCalled();
   });
 
-  it("keeps a cancelled sibling inactive while the valid sibling consumes only its own prepared payload", async () => {
+  it("keeps a cancelled singleton inactive and writes no preparation", async () => {
     const original = assignment();
     const root = directory();
-    const messages = original.claims.map(member => ({ type: "custom", claim_handle: member.handle, number: 42, content: member.work.input }));
-    const authorize = async request => ({ claim_handle: request.claim_handle, authorized: request.claim_handle === "h2", ...(request.claim_handle === "h1" ? { state: "cancelled", suppressed: true } : {}) });
+    const messages = [{ type: "custom", claim_handle: "h1", number: 42, content: "input-1" }];
+    const authorize = async request => ({ claim_handle: request.claim_handle, authorized: false, state: "cancelled", suppressed: true });
     await expect(prepareAdapterContext({ assignment: original, adapter, index: 0, type: "custom", messages, authorize, artifactRoot: root })).rejects.toThrow(/cancelled/);
-    const prepared = await prepareAdapterContext({ assignment: original, adapter, index: 1, type: "custom", messages, authorize, artifactRoot: root });
-    expect(prepared.messages).toEqual([messages[1]]);
-    expect(fs.readdirSync(path.join(root, "claims"))).toEqual([path.basename(prepared.directory)]);
+    expect(fs.existsSync(path.join(root, "claims")) ? fs.readdirSync(path.join(root, "claims")) : []).toEqual([]);
   });
 });
 
 describe("git authorization before credentialed repository readback", () => {
-  it.each(["open", "cancelled", "result"])("rejects a %s Claim without accessing its repository client", async state => {
+  it.each(["unbound", "cancelled", "completed"])("rejects a %s Claim without accessing its repository client", async state => {
     const repositoryRead = vi.fn(async () => {
       throw new Error("unauthorized native read");
     });
-    const authorize = async request => ({ claim_handle: request.claim_handle, authorized: false, state, ...(state === "open" ? {} : { suppressed: true }) });
+    const authorize = async request => ({ claim_handle: request.claim_handle, authorized: false, state, ...(state === "unbound" ? {} : { suppressed: true }) });
     await scope.withClaimExecution({ assignment: assignment(), claim_handle: "h1", authorize }, async () => {
       await expect(assertGitPushAuthorized({ remote: "origin", branch: "work", execGitSync: () => "https://github.com/owner/repo.git\n", github: { rest: { repos: { get: repositoryRead } } } })).rejects.toThrow(
-        /Completion|cancelled|settled/
+        /not open|cancelled|completed/
       );
     });
     expect(repositoryRead).not.toHaveBeenCalled();
   });
 
-  it("uses each checkout's cwd/auth and independently resolved native identity", async () => {
-    const original = assignment();
+  it("uses each singleton dispatch's checkout cwd/auth and independently resolved native identity", async () => {
     const seen = [];
-    for (const member of original.claims) {
-      const authorize = async request => {
-        expect(request.requireCompletion).toBe(true);
-        if (request.resource) expect(request.resource.repository_id).toBe("7");
-        return allow(request);
-      };
+    const execGitSync = (_args, options) => {
+      seen.push([options.cwd, options.env.CHECKOUT_CREDENTIAL]);
+      return "https://github.com/owner/repo.git\n";
+    };
+    const github = { rest: { repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) } } };
+    const authorize = vi.fn(async request => {
+      expect(request.requireCompletion).toBe(true);
+      expect(request.assignment.claims).toHaveLength(1);
+      if (request.resource) expect(request.resource.repository_id).toBe("7");
+      return allow(request);
+    });
+    for (const original of dispatches()) {
+      const [member] = original.claims;
       await scope.withClaimExecution({ assignment: original, claim_handle: member.handle, authorize }, () =>
-        assertGitPushAuthorized({
-          remote: "origin",
-          branch: `work-${member.handle}`,
-          cwd: member.work.checkout,
-          gitAuthEnv: { CHECKOUT_CREDENTIAL: member.handle },
-          execGitSync: (_args, options) => {
-            seen.push([options.cwd, options.env.CHECKOUT_CREDENTIAL]);
-            return "https://github.com/owner/repo.git\n";
-          },
-          github: { rest: { repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }) } } },
-        })
+        assertGitPushAuthorized({ remote: "origin", branch: `work-${member.claim_id}`, cwd: member.work.checkout, gitAuthEnv: { CHECKOUT_CREDENTIAL: member.claim_id }, execGitSync, github })
       );
     }
     expect(seen).toEqual([
-      ["checkout-1", "h1"],
-      ["checkout-2", "h2"],
+      ["checkout-1", "claim-1"],
+      ["checkout-2", "claim-2"],
     ]);
+    const calls = authorize.mock.calls.length;
+    expect(() =>
+      scope.withClaimExecution({ assignment: twoMemberAssignment(), claim_handle: "h1", authorize }, () =>
+        assertGitPushAuthorized({ remote: "origin", branch: "work-two-member", cwd: "checkout-1", gitAuthEnv: { CHECKOUT_CREDENTIAL: "two-member" }, execGitSync, github })
+      )
+    ).toThrow(/exactly one open Claim/);
+    expect(seen).toHaveLength(2);
+    expect(authorize).toHaveBeenCalledTimes(calls);
   });
 
   it("does not change checkout authentication before rejecting a direct signed-push fallback", async () => {
@@ -273,7 +299,7 @@ describe("git authorization before credentialed repository readback", () => {
     await scope.withClaimExecution({ assignment: assignment(), claim_handle: "h1", authorize: async request => ({ claim_handle: request.claim_handle, authorized: false }) }, async () => {
       await expect(
         pushSignedCommits({ owner: "owner", repo: "repo", branch: "work", baseRef: "main", cwd: root, signedCommits: false, pushRemoteUrl: "https://github.com/owner/repo.git", pushToken: "checkout-specific-token" })
-      ).rejects.toThrow(/Completion/);
+      ).rejects.toThrow(/not open/);
     });
     expect(global.exec.exec).not.toHaveBeenCalled();
     expect(global.exec.getExecOutput).not.toHaveBeenCalled();
@@ -289,21 +315,21 @@ describe("git authorization before credentialed repository readback", () => {
       await expect(assertGitPushAuthorized({ remote: "https://github.com/owner/repo.git", branch: "work", cwd: root, github: { rest: { repos: { get: read } } } })).resolves.toBeUndefined();
       expect(read).toHaveBeenCalledTimes(1);
       execFileSync("git", ["-C", root, "config", "--local", "url.https://github.com/foreign/.pushInsteadOf", "https://github.com/owner/"]);
-      await expect(assertGitPushAuthorized({ remote: "https://github.com/owner/repo.git", branch: "work", cwd: root, github: { rest: { repos: { get: read } } } })).rejects.toThrow(/Completion/);
+      await expect(assertGitPushAuthorized({ remote: "https://github.com/owner/repo.git", branch: "work", cwd: root, github: { rest: { repos: { get: read } } } })).rejects.toThrow(/not open/);
       expect(read).toHaveBeenCalledTimes(1);
     });
     expect(execFileSync("git", ["-C", root, "remote"], { encoding: "utf8" }).trim()).toBe("unrelated");
   });
 });
 
-describe.each([1, 2])("native standalone adapters with %i original Claims", count => {
-  it("routes upload bytes, coverage labels and SARIF categories through the original member", async () => {
-    const original = assignment(count);
+describe.each([1, 2])("native standalone adapters across %i singleton dispatches reusing h1", count => {
+  it("routes upload bytes, coverage labels and SARIF categories through each dispatch's sole member", async () => {
+    const originals = dispatches().slice(0, count);
     const root = directory();
     const uploadedLabels = [];
     const categories = [];
     const authorize = async request => {
-      expect(request.assignment).toEqual(original);
+      expect(originals).toContainEqual(request.assignment);
       expect(request.requireCompletion).toBe(true);
       return allow(request);
     };
@@ -315,29 +341,37 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
             categories.push(JSON.parse(zlib.gunzipSync(Buffer.from(input.sarif, "base64"))).runs[0].automationDetails.id);
             return { data: { id: `sarif-${categories.length}` } };
           }),
+          getSarif: async () => ({ data: { processing_status: "complete" } }),
         },
       },
       request: vi.fn(async (route, input) => {
+        if (route.startsWith("GET ")) return { data: { processing_status: "succeeded" } };
         expect(route).toBe("PUT /repos/{owner}/{repo}/code-coverage/report");
         uploadedLabels.push(input.label);
-        expect(zlib.gunzipSync(Buffer.from(input.coverage_report, "base64")).toString()).toBe(original.claims[uploadedLabels.length - 1].work.input);
+        expect(zlib.gunzipSync(Buffer.from(input.coverage_report, "base64")).toString()).toBe(originals[uploadedLabels.length - 1].claims[0].work.input);
         return { data: { id: `coverage-${uploadedLabels.length}` } };
       }),
     };
-    for (const member of original.claims) {
+    const factories = [];
+    for (const original of originals) {
+      const [member] = original.claims;
       const reportRoot = scope.claimArtifactPath(root, member.handle, original);
       fs.mkdirSync(reportRoot, { recursive: true });
       fs.writeFileSync(path.join(reportRoot, "coverage.info"), member.work.input);
       await scope.withClaimExecution({ assignment: original, claim_handle: member.handle, authorize, effects: [] }, async () => {
-        const selector = count === 1 ? {} : { claim_handle: member.handle };
         const scan = await scanning.main({ "target-ref": "refs/heads/main" }, github);
         const upload = await coverage.main({ "target-ref": "refs/heads/main", "coverage-dir": root }, github);
-        if (count > 1) {
-          await expect(scan({ type: "create_code_scanning_alert", file: "src/file.js", line: 1, severity: "warning", message: "finding" })).rejects.toThrow(/claim_handle is required/);
-          await expect(upload({ type: "upload_code_coverage", file: "coverage.info", label: "coverage", language: "c" })).rejects.toThrow(/claim_handle is required/);
-        }
-        expect((await scan({ type: "create_code_scanning_alert", ...selector, file: "src/file.js", line: 1, severity: "warning", message: member.work.input })).success).toBe(true);
-        expect((await upload({ type: "upload_code_coverage", ...selector, file: "coverage.info", label: "coverage", language: "c" })).success).toBe(true);
+        factories.push({ scan, upload });
+        await expect(scan({ type: "create_code_scanning_alert", claim_handle: "h2", file: "src/file.js", line: 1, severity: "warning", message: "finding" })).rejects.toThrow(/foreign/);
+        await expect(upload({ type: "upload_code_coverage", claim_handle: "h2", file: "coverage.info", label: "coverage", language: "c" })).rejects.toThrow(/foreign/);
+        expect((await scan({ type: "create_code_scanning_alert", file: "src/file.js", line: 1, severity: "warning", message: member.work.input })).success).toBe(true);
+        expect((await upload({ type: "upload_code_coverage", file: "coverage.info", label: "coverage", language: "c" })).success).toBe(true);
+      });
+    }
+    if (count > 1) {
+      await scope.withClaimExecution({ assignment: originals[1], claim_handle: "h1", authorize, effects: [] }, async () => {
+        await expect(factories[0].scan({ type: "create_code_scanning_alert", file: "src/file.js", line: 1, severity: "warning", message: "escape" })).rejects.toThrow(/original immutable Claim identity/);
+        await expect(factories[0].upload({ type: "upload_code_coverage", file: "coverage.info", label: "coverage", language: "c" })).rejects.toThrow(/original immutable Claim identity/);
       });
     }
     expect(categories).toHaveLength(count);
@@ -346,9 +380,9 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
     expect(new Set(uploadedLabels).size).toBe(count);
   });
 
-  it.skipIf(process.platform === "win32")("publishes independently namespaced assets and verifies only the original private Claim receipt", async () => {
+  it.skipIf(process.platform === "win32")("publishes independently namespaced assets per singleton dispatch", async () => {
     simulateLinuxAssetDescriptors();
-    const original = assignment(count);
+    const originals = dispatches().slice(0, count);
     const root = directory();
     const refs = new Map();
     const trees = new Map();
@@ -389,19 +423,17 @@ describe.each([1, 2])("native standalone adapters with %i original Claims", coun
         },
       },
     };
-    for (const member of original.claims) {
+    for (const original of originals) {
+      const [member] = original.claims;
       const reportRoot = scope.claimArtifactPath(root, member.handle, original);
       fs.mkdirSync(reportRoot, { recursive: true });
       fs.writeFileSync(path.join(reportRoot, digest("same.png") + ".png"), member.work.input);
       await scope.withClaimExecution({ assignment: original, claim_handle: member.handle, authorize: allow, effects: [] }, async () => {
         const handler = await assets.main({ "assets-dir": root, "target-repo": "owner/repo", branch: "assets/audit" }, github);
-        const message = { type: "upload_asset", ...(count > 1 ? { claim_handle: member.handle } : {}), path: "same.png" };
-        const result = await handler(message);
+        const result = await handler({ type: "upload_asset", path: "same.png" });
         results.push(result);
         expect(result.sha).toBe(digest(member.work.input));
-        expect((await assets.verifyAssetDelivery({ claim: member, result, github, authorize: allow })).verified).toBe(true);
-        expect((await assets.verifyAssetDelivery({ claim: member, result: structuredClone(result), github })).verified).toBe(false);
-        if (results.length > 1) expect((await assets.verifyAssetDelivery({ claim: member, result: results[0], github })).verified).toBe(false);
+        expect(result.path).toContain(scope.claimArtifactPath("", member.handle, original).split("/").pop());
       });
     }
     expect(refs.size).toBe(count);
@@ -432,7 +464,7 @@ describe("standalone adapter rejection before file or native effect access", () 
     expect(fs.readFileSync(sentinel, "utf8")).toBe("harmless external sentinel");
   });
 
-  it.each(["cancelled", "result"])("rejects terminal %s selectors before accessing any standalone upload endpoint", async state => {
+  it.each(["cancelled", "completed"])("rejects terminal %s selectors before accessing any standalone upload endpoint", async state => {
     const access = vi.fn(() => {
       throw new Error("terminal Claim cannot access native credentials or endpoints");
     });
@@ -441,7 +473,7 @@ describe("standalone adapter rejection before file or native effect access", () 
     await scope.withClaimExecution({ assignment: assignment(), claim_handle: "h1", authorize }, async () => {
       for (const module of [scanning, coverage, assets]) {
         const handler = await module.main({ "target-ref": "refs/heads/main", "target-repo": "owner/repo" }, github);
-        await expect(handler({ type: "upload", claim_handle: "h1" })).rejects.toThrow(/cancelled|already settled/);
+        await expect(handler({ type: "upload", claim_handle: "h1" })).rejects.toThrow(/cancelled|already completed/);
       }
     });
     expect(access).not.toHaveBeenCalled();
@@ -475,7 +507,7 @@ describe("standalone adapter rejection before file or native effect access", () 
       await expect(handler({ type: "upload_asset", claim_handle: "h1", path: "missing.png" })).rejects.toThrow();
       await expect(handler({ type: "upload_asset", claim_handle: "h1", path: "missing.exe" })).rejects.toThrow(/extension/);
       await expect(handler({ type: "upload_asset", claim_handle: "h1", repo: "foreign/repo", path: "missing.png" })).rejects.toThrow(/conflicts/);
-      await expect(handler({ type: "upload_asset", path: "missing.png" })).rejects.toThrow(/claim_handle is required/);
+      await expect(handler({ type: "upload_asset", claim_handle: "h2", path: "missing.png" })).rejects.toThrow(/foreign/);
       const preview = await assets.main({ staged: true, "assets-dir": root, "target-repo": "owner/repo" }, github);
       expect(await preview({ type: "upload_asset", claim_handle: "h1", path: "missing.png" })).toEqual({ success: true, staged: true, claim_handle: "h1" });
     });

@@ -1,12 +1,10 @@
 // @ts-check
 "use strict";
 const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
-// @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs:119 validates the fixed adapter repository; assertClaimAuthorized and the guarded effect client authorize resolved targets before writes.
+// @safe-outputs-exempt SEC-005 — work_queue_claim_adapters.cjs validates the fixed adapter repository; assertClaimAuthorized and the guarded effect client authorize resolved targets before writes.
 
-const { resolveRepositoryTarget, resolveParentResourceTarget } = require("./work_queue_effect_resource.cjs");
-
-const { canonical, canonicalBytes, closed } = require("./work_queue_codec.cjs");
-const { assertClaimAuthorized, claimIdentity, assertClaimIdentity, receiptMatchesClaim, claimDeliveryReceipt, durableReceipt, createClaimResourceVerification, withClaimResourceVerification } = require("./work_queue_claim_scope.cjs");
+const { canonicalBytes, closed } = require("./work_queue_codec.cjs");
+const { assertClaimAuthorized, claimIdentity, assertClaimIdentity, currentClaimHandle } = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 
@@ -32,7 +30,6 @@ const RESERVED = new Set([
   "dispatch_id",
   "receipt_id",
 ]);
-const privateReceipts = new WeakMap();
 
 function routeFields(route) {
   if (typeof route !== "string" || !/^\/repos\/\{owner\}\/\{repo\}\/[A-Za-z0-9_{}./-]+$/.test(route) || route.includes("..") || route.includes("//"))
@@ -42,33 +39,21 @@ function routeFields(route) {
   return fields;
 }
 
+// The adapter `verifier` key is accepted for compiled-config compatibility but
+// unused: v4 records effects without delivery readback.
 function validateRestAdapter(adapter) {
   closed(adapter.request, ["method", "route", "permission"], [], "trusted REST adapter request");
-  closed(adapter.verifier, ["route", "fields", "resource-kind"], ["number-field"], "trusted REST adapter verifier");
   if (!["POST", "PUT", "PATCH"].includes(adapter.request.method)) throw new Error("Trusted REST adapter requires an explicit supported mutation method");
   if (!["checks", "contents", "issues", "pull-requests", "deployments", "discussions"].includes(adapter.request.permission)) throw new Error("Trusted REST adapter requires an explicit native write permission");
   const requestFields = routeFields(adapter.request.route);
-  const readFields = routeFields(adapter.verifier.route);
-  if (requestFields.includes("receipt_id") || !readFields.includes("receipt_id")) throw new Error("Independent REST readback must bind the exact private native receipt ID");
-  if (!["unknown", "issue", "pull_request", "comment", "release", "check_run", "deployment", "repository"].includes(adapter.verifier["resource-kind"])) throw new Error("Unsupported trusted REST resource kind");
   const declarations = Object.assign(Object.create(null), adapter.expected || {});
   for (const field of Object.keys(adapter["field-map"] || {})) declarations[field] = true;
   if (!Object.keys(declarations).length || Object.keys(declarations).length > 64 || Object.keys(declarations).some(field => !FIELD.test(field) || RESERVED.has(field)))
     throw new Error("Trusted REST adapter has invalid or reserved effect fields");
-  const verifierFields = adapter.verifier.fields;
-  if (!verifierFields || typeof verifierFields !== "object" || Array.isArray(verifierFields) || !Object.keys(verifierFields).length || Object.keys(verifierFields).length > 64)
-    throw new Error("Trusted REST verifier requires bounded declared field readback");
-  for (const [field, observed] of Object.entries(verifierFields)) {
-    if (!Object.hasOwn(declarations, field) || typeof observed !== "string" || !FIELD.test(observed) || RESERVED.has(observed)) throw new Error("Trusted REST verifier has an undeclared field projection");
-  }
-  for (const field of Object.keys(declarations)) {
-    if (!requestFields.includes(field) && !Object.hasOwn(verifierFields, field)) throw new Error("Every declared REST effect field requires independent readback");
-  }
-  for (const field of [...requestFields, ...readFields]) {
-    if (["owner", "repo", "receipt_id"].includes(field)) continue;
+  for (const field of requestFields) {
+    if (["owner", "repo"].includes(field)) continue;
     if (!Object.hasOwn(declarations, field)) throw new Error("Trusted REST route contains an unbound selector");
   }
-  if (adapter.verifier["number-field"] !== undefined && (!FIELD.test(adapter.verifier["number-field"]) || RESERVED.has(adapter.verifier["number-field"]))) throw new Error("Invalid trusted REST verifier resource number field");
   return adapter;
 }
 
@@ -89,7 +74,7 @@ function nativeIdentity(value) {
 
 function createRestEffectHandler(adapter, github) {
   adapter = validateRestAdapter(structuredClone(adapter));
-  const identity = claimIdentity(require("./work_queue_claim_scope.cjs").currentClaimHandle());
+  const identity = claimIdentity(currentClaimHandle());
   const client = wrapClaimEffectClient(github, { claim_handle: identity.claim_handle });
   const stagedMode = isStagedMode();
   return async message => {
@@ -104,63 +89,12 @@ function createRestEffectHandler(adapter, github) {
       fields[field] = message[field];
     }
     if (canonicalBytes(fields) > 1024 * 1024) throw new Error("Trusted REST effect input exceeds its byte ceiling");
-    const values = { ...fields, owner, repo };
-    const route = concreteRoute(adapter.request.route, values);
+    const route = concreteRoute(adapter.request.route, { ...fields, owner, repo });
     const selectors = new Set(routeFields(adapter.request.route));
     const body = Object.fromEntries(Object.entries(fields).filter(([field]) => !selectors.has(field)));
     const response = await client.request(`${adapter.request.method} ${route}`, body);
-    const id = nativeIdentity(response?.data?.id);
-    const result = { success: true, repo: adapter["target-repo"], id };
-    privateReceipts.set(result, { ...identity, adapter: canonical(adapter), fields: structuredClone(fields), id });
-    return result;
+    return { success: true, repo: adapter["target-repo"], id: nativeIdentity(response?.data?.id) };
   };
 }
 
-function durableRestReceipt(result, claim) {
-  const receipt = result && privateReceipts.get(result);
-  if (!receiptMatchesClaim(receipt, claim) || canonicalBytes(receipt.fields) > 8192) return null;
-  return durableReceipt(receipt, ["adapter"]);
-}
-
-async function verifyRestAdapterDelivery(options) {
-  const receipt = claimDeliveryReceipt(options, "rest_adapter", privateReceipts);
-  return verifyRestReceipt(options, receipt);
-}
-
-async function verifyRestReceipt(options, receipt) {
-  const { adapter, claim, github } = options;
-  const unverified = field_index => ({ verified: false, diagnostics: { event: "rest.readback.mismatch", field_index } });
-  validateRestAdapter(adapter);
-  if (!receiptMatchesClaim(receipt, claim) || (options.durable === true ? options.result?.entry?.adapter : receipt.adapter) !== canonical(adapter)) return unverified(-1);
-  try {
-    if (typeof receipt.id !== "string") return unverified(-1);
-    nativeIdentity(receipt.id);
-    closed(receipt.fields, [...new Set([...Object.keys(adapter.expected || {}), ...Object.keys(adapter["field-map"] || {})])], [], "REST receipt fields");
-    canonical(receipt.fields);
-  } catch {
-    return unverified(-1);
-  }
-  if (!require("./work_queue_declared_verification.cjs").matchesDeclaredAdapterExpected(adapter, receipt.fields, options.verification)) return unverified(-1);
-  const [owner, repo] = adapter["target-repo"].split("/");
-  const route = concreteRoute(adapter.verifier.route, { ...receipt.fields, owner, repo, receipt_id: receipt.id });
-  const { data } = await github.request(`GET ${route}`);
-  if (!data || nativeIdentity(data.id) !== receipt.id) return unverified(-1);
-  const verifiedFields = Object.entries(adapter.verifier.fields);
-  for (const [index, [desired, observed]] of verifiedFields.entries()) {
-    if (!Object.hasOwn(data, observed) || canonical(data[observed]) !== canonical(receipt.fields[desired])) return unverified(index);
-  }
-  const numberField = adapter.verifier["number-field"];
-  const number = numberField === undefined ? undefined : data[numberField];
-  if (numberField !== undefined && (!Number.isSafeInteger(number) || number < 1)) return unverified(verifiedFields.length);
-  const resource = { kind: adapter.verifier["resource-kind"], repository: adapter["target-repo"], id: receipt.id, ...(number === undefined ? {} : { number }) };
-  const proof = createClaimResourceVerification({
-    verified: true,
-    claim_handle: claim.handle,
-    resource,
-    authority_resource: ["issue", "pull_request"].includes(resource.kind) ? await resolveParentResourceTarget(github, { repository: resource.repository, kind: resource.kind, number }, data) : await resolveRepositoryTarget(github, resource),
-    evidence: { source: "independent_native_readback", id: receipt.id, fields: Object.keys(adapter.verifier.fields) },
-  });
-  return withClaimResourceVerification(proof, () => proof, { authorize: options.authorize, context: options.context, github });
-}
-
-module.exports = { validateRestAdapter, createRestEffectHandler, verifyRestAdapterDelivery, durableRestReceipt };
+module.exports = { validateRestAdapter, createRestEffectHandler };

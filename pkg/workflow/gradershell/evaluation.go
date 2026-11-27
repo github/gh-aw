@@ -26,6 +26,9 @@ func HasShellCodeEvaluation(file *syntax.File, dynamicWord func(*syntax.Word) bo
 
 	found := false
 	syntax.Walk(file, func(node syntax.Node) bool {
+		if found {
+			return false
+		}
 		switch node := node.(type) {
 		case *syntax.CallExpr:
 			found = commandReevaluatesCode(node.Args, isDynamic, 0)

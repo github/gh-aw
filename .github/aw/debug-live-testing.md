@@ -56,8 +56,8 @@ branches, memory, issues, PRs and other outputs can still be shared with
 production. Retain the approved effect scope and required protections; use a
 reviewed dry-run lock when testing startup without compiler-managed mutations.
 Dry-run suppresses queue writes and worker launches, so it cannot verify live
-dispatch. Under the [work-queue protocol](work-queue.md), the first accepted
-producer submit bootstraps Policy and Work automatically — do not demand
+dispatch. Under the [work-queue protocol](work-queue.md), the first trusted
+producer submit creates the queue branch with its Work — do not demand
 administrator seeding or repository-rule inventories for queue use.
 
 If another gate blocks execution, state the specific blocker and the smallest

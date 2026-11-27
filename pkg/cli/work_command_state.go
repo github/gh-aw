@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/github/gh-aw/pkg/workqueue"
 	"github.com/spf13/cobra"
@@ -16,29 +15,28 @@ import (
 
 const workQueueViewBytes = 64 << 10
 
+var workQueueWorkStateNames = []string{"available", "claimed", "completed", "cancelled"}
+
 type workQueueRow struct {
-	Kind                string                `json:"kind"`
-	ID                  string                `json:"id"`
-	WorkID              string                `json:"work_id,omitempty"`
-	GraphID             string                `json:"graph_id"`
-	Text                string                `json:"text"`
-	State               string                `json:"state,omitempty"`
-	Priority            int                   `json:"priority,omitempty"`
-	Delivery            string                `json:"delivery,omitempty"`
-	Current             bool                  `json:"current,omitempty"`
-	DispatchID          string                `json:"dispatch_id,omitempty"`
-	Handle              string                `json:"claim_handle,omitempty"`
-	Pool                string                `json:"pool,omitempty"`
-	NodeKey             string                `json:"node_key,omitempty"`
-	WorkerProfile       string                `json:"worker_profile,omitempty"`
-	Attempts            *int                  `json:"attempts,omitempty"`
-	AdmittedAt          *int64                `json:"admitted_at,omitempty"`
-	GrantedAt           *int64                `json:"granted_at,omitempty"`
-	RetryNotBefore      *int64                `json:"retry_not_before,omitempty"`
-	ClaimID             string                `json:"claim_id,omitempty"`
-	CancellationReason  string                `json:"cancellation_reason,omitempty"`
-	Run                 *workqueue.RunBinding `json:"run,omitempty"`
-	ReservationRetained *bool                 `json:"reservation_retained,omitempty"`
+	Kind               string                `json:"kind"`
+	ID                 string                `json:"id"`
+	WorkID             string                `json:"work_id,omitempty"`
+	GraphID            string                `json:"graph_id"`
+	Text               string                `json:"text"`
+	State              string                `json:"state,omitempty"`
+	Priority           int                   `json:"priority,omitempty"`
+	Current            bool                  `json:"current,omitempty"`
+	DispatchID         string                `json:"dispatch_id,omitempty"`
+	DispatchState      string                `json:"dispatch_state,omitempty"`
+	Handle             string                `json:"claim_handle,omitempty"`
+	Pool               string                `json:"pool,omitempty"`
+	NodeKey            string                `json:"node_key,omitempty"`
+	WorkerProfile      string                `json:"worker_profile,omitempty"`
+	Attempts           *int                  `json:"attempts,omitempty"`
+	ClaimID            string                `json:"claim_id,omitempty"`
+	CancellationReason string                `json:"cancellation_reason,omitempty"`
+	Run                *workqueue.RunBinding `json:"run,omitempty"`
+	Effects            int                   `json:"effects,omitempty"`
 }
 
 func (row workQueueRow) key() string { return row.Kind + ":" + row.ID }
@@ -64,6 +62,15 @@ func workQueueMatches(query string, values ...string) bool {
 	return false
 }
 
+// workQueueEffectCount counts recorded effects (a JSON array); malformed or absent effects count as none.
+func workQueueEffectCount(effects json.RawMessage) int {
+	var entries []json.RawMessage
+	if json.Unmarshal(effects, &entries) != nil {
+		return 0
+	}
+	return len(entries)
+}
+
 func workQueueOrderedWork(state workqueue.Projection, filter workQueueFilter) []*workqueue.WorkState {
 	works := make([]*workqueue.WorkState, 0, len(state.Works))
 	for _, work := range state.Works {
@@ -76,10 +83,7 @@ func workQueueOrderedWork(state workqueue.Projection, filter workQueueFilter) []
 		if order := cmp.Compare(a.GraphID, b.GraphID); order != 0 {
 			return order
 		}
-		if order := cmp.Compare(a.Position.Commit, b.Position.Commit); order != 0 {
-			return order
-		}
-		if order := cmp.Compare(a.Position.Operation, b.Position.Operation); order != 0 {
+		if order := workqueue.FIFOCompare(a.Position, b.Position); order != 0 {
 			return order
 		}
 		return cmp.Compare(a.WorkID, b.WorkID)
@@ -87,7 +91,17 @@ func workQueueOrderedWork(state workqueue.Projection, filter workQueueFilter) []
 	return works
 }
 
-func workQueueMatchingClaims(state workqueue.Projection, work *workqueue.WorkState, members []*workqueue.ClaimState, query string) ([]*workqueue.ClaimState, bool) {
+// workQueueDispatchOrdinals maps each Dispatch to its creation order (newest highest).
+func workQueueDispatchOrdinals(state workqueue.Projection) map[string]int {
+	order := state.DispatchOrder()
+	ordinals := make(map[string]int, len(order))
+	for index, id := range order {
+		ordinals[id] = index
+	}
+	return ordinals
+}
+
+func workQueueMatchingClaims(work *workqueue.WorkState, members []*workqueue.ClaimState, ordinals map[string]int, query string) ([]*workqueue.ClaimState, bool) {
 	slices.SortFunc(members, func(a, b *workqueue.ClaimState) int {
 		if a.ClaimID == work.ClaimID && b.ClaimID != work.ClaimID {
 			return -1
@@ -95,12 +109,12 @@ func workQueueMatchingClaims(state workqueue.Projection, work *workqueue.WorkSta
 		if b.ClaimID == work.ClaimID && a.ClaimID != work.ClaimID {
 			return 1
 		}
-		if order := cmp.Compare(state.Requests[b.RequestID].At, state.Requests[a.RequestID].At); order != 0 {
+		if order := cmp.Compare(ordinals[b.DispatchID], ordinals[a.DispatchID]); order != 0 {
 			return order
 		}
 		return cmp.Compare(a.ClaimID, b.ClaimID)
 	})
-	matches := workQueueMatches(query, work.WorkID, work.GraphID, work.NodeKey, work.FairnessKey, work.State, work.Pool, work.WorkerProfile, work.Barrier)
+	matches := workQueueMatches(query, work.WorkID, work.GraphID, work.NodeKey, work.FairnessKey, work.State, work.Pool, work.WorkerProfile)
 	selected := []*workqueue.ClaimState{}
 	for _, claim := range members {
 		if matches || workQueueMatches(query, claim.ClaimID, claim.Handle, claim.DispatchID, claim.State) {
@@ -115,10 +129,11 @@ func workQueueRows(state workqueue.Projection, filter workQueueFilter, collapsed
 	for _, claim := range state.Claims {
 		claims[claim.WorkID] = append(claims[claim.WorkID], claim)
 	}
+	ordinals := workQueueDispatchOrdinals(state)
 	groups := []workQueueGroup{}
 	counts := map[string]int{}
 	for _, work := range workQueueOrderedWork(state, filter) {
-		members, matches := workQueueMatchingClaims(state, work, claims[work.WorkID], filter.Query)
+		members, matches := workQueueMatchingClaims(work, claims[work.WorkID], ordinals, filter.Query)
 		if !matches && len(members) == 0 {
 			continue
 		}
@@ -136,9 +151,7 @@ func workQueueRows(state workqueue.Projection, filter workQueueFilter, collapsed
 		counts[graph]--
 		last := counts[graph] == 0
 		closed := collapsed[work.WorkID] && filter.Query == ""
-		row := workQueueForestWorkRow(work, last, closed, len(group.claims) > 0)
-		row.AdmittedAt = workQueueAdmittedAt(state, work)
-		rows = append(rows, row)
+		rows = append(rows, workQueueForestWorkRow(work, last, closed, len(group.claims) > 0))
 		if !closed {
 			rows = append(rows, workQueueForestClaimRows(state, work, group.claims, last)...)
 		}
@@ -155,10 +168,10 @@ func workQueueForestWorkRow(work *workqueue.WorkState, last, collapsed, hasClaim
 		marker = "+"
 	}
 	return workQueueRow{Kind: "work", ID: work.WorkID, WorkID: work.WorkID, GraphID: work.GraphID,
-		State: work.State, Priority: work.SchedulingPriority(), Delivery: work.Barrier,
-		Pool: work.Pool, NodeKey: work.NodeKey, WorkerProfile: work.WorkerProfile, Attempts: &work.Attempts,
-		RetryNotBefore: &work.RetryNotBefore, ClaimID: work.ClaimID, CancellationReason: work.CancellationReason,
-		Text: fmt.Sprintf("%s [%s] W %s %s [%s P%d delivery=%s]", connector, marker, workQueueText(work.WorkID), workQueueText(work.NodeKey), work.State, work.SchedulingPriority(), work.Barrier)}
+		State: work.State, Priority: work.Priority, Pool: work.Pool, NodeKey: work.NodeKey,
+		WorkerProfile: work.WorkerProfile, Attempts: &work.Attempts, ClaimID: work.ClaimID,
+		CancellationReason: work.CancellationReason, Effects: workQueueEffectCount(work.Effects),
+		Text: fmt.Sprintf("%s [%s] W %s %s [%s P%d attempts=%d]", connector, marker, workQueueText(work.WorkID), workQueueText(work.NodeKey), work.State, work.Priority, work.Attempts)}
 }
 
 func workQueueForestClaimRows(state workqueue.Projection, work *workqueue.WorkState, members []*workqueue.ClaimState, last bool) []workQueueRow {
@@ -180,41 +193,35 @@ func workQueueForestClaimRows(state workqueue.Projection, work *workqueue.WorkSt
 		row := workQueueRow{Kind: "claim", ID: claim.ClaimID, WorkID: work.WorkID, GraphID: work.GraphID,
 			State: claim.State, Current: current, DispatchID: claim.DispatchID, Handle: claim.Handle,
 			Pool: work.Pool, NodeKey: work.NodeKey, WorkerProfile: work.WorkerProfile,
-			RetryNotBefore: &claim.RetryNotBefore, CancellationReason: claim.CancellationReason,
-			Delivery: workQueueClaimDelivery(state, claim),
-			Text:     fmt.Sprintf("%s%s C %s [%s %s] handle=%s dispatch=%s", prefix, connector, workQueueText(claim.ClaimID), claim.State, owner, workQueueText(claim.Handle), workQueueText(claim.DispatchID))}
-		if commit, ok := state.Requests[claim.RequestID]; ok {
-			row.GrantedAt = &commit.At
-		}
+			CancellationReason: claim.CancellationReason, Effects: workQueueEffectCount(claim.Effects)}
+		dispatchState, run := "missing", "-"
 		if dispatch := state.Dispatches[claim.DispatchID]; dispatch != nil {
-			retained := !dispatch.Released
-			row.ReservationRetained, row.Run = &retained, dispatch.Run
+			dispatchState, row.DispatchState, row.Run = dispatch.State, dispatch.State, dispatch.Run
+			if dispatch.Run != nil {
+				run = fmt.Sprintf("%s/%d", dispatch.Run.RunID, dispatch.Run.RunAttempt)
+			}
 		}
+		row.Text = fmt.Sprintf("%s%s C %s [%s %s] dispatch=%s (%s) run=%s", prefix, connector, workQueueText(claim.ClaimID), claim.State, owner, workQueueText(claim.DispatchID), dispatchState, workQueueText(run))
 		rows = append(rows, row)
 	}
 	return rows
 }
 
 type workQueuePage struct {
-	EvaluatedAt     int64           `json:"evaluated_at"`
-	Status          string          `json:"status"`
-	Tip             string          `json:"tip"`
-	PolicyEpoch     string          `json:"policy_epoch"`
-	Repository      string          `json:"repository"`
-	Branch          string          `json:"branch"`
-	Stats           workqueue.Stats `json:"stats"`
-	AdmissionPaused bool            `json:"admission_paused"`
-	GrantsPaused    bool            `json:"grants_paused"`
-	Offset          int             `json:"offset"`
-	TotalRows       int             `json:"total_rows"`
-	NextOffset      *int            `json:"next_offset,omitempty"`
-	Rows            []workQueueRow  `json:"rows"`
+	Status     string          `json:"status"`
+	Tip        string          `json:"tip"`
+	Repository string          `json:"repository"`
+	Branch     string          `json:"branch"`
+	Stats      workqueue.Stats `json:"stats"`
+	Offset     int             `json:"offset"`
+	TotalRows  int             `json:"total_rows"`
+	NextOffset *int            `json:"next_offset,omitempty"`
+	Rows       []workQueueRow  `json:"rows"`
 }
 
 func workQueueStatePage(state workqueue.Projection, branch string, rows []workQueueRow, offset, limit int) (workQueuePage, error) {
-	page := workQueuePage{EvaluatedAt: time.Now().UnixMilli(), Status: "committed_snapshot", Tip: state.Tip, PolicyEpoch: state.PolicyEpoch,
-		Repository: state.Repository, Branch: branch, Stats: state.Stats, AdmissionPaused: state.AdmissionPaused, GrantsPaused: state.GrantsPaused,
-		Offset: offset, TotalRows: len(rows), Rows: []workQueueRow{}}
+	page := workQueuePage{Status: "committed_snapshot", Tip: state.Tip, Repository: state.Repository, Branch: branch,
+		Stats: state.Stats, Offset: offset, TotalRows: len(rows), Rows: []workQueueRow{}}
 	if offset < 0 || limit < 1 || limit > 256 {
 		return page, errors.New("invalid state page: offset >= 0 and limit 1..256 required")
 	}
@@ -242,10 +249,10 @@ func workQueueStatePage(state workqueue.Projection, branch string, rows []workQu
 }
 
 func workQueuePageText(page workQueuePage) string {
-	lines := []string{fmt.Sprintf("WORK QUEUE %s branch=%s\nTip %s | policy %s\nWork %d: available=%d claimed=%d completed=%d cancelled=%d | Claims=%d native reservations=%d\nAdmission paused=%t | grants paused=%t | rows %d..%d/%d",
-		workQueueText(page.Repository), workQueueText(page.Branch), workQueueText(page.Tip), workQueueText(page.PolicyEpoch),
+	lines := []string{fmt.Sprintf("WORK QUEUE %s branch=%s\nTip %s\nWork %d: available=%d claimed=%d completed=%d cancelled=%d | Claims=%d open dispatches=%d\nRows %d..%d/%d",
+		workQueueText(page.Repository), workQueueText(page.Branch), workQueueText(page.Tip),
 		page.Stats.Work, page.Stats.Available, page.Stats.Claimed, page.Stats.Completed, page.Stats.Cancelled, page.Stats.Claims, page.Stats.Dispatches,
-		page.AdmissionPaused, page.GrantsPaused, page.Offset, page.Offset+len(page.Rows), page.TotalRows)}
+		page.Offset, page.Offset+len(page.Rows), page.TotalRows)}
 	for _, row := range page.Rows {
 		lines = append(lines, row.Text)
 	}
@@ -256,7 +263,7 @@ func workQueuePageText(page workQueuePage) string {
 		lines = append(lines, fmt.Sprintf("... more rows: use state --offset %d (same filters; refresh may shift offsets)", *page.NextOffset))
 	}
 	lines = append(lines, "W=Work; C=Claim; branches group graph membership/attempts, not dependency edges.",
-		"Use inspect for exact IDs, dependency cross-references, dispatch membership and delivery barriers.")
+		"Use inspect for exact IDs, dependency cross-references, dispatch state, bound run and recorded effects.")
 	return strings.Join(lines, "\n")
 }
 
@@ -276,7 +283,7 @@ func workStateCommand() *cobra.Command {
 		filter.Pool, _ = cmd.Flags().GetString("pool")
 		filter.State, _ = cmd.Flags().GetString("state")
 		filter.Query, _ = cmd.Flags().GetString("search")
-		if offset < 0 || limit < 1 || limit > 256 || filter.State != "" && !slices.Contains([]string{"available", "claimed", "completed", "cancelled"}, filter.State) {
+		if offset < 0 || limit < 1 || limit > 256 || filter.State != "" && !slices.Contains(workQueueWorkStateNames, filter.State) {
 			return errors.New("invalid state filters: use offset >= 0, limit 1..256 and a supported Work state")
 		}
 		state, err := workRead(cmd)

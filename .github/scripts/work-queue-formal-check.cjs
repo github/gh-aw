@@ -6,7 +6,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { spawn, spawnSync } = require("node:child_process");
 
-const MODELS = Object.freeze({ WorkQueue: "WorkQueue", FairDAGGitHub: "FairWorkQueue", QueueOrdering: "WorkQueue" });
+const MODELS = Object.freeze({ WorkQueueV4: "WorkQueueV4" });
 const TLC_SHA256 = "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88";
 const DEFAULT_TIMEOUT_SECONDS = 280 * 60;
 const CHECKPOINT_MAX_BYTES = 256 * 1024 * 1024;
@@ -113,7 +113,7 @@ function checkpointBundle(stateDir, bundleDir, maxBytes, checkpointConfirmed = f
  */
 async function runVerification(options) {
   const { config, jar, outputDir } = options;
-  if (!Object.hasOwn(MODELS, config)) throw new Error("config must be WorkQueue, FairDAGGitHub, or QueueOrdering");
+  if (!Object.hasOwn(MODELS, config)) throw new Error("config must be WorkQueueV4");
   if (!path.isAbsolute(outputDir) || path.resolve(outputDir) === path.parse(outputDir).root) {
     throw new Error("outputDir must be an absolute non-root directory");
   }

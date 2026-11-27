@@ -44,6 +44,7 @@ var notYetEnforced = map[string]string{
 	"httpclientnotimeout":              "the new HTTP client timeout analyzer needs an enforcement-readiness audit",
 	"ignoredlocalerror":                "existing ignored local errors need review before CI enforcement",
 	"jsondecodertrailingdataunchecked": "new JSON decoder correctness analyzer needs an enforcement-readiness audit before CI enables it",
+	"jsondecoderunknownfields":         "new JSON decoder schema-drift analyzer needs an enforcement-readiness audit before CI enables it",
 	"jsonunmarshalbytesconversion":     "existing production conversions need review before CI enforcement",
 	"largefunc":                        "existing production violations need remediation before enforcement; nolint suppression already works",
 	"lenstringzero":                    "requires an enforcement audit after the diagnostic-message fix (#54717)",
@@ -64,11 +65,13 @@ var notYetEnforced = map[string]string{
 	"sprintferrdot":                    "has not yet completed an enforcement-readiness audit",
 	"ssljson":                          "has not yet completed an enforcement-readiness audit",
 	"stringsconcatloop":                "has not yet completed an enforcement-readiness audit",
+	"trimspacestringbytes":             "existing byte conversions need case-by-case review before CI enforcement",
 	"typeassertionnil":                 "needs a cross-platform enforcement-readiness audit before CI enables it",
 	"typeassertionokdiscarded":         "existing production violations need remediation before enforcement; nolint suppression already works",
 	"unchecked_deferredclose":          "existing deferred Close() findings need remediation before CI enforcement",
 	"uncheckedsliceindex":              "existing production violations need remediation before enforcement; nolint suppression already works",
 	"walkdirignoredeerror":             "existing discarded WalkDir errors in audit_threat_detection.go and model_routing.go need remediation before CI enforcement",
+	"writefilepublicpermsensitive":     "heuristic findings need an enforcement-readiness audit before CI enables it",
 }
 
 // TestDocGo_CountMatchesBullets validates that the "All N active analyzers:"

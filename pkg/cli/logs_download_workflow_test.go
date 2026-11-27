@@ -18,9 +18,9 @@ func workflowLogsArchiveFixture(t *testing.T, invalidEntry bool) []byte {
 	t.Helper()
 	var data bytes.Buffer
 	writer := zip.NewWriter(&data)
-	file, err := writer.Create("safe_outputs/4_Reconcile work queue claim.txt")
+	file, err := writer.Create("safe_outputs/5_Finish work queue claim.txt")
 	require.NoError(t, err)
-	_, err = file.Write([]byte("2026-10-02T12:00:00Z Work queue: worker completion verified\n"))
+	_, err = file.Write([]byte("2026-10-02T12:00:00Z Work queue finish: d_example completed (committed)\n"))
 	require.NoError(t, err)
 	if invalidEntry {
 		file, err = writer.Create("../invalid.txt")
@@ -56,9 +56,9 @@ func TestWorkflowLogsAtomicCompletion(t *testing.T) {
 func TestWorkflowLogsIncompleteLegacyDirectory(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	step := filepath.Join(dir, "workflow-logs", "safe_outputs", "4_Reconcile work queue claim.txt")
+	step := filepath.Join(dir, "workflow-logs", "safe_outputs", "5_Finish work queue claim.txt")
 	require.NoError(t, os.MkdirAll(filepath.Dir(step), 0o755))
-	require.NoError(t, os.WriteFile(step, []byte("2026-10-02T12:00:00Z Work queue: partial evidence\n"), 0o600))
+	require.NoError(t, os.WriteFile(step, []byte("2026-10-02T12:00:00Z Work queue finish: partial evidence\n"), 0o600))
 	assert.False(t, workflowRunLogsComplete(dir))
 	report, err := extractWorkQueueReport(dir)
 	require.NoError(t, err)

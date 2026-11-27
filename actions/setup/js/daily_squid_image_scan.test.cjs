@@ -5,7 +5,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-import { readLockFileHeaders } from "./work_queue_provisioning.cjs";
+import { readLockFileHeaders } from "./lock_file_headers.cjs";
 
 const require = createRequire(import.meta.url);
 const { buildCopilotSDKPermissionHandler } = require("./copilot_sdk_permissions.cjs");
@@ -295,9 +295,9 @@ fi
         "ghcr.io/github/gh-aw-node-other:v1:1:1: error: [Critical] CVE-2026-7777: package@1",
         `Running grype on ${vendored}`,
         ...["Low", "Negligible", "Unknown"].map(severity => `${vendored}:1:1: info: [${severity}] CVE-2026-8888: package@1`),
-        ...vendoredFindings.map(finding => `${vendored}:1:1: ${finding}`),
         ...Array(10000).fill(`${vendored}:1:1: info: [Low] CVE-2026-9999: package@1`),
         `syft scanned ${vendored}`,
+        ...vendoredFindings.map(finding => `${vendored}:1:1: ${finding}`),
       ];
       const fixture = join(directory, "compile-output.txt");
       const log = `${lines.join("\n")}\n`;
@@ -308,6 +308,32 @@ fi
       expect(result.status, result.stdout + result.stderr).toBe(status);
       if (message) expect(result.stdout).toContain(message);
       else expect(result.stdout).not.toContain("::error::");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("gates a late unterminated vendored Critical after earlier non-critical findings", () => {
+    const directory = mkdtempSync(join(tmpdir(), "image-late-gate-"));
+    try {
+      const vendored = "ghcr.io/github/gh-aw-node@sha256:committed";
+      const lines = [
+        `${vendored}:1:1: warning: [High] CVE-2026-1111: openssl@1`,
+        `${vendored}:1:1: warning: [Medium] CVE-2026-2222: zlib@1 (fix: 2)`,
+        "ghcr.io/github/gh-aw-node-other:v1:1:1: error: [Critical] CVE-2026-7777: package@1",
+        ...Array(20000).fill(`${vendored}:1:1: info: [Low] CVE-2026-9999: package@1 progress`),
+        `${vendored}:1:1: error: [Critical] CVE-2026-4444: openssl@1`,
+      ];
+      const fixture = join(directory, "compile-output.txt");
+      const log = lines.join("\n");
+      expect(Buffer.byteLength(log)).toBeGreaterThan(500000);
+      writeFileSync(fixture, log);
+      const result = spawnSync("bash", ["--noprofile", "--norc", "-e", "-o", "pipefail", "-c", gate.replaceAll(scanLog, fixture)], { encoding: "utf8", timeout: 10000 });
+      expect(result.error).toBeUndefined();
+      expect(result.signal).toBeNull();
+      expect(result.status, result.stdout + result.stderr).toBe(1);
+      expect(result.stdout.match(/::error::/g)).toHaveLength(1);
+      expect(result.stdout).toContain("Critical vulnerabilities");
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

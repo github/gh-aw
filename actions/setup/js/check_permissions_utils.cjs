@@ -241,6 +241,50 @@ async function checkBotStatus(actor, owner, repo) {
 }
 
 /**
+ * Resolve the effective repository role from a `repos.getCollaboratorPermissionLevel`
+ * response body. Pure: no API calls, no logging, no ambient clients.
+ *
+ * Standard GitHub repository permission levels. Custom org repository roles (e.g.
+ * "Security Champions") have a role_name that is not one of these — for those, fall back
+ * to the standard `permission` level reported by the same endpoint so the actor is not
+ * blocked simply because their custom role name is not literally listed in on.roles.
+ * A custom role can never grant admin: GitHub derives custom repository roles from the
+ * read/triage/write/maintain base roles only, so `admin` is refused here even if the API
+ * unexpectedly reports it for a custom role.
+ * @param {{permission?: unknown, role_name?: unknown} | null | undefined} data
+ * @returns {{effectiveRole: string, normalizedPermission: string, normalizedRoleName: string, isCustomRole: boolean, resolvedBaseRole: string}}
+ */
+function resolveRepositoryRole(data) {
+  const permission = typeof data?.permission === "string" ? data.permission : "";
+  const rawRoleName = data?.role_name;
+  const normalizedRoleName = normalizeRoleName(typeof rawRoleName === "string" ? rawRoleName : "");
+  const normalizedPermission = normalizeRoleName(permission);
+  const effectiveRole = normalizedRoleName || normalizedPermission;
+  const isCustomRole = normalizedRoleName !== "" && !STANDARD_ROLES.has(normalizedRoleName);
+  const resolvedBaseRole = isCustomRole && CUSTOM_ROLE_BASE_ROLES.has(normalizedPermission) ? normalizedPermission : "";
+  return { effectiveRole, normalizedPermission, normalizedRoleName, isCustomRole, resolvedBaseRole };
+}
+
+/**
+ * Match a resolved role against required roles. For standard roles, use role_name
+ * (precise: maintain/triage are not collapsed to write/read). For custom org roles,
+ * fall back to the standard `permission` level GitHub already computes for the actor
+ * (readable with the repository-scoped GITHUB_TOKEN); fail closed if it is not one of
+ * the non-admin base roles.
+ * @param {ReturnType<typeof resolveRepositoryRole>} resolved
+ * @param {string[]} requiredPermissions
+ * @returns {{ permission: string, roleMatchType: "effective-role" | "base-role" } | null}
+ */
+function matchRepositoryRole(resolved, requiredPermissions) {
+  for (const requiredPerm of requiredPermissions) {
+    const normalizedRequired = normalizeRoleName(requiredPerm);
+    if (normalizedRequired !== "" && normalizedRequired === resolved.effectiveRole) return { permission: normalizedRequired, roleMatchType: "effective-role" };
+    if (resolved.resolvedBaseRole !== "" && normalizedRequired === resolved.resolvedBaseRole) return { permission: normalizedRequired, roleMatchType: "base-role" };
+  }
+  return null;
+}
+
+/**
  * Check if user has required repository permissions
  * @param {string} actor - GitHub username to check
  * @param {string} owner - Repository owner
@@ -259,26 +303,11 @@ async function checkRepositoryPermission(actor, owner, repo, requiredPermissions
       username: actor,
     });
 
-    /** @type {{ permission: string, role_name?: unknown }} */
-    const repoPermissionData = repoPermission.data;
-    const permission = repoPermissionData.permission;
-    const rawRoleName = repoPermissionData.role_name;
-    const roleName = rawRoleName == null ? "" : typeof rawRoleName === "string" ? rawRoleName : "";
-    const normalizedRoleName = normalizeRoleName(roleName);
-    const normalizedPermission = normalizeRoleName(permission);
-    const effectiveRole = normalizedRoleName || normalizedPermission;
+    const resolved = resolveRepositoryRole(repoPermission.data);
+    const { effectiveRole, normalizedPermission, normalizedRoleName, isCustomRole, resolvedBaseRole } = resolved;
     const logDetails = normalizedRoleName && normalizedRoleName !== normalizedPermission ? `${normalizedPermission} (role: ${normalizedRoleName})` : normalizedPermission;
     core.info(`Repository permission level: ${logDetails}`);
 
-    // Standard GitHub repository permission levels. Custom org repository roles (e.g.
-    // "Security Champions") have a role_name that is not one of these — for those, fall back
-    // to the standard `permission` level reported by the same endpoint so the actor is not
-    // blocked simply because their custom role name is not literally listed in on.roles.
-    // A custom role can never grant admin: GitHub derives custom repository roles from the
-    // read/triage/write/maintain base roles only, so `admin` is refused here even if the API
-    // unexpectedly reports it for a custom role.
-    const isCustomRole = normalizedRoleName !== "" && !STANDARD_ROLES.has(normalizedRoleName);
-    const resolvedBaseRole = isCustomRole && CUSTOM_ROLE_BASE_ROLES.has(normalizedPermission) ? normalizedPermission : "";
     const debugRoleName = normalizedRoleName || "<empty>";
     const debugBaseRole = resolvedBaseRole || "<empty>";
     core.debug?.(`Repository permission API fields for '${actor}': permission='${normalizedPermission}', role='${debugRoleName}'`);
@@ -290,24 +319,7 @@ async function checkRepositoryPermission(actor, owner, repo, requiredPermissions
       core.info(`Repository permission fallback unavailable for custom role '${normalizedRoleName}' because GitHub did not report a standard permission level`);
     }
 
-    // Check if user has one of the required permission levels.
-    // For standard roles, use role_name (precise: maintain/triage are not collapsed to
-    // write/read). For custom org roles, fall back to the standard `permission` level that
-    // GitHub already computes for the actor (readable with the repository-scoped
-    // GITHUB_TOKEN); fail closed if it is not one of the non-admin base roles.
-    /** @type {{ permission: string, roleMatchType: string }|null} */
-    let permissionMatch = null;
-    for (const requiredPerm of requiredPermissions) {
-      const normalizedRequired = normalizeRoleName(requiredPerm);
-      if (normalizedRequired === effectiveRole) {
-        permissionMatch = { permission: normalizedRequired, roleMatchType: "effective-role" };
-        break;
-      }
-      if (resolvedBaseRole !== "" && normalizedRequired === resolvedBaseRole) {
-        permissionMatch = { permission: normalizedRequired, roleMatchType: "base-role" };
-        break;
-      }
-    }
+    const permissionMatch = matchRepositoryRole(resolved, requiredPermissions);
 
     if (permissionMatch) {
       if (permissionMatch.roleMatchType === "base-role") {
@@ -336,4 +348,6 @@ module.exports = {
   isConfusedDeputyAttack,
   checkRepositoryPermission,
   checkBotStatus,
+  matchRepositoryRole,
+  resolveRepositoryRole,
 };

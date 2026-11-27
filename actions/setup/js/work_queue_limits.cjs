@@ -2,73 +2,45 @@
 "use strict";
 
 const { canonicalBytes, integer, queueError } = require("./work_queue_codec.cjs");
-const { indexesFor } = require("./work_queue_indexes.cjs");
 
-/** @typedef {{ledger_bytes: number, recovery_bytes: number, payload_bytes: number, graph_nodes: number, predecessors: number, pending_nodes: number, operations: number, assignment_bytes: number, result_bytes: number, evidence_bytes: number, observation_writes: number}} QueueLimits */
-
-/** @type {Readonly<QueueLimits>} */
-const DEFAULT_LIMITS = Object.freeze({
-  ledger_bytes: 64 * 1024 * 1024,
-  recovery_bytes: 16 * 1024 * 1024,
-  payload_bytes: 16 * 1024,
-  graph_nodes: 4096,
-  predecessors: 64,
-  pending_nodes: 4096,
-  operations: 256,
-  assignment_bytes: 48 * 1024,
-  result_bytes: 4096,
-  evidence_bytes: 1024,
-  observation_writes: 4096,
-});
+// Protocol v4 bounds. They are constants of the wire format, never Policy: the
+// compiled policy environment carries only pool scheduling preferences.
+const PAYLOAD_BYTES = 16 * 1024;
+const OPERATIONS_PER_COMMIT = 256;
+const GRAPH_NODES = 4096;
+const PREDECESSORS = 64;
+const ASSIGNMENT_BYTES = 48 * 1024;
+const EFFECTS_BYTES = 4096;
+const LEDGER_BYTES = 64 * 1024 * 1024;
+const CHECKPOINT_AFTER_LINES = 512;
+// Upper bound of the configurable pending_limit; replay enforces it per pool.
+const MAX_PENDING_WORK = 4096;
+// A Checkpoint keeps at most this many request IDs, the most recent of the log it
+// folds, so request_reused deduplicates a request through at least the next epoch.
+const RETAINED_REQUESTS = 4096;
 
 function boundedBytes(value, limit, name) {
   if (canonicalBytes(value) > limit) throw queueError("resource_limit", `${name} exceeds ${limit} canonical bytes`);
 }
 
-function validateLimits(limits) {
-  for (const [name, ceiling] of Object.entries(DEFAULT_LIMITS)) integer(limits[name], 1, ceiling, `limit ${name}`);
-  if (Object.keys(limits).some(name => !Object.hasOwn(DEFAULT_LIMITS, name))) throw queueError("resource_limit", "unknown limit");
-  return limits;
+// External dependency refreshes share one dispatch_next commit with its Claims.
+function observationRefreshBudget(maxClaims, maximum = 128) {
+  integer(maxClaims, 1, OPERATIONS_PER_COMMIT, "max_claims");
+  integer(maximum, 0, OPERATIONS_PER_COMMIT - 1, "observation refresh budget");
+  return Math.min(maximum, OPERATIONS_PER_COMMIT - maxClaims);
 }
 
-function observationRefreshBudget(state, maximum = 128) {
-  if (!state.policy) throw queueError("policy_missing", "observation refresh requires an installed policy");
-  integer(maximum, 0, DEFAULT_LIMITS.operations - 1, "observation refresh budget");
-  if (state.grants_paused || state.ledgerBytes >= state.policy.limits.ledger_bytes) return 0;
-  return Math.min(maximum, Math.max(0, state.policy.limits.operations - 1));
-}
-
-function recoveryHeadroom(state) {
-  // Reserve every bounded remaining retry plus delivery and native closure.
-  let bytes = 0;
-  const indexes = indexesFor(state);
-  for (const id of indexes.unfinished) {
-    const node = state.works.get(id);
-    const pool = state.policy.pools[node.pool];
-    const limits = state.policy.limits;
-    const remaining = node.state === "completed" ? 0 : Math.max(0, pool.retry.max_attempts - node.attempts);
-    bytes += remaining * (4 * limits.evidence_bytes + 8192) + 2 * limits.result_bytes + 2 * limits.evidence_bytes + 8192;
-    if (node.state === "claimed") bytes += 8192;
-  }
-  for (const id of indexes.reservations) {
-    const dispatch = state.dispatches.get(id);
-    const remaining = Math.max(0, state.policy.pools[dispatch.pool].reconciliation.max_attempts + 4 - (state.lifecycleWrites.get(dispatch.dispatch_id) ?? 0));
-    bytes += remaining * (2 * state.policy.limits.evidence_bytes + 12288) + 2 * state.policy.limits.evidence_bytes + 8192;
-  }
-  return bytes;
-}
-
-function checkLedgerBudget(state, candidateBytes, admission, observations = false) {
-  if (!state.policy) return;
-  const limits = state.policy.limits;
-  const total = state.ledgerBytes + candidateBytes;
-  const headroom = recoveryHeadroom(state);
-  if (total > limits.ledger_bytes + limits.recovery_bytes) throw queueError("ledger_limit", "ledger recovery reserve exhausted");
-  if (headroom > limits.ledger_bytes + limits.recovery_bytes - total) throw queueError("ledger_limit", "write would consume remaining bounded closure/recovery headroom");
-  if (observations && total > limits.ledger_bytes) throw queueError("ledger_limit", "optional observations cannot consume closure/recovery headroom");
-  if (admission && (total > limits.ledger_bytes || headroom > limits.recovery_bytes)) {
-    throw queueError("ledger_limit", "new admission would consume bounded closure/recovery headroom");
-  }
-}
-
-module.exports = { DEFAULT_LIMITS, boundedBytes, checkLedgerBudget, observationRefreshBudget, recoveryHeadroom, validateLimits };
+module.exports = {
+  ASSIGNMENT_BYTES,
+  CHECKPOINT_AFTER_LINES,
+  EFFECTS_BYTES,
+  GRAPH_NODES,
+  LEDGER_BYTES,
+  MAX_PENDING_WORK,
+  OPERATIONS_PER_COMMIT,
+  PAYLOAD_BYTES,
+  PREDECESSORS,
+  RETAINED_REQUESTS,
+  boundedBytes,
+  observationRefreshBudget,
+};

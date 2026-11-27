@@ -44,6 +44,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/ignoredlocalerror"
 	"github.com/github/gh-aw/pkg/linters/ioutildeprecated"
 	"github.com/github/gh-aw/pkg/linters/jsondecodertrailingdataunchecked"
+	"github.com/github/gh-aw/pkg/linters/jsondecoderunknownfields"
 	"github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror"
 	"github.com/github/gh-aw/pkg/linters/jsonunmarshalbytesconversion"
 	"github.com/github/gh-aw/pkg/linters/largefunc"
@@ -95,6 +96,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/timesleepnocontext"
 	"github.com/github/gh-aw/pkg/linters/tolowerequalfold"
 	"github.com/github/gh-aw/pkg/linters/trimleftright"
+	"github.com/github/gh-aw/pkg/linters/trimspacestringbytes"
 	"github.com/github/gh-aw/pkg/linters/typeassertionnil"
 	"github.com/github/gh-aw/pkg/linters/typeassertionokdiscarded"
 	unchecked_deferredclose "github.com/github/gh-aw/pkg/linters/unchecked-deferred-close"
@@ -105,6 +107,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/walkfuncerrshadow"
 	"github.com/github/gh-aw/pkg/linters/wgdonenotdeferred"
 	"github.com/github/gh-aw/pkg/linters/writebytestring"
+	"github.com/github/gh-aw/pkg/linters/writefilepublicpermsensitive"
 )
 
 // All returns all registered custom analysis linters.
@@ -200,6 +203,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	stringssplitfirst.Analyzer,
 	stringscountcontains.Analyzer,
 	jsondecodertrailingdataunchecked.Analyzer,
+	jsondecoderunknownfields.Analyzer,
 	jsonmarshalignoredeerror.Analyzer,
 	jsonunmarshalbytesconversion.Analyzer,
 	lenstringzero.Analyzer,
@@ -209,6 +213,7 @@ var allAnalyzers = []*analysis.Analyzer{
 	timenowsub.Analyzer,
 	tolowerequalfold.Analyzer,
 	trimleftright.Analyzer,
+	trimspacestringbytes.Analyzer,
 	typeassertionnil.Analyzer,
 	typeassertionokdiscarded.Analyzer,
 	uncheckedsliceindex.Analyzer,
@@ -219,4 +224,5 @@ var allAnalyzers = []*analysis.Analyzer{
 	walkfuncerrshadow.Analyzer,
 	wgdonenotdeferred.Analyzer,
 	writebytestring.Analyzer,
+	writefilepublicpermsensitive.Analyzer,
 }

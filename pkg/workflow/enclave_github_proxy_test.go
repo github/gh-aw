@@ -170,6 +170,23 @@ func TestDynamicEnclaveWriteSinkPolicyUsesWorkflowDestinationVisibility(t *testi
 	}
 }
 
+func TestStaticEnclaveWriteSinkPolicyDeduplicatesAcceptEntries(t *testing.T) {
+	workflowData := enclaveGitHubToolsWorkflowData()
+	workflowData.Tools["github"] = false
+	workflowData.Enclaves[0].Agent.Tools.GitHub.AllowedRepos = GitHubReposScope{
+		"octo-org/*",
+		"octo-org/private-service",
+		"octo-org/*",
+	}
+
+	assert.Equal(t, map[string]any{
+		"write-sink": map[string]any{
+			"accept":          []string{"private:octo-org", "private:octo-org/private-service"},
+			"sink-visibility": sinkVisibilityRuntimeExpr,
+		},
+	}, staticEnclaveWriteSinkGuardPolicy(workflowData))
+}
+
 // TestCompileDynamicGitHubEnclaveDisabledPrimaryGitHub compiles a workflow matching the
 // gh-aw#59523 fixture: tools.github: false with a dynamic GitHub repository enclave. It
 // asserts the compiler generates a usable lock file without manual edits (guard policy,

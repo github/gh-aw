@@ -43,15 +43,20 @@ var routingWorkflowIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*(?:
 
 // routingHistoryState is state.json, version 2. Fields keep the history's order.
 type routingHistoryState struct {
-	V             int                             `json:"v"`
-	Workflow      string                          `json:"workflow"`
-	Seq           int64                           `json:"seq"`
-	Generation    *routingGeneration              `json:"generation"`
-	ResetAfterRun int64                           `json:"reset_after_run"`
-	LastRun       int64                           `json:"last_run"`
-	Unexplained   int64                           `json:"unexplained"`
-	Scopes        map[string]*routingHistoryScope `json:"scopes"`
-	Updated       *routingUpdated                 `json:"updated"`
+	V                      int                             `json:"v"`
+	Workflow               string                          `json:"workflow"`
+	Seq                    int64                           `json:"seq"`
+	Generation             *routingGeneration              `json:"generation"`
+	ResetAfterRun          int64                           `json:"reset_after_run"`
+	LastRun                int64                           `json:"last_run"`
+	FirstWriteRun          int64                           `json:"first_write_run,omitempty"`
+	ReconciledThrough      *int64                          `json:"reconciled_through,omitempty"`
+	UnresolvedRuns         *[]int64                        `json:"unresolved_runs,omitempty"`
+	UnresolvedRunIDs       map[string]string               `json:"unresolved_run_ids,omitempty"`
+	UnresolvedLookupCursor *int64                          `json:"unresolved_lookup_cursor,omitempty"`
+	Unexplained            int64                           `json:"unexplained"`
+	Scopes                 map[string]*routingHistoryScope `json:"scopes"`
+	Updated                *routingUpdated                 `json:"updated"`
 }
 
 type routingGeneration struct {
@@ -111,18 +116,20 @@ type routingRunLine struct {
 
 // RoutingStatus is the JSON output of gh aw routing status <workflow>.
 type RoutingStatus struct {
-	Workflow       string               `json:"workflow"`
-	Branch         string               `json:"branch"`
-	Head           string               `json:"head"`
-	Generation     *routingGeneration   `json:"generation"`
-	LastRun        int64                `json:"last_run"`
-	ResetAfterRun  int64                `json:"reset_after_run"`
-	Unexplained    int64                `json:"unexplained"`
-	Updated        *routingUpdated      `json:"updated"`
-	Recommendation *string              `json:"recommendation"`
-	Note           string               `json:"note"`
-	Scopes         []RoutingScopeStatus `json:"scopes"`
-	Recent         RoutingRecentRuns    `json:"recent"`
+	Workflow          string               `json:"workflow"`
+	Branch            string               `json:"branch"`
+	Head              string               `json:"head"`
+	Generation        *routingGeneration   `json:"generation"`
+	LastRun           int64                `json:"last_run"`
+	ResetAfterRun     int64                `json:"reset_after_run"`
+	ReconciledThrough *int64               `json:"reconciled_through,omitempty"`
+	UnresolvedRuns    *[]int64             `json:"unresolved_runs,omitempty"`
+	Unexplained       int64                `json:"unexplained"`
+	Updated           *routingUpdated      `json:"updated"`
+	Recommendation    *string              `json:"recommendation"`
+	Note              string               `json:"note"`
+	Scopes            []RoutingScopeStatus `json:"scopes"`
+	Recent            RoutingRecentRuns    `json:"recent"`
 }
 
 // RoutingScopeStatus is one scope's evidence.
@@ -187,7 +194,7 @@ func NewRoutingCommand() *cobra.Command {
 		Short: "Show or reset what adaptive routing has recorded for a workflow",
 		Long: `Show or reset what adaptive routing has recorded for a workflow.
 
-A workflow with adaptive-routing: observe keeps its ordinary router pick, and each
+A workflow with learning: observe under model-routing keeps its ordinary router pick, and each
 run's model and effort, verdict and cost are recorded on its
 memory/adaptive-routing/<workflow> branch.
 
@@ -313,7 +320,8 @@ func readRoutingRuns(ctx context.Context, api routingAPI, head string) ([]routin
 func buildRoutingStatus(workflowID, branch, head string, state *routingHistoryState, lines []routingRunLine) RoutingStatus {
 	status := RoutingStatus{
 		Workflow: workflowID, Branch: branch, Head: head, Generation: state.Generation, LastRun: state.LastRun,
-		ResetAfterRun: state.ResetAfterRun, Unexplained: state.Unexplained, Updated: state.Updated,
+		ResetAfterRun: state.ResetAfterRun, ReconciledThrough: state.ReconciledThrough, UnresolvedRuns: state.UnresolvedRuns,
+		Unexplained: state.Unexplained, Updated: state.Updated,
 		Note: routingNoRecommendation, Scopes: []RoutingScopeStatus{},
 	}
 	for _, name := range slices.Sorted(maps.Keys(state.Scopes)) {
@@ -361,7 +369,7 @@ func runRoutingStatus(ctx context.Context, api routingAPI, workflowID string, ou
 		return err
 	}
 	if head == "" {
-		return fmt.Errorf("no routing history for %s: %s does not exist. Add adaptive-routing: observe to the workflow and let it run", workflowID, branch)
+		return fmt.Errorf("no routing history for %s: %s does not exist. Set learning: observe under model-routing in the workflow and let it run", workflowID, branch)
 	}
 	state, err := readRoutingState(ctx, api, head, workflowID)
 	if err != nil {
@@ -408,6 +416,13 @@ func printRoutingStatus(w io.Writer, status RoutingStatus) error {
 	}
 	if status.ResetAfterRun > 0 {
 		line("  Reset after: run ", strconv.FormatInt(status.ResetAfterRun, 10))
+	}
+	if status.ReconciledThrough != nil {
+		reconciled := "through run " + strconv.FormatInt(*status.ReconciledThrough, 10)
+		if status.UnresolvedRuns != nil && len(*status.UnresolvedRuns) > 0 {
+			reconciled += fmt.Sprintf(" (%d unresolved)", len(*status.UnresolvedRuns))
+		}
+		line("  Reconciled:  ", reconciled)
 	}
 	line("  Unexplained: ", strconv.FormatInt(status.Unexplained, 10))
 	line(console.FormatInfoMessage(status.Note))
@@ -518,9 +533,45 @@ func runRoutingList(ctx context.Context, api routingAPI, out io.Writer, jsonOutp
 }
 
 // resetRoutingState fences every run up to latestRun, empties the scopes and lets exploration
-// resume, as the reducer's reset vector (aw2-reducer.json) defines.
+// resume, as the reducer's reset vector (aw2-reducer.json) defines. Reconciliation coverage
+// fields are preserved, clearing only obligations at or below latestRun.
 func resetRoutingState(state routingHistoryState, latestRun int64, at string) routingHistoryState {
 	state.ResetAfterRun = latestRun
+	if state.LastRun <= latestRun {
+		state.FirstWriteRun = 0
+	}
+	if state.ReconciledThrough != nil {
+		reconciled := max(*state.ReconciledThrough, latestRun)
+		state.ReconciledThrough = &reconciled
+	}
+	if state.UnresolvedRuns != nil {
+		kept := []int64{}
+		for _, runNum := range *state.UnresolvedRuns {
+			if runNum > latestRun {
+				kept = append(kept, runNum)
+			}
+		}
+		slices.Sort(kept)
+		kept = slices.Compact(kept)
+		state.UnresolvedRuns = &kept
+	}
+	if len(state.UnresolvedRunIDs) > 0 {
+		keptIDs := map[string]string{}
+		for key, runID := range state.UnresolvedRunIDs {
+			runNum, err := strconv.ParseInt(key, 10, 64)
+			if err == nil && runNum > latestRun && runID != "" {
+				keptIDs[key] = runID
+			}
+		}
+		if len(keptIDs) > 0 {
+			state.UnresolvedRunIDs = keptIDs
+		} else {
+			state.UnresolvedRunIDs = nil
+		}
+	}
+	if len(state.UnresolvedRunIDs) == 0 || (state.UnresolvedLookupCursor != nil && *state.UnresolvedLookupCursor <= latestRun) {
+		state.UnresolvedLookupCursor = nil
+	}
 	state.Scopes = map[string]*routingHistoryScope{}
 	state.Unexplained = 0
 	state.Updated = &routingUpdated{Run: nil, At: at}
@@ -598,7 +649,7 @@ func (g *ghRoutingAPI) BranchHead(ctx context.Context, branch string) (string, e
 		}
 		return "", fmt.Errorf("could not read %s: %w", branch, err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	return string(bytes.TrimSpace(out)), nil
 }
 
 func (g *ghRoutingAPI) ReadFile(ctx context.Context, ref, path string) ([]byte, error) {
@@ -615,7 +666,7 @@ func (g *ghRoutingAPI) HistoryBranches(ctx context.Context) ([]string, error) {
 		return nil, fmt.Errorf("could not list routing histories: %w", err)
 	}
 	var branches []string
-	for ref := range strings.SplitSeq(strings.TrimSpace(string(out)), "\n") {
+	for ref := range strings.SplitSeq(string(bytes.TrimSpace(out)), "\n") {
 		if branch, ok := strings.CutPrefix(strings.TrimSpace(ref), "refs/heads/"); ok {
 			branches = append(branches, branch)
 		}
@@ -633,7 +684,7 @@ func (g *ghRoutingAPI) LatestRunNumber(ctx context.Context, workflowFile string)
 	if err != nil {
 		return 0, fmt.Errorf("could not read the latest run of %s: %w", workflowFile, err)
 	}
-	return strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
+	return strconv.ParseInt(string(bytes.TrimSpace(out)), 10, 64)
 }
 
 const routingCommitMutation = `mutation($input: CreateCommitOnBranchInput!) {
@@ -662,5 +713,5 @@ func (g *ghRoutingAPI) CommitFile(ctx context.Context, branch, expectedHead, pat
 	if err != nil {
 		return "", fmt.Errorf("the commit was refused (another run may have saved first; run the command again): %w", err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	return string(bytes.TrimSpace(out)), nil
 }

@@ -28,30 +28,12 @@ const { resolveExperimentStateRebaseConflict } = require("./push_experiment_stat
 const { withGitClaimEffects } = require("./work_queue_git_effects.cjs");
 const { withClaimExecution, currentClaimResourceEffects } = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
-const { authorizeWorkerClaim } = require("./finish_work_queue_claim.cjs");
-const { queueFixture, REPOSITORY, WORKFLOW, REF } = require("./work_queue_lifecycle.test_helpers.cjs");
+const REPOSITORY = "owner/repo";
 
-function signedClaimFixture(resources) {
-  const queue = queueFixture({
-    bound: true,
-    count: 1,
-    configureWork(work) {
-      work.payload = { effect_contract: { version: 1, outputs: [{ type: "create_issue", min: 0, max: 1 }] }, resource_scope: { version: 1, resources } };
-    },
-  });
-  const assignment = queue.assignment;
-  const member = assignment.claims[0];
-  queue.append("finish", { dispatch_id: assignment.dispatch_id, claim_handle: member.handle, outcome: "completed" }, { ...queue.workerActor, dispatch_id: assignment.dispatch_id, claim_handle: member.handle });
-  const authorize = vi.fn(request =>
-    authorizeWorkerClaim({
-      ...request,
-      context: queue.workerContext,
-      githubClient: queue.githubClient,
-      workflowRef: `${REPOSITORY}/${WORKFLOW}@${REF}`,
-      readWorkQueueLog: queue.readWorkQueueLog,
-    })
-  );
-  return { assignment, claim_handle: member.handle, authorize };
+function signedClaimFixture() {
+  const assignment = { dispatch_id: "d1", claims: [{ handle: "h1", claim_id: "c1", work_id: "w1", work: { effect_contract: { version: 1, outputs: [{ type: "create_issue", min: 0, max: 1 }] } }, result_refs: [] }] };
+  const authorize = vi.fn(async request => ({ claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === REPOSITORY, state: "open" }));
+  return { assignment, claim_handle: "h1", authorize };
 }
 
 describe("withGitClaimEffects signed replay bindings", () => {
@@ -356,7 +338,7 @@ describe("push_signed_commits integration tests", () => {
   describe("Claim-scoped signed replay", () => {
     const repository = { repository: REPOSITORY, host: "github.com", repository_id: "7" };
 
-    it.each([true, false])("binds new branch creation to first-commit paths (matching selector: %s)", async matching => {
+    it.each([true, false])("creates a new branch only for an authorized Claim (authorized: %s)", async authorized => {
       const branch = "claim-new-branch";
       execGit(["checkout", "-b", branch], { cwd: workDir });
       fs.mkdirSync(path.join(workDir, "eslint-factory"));
@@ -366,18 +348,19 @@ describe("push_signed_commits integration tests", () => {
       global.exec = makeRealExec(workDir);
       const source = makeMockGithubClient();
       source.rest.repos = { get: vi.fn(async () => ({ data: { id: 7, full_name: REPOSITORY } })) };
-      const scope = signedClaimFixture([{ ...repository, ref: `refs/heads/${branch}`, path: matching ? "eslint-factory/rule.ts" : "eslint-factory/other.ts" }]);
+      const scope = signedClaimFixture();
+      if (!authorized) scope.authorize.mockImplementation(async request => ({ claim_handle: request.claim_handle, authorized: false, state: "unbound" }));
       const replay = () =>
         withClaimExecution(scope, () =>
           pushSignedCommits({ githubClient: wrapClaimEffectClient(source, { claim_handle: scope.claim_handle }), owner: "owner", repo: "repo", branch, baseRef: "origin/main", cwd: workDir, allowGitPushFallback: false })
         );
-      if (matching) {
+      if (authorized) {
         await expect(replay()).resolves.toBe("signed-oid-abc123");
         expect(source.rest.git.createRef).toHaveBeenCalledOnce();
         expect(source.rest.git.createCommit).toHaveBeenCalledOnce();
         expect(source.graphql).not.toHaveBeenCalled();
       } else {
-        await expect(replay()).rejects.toThrow("immutable Work");
+        await expect(replay()).rejects.toThrow(/not open/);
         expect(source.rest.git.createRef).not.toHaveBeenCalled();
         expect(source.graphql).not.toHaveBeenCalled();
       }

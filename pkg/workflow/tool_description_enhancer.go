@@ -14,6 +14,9 @@ type toolConstraintBuilder func(*SafeOutputsConfig) []string
 
 var toolConstraintBuilders = map[string]toolConstraintBuilder{
 	"create_issue": func(safeOutputs *SafeOutputsConfig) []string { return createIssueConstraints(safeOutputs.CreateIssues) },
+	"set_issue_status": func(safeOutputs *SafeOutputsConfig) []string {
+		return setIssueStatusConstraints(safeOutputs.SetIssueStatus)
+	},
 	"set_issue_field": func(safeOutputs *SafeOutputsConfig) []string {
 		return setIssueFieldConstraints(safeOutputs.SetIssueField)
 	},
@@ -199,6 +202,15 @@ func createIssueConstraints(config *CreateIssuesConfig) []string {
 			*constraints = append(*constraints, fmt.Sprintf("Only these labels are allowed: %s.", formatStringList(config.AllowedLabels)))
 		}
 		appendAllowedIssueFieldsConstraint(constraints, config.AllowedFields)
+		if config.PlanningStatus != nil {
+			*constraints = append(*constraints, fmt.Sprintf("Default native planning status: %v.", config.PlanningStatus))
+		}
+		if len(config.AllowedStatuses) > 0 {
+			*constraints = append(*constraints, fmt.Sprintf("Only these planning statuses are allowed: %v.", config.AllowedStatuses))
+		}
+		if config.PlanningStatus != nil || len(config.AllowedStatuses) > 0 {
+			*constraints = append(*constraints, "Initial planning statuses must use open categories: backlog, planned, or started.")
+		}
 		if limit := config.maxIssueArtifacts(); limit > 0 {
 			*constraints = append(*constraints, fmt.Sprintf("Maximum %d artifact(s) can be attached per issue.", limit))
 			*constraints = append(*constraints, fmt.Sprintf("Maximum artifact body size: %d UTF-8 bytes.", config.maxIssueArtifactSize()))
@@ -215,6 +227,27 @@ func createIssueConstraints(config *CreateIssuesConfig) []string {
 		if config.NormalizeClosingKeywords != nil && *config.NormalizeClosingKeywords {
 			*constraints = append(*constraints, "Backtick-wrapped issue-closing keyword references (e.g. `Closes #1`) in the body field will be automatically normalized to plain text.")
 		}
+	})
+}
+
+func setIssueStatusConstraints(config *SetIssueStatusConfig) []string {
+	return buildConstraints(config, func(config *SetIssueStatusConfig, constraints *[]string) {
+		appendMaxConstraint(constraints, config.Max, "Maximum %d issue planning status update(s) can be made.")
+		appendTargetConstraint(constraints, config.Target)
+		appendStringConstraint(constraints, config.TargetRepoSlug, "Issue planning statuses will be updated in repository %q.")
+		if len(config.Allowed) > 0 {
+			*constraints = append(*constraints, fmt.Sprintf("Only these planning statuses are allowed: %v.", config.Allowed))
+		}
+		if !config.AllowClose {
+			*constraints = append(*constraints, "Closing an open issue through a planning status change is not allowed.")
+		}
+		if !config.AllowReopen {
+			*constraints = append(*constraints, "Reopening a closed issue through a planning status change is not allowed.")
+		}
+		if len(config.RequiredLabels) > 0 {
+			*constraints = append(*constraints, fmt.Sprintf("Target issues must have all labels: %s.", formatStringList(config.RequiredLabels)))
+		}
+		appendStringConstraint(constraints, config.RequiredTitlePrefix, "Target issue titles must start with %q.")
 	})
 }
 
@@ -596,6 +629,6 @@ func updateProjectConstraints(config *UpdateProjectConfig) []string {
 func createProjectStatusUpdateConstraints(config *CreateProjectStatusUpdateConfig) []string {
 	return buildConstraints(config, func(config *CreateProjectStatusUpdateConfig, constraints *[]string) {
 		appendMaxConstraint(constraints, config.Max, "Maximum %d status update(s) can be created.")
-		appendStringConstraint(constraints, config.Project, "Default project URL: %q.")
+		appendStringConstraint(constraints, config.Project, "Configured project URL for project/token setup; each status update still requires its own project field: %q.")
 	})
 }

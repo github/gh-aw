@@ -1,7 +1,10 @@
 # ADR-64955: Git-Backed Work Queue Coordination
 
+> [!NOTE]
+> Superseded by work queue protocol v4 ([specification](../src/content/docs/specs/work-queue-specification.md), [pull request #79748](https://github.com/github/gh-aw/pull/79748)). The Git-backed `work-queue.jsonl` ledger, the causal QueueCommit chain and compare-and-swap publication remain. v4 removed installed Policy and epochs, delivery barriers, Results and DeliveryFailure, SHA-tag dispatch, and every time-based decision (expiry, backoff, deadlines, observation age). Pool limits now come from the compiled workflow configuration on every run, and effects are at-least-once across attempts. Links to the version-3 contract and formal models below point at the last revision that contained them.
+
 **Date**: 2026-10-02
-**Status**: Draft
+**Status**: Superseded
 **Deciders**: gh-aw maintainers (review pending)
 
 ---
@@ -40,11 +43,11 @@ Claim, and a snapshot prediction never selects the authoritative Work.
 | Recovery | Fence one sender before dispatch. Retain uncertain reservations; release only on definitive nonlaunch or exact terminal evidence. Result/DeliveryFailure closes delivery without replaying completed effects. |
 | Compaction | Canonicalize/deduplicate complete commits without changing causal positions, requests, charges, Results or history. No authoritative sidecar. |
 
-The [formal verification notes and reproducible checker](../../specs/work-queue/README.md) document the invariants and assumptions. The retained historical arbitration model has a parameterized inductive proof argument; the successor models provide bounded checks. Neither establishes a mechanically checked unbounded proof or refinement of the current runtime.
+The [version-3 formal verification notes and reproducible checker](https://github.com/github/gh-aw/blob/dd75ba585ad44bf1ad0bc4280341b3901bd41d72/specs/work-queue/README.md) document the invariants and assumptions. The retained historical arbitration model has a parameterized inductive proof argument; the successor models provide bounded checks. Neither establishes a mechanically checked unbounded proof or refinement of the current runtime. Protocol v4 replaces those models with one bounded model, [`WorkQueueV4.tla`](../../specs/work-queue/README.md).
 
 Use `work-queue` for public names, branches, and artifact filenames, and
 `work_queue` for AW context fields and MCP tool prefixes. The
-[`transactions.tsp`](../../specs/work-queue/transactions.tsp) defines one current
+[`transactions.tsp`](https://github.com/github/gh-aw/blob/dd75ba585ad44bf1ad0bc4280341b3901bd41d72/specs/work-queue/transactions.tsp) defined one version-3
 contract for both surfaces. An explicitly configured branch remains a separate
 authority; no reader silently combines queues.
 
@@ -66,11 +69,11 @@ flowchart LR
 
 The conclusion job writes a work queue activity step summary for workflows using `tools.work-queue`. It compares the activation snapshot with a read-only refresh of the durable queue, showing work and claim state counts, new transaction counts by kind, and the assigned worker's current state in a collapsed details section. These are shared-queue observations since activation, not activity attributed exclusively to the current run. Work, claim, and attempt identifiers are omitted. An unreadable snapshot or queue is reported as unavailable, not as an empty queue.
 
-The [formal evidence](../../specs/work-queue/README.md) distinguishes bounded
+The [version-3 formal evidence](https://github.com/github/gh-aw/blob/dd75ba585ad44bf1ad0bc4280341b3901bd41d72/specs/work-queue/README.md) distinguishes bounded
 models, witnesses, independent service properties and runtime conformance.
-Unfinished searches are not passes. The
-[implementation coverage table](../src/content/docs/specs/work-queue-specification.md#91-implementation-coverage-and-remaining-requirements)
-tracks deferred writer-restriction enforcement and other unverified obligations.
+Unfinished searches are not passes. The v4 specification's
+[guarantees and non-guarantees](../src/content/docs/specs/work-queue-specification.md#21-guarantees-and-non-guarantees)
+state that trusted queue-branch writers remain an operator precondition.
 
 ### Alternatives Considered
 

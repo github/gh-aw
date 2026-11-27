@@ -1,12 +1,43 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"errors"
+	"strconv"
+	"time"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+)
+
+// minuteTimeoutValue preserves integer-minute flags while accepting whole-minute durations.
+type minuteTimeoutValue struct {
+	pflag.Value
+}
+
+func (v minuteTimeoutValue) Set(value string) error {
+	if _, err := strconv.ParseInt(value, 0, 0); err == nil {
+		return v.Value.Set(value)
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil || duration%time.Minute != 0 {
+		return errors.New("must be an integer number of minutes or a whole-minute duration like \"5m\" or \"1h\"")
+	}
+	return v.Value.Set(strconv.FormatInt(int64(duration/time.Minute), 10))
+}
+
+func addMinuteTimeoutFlag(cmd *cobra.Command, defaultValue int, usage string) {
+	cmd.Flags().Int("timeout", defaultValue, "Accepts `minutes|duration`. "+usage)
+	flag := cmd.Flags().Lookup("timeout")
+	flag.Value = minuteTimeoutValue{Value: flag.Value}
+}
 
 const engineFlagHelpList = "copilot, claude, codex, gemini, pi, agy (experimental)"
 
 const (
 	EngineFlagOverrideUsage = "Override AI engine (" + engineFlagHelpList + ")"
 	EngineFlagFilterUsage   = "Filter logs by AI engine (" + engineFlagHelpList + ")"
+	repoHostUsage           = "Target repository ([HOST/]owner/repo format)"
+	repoNoHostUsage         = "Target repository (owner/repo format only; GHES host prefixes are not supported)"
 )
 
 // addEngineFlag adds the --engine/-e flag to a command.
@@ -24,7 +55,7 @@ func addEngineFilterFlag(cmd *cobra.Command) {
 // addRepoFlag adds the --repo/-r flag to a command.
 // This flag allows specifying a target repository.
 func addRepoFlag(cmd *cobra.Command) {
-	cmd.Flags().StringP("repo", "r", "", "Target repository ([HOST/]owner/repo format). Defaults to current repository")
+	cmd.Flags().StringP("repo", "r", "", repoHostUsage+". Defaults to current repository")
 }
 
 // addOutputFlag adds the --output/-o flag to a command.

@@ -786,3 +786,56 @@ func TestSpec_ThreadSafety_Coordinator(t *testing.T) {
 		assert.Equal(t, workers/2, trainedEvents, "concurrent training should account for every %s event", stage)
 	}
 }
+
+func TestSpec_ThreadSafety_CoordinatorConcurrentSnapshotLoads(t *testing.T) {
+	t.Parallel()
+	cfg := agentdrain.DefaultConfig()
+	source, err := agentdrain.NewCoordinator(cfg, []string{"source"})
+	require.NoError(t, err)
+	_, err = source.TrainEvent(agentdrain.AgentEvent{Stage: "source", Fields: map[string]string{"action": "start"}})
+	require.NoError(t, err)
+	snapshots, err := source.SaveSnapshots()
+	require.NoError(t, err)
+
+	coordinator, err := agentdrain.NewCoordinator(cfg, nil)
+	require.NoError(t, err)
+
+	const iterations = 100
+	start := make(chan struct{})
+	errCh := make(chan error, 2)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		<-start
+		for i := range iterations {
+			if err := coordinator.LoadSnapshots(map[string][]byte{"stage-" + strconv.Itoa(i): snapshots["source"]}); err != nil {
+				errCh <- err
+				return
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		<-start
+		for range iterations {
+			if _, err := coordinator.SaveSnapshots(); err != nil {
+				errCh <- err
+				return
+			}
+		}
+	}()
+	close(start)
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		require.NoError(t, err, "concurrent snapshot operations should succeed")
+	}
+
+	saved, err := coordinator.SaveSnapshots()
+	require.NoError(t, err)
+	require.Len(t, saved, iterations)
+	for i := range iterations {
+		assert.JSONEq(t, string(snapshots["source"]), string(saved["stage-"+strconv.Itoa(i)]))
+	}
+}

@@ -84,6 +84,10 @@ safe-outputs:
         name: { type: string }
         rationale: { type: string }
         confidence: { type: string, enum: [HIGH, MEDIUM, LOW] }
+  set-issue-status:
+    target: "*"
+    allowed: [Backlog]
+    max: 10
   create-discussion:
     expires: 1d
     title-prefix: "[Auto-Triage] "
@@ -116,7 +120,7 @@ Reduce the percentage of unlabeled issues from 8.6% to below 5% by automatically
 
 ## Task
 
-When triggered by an issue event (opened/edited), scheduled run, or manual dispatch, analyze issues and apply appropriate labels.
+When triggered by an issue event (opened/edited), scheduled run, or manual dispatch, analyze issues and apply appropriate labels. For each issue you label that has no native planning status, set its status to `Backlog`; preserve any existing status.
 
 ### Primary Backlog Label
 
@@ -144,8 +148,9 @@ When running on schedule:
 2. **Also read partially-labeled issues** from `/tmp/gh-aw/agent/partial-labeled-issues.json` — these are issues that have only generic type labels (`bug`, `enhancement`, `documentation`, `question`) but no component labels. Process these in the same pass to add missing component labels (e.g., `safe-outputs`, `mcp`, `copilot`). Skip this file if it's missing or empty.
 3. **Also read `/tmp/gh-aw/agent/missing-backlog-label.json`** for issues without a primary label, including issues already marked `needs-triage`. If all three lists are empty, call `noop` and stop.
 4. **Process up to 10 distinct issues total.** Deduplicate by issue number across all sources, using any available `primary_backlog_label`. Prioritize fully unlabeled issues, then missing primary labels with a helper match or no `needs-triage`, then other first-time triage work. Revisit remaining `needs-triage` issues with spare capacity. Do not reapply existing labels.
-5. **Apply labels** to each issue based on classification; the pre-fetched data already includes `number`, `title`, `body`, and `labels` (for partial-labeled). Only call `issue_read` when you need additional metadata not present in those fields (e.g., comments, reactions, or author association details not available in the pre-fetch).
-6. **Create a summary report** as a discussion with statistics on processed issues
+5. **Apply labels** to each issue based on classification; the pre-fetched data already includes `number`, `title`, `body`, and `labels` (for partial-labeled). Only call `issue_read` when you need additional metadata not present in those fields (e.g., comments, reactions, author association, or native planning status).
+6. For each issue that receives a label and has no current planning status, use `set_issue_status` with its numeric `issue_number` and `Backlog`. Do not change an existing status.
+7. **Create a summary report** as a discussion with statistics on processed issues
 
 ### On Manual/On-Demand Runs (workflow_dispatch)
 
@@ -159,7 +164,8 @@ When issues needing triage exist:
 
 4. **Process up to 10 distinct issues** in this run using the scheduled-run deduplication and priority rules; if more exist, note the remainder in the report
 5. **Apply labels** to each issue based on classification rules below, using title/body heuristics and existing triage rules
-6. **Create a summary report** as a discussion listing every issue processed, the labels applied, and how many unlabeled issues (if any) still remain for the next pass
+6. For each issue that receives a label and has no current planning status, use `set_issue_status` with its numeric `issue_number` and `Backlog`. Do not change an existing status.
+7. **Create a summary report** as a discussion listing every issue processed, the labels applied, and how many unlabeled issues (if any) still remain for the next pass
 
 ## Classification Rules
 

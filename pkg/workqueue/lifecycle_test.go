@@ -2,474 +2,127 @@ package workqueue
 
 import (
 	"encoding/json"
-	"maps"
-	"os/exec"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-func boundAssignment(t *testing.T, updates ...func(*Policy)) ([]QueueCommit, Assignment) {
-	return boundAssignmentWithWork(t, nil, updates...)
-}
-
-func boundAssignmentWithWork(t *testing.T, adjust func(*WorkDefinition), updates ...func(*Policy)) ([]QueueCommit, Assignment) {
+func releaseCommit(t *testing.T, log []QueueCommit, dispatchID, reason string, extra ...any) []QueueCommit {
 	t.Helper()
-	commits := testGenesis(t, func(policy *Policy) {
-		pool := policy.Pools["default"]
-		profile := pool.Profiles["default"]
-		profile.MaxClaims = 3
-		pool.Profiles["default"] = profile
-		policy.Pools["default"] = pool
-		for _, update := range updates {
-			update(policy)
-		}
-	})
-	a, b, c := testNode(t, commits, "a"), testNode(t, commits, "b"), testNode(t, commits, "c")
-	if adjust != nil {
-		adjust(&a)
-		adjust(&b)
-		adjust(&c)
-	}
-	commits = testSubmit(t, commits, "submit", a, b, c)
-	commits, decision := testGrant(t, commits, "grant", 3, 1)
-	assignment := decision.Assignments[0]
-	sender := testActor("dispatcher")
-	sender.Workflow, sender.RunID, sender.RunAttempt = ".github/workflows/dispatcher.lock.yml", "101", 1
-	commits = testOperations(t, commits, sender, "start", "dispatch", mustOp(t, map[string]any{
-		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": sender,
-	}))
-	state, _ := Replay(commits)
-	profile := state.Policy.Pools["default"].Profiles["default"]
-	binding := RunBinding{
-		RunID: "202", RunAttempt: 1, Repository: testRepository, Workflow: profile.Workflow,
-		Ref: profile.Ref, Principal: profile.Principal, Event: "workflow_dispatch",
-	}
-	evidence := Evidence{
-		Kind: "reconciliation", Source: "github_api", Repository: testRepository,
-		Workflow: profile.Workflow, Ref: profile.Ref, Principal: profile.Principal,
-		CheckedAt: 4000, RunID: "202", RunAttempt: 1,
-	}
-	commits = testOperations(t, commits, testActor("reconciler"), "bind", "dispatch", mustOp(t, map[string]any{
-		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "bound", "run": binding, "evidence": evidence,
-	}))
-	return commits, assignment
+	values := append([]any{ReleaseOperation{Kind: "Release", DispatchID: dispatchID, Reason: reason}}, extra...)
+	return appendTestCommit(t, log, testReconciler, "release", ReleaseParameters{DispatchID: dispatchID, Reason: reason}, mustOps(t, values...))
 }
 
-func workerActor(assignment Assignment, handle string) Actor {
-	actor := testActor("worker")
-	actor.Workflow, actor.RunID, actor.RunAttempt = ".github/workflows/worker.lock.yml", "202", 1
-	actor.DispatchID, actor.ClaimHandle = assignment.DispatchID, handle
-	return actor
-}
-
-func finishMember(t *testing.T, commits []QueueCommit, assignment Assignment, member int, outcome string, times ...int64) []QueueCommit {
+func rejectAppend(t *testing.T, log []QueueCommit, commit QueueCommit, code string) {
 	t.Helper()
-	actor := workerActor(assignment, assignment.Claims[member].Handle)
-	request, err := NewRequest("finish-"+assignment.Claims[member].Handle, "finish", actor, FinishParameters{
-		DispatchID: assignment.DispatchID, ClaimHandle: actor.ClaimHandle, Outcome: outcome,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	at := int64(4000)
-	if len(times) > 0 {
-		at = times[0]
-	}
-	next, _, _, err := BuildCandidate(commits, actor, request, at)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return next
+	state, err := Replay(log)
+	require.NoError(t, err)
+	_, err = AppendCommit(state, commit)
+	requireCode(t, err, code)
 }
 
-func terminalFor(state Projection, assignment Assignment) Evidence {
-	profile := state.Policy.Pools[assignment.Pool].Profiles[assignment.WorkerProfile]
-	return Evidence{
-		Kind: "terminal_run", Source: "github_api", Repository: testRepository,
-		Workflow: profile.Workflow, Ref: profile.Ref, Principal: profile.Principal,
-		CheckedAt: 4000, RunID: "202", RunAttempt: 1, Status: "completed", Conclusion: "failure",
-	}
+func TestLifecycleSubmitDispatchBindFinishRelease(t *testing.T) {
+	a := testWork(t, "a", nil)
+	b := testWork(t, "b", nil)
+	log := testSubmit(t, nil, a, b)
+	log, decision := testDispatchNext(t, log, testDispatchParameters(func(parameters *DispatchParameters) { parameters.Concurrency = 1 }))
+	require.Equal(t, "capacity_blocked", decision.Reason)
+	require.Len(t, decision.Operations, 1)
+	require.Equal(t, a.WorkID, decision.Operations[0].WorkID)
+	first := decision.Dispatches[0]
+	launched := testLaunch(t, log, first, "7")
+
+	other := Actor{Role: "worker", Repository: testRepository, Workflow: ".github/workflows/other.lock.yml", RunID: "9", RunAttempt: 1}
+	foreignBind := buildTestCommit(t, launched, other, "bind", DispatchIDParameters{DispatchID: first}, mustOps(t, BoundOperation{Kind: "Bound", DispatchID: first, RunID: "9", RunAttempt: 1}))
+	rejectAppend(t, launched, foreignBind, "run_binding_conflict")
+
+	worker := testWorker("7", 1)
+	bound := testBind(t, launched, first, worker)
+	foreignFinish := buildTestCommit(t, bound, testWorker("8", 1), "finish", DispatchIDParameters{DispatchID: first}, testFinishOperations(t, bound, first))
+	rejectAppend(t, bound, foreignFinish, "claim_scope_invalid")
+
+	finished := appendTestCommit(t, bound, worker, "finish", DispatchIDParameters{DispatchID: first}, testFinishOperations(t, bound, first))
+	state, err := Replay(finished)
+	require.NoError(t, err)
+	require.Equal(t, "completed", state.Works[a.WorkID].State)
+	require.Equal(t, "available", state.Works[b.WorkID].State)
+	require.Equal(t, "closed", state.Dispatches[first].State)
+	require.JSONEq(t, "[]", string(state.Works[a.WorkID].Effects))
+
+	log, decision = testDispatchNext(t, finished, testDispatchParameters(nil))
+	require.Len(t, decision.Operations, 1)
+	require.Equal(t, b.WorkID, decision.Operations[0].WorkID)
+	second := decision.Dispatches[0]
+	claimID := decision.Operations[0].ClaimID
+	state, err = Replay(releaseCommit(t, log, second, "run_missing"))
+	require.NoError(t, err)
+	require.Equal(t, "available", state.Works[b.WorkID].State)
+	require.Equal(t, 1, state.Works[b.WorkID].Attempts)
+	require.Equal(t, "closed", state.Dispatches[second].State)
+	require.Equal(t, "run_missing", state.Claims[claimID].CancellationReason)
+
+	// With max_attempts 1 the publisher appends WorkCancellation attempts_exhausted.
+	exhausted := releaseCommit(t, log, second, "run_missing", WorkCancellationOperation{Kind: "WorkCancellation", WorkID: b.WorkID, Reason: "attempts_exhausted", ClaimID: claimID})
+	state, err = Replay(exhausted)
+	require.NoError(t, err)
+	require.Equal(t, "cancelled", state.Works[b.WorkID].State)
+	require.Equal(t, "attempts_exhausted", state.Works[b.WorkID].CancellationReason)
+	require.Equal(t, Stats{Work: 2, Completed: 1, Cancelled: 1, Claims: 2, Transactions: len(exhausted), Nodes: 2}, state.Stats)
 }
 
-func TestIndependentMixedOutcomesAndNativeReservation(t *testing.T) {
-	commits, assignment, target := boundEffectAssignment(t)
-	commits = finishMember(t, commits, assignment, 0, "completed")
-	commits = finishMember(t, commits, assignment, 1, "cancelled")
-	state, _ := Replay(commits)
-	if state.Stats.Completed != 1 || state.Stats.Available != 1 || state.Stats.Claimed != 1 ||
-		state.Stats.Dispatches != 1 {
-		t.Fatalf("one member outcome settled the shared native reservation: %+v", state.Stats)
-	}
-	if err := AuthorizeEffect(state, workerActor(assignment, "h1"), target); err != nil {
-		t.Fatal(err)
-	}
-	for _, handle := range []string{"h2", "h3"} {
-		if err := AuthorizeEffect(state, workerActor(assignment, handle), target); err == nil {
-			t.Fatal("cancelled/open sibling borrowed completed member authority")
-		}
-	}
-	if _, err := NormalizeClaimHandle(assignment, nil); err == nil || !strings.Contains(err.Error(), "claim_scope_required") {
-		t.Fatal("closing members collapsed original multi-Claim assignment")
-	}
-	terminal := terminalFor(state, assignment)
-	third := assignment.Claims[2]
-	commits = testOperations(t, commits, testActor("reconciler"), "release", "release",
-		mustOp(t, map[string]any{"kind": "ClaimCancellation", "work_id": third.WorkID, "claim_id": third.ClaimID, "reason": "run_terminal", "retry_not_before": 34000}),
-		mustOp(t, map[string]any{"kind": "Release", "dispatch_id": assignment.DispatchID, "evidence": terminal}))
-	state, err := Replay(commits)
-	if err != nil || state.Stats.Completed != 1 || state.Stats.Dispatches != 0 || state.Stats.Available != 2 {
-		t.Fatalf("terminal recovery rolled back completed sibling: %+v %v", state.Stats, err)
-	}
-	if state.Works[assignment.Claims[0].WorkID].Barrier != "pending" {
-		t.Fatal("native termination invented delivery success")
-	}
+func TestReplayRejectsNonV4AndDuplicateRequests(t *testing.T) {
+	_, err := ReplayLog([]byte(`{"version":3}` + "\n"))
+	requireCode(t, err, "unsupported_protocol")
+	log := testSubmit(t, nil, testWork(t, "a", nil))
+	duplicate := log[0]
+	previous := log[0].ID
+	duplicate.Previous = &previous
+	duplicate.ID = CommitID(&previous, duplicate.Request.ID)
+	_, err = Replay(append(log, duplicate))
+	requireCode(t, err, "request_reused")
 }
 
-func TestCompletionIsNotResultAndBarriersAreExclusive(t *testing.T) {
-	commits, assignment := boundAssignment(t)
-	root := assignment.Claims[0]
-	child := testNode(t, commits, "child")
-	child.DependsOn = []Dependency{{Kind: "work", WorkID: root.WorkID}}
-	commits = testSubmit(t, commits, "child-submit", child)
-	commits = finishMember(t, commits, assignment, 0, "completed")
-	state, _ := Replay(commits)
-	explanation, _ := ExplainWork(state, child.WorkID, 4000)
-	if explanation.Ready || explanation.Reason != "dependency_result_unavailable" {
-		t.Fatal("Completion released predecessor readiness without verified Result")
+func TestCheckpointRoundTripPreservesProjection(t *testing.T) {
+	log := testSubmit(t, nil, testWork(t, "a", nil), testWork(t, "b", nil))
+	log, decision := testDispatchNext(t, log, testDispatchParameters(nil))
+	log = testLaunch(t, log, decision.Dispatches[0], "7")
+	state, err := Replay(log)
+	require.NoError(t, err)
+	commit, err := CheckpointCommit(state, testReconciler, 5)
+	require.NoError(t, err)
+	require.Nil(t, commit.Previous)
+	restored, err := Replay([]QueueCommit{commit})
+	require.NoError(t, err)
+	require.Equal(t, state.Commits+1, restored.Commits)
+	require.Equal(t, commit.ID, restored.Tip)
+	original, err := SerializeProjection(state)
+	require.NoError(t, err)
+	var before, after map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(original, &before))
+	data, err := SerializeProjection(restored)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(data, &after))
+	for _, field := range []string{"repository", "works", "claims", "dispatches", "observations", "work_creators"} {
+		require.JSONEq(t, string(before[field]), string(after[field]), field)
 	}
-	terminal := terminalFor(state, assignment)
-	delivery := terminal
-	delivery.Kind, delivery.Source, delivery.Receipt = "delivery", "verified_receipts", "verified-h1"
-	completionID := state.Works[root.WorkID].CompletionID
-	result := mustOp(t, map[string]any{
-		"kind": "Result", "work_id": root.WorkID, "claim_id": root.ClaimID,
-		"completion_id": completionID, "descriptor": map[string]any{"ok": true}, "evidence": delivery,
-	})
-	commits = testOperations(t, commits, testActor("reconciler"), "result", "result", result)
-	state, _ = Replay(commits)
-	explanation, _ = ExplainWork(state, child.WorkID, 4000)
-	if !explanation.Ready {
-		t.Fatalf("verified Result did not release child: %+v", explanation)
-	}
-	terminal.Attempts, terminal.Effects = 5, "unknown"
-	failure := mustOp(t, map[string]any{
-		"kind": "DeliveryFailure", "work_id": root.WorkID, "claim_id": root.ClaimID,
-		"completion_id": completionID, "reason": "receipts_unknown", "disposition": "unknown", "evidence": terminal,
-	})
-	request, _ := NewRequest("failure", "delivery_failure", testActor("reconciler"), OperationsParameters{Operations: []Operation{failure}})
-	if _, _, _, err := BuildCandidate(commits, testActor("reconciler"), request, 4000); err == nil ||
-		!strings.Contains(err.Error(), "delivery_barrier_conflict") {
-		t.Fatalf("Result and DeliveryFailure both became authoritative: %v", err)
-	}
+	// Lines after a checkpoint replay normally; a checkpoint is only valid as line 1.
+	next := testBind(t, []QueueCommit{commit}, decision.Dispatches[0], testWorker("7", 1))
+	_, err = Replay(append(next, commit))
+	require.Error(t, err)
 }
 
-func TestUncertainRunNeverExpiresOrReleases(t *testing.T) {
-	commits, assignment := boundAssignment(t)
-	commits = commits[:len(commits)-1]
-	commits = testOperations(t, commits, testActor("reconciler"), "uncertain", "dispatch", mustOp(t, map[string]any{
-		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "uncertain", "reason": "response_lost",
-	}))
-	state, _ := Replay(commits)
-	release := mustOp(t, map[string]any{
-		"kind": "Release", "dispatch_id": assignment.DispatchID,
-		"evidence": Evidence{Kind: "nonlaunch", Source: "github_api", Repository: testRepository,
-			Workflow: ".github/workflows/worker.lock.yml", Ref: state.Policy.Pools["default"].Profiles["default"].Ref,
-			Principal: testPrincipal, CheckedAt: 4000},
-	})
-	request, _ := NewRequest("unsafe-release", "release", testActor("reconciler"), OperationsParameters{Operations: []Operation{release}})
-	if _, _, _, err := BuildCandidate(commits, testActor("reconciler"), request, 900000); err == nil {
-		t.Fatal("deadline/missing native binding was interpreted as proof of nonlaunch")
+func TestPlanDispatchHonorsPerAccountLimit(t *testing.T) {
+	works := []WorkDefinition{
+		testWork(t, "a", func(work *WorkDefinition) { work.FairnessKey = "x" }),
+		testWork(t, "b", func(work *WorkDefinition) { work.FairnessKey = "x" }),
+		testWork(t, "c", func(work *WorkDefinition) { work.FairnessKey = "y" }),
 	}
-}
-
-func TestRunAttemptAndScopeCannotBeForged(t *testing.T) {
-	commits, assignment := boundAssignment(t)
-	state, _ := Replay(commits)
-	for _, mutate := range []func(*Actor){
-		func(a *Actor) { a.RunAttempt = 2 },
-		func(a *Actor) { a.RunID = "wrong" },
-		func(a *Actor) { a.ClaimHandle = "foreign" },
-		func(a *Actor) { a.Principal = "foreign" },
-		func(a *Actor) { a.Workflow = "foreign" },
-	} {
-		actor := workerActor(assignment, "h1")
-		mutate(&actor)
-		if _, err := state.scopedClaim(actor, assignment.DispatchID, "h1"); err == nil {
-			t.Fatal("forged attempt/identity/scope acquired Claim")
-		}
-
-	}
-	selected := ""
-	if _, err := NormalizeClaimHandle(assignment, &selected); err == nil {
-		t.Fatal("empty is not omitted")
-	}
-	scalar := Assignment{}
-	if err := json.Unmarshal([]byte(`{"work_id":"w","claim_id":"c","work":{}}`), &scalar); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := NormalizeClaimHandle(scalar, nil); err == nil {
-		t.Fatal("legacy scalar assignment authorized native worker")
-	}
-}
-
-func TestNativeFinishNormalizerPreservesAbsentAndNull(t *testing.T) {
-	_, assignment := boundAssignment(t)
-	for _, data := range []string{
-		`{"outcome":"completed"}`, `{"outcome":"completed","claim_handle":null}`,
-		`{"outcome":"completed","claim_handle":""}`, `{"outcome":"completed","claim_handle":"foreign"}`,
-		`{"outcome":"completed","claim_id":"c1"}`, `{"outcome":"finished","claim_handle":"h1"}`,
-	} {
-		if _, err := NormalizeFinishIntent(assignment, []byte(data)); err == nil {
-			t.Fatalf("invalid/ambiguous multi-Claim finish accepted: %s", data)
-		}
-	}
-	if result, err := NormalizeFinishIntent(assignment, []byte(`{"outcome":"completed","claim_handle":"h1"}`)); err != nil || result.ClaimHandle != "h1" {
-		t.Fatalf("explicit original member rejected: %+v %v", result, err)
-	}
-	assignment.Claims = assignment.Claims[:1]
-	if _, err := NormalizeFinishIntent(assignment, []byte(`{"outcome":"completed"}`)); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := NormalizeFinishIntent(assignment, []byte(`{"outcome":"completed","claim_handle":null}`)); err == nil {
-		t.Fatal("null was silently treated as omitted for a one-Claim assignment")
-	}
-}
-
-func TestCancellationMetadataIsImmutableAndIdempotent(t *testing.T) {
-	commits, assignment := boundAssignment(t)
-	commits = finishMember(t, commits, assignment, 1, "cancelled")
-	operation := commits[len(commits)-1].Operations[0]
-	var cancellation map[string]any
-	_ = json.Unmarshal(operation, &cancellation)
-	state, _ := Replay(commits)
-	claim := state.Claims[assignment.Claims[1].ClaimID]
-	if claim.CancellationReason != cancellation["reason"] || claim.RetryNotBefore != 34000 {
-		t.Fatalf("Claim lost immutable cancellation metadata: %+v", claim)
-	}
-	duplicate, _ := NewRequest("duplicate-cancel", "cancel_claim", testActor("reconciler"), OperationsParameters{Operations: []Operation{operation}})
-	if _, _, _, err := BuildCandidate(commits, testActor("reconciler"), duplicate, 4000); err != nil {
-		t.Fatal(err)
-	}
-	for _, field := range []string{"reason", "retry_not_before"} {
-		changed := make(map[string]any, len(cancellation))
-		maps.Copy(changed, cancellation)
-		if field == "reason" {
-			changed[field] = "changed"
-		} else {
-			changed[field] = 35000
-		}
-		request, _ := NewRequest("changed-"+field, "cancel_claim", testActor("reconciler"), OperationsParameters{Operations: []Operation{mustOp(t, changed)}})
-		if _, _, _, err := BuildCandidate(commits, testActor("reconciler"), request, 4000); err == nil {
-			t.Fatalf("Claim cancellation %s changed after terminal fact", field)
-		}
-	}
-	workCancellation := mustOp(t, map[string]string{
-		"kind": "WorkCancellation", "work_id": assignment.Claims[2].WorkID, "reason": "operator_cancelled",
-	})
-	commits = testOperations(t, commits, testActor("administrator"), "cancel-work", "cancel_work", workCancellation)
-	state, _ = Replay(commits)
-	work := state.Works[assignment.Claims[2].WorkID]
-	original := work.CancellationCommitID
-	if work.CancellationReason != "operator_cancelled" || original != state.Tip ||
-		state.Claims[assignment.Claims[2].ClaimID].CancellationReason != work.CancellationReason ||
-		state.Stats.Dispatches != 1 {
-		t.Fatal("Work cancellation lost reason or released an executing native reservation")
-	}
-	commits = testOperations(t, commits, testActor("administrator"), "same-work-cancel", "cancel_work", workCancellation)
-	state, _ = Replay(commits)
-	if state.Works[work.WorkID].CancellationCommitID != original {
-		t.Fatal("idempotent cancellation rewrote original terminal provenance")
-	}
-	changed, _ := NewRequest("changed-work-cancel", "cancel_work", testActor("administrator"), OperationsParameters{Operations: []Operation{
-		mustOp(t, map[string]string{"kind": "WorkCancellation", "work_id": work.WorkID, "reason": "changed"}),
-	}})
-	if _, _, _, err := BuildCandidate(commits, testActor("administrator"), changed, 4000); err == nil {
-		t.Fatal("Work terminal reason was overwritten")
-	}
-}
-
-func TestDispatcherOriginMayDifferFromApprovedLaunchPrincipal(t *testing.T) {
-	commits, assignment, target := boundEffectAssignment(t)
-	reserved := commits[:len(commits)-2]
-	sender := testActor("dispatcher")
-	sender.Principal = "2002"
-	sender.Workflow, sender.RunID, sender.RunAttempt = ".github/workflows/dispatcher.lock.yml", "101", 1
-	commits = testOperations(t, reserved, sender, "different-origin-start", "dispatch", mustOp(t, map[string]any{
-		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": sender,
-	}))
-	state, err := Replay(commits)
-	if err != nil || state.Dispatches[assignment.DispatchID].Sender.Principal == state.Dispatches[assignment.DispatchID].Profile.Principal {
-		t.Fatalf("logical dispatcher origin must not masquerade as its dispatch credential: %v", err)
-	}
-	profile := state.Dispatches[assignment.DispatchID].Profile
-	binding := RunBinding{
-		RunID: "202", RunAttempt: 1, Repository: testRepository, Workflow: profile.Workflow,
-		Ref: profile.Ref, Principal: profile.Principal, Event: "workflow_dispatch",
-	}
-	evidence := Evidence{
-		Kind: "reconciliation", Source: "github_api", Repository: testRepository,
-		Workflow: profile.Workflow, Ref: profile.Ref, Principal: profile.Principal,
-		CheckedAt: 4000, RunID: binding.RunID, RunAttempt: 1,
-	}
-	impostorRun, impostorEvidence := binding, evidence
-	impostorRun.Principal, impostorEvidence.Principal = sender.Principal, sender.Principal
-	operation := mustOp(t, map[string]any{
-		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "bound",
-		"run": impostorRun, "evidence": impostorEvidence,
-	})
-	request, err := NewRequest("sender-is-not-worker", "dispatch", testActor("reconciler"),
-		OperationsParameters{Operations: []Operation{operation}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, _, err := BuildCandidate(commits, testActor("reconciler"), request, 4000); err == nil ||
-		!strings.HasPrefix(err.Error(), "run_binding_conflict:") {
-		t.Fatalf("dispatcher origin replaced the approved native worker principal: %v", err)
-	}
-	commits = testOperations(t, commits, testActor("reconciler"), "different-origin-bind", "dispatch", mustOp(t, map[string]any{
-		"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "bound",
-		"run": binding, "evidence": evidence,
-	}))
-	commits = finishMember(t, commits, assignment, 0, "completed")
-	state, err = Replay(commits)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if state.Dispatches[assignment.DispatchID].Sender.Principal != sender.Principal ||
-		state.Dispatches[assignment.DispatchID].Run.Principal != profile.Principal {
-		t.Fatal("binding or Completion conflated logical sender and native worker principals")
-	}
-	worker := workerActor(assignment, "h1")
-	if err := AuthorizeEffect(state, worker, target); err != nil {
-		t.Fatalf("approved native worker lost authority under a different logical sender: %v", err)
-	}
-	worker.Principal = sender.Principal
-	if err := AuthorizeEffect(state, worker, target); err == nil ||
-		!strings.HasPrefix(err.Error(), "run_binding_conflict:") {
-		t.Fatalf("logical dispatcher borrowed native worker effect authority: %v", err)
-	}
-}
-
-func TestFinalRetryWorkerCancellationAtomicallyClosesWork(t *testing.T) {
-	commits, assignment := boundAssignment(t, func(policy *Policy) {
-		pool := policy.Pools["default"]
-		pool.Retry.MaxAttempts = 1
-		policy.Pools["default"] = pool
-	})
-	actor := workerActor(assignment, "h1")
-	request, err := NewRequest("final-retry-cancel", "finish", actor, FinishParameters{
-		DispatchID: assignment.DispatchID, ClaimHandle: actor.ClaimHandle, Outcome: "cancelled",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	next, commit, _, err := BuildCandidate(commits, actor, request, 4000)
-	if err != nil || commit == nil || len(commit.Operations) != 2 ||
-		mustOperationKind(t, commit.Operations[0]) != "ClaimCancellation" ||
-		mustOperationKind(t, commit.Operations[1]) != "WorkCancellation" || commit.Actor.Role != "worker" {
-		t.Fatalf("final retry did not atomically close its original Work under worker authority: %v %+v", err, commit)
-	}
-	state, err := Replay(next)
-	if err != nil {
-		t.Fatal(err)
-	}
-	work := state.Works[assignment.Claims[0].WorkID]
-	if work.State != "cancelled" || work.CancellationReason != "attempts_exhausted" ||
-		state.Claims[assignment.Claims[0].ClaimID].State != "cancelled" ||
-		state.Claims[assignment.Claims[1].ClaimID].State != "open" ||
-		state.Dispatches[assignment.DispatchID].Released {
-		t.Fatal("cold replay reopened exhausted Work, closed a sibling or released native capacity")
-	}
-	assertRecoveryReplayParity(t, next, "")
-	for _, invalid := range []struct {
-		name   string
-		workID string
-		reason string
-	}{
-		{"arbitrary terminal reason", assignment.Claims[0].WorkID, "worker_cancelled"},
-		{"foreign sibling closure", assignment.Claims[1].WorkID, "attempts_exhausted"},
-	} {
-		t.Run(invalid.name, func(t *testing.T) {
-			fork := append([]QueueCommit{}, next...)
-			tip := &fork[len(fork)-1]
-			tip.Operations = append([]Operation{}, tip.Operations...)
-			tip.Operations[1] = mustOp(t, map[string]any{
-				"kind": "WorkCancellation", "work_id": invalid.workID, "reason": invalid.reason,
-			})
-			if _, err := Replay(fork); err == nil || !strings.HasPrefix(err.Error(), "ownership_unauthorized:") {
-				t.Fatalf("exhausted finish acquired arbitrary Work closure authority: %v", err)
-			}
-		})
-	}
-}
-
-func TestNativeRunCannotBindAnotherDispatch(t *testing.T) {
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Fatalf("native run binding parity requires Node.js: %v", err)
-	}
-	commits, original := boundAssignment(t)
-	node := testNode(t, commits, "other")
-	commits = testSubmit(t, commits, "other-submit", node)
-	commits, decision := testGrant(t, commits, "other-grant", 1, 1)
-	target := decision.Assignments[0]
-	sender := testActor("dispatcher")
-	sender.Workflow, sender.RunID, sender.RunAttempt = ".github/workflows/dispatcher.lock.yml", "101", 1
-	commits = testOperations(t, commits, sender, "other-start", "dispatch", mustOp(t, map[string]any{
-		"kind": "Dispatch", "dispatch_id": target.DispatchID, "state": "started", "sender": sender,
-	}))
-	state, err := Replay(commits)
-	if err != nil {
-		t.Fatal(err)
-	}
-	originalRun := *state.Dispatches[original.DispatchID].Run
-	profile := state.Dispatches[target.DispatchID].Profile
-	evidence := Evidence{
-		Kind: "reconciliation", Source: "github_api", Repository: testRepository,
-		Workflow: profile.Workflow, Ref: profile.Ref, Principal: profile.Principal,
-		CheckedAt: 4000, RunID: originalRun.RunID, RunAttempt: 1,
-	}
-	operation := mustOp(t, map[string]any{
-		"kind": "Dispatch", "dispatch_id": target.DispatchID, "state": "bound", "run": originalRun, "evidence": evidence,
-	})
-	actor := testActor("reconciler")
-	request, err := NewRequest("reuse-run", "dispatch", actor, OperationsParameters{Operations: []Operation{operation}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertReuseRejected := func(t *testing.T, prefix []QueueCommit) {
-		t.Helper()
-		if _, _, _, err := BuildCandidate(prefix, actor, request, 4000); err == nil ||
-			!strings.HasPrefix(err.Error(), "run_binding_conflict:") {
-			t.Fatalf("native run acquired another group's claims: %v", err)
-		}
-		assertRecoveryReplayParity(t, prefix, "")
-		previous := prefix[len(prefix)-1].ID
-		forbidden := QueueCommit{
-			Version: Version, ID: "forbidden-run-reuse", Previous: &previous,
-			Request: request, Actor: actor, PolicyEpoch: state.PolicyEpoch, At: 4000,
-			Operations: []Operation{operation},
-		}
-		invalid := append(append([]QueueCommit{}, prefix...), forbidden)
-		if _, err := Replay(invalid); err == nil || !strings.HasPrefix(err.Error(), "run_binding_conflict:") {
-			t.Fatalf("cold native replay accepted duplicate binding: %v", err)
-		}
-		assertRecoveryReplayParity(t, invalid, "run_binding_conflict")
-	}
-	t.Run("active", func(t *testing.T) {
-		assertReuseRejected(t, commits)
-	})
-	operations := []Operation{}
-	for _, member := range original.Claims {
-		operations = append(operations, mustOp(t, map[string]any{
-			"kind": "ClaimCancellation", "work_id": member.WorkID, "claim_id": member.ClaimID,
-			"reason": "native_terminal", "retry_not_before": 34000,
-		}))
-	}
-	operations = append(operations, mustOp(t, map[string]any{
-		"kind": "Release", "dispatch_id": original.DispatchID, "evidence": terminalFor(state, original),
-	}))
-	commits = testOperations(t, commits, testActor("reconciler"), "release-original", "release", operations...)
-	t.Run("released", func(t *testing.T) {
-		assertReuseRejected(t, commits)
-	})
+	state, err := Replay(testSubmit(t, nil, works...))
+	require.NoError(t, err)
+	decision, err := PlanDispatch(state, testDispatchParameters(func(parameters *DispatchParameters) { parameters.PerAccountLimit = 1 }), "request:test")
+	require.NoError(t, err)
+	require.Equal(t, []string{"a", "c"}, nodeKeys(state, decision))
+	require.Equal(t, "prefix_complete", decision.Reason)
+	claimID, dispatchID, handle := ClaimIdentity("request:test", works[0].WorkID)
+	require.Equal(t, ClaimOperation{Kind: "Claim", WorkID: works[0].WorkID, ClaimID: claimID, DispatchID: dispatchID, Handle: handle}, decision.Operations[0])
 }

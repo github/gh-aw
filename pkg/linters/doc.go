@@ -1,6 +1,6 @@
 // Package linters is a namespace for gh-aw's custom Go analysis linters.
 //
-// All 102 active analyzers:
+// All 105 active analyzers:
 //
 //   - appendbytestring — flags append(b, []byte(s)...) calls where s is a string that can be simplified to append(b, s...)
 //   - appendoneelement — flags append(s, []T{x}...) calls where a single-element slice literal is spread and can be simplified to append(s, x)
@@ -43,6 +43,7 @@
 //   - ignoredlocalerror — reports discarded errors from functions in the gh-aw module
 //   - ioutildeprecated — reports uses of deprecated io/ioutil functions that should be replaced with io or os package equivalents
 //   - jsondecodertrailingdataunchecked — reports in-memory JSON decoders whose first Decode is not followed by a Decode that checks for io.EOF
+//   - jsondecoderunknownfields — reports JSON decoders that do not reject unknown fields
 //   - jsonmarshalignoredeerror — flags json.Marshal/Unmarshal calls where the error is discarded with _
 //   - jsonunmarshalbytesconversion — reports json.Unmarshal calls that convert a string to []byte
 //   - largefunc — flags function bodies that exceed a configurable line-count threshold
@@ -94,6 +95,7 @@
 //   - timenowsub — reports time.Now().Sub(t) calls that should be simplified to time.Since(t)
 //   - tolowerequalfold — flags case-insensitive comparisons via ToLower/ToUpper that should use EqualFold
 //   - trimleftright — flags strings.TrimLeft/TrimRight calls with a multi-character literal cutset where TrimPrefix/TrimSuffix was likely intended
+//   - trimspacestringbytes — reports strings.TrimSpace(string(b)) for byte slices and recommends considering bytes.TrimSpace
 //   - typeassertionnil — flags single-value type assertions to pointer types and recommends the two-value form
 //   - typeassertionokdiscarded — flags two-value type assertions whose ok result is discarded
 //   - uncheckedsliceindex — reports slice and string indexes without proven bounds
@@ -104,6 +106,7 @@
 //   - walkfuncerrshadow — flags filepath.Walk/WalkDir callbacks whose err parameter shadows an outer err variable assigned from the walk call
 //   - wgdonenotdeferred — flags non-deferred sync.WaitGroup.Done() calls
 //   - writebytestring — flags w.Write([]byte(s)) calls where s is a string that can be replaced with io.WriteString(w, s)
+//   - writefilepublicpermsensitive — flags FilePermPublic on potentially sensitive paths or content
 //
 // The package also exposes a compatibility alias (ErrorMessageAnalyzer) that
 // points to the errormessage subpackage analyzer.

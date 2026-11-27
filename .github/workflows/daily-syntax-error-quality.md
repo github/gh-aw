@@ -51,16 +51,15 @@ steps:
         cp "$workflow" /tmp/gh-aw/agent/candidates/
       done < /tmp/gh-aw/agent/candidates.txt
       echo "Pre-selected $(wc -l < /tmp/gh-aw/agent/candidates.txt) candidate workflows"
-  - name: Install gh-aw CLI
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  - name: Set up Go
+    uses: actions/setup-go@v7.0.0
+    with:
+      go-version-file: go.mod
+      cache: true
+  - name: Build gh-aw compiler
     run: |
-      if gh extension list | grep -q "github/gh-aw"; then
-        gh extension upgrade gh-aw || true
-      else
-        gh extension install github/gh-aw
-      fi
-      gh aw --version
+      go build -o /tmp/gh-aw/agent/gh-aw ./cmd/gh-aw
+      /tmp/gh-aw/agent/gh-aw version
 imports:
   - shared/langgraph.md
   - shared/reporting.md
@@ -93,25 +92,27 @@ Test the quality of compiler error messages by:
 
 **Target**: Complete the full analysis in ≤ 20 turns.
 
+- Invoke the next tool directly; a text-only response ends the LangGraph session.
+- Reserve the final tool call for `create_issue`, `noop`, or `report_incomplete`. If a required step is blocked, report the blocker with `report_incomplete`, not prose or `noop`.
 - Test **2 workflows** (not 3) — one simple, one complex.
 - One error category per workflow (Category A for workflow 1, Category B for workflow 2).
-- **If the average score across both test cases is ≥ 65 and no individual score is < 50**: skip Phase 6 entirely, call `noop` with a one-line summary — do **not** generate the issue or structured report.
+- **If the average score across both test cases is ≥ 65, no individual score is < 50, and no critical pattern issue is identified**: skip Phase 6, call `noop` with a one-line summary — do **not** generate the issue or structured report.
 - When scores require an issue: use the compact format in Phase 6 — skip verbose per-dimension narratives.
 - Do **not** re-read files already loaded into context.
-- One `gh aw compile` call per test case — do not retry after an expected failure.
+- One compiler call per test case — do not retry after an expected failure.
 - Use `head -n 30` to preview workflows — do **not** read full file contents.
 
 ## Current Context
 
 - **Repository**: ${{ github.repository }}
 - **Workspace**: ${{ github.workspace }}
-- **Compiler**: gh aw
+- **Compiler**: `/tmp/gh-aw/agent/gh-aw` (built from this checkout; use this path rather than `gh aw`)
 - **Candidate copy directory**: /tmp/gh-aw/agent/candidates
 
 ## ⚡ Batching Rules (enforce strictly)
 
 - Read `candidates.txt` and preview both selected workflows in **one** bash call.
-- For each test case, use **one chained bash call** that starts with `cp /tmp/gh-aw/agent/candidates/...` and includes the file edit plus `gh aw compile ... 2>&1`.
+- For each test case, use **one chained bash call** that starts with `cp /tmp/gh-aw/agent/candidates/...` and includes the file edit plus `/tmp/gh-aw/agent/gh-aw compile ... 2>&1`.
 - Never spend a separate tool call on shell work you can combine with `&&`.
 - Target: complete Phases 1–5 in **≤ 10 tool calls total**.
 
@@ -203,7 +204,8 @@ For each test case:
 1. **Attempt to compile** the modified workflow:
    ```bash
    cd /tmp/gh-aw/agent/syntax-error-tests
-   gh aw compile test-1.md 2>&1 | tee test-1-output.txt
+   set -o pipefail
+   /tmp/gh-aw/agent/gh-aw compile test-1.md --no-emit 2>&1 | tee test-1-output.txt
    ```
 
 2. **Capture the full output** including:
@@ -217,6 +219,11 @@ For each test case:
    - Error message text
    - Suggestions or hints (if provided)
    - Examples (if provided)
+
+An expected syntax or configuration error must identify the error introduced.
+If the compiler cannot run, a candidate cannot be tested, or the output reports
+an unrelated setup/import error, do not score it as a compiler diagnostic.
+Call `safeoutputs report_incomplete '{"reason":"<concrete blocker>"}'` and stop.
 
 ## Phase 4: Evaluate Error Message Quality
 
@@ -232,7 +239,7 @@ For each error output, score across these dimensions (total 100 points):
 
 **Scoring Summary**:
 - **Excellent**: 85-100 · **Good**: 70-84 · **Acceptable**: 55-69 · **Poor**: 40-54 · **Critical**: 0-39
-- **Quality Threshold**: Average ≥ 65 **and** no individual score < 50 → noop (skip issue creation)
+- **Quality Threshold**: Average ≥ 65, no individual score < 50, and no critical pattern issue → noop (skip issue creation)
 
 ## Phase 5: Generate Evaluation Report
 
@@ -251,7 +258,7 @@ Collect key strengths (1–2 bullets) and improvement suggestions (1–2 bullets
 - Any individual test case scores < 50, OR
 - Critical pattern issues are identified
 
-If the threshold is met (average ≥ 65 and no score < 50), **skip this phase entirely** and proceed directly to Phase 7.
+If the threshold is met and no critical pattern issue is identified, **skip this phase entirely** and proceed directly to Phase 7.
 
 ### Issue Structure
 
@@ -303,30 +310,30 @@ Suggested structure:
 
 ### Issue Creation Guidelines
 
-1. **Only Create When Needed**: Don't create issues if quality is good (≥70)
+1. **Only Create When Needed**: Follow the Phase 6 thresholds.
 2. **Actionable Recommendations**: Provide specific, implementable suggestions
 3. **Prioritize Improvements**: Focus on high-impact, feasible changes
 4. **Include Examples**: Show both current and improved error messages
 
 ## Phase 7: Signal Completion ⚠️ REQUIRED — DO NOT SKIP
 
-**This phase is mandatory regardless of your findings. Execute it as your final action.**
+**This phase is mandatory regardless of your findings. Do not finish with prose alone.**
 
 After Phase 5 scoring (and after Phase 6 if you created an issue):
 
-**Path A — Threshold met (average ≥ 65, no score < 50)**:
+**Path A — Threshold met (average ≥ 65, no score < 50, no critical pattern issue)**:
 Run this shell command now:
 ```
-safeoutputs noop --message "Analyzed [workflow1.md] (Category A) + [workflow2.md] (Category B). Average: [N]/100. Threshold met — no issue needed."
+safeoutputs noop '{"message":"Analyzed [workflow1.md] (Category A) and [workflow2.md] (Category B). Average: [N]/100. Threshold met; no issue needed."}'
 ```
 
 **Path B — Issue created in Phase 6**:
-Run this shell command now:
-```
-safeoutputs noop --message "Created quality improvement issue. Analyzed [workflow1.md] + [workflow2.md]. Average: [N]/100."
-```
+The successful `create_issue` safe output is the terminal action. Do not call `noop`.
 
-⚠️ **Your session ends only after executing one of the above shell commands. Do not output text and stop — run the command.**
+**Path C — Work incomplete or blocked**:
+Call `safeoutputs report_incomplete '{"reason":"<concrete blocker>"}'`, not `noop`.
+
+⚠️ **Your session ends only after a terminal safe output. Do not output text and stop without invoking it.**
 
 ## Success Criteria
 
@@ -337,7 +344,7 @@ A successful analysis run:
 - ✅ Provides quality scores across all dimensions
 - ✅ Creates issue only when quality is below threshold (average < 65 or any score < 50)
 - ✅ Cleans up temporary test files
-- ✅ Executes Phase 7 shell command to signal completion
+- ✅ Emits a terminal safe output to signal completion
 
 ---
 

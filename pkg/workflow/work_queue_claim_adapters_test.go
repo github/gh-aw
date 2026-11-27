@@ -2,8 +2,6 @@ package workflow
 
 import (
 	"encoding/json"
-	"fmt"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -97,9 +95,8 @@ func TestWorkQueueCustomAdapterDeclarationAndPreparationIsolation(t *testing.T) 
 	compiler := NewCompiler()
 	names, err := compiler.buildWorkQueuePreparedAdapterJobs(data, false)
 	require.NoError(t, err)
-	require.Len(t, names, 16)
-	require.Equal(t, "work_queue_prepare_custom_0", names[0])
-	require.Equal(t, "work_queue_prepare_custom_15", names[15])
+	require.Equal(t, []string{"work_queue_prepare_custom_0"}, names)
+	require.Len(t, compiler.jobManager.jobs, 1)
 	job := compiler.jobManager.jobs[names[0]]
 	require.Contains(t, job.Permissions, "contents: read")
 	require.NotContains(t, job.Permissions, "write")
@@ -114,17 +111,18 @@ func TestWorkQueueCustomAdapterDeclarationAndPreparationIsolation(t *testing.T) 
 	require.Contains(t, steps, "/claims/")
 	require.NotContains(t, steps, "claim_authorized")
 	download := strings.Join(compiler.buildSafeOutputsDownloadSteps(data, ""), "")
-	require.Contains(t, download, "Download isolated Claim adapter preparations")
-	require.Contains(t, download, "artifact-ids: ${{ needs.work_queue_prepare_custom_0.outputs.artifact_id }}")
-	require.Contains(t, download, "artifact-ids: ${{ needs.work_queue_prepare_custom_15.outputs.artifact_id }}")
+	require.Contains(t, download, "Download isolated Claim adapter preparation custom")
+	require.Equal(t, 1, strings.Count(download, "Download isolated Claim adapter preparation"))
+	require.Equal(t, 1, strings.Count(download, "artifact-ids: ${{ needs.work_queue_prepare_custom_0.outputs.artifact_id }}"))
+	require.Equal(t, 1, strings.Count(download, "artifact-ids:"))
 	require.NotContains(t, download, "pattern: work-queue-claim-adapter-*")
 	require.Contains(t, download, "/claim-adapters/custom/0/claims/")
 	require.Equal(t, "${{ steps.claim_adapter_artifact.outputs.artifact-id }}", job.Outputs["artifact_id"])
-	for index, name := range names {
+	for _, name := range names {
 		isolated := compiler.jobManager.jobs[name]
 		require.Len(t, isolated.Outputs, 1)
 		require.Empty(t, isolated.Strategy)
-		require.Contains(t, strings.Join(isolated.Steps, ""), fmt.Sprintf("GH_AW_CLAIM_ADAPTER_INDEX: %q", strconv.Itoa(index)))
+		require.Contains(t, strings.Join(isolated.Steps, ""), `GH_AW_CLAIM_ADAPTER_INDEX: "0"`)
 		var compiled struct {
 			Steps []struct {
 				ID  string
@@ -138,7 +136,7 @@ func TestWorkQueueCustomAdapterDeclarationAndPreparationIsolation(t *testing.T) 
 				preparationEnv = step.Env
 			}
 		}
-		require.Equal(t, "${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}", preparationEnv["GH_AW_AGENT_OUTPUT"], "Claim adapter slot %d must load the downloaded assignment-level agent output", index)
+		require.Equal(t, "${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}", preparationEnv["GH_AW_AGENT_OUTPUT"], "Claim adapter preparer must load the downloaded assignment-level agent output")
 	}
 	data.SafeOutputs.Jobs["custom"].Permissions = map[string]string{"contents": "write"}
 	require.ErrorContains(t, validateWorkQueueConfiguration(data), "cannot obtain")
@@ -169,7 +167,7 @@ func TestWorkQueueDeclaredRESTAdapterRequiresCompleteIndependentVerifier(t *test
 	compiler := NewCompiler()
 	names, err := compiler.buildWorkQueuePreparedAdapterJobs(data, false)
 	require.NoError(t, err)
-	require.Len(t, names, 16)
+	require.Len(t, names, 1)
 	first := strings.Join(compiler.jobManager.jobs[names[0]].Steps, "")
 	require.Contains(t, first, "github_rest")
 	require.Contains(t, first, "receipt_id")
@@ -210,7 +208,7 @@ func TestWorkQueueDeclaredGitTreeAdapterAndPermissions(t *testing.T) {
 	require.NotEqual(t, PermissionWrite, level)
 	names, err := compiler.buildWorkQueuePreparedAdapterJobs(data, false)
 	require.NoError(t, err)
-	require.Len(t, names, 16)
+	require.Len(t, names, 1)
 	require.NotContains(t, compiler.jobManager.jobs[names[0]].Permissions, "write")
 	require.Contains(t, strings.Join(compiler.jobManager.jobs[names[0]].Steps, ""), "git_tree")
 	adapter := config.ClaimAdapters["code"]
@@ -266,7 +264,7 @@ func TestWorkQueueDeclaredGraphQLAdapterRequiresCompleteNativeVerifier(t *testin
 	require.NotEqual(t, PermissionWrite, level)
 	names, err := compiler.buildWorkQueuePreparedAdapterJobs(data, false)
 	require.NoError(t, err)
-	require.Len(t, names, 16)
+	require.Len(t, names, 1)
 	require.Contains(t, strings.Join(compiler.jobManager.jobs[names[0]].Steps, ""), "github_graphql")
 	require.NotContains(t, compiler.jobManager.jobs[names[0]].Permissions, "write")
 	delete(adapter.GraphQL.Fields, "body")
@@ -326,7 +324,7 @@ func TestWorkQueueActionAdapterIsPreparedAndHasNoCredentialedFallback(t *testing
 	require.NoError(t, validateWorkQueueConfiguration(data))
 	names, err := compiler.buildWorkQueuePreparedAdapterJobs(data, false)
 	require.NoError(t, err)
-	require.Len(t, names, 16)
+	require.Len(t, names, 1)
 	job := compiler.jobManager.jobs[names[0]]
 	require.Contains(t, strings.Join(job.Steps, ""), "actions/github-script@")
 	require.Contains(t, strings.Join(job.Steps, ""), "GH_AW_CLAIM_OUTPUT")

@@ -18,407 +18,293 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func currentWorkQueueTestDir(t *testing.T) string {
-	t.Helper()
-	return t.TempDir()
+const logsWQSnapshotSHA = "0123456789abcdef0123456789abcdef01234567"
+
+// logsWQFixture is a worker activation snapshot: two Work submitted, one
+// dispatched, launched and bound to the snapshot's own run.
+type logsWQFixture struct {
+	log        *workQueueTestLog
+	dispatchID string
+	worker     workqueue.Actor
+	assignment workqueue.Assignment
 }
 
-func TestWorkQueueSnapshotEqualityPreservesValuesAndNilShape(t *testing.T) {
-	sha, claim, attempt, enqueued := "snapshot-sha", "historical-claim", "historical-attempt", int64(7)
-	seed := WorkQueueSnapshot{
-		Version: 3, SHA: &sha, Worker: &WorkQueueWorker{WorkID: "work", ClaimID: "claim"},
-		Transactions: []WorkQueueTransaction{{Version: 2, Kind: "Completion", Work: "work", Claim: &claim, Attempt: &attempt, Enqueued: &enqueued}},
-		Current: &WorkQueueCurrentSnapshot{Role: "worker", PolicyInstalled: true, Tip: "tip", PolicyEpoch: "epoch",
-			Assignment: &WorkQueueAssignmentReceipt{DispatchID: "dispatch", RequestID: "request", CommitID: "commit",
-				Claims: []WorkQueueClaimReceipt{{Handle: "handle", ClaimID: "claim", WorkID: "work", State: "completed", Barrier: "pending"}}}},
+func logsWQEnvelope(role string, origin any, worker *workqueue.Assignment, transactionLog string) map[string]any {
+	return map[string]any{
+		"version": workqueue.Version, "sha": logsWQSnapshotSHA, "transactionLog": transactionLog,
+		"origin": origin, "role": role, "worker": worker,
 	}
+}
+
+func logsWQObserver() workqueue.Actor {
+	return workqueue.Actor{Role: "observer", Repository: workQueueTestRepository, Workflow: ".github/workflows/monitor.lock.yml", RunID: "300", RunAttempt: 1}
+}
+
+func logsWQWorkerFixture(t *testing.T) (map[string]any, logsWQFixture) {
+	t.Helper()
+	log := newWorkQueueTestLog(t)
+	private := func(work *workqueue.WorkDefinition) {
+		work.Payload = json.RawMessage(`{"plan":"private-task-content"}`)
+	}
+	log.submit(log.work("a", private), log.work("b", private))
+	dispatchID := log.dispatch(1)[0]
+	log.launch(dispatchID, "201")
+	worker := workQueueTestWorker("201")
+	log.bind(dispatchID, worker)
+	assignment, err := workqueue.AssignmentForDispatch(log.state(), dispatchID)
+	require.NoError(t, err)
+	require.Len(t, assignment.Claims, 1)
+	fixture := logsWQFixture{log: log, dispatchID: dispatchID, worker: worker, assignment: assignment}
+	return logsWQEnvelope("worker", worker, &assignment, log.jsonl()), fixture
+}
+
+func logsWQParse(t *testing.T, envelope map[string]any) (*WorkQueueSnapshot, error) {
+	t.Helper()
+	data, err := json.Marshal(envelope)
+	require.NoError(t, err)
+	return parseWorkQueueSnapshot(data)
+}
+
+func logsWQWriteFinish(t *testing.T, dir string, lines ...string) string {
+	t.Helper()
+	path := filepath.Join(dir, workQueueFinishFile)
+	require.NoError(t, os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600))
+	return path
+}
+
+func TestWorkQueueReportMergeDetectsSnapshotValueChanges(t *testing.T) {
+	t.Parallel()
+	envelope, _ := logsWQWorkerFixture(t)
+	seed, err := logsWQParse(t, envelope)
+	require.NoError(t, err)
 	encoded, err := json.Marshal(seed)
 	require.NoError(t, err)
 	for name, change := range map[string]func(*WorkQueueSnapshot){
-		"version":       func(s *WorkQueueSnapshot) { s.Version++ },
-		"sha":           func(s *WorkQueueSnapshot) { *s.SHA = "other" },
-		"worker":        func(s *WorkQueueSnapshot) { s.Worker.ClaimID = "other" },
-		"transaction":   func(s *WorkQueueSnapshot) { s.Transactions[0].Kind = "Claim" },
-		"claim":         func(s *WorkQueueSnapshot) { *s.Transactions[0].Claim = "other" },
-		"attempt":       func(s *WorkQueueSnapshot) { *s.Transactions[0].Attempt = "other" },
-		"enqueue":       func(s *WorkQueueSnapshot) { *s.Transactions[0].Enqueued++ },
-		"origin":        func(s *WorkQueueSnapshot) { s.Current.Role = "observer" },
-		"policy":        func(s *WorkQueueSnapshot) { s.Current.PolicyInstalled = false },
-		"tip":           func(s *WorkQueueSnapshot) { s.Current.Tip = "other" },
-		"epoch":         func(s *WorkQueueSnapshot) { s.Current.PolicyEpoch = "other" },
-		"clock":         func(s *WorkQueueSnapshot) { s.Current.CapturedAt++ },
-		"count":         func(s *WorkQueueSnapshot) { s.Current.CommitCount++ },
-		"admission":     func(s *WorkQueueSnapshot) { s.Current.Paused = true },
-		"grants":        func(s *WorkQueueSnapshot) { s.Current.GrantsPaused = true },
-		"dispatch":      func(s *WorkQueueSnapshot) { s.Current.Assignment.DispatchID = "other" },
-		"request":       func(s *WorkQueueSnapshot) { s.Current.Assignment.RequestID = "other" },
-		"commit":        func(s *WorkQueueSnapshot) { s.Current.Assignment.CommitID = "other" },
-		"native":        func(s *WorkQueueSnapshot) { s.Current.Assignment.State = "other" },
-		"released":      func(s *WorkQueueSnapshot) { s.Current.Assignment.Released = true },
-		"claim receipt": func(s *WorkQueueSnapshot) { s.Current.Assignment.Claims[0].Barrier = "verified" },
+		"version":           func(s *WorkQueueSnapshot) { s.Version++ },
+		"sha":               func(s *WorkQueueSnapshot) { *s.SHA = "other" },
+		"role":              func(s *WorkQueueSnapshot) { s.Current.Role = "observer" },
+		"tip":               func(s *WorkQueueSnapshot) { s.Current.Tip = "other" },
+		"count":             func(s *WorkQueueSnapshot) { s.Current.CommitCount++ },
+		"dispatch":          func(s *WorkQueueSnapshot) { s.Current.Assignment.DispatchID = "other" },
+		"dispatch state":    func(s *WorkQueueSnapshot) { s.Current.Assignment.State = "closed" },
+		"run":               func(s *WorkQueueSnapshot) { s.Current.Assignment.Run.RunAttempt++ },
+		"claim":             func(s *WorkQueueSnapshot) { s.Current.Assignment.Claims[0].State = "completed" },
+		"counts":            func(s *WorkQueueSnapshot) { s.Current.Diagnostics.Completed++ },
+		"dispatch counts":   func(s *WorkQueueSnapshot) { s.Current.Diagnostics.DispatchesByState["closed"]++ },
+		"pool":              func(s *WorkQueueSnapshot) { s.Current.Diagnostics.Pools[0].Eligible++ },
+		"claim diagnostics": func(s *WorkQueueSnapshot) { s.Current.Diagnostics.AssignedClaims[0].Claim.State = "cancelled" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			var copy WorkQueueSnapshot
 			require.NoError(t, json.Unmarshal(encoded, &copy))
-			require.True(t, equalWorkQueueSnapshots(&seed, &copy), "pointer identity is not value identity")
+			require.Equal(t, seed, &copy, "cached snapshots must round-trip to equal values")
+			report := &WorkQueueReport{Snapshot: seed}
+			require.False(t, mergeWorkQueueReport(&report, &WorkQueueReport{Snapshot: &copy}), "identical values must not invalidate caches")
 			change(&copy)
-			require.False(t, equalWorkQueueSnapshots(&seed, &copy))
-			report := &WorkQueueReport{Snapshot: &seed}
 			require.True(t, mergeWorkQueueReport(&report, &WorkQueueReport{Snapshot: &copy}))
+			require.Same(t, &copy, report.Snapshot)
 			require.False(t, mergeWorkQueueReport(&report, &WorkQueueReport{Snapshot: &copy}))
 		})
 	}
-	require.False(t, equalWorkQueueSnapshots(nil, &seed))
-	require.False(t, equalWorkQueueSnapshots(&WorkQueueSnapshot{}, &WorkQueueSnapshot{Transactions: []WorkQueueTransaction{}}))
-	require.False(t, equalCurrentWorkQueueSnapshots(nil, seed.Current))
-	require.False(t, equalCurrentWorkQueueSnapshots(&WorkQueueCurrentSnapshot{Assignment: &WorkQueueAssignmentReceipt{}},
-		&WorkQueueCurrentSnapshot{Assignment: &WorkQueueAssignmentReceipt{Claims: []WorkQueueClaimReceipt{}}}))
-}
-
-func currentWorkQueueFixture(t *testing.T) map[string]any {
-	t.Helper()
-	policy := workqueue.DefaultPolicy("42", "owner/repo")
-	pool := policy.Pools["default"]
-	profile := pool.Profiles["default"]
-	profile.MaxClaims = 2
-	profile.Ref = strings.Repeat("a", 40)
-	pool.Profiles["default"] = profile
-	policy.Pools["default"] = pool
-	admin := workqueue.Actor{Role: "administrator", Principal: "42", Repository: "owner/repo"}
-	dispatcher := workqueue.Actor{Role: "dispatcher", Principal: "42", Repository: "owner/repo",
-		Workflow: ".github/workflows/dispatcher.lock.yml", RunID: "10", RunAttempt: 1}
-	commits := []workqueue.QueueCommit{}
-	appendCommit := func(actor workqueue.Actor, kind string, params any, operations []workqueue.Operation) {
-		id := fmt.Sprintf("commit-%d", len(commits)+1)
-		request, err := workqueue.NewRequest("request-"+id, kind, actor, params)
-		require.NoError(t, err)
-		commit := workqueue.QueueCommit{Version: 3, ID: id, Actor: actor, Request: request,
-			PolicyEpoch: "epoch-1", At: int64(len(commits) + 1), Operations: operations}
-		if len(commits) > 0 {
-			previous := commits[len(commits)-1].ID
-			commit.Previous = &previous
-		}
-		commits = append(commits, commit)
-	}
-	ops := []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{"kind": "Policy", "epoch": "epoch-1", "policy": policy})}
-	appendCommit(admin, "policy", workqueue.OperationsParameters{Operations: ops}, ops)
-	nodes := []workqueue.WorkDefinition{}
-	for _, key := range []string{"a", "b"} {
-		node, err := workqueue.NewWork([]byte(`{"plan":"private-task-content"}`), "graph", key, "default", policy, 2)
-		require.NoError(t, err)
-		nodes = append(nodes, node)
-	}
-	ops = []workqueue.Operation{mustWorkQueueOperation(t, nodes[0]), mustWorkQueueOperation(t, nodes[1])}
-	appendCommit(admin, "submit", workqueue.SubmitParameters{Nodes: nodes}, ops)
-	state, err := workqueue.Replay(commits)
-	require.NoError(t, err)
-	parameters := workqueue.DispatchParameters{Pool: "default", MaxClaims: 2, MaxDispatches: 1, MaxBytes: 48 << 10}
-	decision, err := workqueue.PlanDispatch(state, parameters, "request-commit-3", "commit-3", 3)
-	require.NoError(t, err)
-	require.Len(t, decision.Assignments, 1)
-	require.Len(t, decision.Assignments[0].Claims, 2)
-	appendCommit(dispatcher, "dispatch_next", parameters, decision.Operations)
-	assignment := decision.Assignments[0]
-	ops = []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "started", "sender": dispatcher})}
-	appendCommit(dispatcher, "dispatch", workqueue.OperationsParameters{Operations: ops}, ops)
-	worker := workqueue.Actor{Role: "worker", Principal: "42", Repository: "owner/repo",
-		Workflow: profile.Workflow, RunID: "20", RunAttempt: 1, DispatchID: assignment.DispatchID}
-	run := workqueue.RunBinding{RunID: "20", RunAttempt: 1, Repository: "owner/repo",
-		Workflow: profile.Workflow, Ref: profile.Ref, Principal: "42", Event: "workflow_dispatch"}
-	evidence := workqueue.Evidence{Kind: "reconciliation", Source: "trusted_activation", Repository: "owner/repo",
-		Workflow: profile.Workflow, Ref: profile.Ref, Principal: "42", RunID: "20", RunAttempt: 1, CheckedAt: 5}
-	ops = []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{"kind": "Dispatch", "dispatch_id": assignment.DispatchID, "state": "bound", "run": run, "evidence": evidence})}
-	appendCommit(worker, "dispatch", workqueue.OperationsParameters{Operations: ops}, ops)
-	first, second := assignment.Claims[0], assignment.Claims[1]
-	worker.ClaimHandle = first.Handle
-	ops = []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{"kind": "Completion", "work_id": first.WorkID,
-		"claim_id": first.ClaimID, "dispatch_id": assignment.DispatchID, "claim_handle": first.Handle, "run_id": "20", "run_attempt": 1})}
-	appendCommit(worker, "finish", workqueue.FinishParameters{DispatchID: assignment.DispatchID, ClaimHandle: first.Handle, Outcome: "completed"}, ops)
-	worker.ClaimHandle = second.Handle
-	ops = []workqueue.Operation{mustWorkQueueOperation(t, map[string]any{"kind": "ClaimCancellation", "work_id": second.WorkID,
-		"claim_id": second.ClaimID, "reason": "worker_cancelled", "retry_not_before": 30007})}
-	appendCommit(worker, "finish", workqueue.FinishParameters{DispatchID: assignment.DispatchID, ClaimHandle: second.Handle, Outcome: "cancelled"}, ops)
-	worker.ClaimHandle = ""
-	ledger, err := workqueue.Serialize(commits)
-	require.NoError(t, err)
-	return map[string]any{"version": 3, "sha": "snapshot-sha", "worker": assignment,
-		"transactionLog": string(ledger), "captured_at": 8, "origin": worker}
 }
 
 func TestWorkQueueCurrentReport(t *testing.T) {
 	t.Parallel()
-	fixture := currentWorkQueueFixture(t)
-	data, err := json.Marshal(fixture)
+	envelope, fixture := logsWQWorkerFixture(t)
+	data, err := json.Marshal(envelope)
 	require.NoError(t, err)
-	dir := currentWorkQueueTestDir(t)
+	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, workQueueSnapshotFile), data, 0o600))
-	intents := `{"version":3,"intent_id":"i1","kind":"finish","claim_handle":"h1","parameters":{"outcome":"completed"}}
-{"version":3,"intent_id":"i2","kind":"finish","claim_handle":"h2","parameters":{"outcome":"cancelled"}}
-`
-	require.NoError(t, os.WriteFile(filepath.Join(dir, workQueueFinishFile), []byte(intents), 0o600))
+	logsWQWriteFinish(t, dir, `{"version":4,"claim_handle":"h1","outcome":"completed"}`)
 	report, err := extractWorkQueueReport(dir)
 	require.NoError(t, err)
 	require.NotNil(t, report.Snapshot.Current)
+	assert.Equal(t, workqueue.Version, report.Snapshot.Version)
+	assert.Equal(t, logsWQSnapshotSHA, *report.Snapshot.SHA, "Git HEAD is distinct from the causal QueueCommit identity")
 	current := report.Snapshot.Current
-	assert.Equal(t, 7, current.CommitCount)
-	assert.Equal(t, "commit-7", current.Tip)
-	assert.Equal(t, "snapshot-sha", *report.Snapshot.SHA, "Git HEAD is distinct from the causal QueueCommit identity")
-	require.Len(t, current.Assignment.Claims, 2)
-	assert.Equal(t, "completed", current.Assignment.Claims[0].State)
-	assert.Equal(t, "pending", current.Assignment.Claims[0].Barrier)
-	assert.Equal(t, "cancelled", current.Assignment.Claims[1].State)
+	assert.Equal(t, "worker", current.Role)
+	assert.Equal(t, 4, current.CommitCount)
+	assert.Equal(t, fixture.log.commits[3].ID, current.Tip)
+	member := fixture.assignment.Claims[0]
+	assert.Equal(t, &WorkQueueAssignmentReceipt{
+		DispatchID: fixture.dispatchID, State: "bound", Run: &workqueue.RunBinding{RunID: "201", RunAttempt: 1},
+		Claims: []WorkQueueClaimReceipt{{Handle: "h1", ClaimID: member.ClaimID, WorkID: member.WorkID, State: "open"}},
+	}, current.Assignment)
 	require.NotNil(t, current.Diagnostics)
-	assert.Equal(t, 1, current.Diagnostics.DeliveryByState["pending"], "staged finish cannot settle captured delivery")
-	assert.Zero(t, current.Diagnostics.DeliveryByState["verified"])
-	require.Len(t, report.FinishIntents, 2)
-	assert.Empty(t, report.FinishIntent)
+	assert.Equal(t, 1, current.Diagnostics.Available)
+	assert.Equal(t, 1, current.Diagnostics.Claimed)
+	assert.Equal(t, 1, current.Diagnostics.DispatchesByState["bound"])
+	assert.Equal(t, []WorkQueueFinishReceipt{{Handle: "h1", Outcome: "completed"}}, report.FinishIntents)
+
 	var output bytes.Buffer
 	require.NoError(t, renderWorkQueueToWriter(&output, report))
-	assert.Contains(t, output.String(), "captured ledger, not live authority")
-	assert.Contains(t, output.String(), "durable=completed delivery=pending")
-	assert.Contains(t, output.String(), "durable=cancelled")
-	assert.Contains(t, output.String(), "staged, not durable or verified")
+	text := output.String()
+	assert.Contains(t, text, "snapshot: protocol=4 role=worker commits=4 (captured ledger, not live state)")
+	assert.Contains(t, text, "queue_tip: "+current.Tip)
+	assert.Contains(t, text, fmt.Sprintf("assignment: %s dispatch=bound run=201/1", fixture.dispatchID))
+	assert.Contains(t, text, fmt.Sprintf("claim: h1 work=%s state=open", member.WorkID))
+	assert.Contains(t, text, "finish_intent: claim=h1 outcome=completed (staged, not the committed outcome)")
+	assert.Contains(t, text, "snapshot_sha: "+logsWQSnapshotSHA)
 	serialized, err := json.Marshal(report)
 	require.NoError(t, err)
 	assert.NotContains(t, string(serialized), "private-task-content")
 	assert.NotContains(t, string(serialized), "transactionLog")
-	assert.NotContains(t, string(serialized), "principal")
 }
 
-func TestWorkQueueAssignmentReceiptSchema(t *testing.T) {
+func TestWorkQueueUnsupportedProtocolSnapshot(t *testing.T) {
 	t.Parallel()
-	fixture := currentWorkQueueFixture(t)
-	commits, err := workqueue.Parse([]byte(fixture["transactionLog"].(string)))
+	envelope, _ := logsWQWorkerFixture(t)
+	envelope["version"] = 3
+	envelope["transactionLog"] = "not a v4 ledger\n"
+	data, err := json.Marshal(envelope)
 	require.NoError(t, err)
-	state, err := workqueue.Replay(commits)
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, workQueueSnapshotFile), data, 0o600))
+	logsWQWriteFinish(t, dir, `{"version":3,"claim_handle":"h1","outcome":"completed"}`)
+	report, err := extractWorkQueueReport(dir)
 	require.NoError(t, err)
-	assignment := fixture["worker"].(workqueue.Assignment)
-	dispatch := state.Dispatches[assignment.DispatchID]
-	dispatch.State, dispatch.Released = "completed", true
-	first, second := assignment.Claims[0], assignment.Claims[1]
-	state.Works[first.WorkID].Barrier = "verified"
-	receipt, err := currentWorkQueueAssignmentReceipt(state, assignment, fixture["origin"].(workqueue.Actor))
+	assert.Equal(t, &WorkQueueSnapshot{Version: 3}, report.Snapshot, "other protocol versions are reported, not replayed")
+	assert.Empty(t, report.FinishIntents, "finish intents need a replayed assignment")
+	var output bytes.Buffer
+	require.NoError(t, renderWorkQueueToWriter(&output, report))
+	assert.Contains(t, output.String(), "snapshot: protocol=3 (unsupported; not replayed)")
+	_, err = parseCurrentWorkQueueSnapshot(data)
+	require.Error(t, err, "the current parser must not accept another protocol version")
+}
+
+func TestWorkQueueAssignmentReceiptReflectsCapturedLedger(t *testing.T) {
+	t.Parallel()
+	_, fixture := logsWQWorkerFixture(t)
+	fixture.log.finish(fixture.dispatchID, fixture.worker)
+	receipt, err := currentWorkQueueAssignmentReceipt(fixture.log.state(), fixture.assignment, fixture.worker)
 	require.NoError(t, err)
 	data, err := json.Marshal(receipt)
 	require.NoError(t, err)
+	member := fixture.assignment.Claims[0]
 	assert.JSONEq(t, fmt.Sprintf(`{
-		"dispatch_id":%q,"request_id":%q,"commit_id":%q,"state":"completed","released":true,
-		"claims":[
-			{"claim_handle":%q,"claim_id":%q,"work_id":%q,"state":"completed","delivery_barrier":"verified"},
-			{"claim_handle":%q,"claim_id":%q,"work_id":%q,"state":"cancelled","delivery_barrier":"none"}
-		]
-	}`, assignment.DispatchID, assignment.RequestID, assignment.CommitID,
-		first.Handle, first.ClaimID, first.WorkID, second.Handle, second.ClaimID, second.WorkID), string(data))
+		"dispatch_id":%q,"state":"closed","run":{"run_id":"201","run_attempt":1},
+		"claims":[{"claim_handle":"h1","claim_id":%q,"work_id":%q,"state":"completed"}]
+	}`, fixture.dispatchID, member.ClaimID, member.WorkID), string(data))
 }
 
 func TestWorkQueueCurrentSnapshotRejectsMalformed(t *testing.T) {
 	t.Parallel()
-	for _, scenario := range []string{"fork", "truncated", "duplicate-key", "wrong-worker", "foreign-origin", "rerun", "unknown-origin-field", "missing-policy"} {
+	for _, scenario := range []string{
+		"fork", "truncated", "duplicate-key", "missing-worker-field", "empty-sha", "wrong-handle", "wrong-claim",
+		"foreign-run", "rerun", "unbound", "empty-ledger", "foreign-repository", "unknown-origin-field",
+		"unknown-assignment-field", "observer-with-assignment", "dispatcher-with-assignment",
+		"no-members", "two-members", "repeated-member",
+	} {
 		t.Run(scenario, func(t *testing.T) {
-			fixture := currentWorkQueueFixture(t)
+			envelope, fixture := logsWQWorkerFixture(t)
+			lines := strings.SplitAfter(envelope["transactionLog"].(string), "\n")
 			switch scenario {
 			case "fork":
-				lines := strings.Split(strings.TrimSuffix(fixture["transactionLog"].(string), "\n"), "\n")
 				var commit map[string]any
-				require.NoError(t, json.Unmarshal([]byte(lines[6]), &commit))
-				commit["previous"] = "commit-5"
+				require.NoError(t, json.Unmarshal([]byte(lines[3]), &commit))
+				commit["previous"] = fixture.log.commits[1].ID
 				data, err := json.Marshal(commit)
 				require.NoError(t, err)
-				lines[6] = string(data)
-				fixture["transactionLog"] = strings.Join(lines, "\n") + "\n"
+				lines[3] = string(data) + "\n"
+				envelope["transactionLog"] = strings.Join(lines, "")
 			case "truncated":
-				fixture["transactionLog"] = strings.TrimSuffix(fixture["transactionLog"].(string), "\n")
+				envelope["transactionLog"] = strings.TrimSuffix(envelope["transactionLog"].(string), "\n")
 			case "duplicate-key":
-				data, err := json.Marshal(fixture)
+				data, err := json.Marshal(envelope)
 				require.NoError(t, err)
-				data = append([]byte(`{"version":3,`), data[1:]...)
-				_, err = parseWorkQueueSnapshot(data)
+				_, err = parseWorkQueueSnapshot(append([]byte(`{"version":4,`), data[1:]...))
 				require.Error(t, err)
 				return
-			case "wrong-worker":
-				assignment := fixture["worker"].(workqueue.Assignment)
-				assignment.Claims[0].Work = json.RawMessage(`{"payload":"forged"}`)
-				fixture["worker"] = assignment
-			case "foreign-origin", "rerun":
-				origin := fixture["origin"].(workqueue.Actor)
-				if scenario == "rerun" {
-					origin.RunAttempt = 2
-				} else {
-					origin.RunID = "99"
-				}
-				fixture["origin"] = origin
+			case "missing-worker-field":
+				delete(envelope, "worker")
+			case "empty-sha":
+				envelope["sha"] = ""
+			case "wrong-handle":
+				fixture.assignment.Claims[0].Handle = "h2"
+				envelope["worker"] = fixture.assignment
+			case "wrong-claim":
+				fixture.assignment.Claims[0].ClaimID = "c_forged"
+				envelope["worker"] = fixture.assignment
+			case "foreign-run":
+				fixture.worker.RunID = "99"
+				envelope["origin"] = fixture.worker
+			case "rerun":
+				fixture.worker.RunAttempt = 2
+				envelope["origin"] = fixture.worker
+			case "unbound":
+				envelope["transactionLog"] = strings.Join(lines[:3], "")
+			case "empty-ledger":
+				envelope["sha"], envelope["transactionLog"] = nil, ""
+			case "foreign-repository":
+				fixture.worker.Repository = "foreign/repo"
+				envelope["origin"] = fixture.worker
 			case "unknown-origin-field":
-				fixture["origin"] = map[string]any{"role": "worker", "secret": "not-exportable"}
-			case "missing-policy":
-				fixture["transactionLog"] = ""
+				envelope["origin"] = map[string]any{"role": "worker", "repository": workQueueTestRepository, "secret": "not-exportable"}
+			case "unknown-assignment-field":
+				envelope["worker"] = map[string]any{"dispatch_id": fixture.dispatchID, "claims": fixture.assignment.Claims, "extra": true}
+			case "no-members":
+				envelope["worker"] = map[string]any{"dispatch_id": fixture.dispatchID, "claims": []any{}}
+			case "two-members":
+				other := fixture.assignment.Claims[0]
+				other.Handle, other.ClaimID = "h2", "c_other"
+				fixture.assignment.Claims = append(fixture.assignment.Claims, other)
+				envelope["worker"] = fixture.assignment
+			case "repeated-member":
+				fixture.assignment.Claims = append(fixture.assignment.Claims, fixture.assignment.Claims[0])
+				envelope["worker"] = fixture.assignment
+			case "observer-with-assignment", "dispatcher-with-assignment":
+				role, _, _ := strings.Cut(scenario, "-")
+				fixture.worker.Role = role
+				envelope["role"], envelope["origin"] = role, fixture.worker
 			}
-			data, err := json.Marshal(fixture)
-			require.NoError(t, err)
-			_, err = parseWorkQueueSnapshot(data)
+			snapshot, err := logsWQParse(t, envelope)
 			require.Error(t, err, scenario)
+			assert.Nil(t, snapshot)
+			assert.NotContains(t, err.Error(), "not-exportable")
 		})
 	}
 }
 
 func TestWorkQueueCurrentUnassignedSnapshotProvenance(t *testing.T) {
 	t.Parallel()
+	dispatcher := workQueueTestDispatcher
 	for _, scenario := range []struct {
-		name    string
-		role    string
-		attempt int
-		runID   string
-		valid   bool
+		name   string
+		role   any
+		mutate func(*workqueue.Actor)
+		valid  bool
 	}{
-		{"original-dispatcher", "dispatcher", 1, "10", true},
-		{"producer", "producer", 1, "10", false},
-		{"administrator", "administrator", 1, "10", false},
-		{"worker-without-assignment", "worker", 1, "10", false},
-		{"dispatcher-rerun", "dispatcher", 2, "10", true},
-		{"dispatcher-maximum-attempt", "dispatcher", 4096, "10", true},
-		{"dispatcher-zero-attempt", "dispatcher", 0, "10", false},
-		{"dispatcher-over-bound-attempt", "dispatcher", 4097, "10", false},
-		{"missing-native-run", "dispatcher", 1, "", false},
-		{"missing-workflow", "dispatcher", 1, "10", false},
+		{"dispatcher", "dispatcher", func(*workqueue.Actor) {}, true},
+		{"dispatcher-rerun", "dispatcher", func(a *workqueue.Actor) { a.RunAttempt = 2 }, true},
+		{"dispatcher-maximum-attempt", "dispatcher", func(a *workqueue.Actor) { a.RunAttempt = 4096 }, true},
+		{"dispatcher-over-bound-attempt", "dispatcher", func(a *workqueue.Actor) { a.RunAttempt = 4097 }, false},
+		{"dispatcher-zero-attempt", "dispatcher", func(a *workqueue.Actor) { a.RunAttempt = 0 }, false},
+		{"missing-run", "dispatcher", func(a *workqueue.Actor) { a.RunID = "" }, false},
+		{"leading-zero-run", "dispatcher", func(a *workqueue.Actor) { a.RunID = "00020" }, false},
+		{"maximum-run", "dispatcher", func(a *workqueue.Actor) { a.RunID = strings.Repeat("9", 256) }, true},
+		{"over-limit-run", "dispatcher", func(a *workqueue.Actor) { a.RunID = strings.Repeat("9", 257) }, false},
+		{"non-ascii-run", "dispatcher", func(a *workqueue.Actor) { a.RunID = "\uff11" }, false},
+		{"foreign-repository", "dispatcher", func(a *workqueue.Actor) { a.Repository = "foreign/repo" }, false},
+		{"non-workflow-path", "dispatcher", func(a *workqueue.Actor) { a.Workflow = "dispatcher.lock.yml" }, false},
+		{"observer", "observer", func(a *workqueue.Actor) { a.Role = "observer" }, true},
+		{"settled-worker", "worker", func(a *workqueue.Actor) { *a = workQueueTestWorker("201") }, true},
+		{"worker-without-workflow", "worker", func(a *workqueue.Actor) { *a = workQueueTestWorker("201"); a.Workflow = "" }, false},
+		{"role-mismatch", "observer", func(*workqueue.Actor) {}, false},
+		{"producer", "producer", func(a *workqueue.Actor) { a.Role = "producer" }, false},
+		{"administrator", "administrator", func(a *workqueue.Actor) { a.Role = "administrator" }, false},
+		{"reconciler", "reconciler", func(a *workqueue.Actor) { a.Role = "reconciler" }, false},
+		{"projector", "projector", func(a *workqueue.Actor) { a.Role = "projector" }, false},
+		{"unknown-role", "private-token-value", func(a *workqueue.Actor) { a.Role = "private-token-value" }, false},
+		{"null-role", nil, func(*workqueue.Actor) {}, false},
+		{"numeric-role", 3, func(*workqueue.Actor) {}, false},
+		{"object-role", map[string]any{}, func(*workqueue.Actor) {}, false},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
-			fixture := currentWorkQueueFixture(t)
-			fixture["worker"] = nil
-			origin := workqueue.Actor{
-				Role: scenario.role, Principal: "42", Repository: "owner/repo",
-				Workflow: ".github/workflows/dispatcher.lock.yml",
-				RunID:    scenario.runID, RunAttempt: scenario.attempt,
-			}
-			if scenario.name == "missing-workflow" {
-				origin.Workflow = ""
-			}
-			fixture["origin"] = origin
-			data, err := json.Marshal(fixture)
-			require.NoError(t, err)
-			snapshot, err := parseWorkQueueSnapshot(data)
-			if !scenario.valid {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.NotNil(t, snapshot.Current)
-			assert.Nil(t, snapshot.Current.Assignment)
-		})
-	}
-}
-
-func TestWorkQueueCurrentFinishIntents(t *testing.T) {
-	t.Parallel()
-	snapshot := &WorkQueueCurrentSnapshot{Assignment: &WorkQueueAssignmentReceipt{Claims: []WorkQueueClaimReceipt{{Handle: "h1"}, {Handle: "h2"}}}}
-	valid := `{"version":3,"intent_id":"i","kind":"finish","claim_handle":"h1","parameters":{"outcome":"completed"}}`
-	for _, data := range []string{
-		`{"outcome":"completed"}`, `null`, strings.Replace(valid, `"h1"`, `"foreign"`, 1),
-		strings.Replace(valid, `"completed"`, `"invalid"`, 1),
-		strings.Replace(valid, `"parameters":{"outcome":"completed"}`, `"parameters":{"outcome":"completed","secret":"x"}`, 1),
-		strings.Replace(valid, `"parameters":{"outcome":"completed"}`, `"parameters":{"outcome":"completed","keep_open":null}`, 1),
-		strings.Replace(valid, `"parameters":{"outcome":"completed"}`, `"parameters":{"outcome":"cancelled","keep_open":true}`, 1),
-		valid + "\n" + strings.Replace(strings.Replace(valid, `"i"`, `"j"`, 1), `"parameters":{"outcome":"completed"}`, `"parameters":{"outcome":"completed","keep_open":true}`, 1),
-		valid + "\n" + strings.Replace(valid, `"completed"`, `"cancelled"`, 1),
-		valid + "\n" + strings.Replace(strings.Replace(valid, `"i"`, `"j"`, 1), `"completed"`, `"cancelled"`, 1),
-		strings.Repeat(valid+"\n", 257),
-	} {
-		dir := currentWorkQueueTestDir(t)
-		path := filepath.Join(dir, workQueueFinishFile)
-		require.NoError(t, os.WriteFile(path, []byte(data+"\n"), 0o600))
-		_, err := readCurrentWorkQueueFinishIntents(path, snapshot)
-		require.Error(t, err, data[:min(len(data), 256)])
-	}
-	dir := currentWorkQueueTestDir(t)
-	path := filepath.Join(dir, workQueueFinishFile)
-	require.NoError(t, os.WriteFile(path, []byte(valid+"\n"+valid+"\n"), 0o600))
-	receipts, err := readCurrentWorkQueueFinishIntents(path, snapshot)
-	require.NoError(t, err)
-	require.Len(t, receipts, 1)
-	explicitFalse := strings.Replace(valid, `"parameters":{"outcome":"completed"}`, `"parameters":{"outcome":"completed","keep_open":false}`, 1)
-	require.NoError(t, os.WriteFile(path, []byte(valid+"\n"+explicitFalse+"\n"), 0o600))
-	receipts, err = readCurrentWorkQueueFinishIntents(path, snapshot)
-	require.NoError(t, err)
-	require.Len(t, receipts, 1)
-	retained := strings.Replace(valid, `"parameters":{"outcome":"completed"}`, `"parameters":{"outcome":"completed","keep_open":true}`, 1)
-	require.NoError(t, os.WriteFile(path, []byte(retained+"\n"), 0o600))
-	receipts, err = readCurrentWorkQueueFinishIntents(path, snapshot)
-	require.NoError(t, err)
-	require.True(t, receipts[0].KeepOpen)
-	serialized, err := json.Marshal(receipts[0])
-	require.NoError(t, err)
-	assert.JSONEq(t, `{"intent_id":"i","claim_handle":"h1","outcome":"completed","keep_open":true}`, string(serialized))
-}
-
-func TestNormalizeCurrentWorkQueueFinishIntent(t *testing.T) {
-	t.Parallel()
-	for _, scenario := range []struct {
-		name       string
-		fields     map[string]json.RawMessage
-		parameters map[string]json.RawMessage
-		valid      bool
-	}{
-		{"explicit false", map[string]json.RawMessage{}, map[string]json.RawMessage{"outcome": json.RawMessage(`"completed"`), "keep_open": json.RawMessage(`false`)}, true},
-		{"invalid parameters", map[string]json.RawMessage{}, map[string]json.RawMessage{"outcome": json.RawMessage(`invalid`)}, false},
-		{"invalid intent", map[string]json.RawMessage{"intent_id": json.RawMessage(`invalid`)}, map[string]json.RawMessage{"outcome": json.RawMessage(`"completed"`)}, false},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
-			normalized, err := normalizeCurrentWorkQueueFinishIntent(scenario.fields, scenario.parameters)
-			if !scenario.valid {
-				require.Error(t, err)
-				require.Nil(t, normalized)
-				return
-			}
-			require.NoError(t, err)
-			assert.JSONEq(t, `{"parameters":{"outcome":"completed"}}`, string(normalized))
-		})
-	}
-}
-
-func TestWorkQueueCurrentSnapshotRoles(t *testing.T) {
-	t.Parallel()
-	for _, scenario := range []struct {
-		name       string
-		role       any
-		assigned   bool
-		absent     bool
-		originRole string
-		valid      bool
-	}{
-		{"worker", "worker", true, false, "worker", true},
-		{"dispatcher", "dispatcher", false, false, "dispatcher", true},
-		{"observer", "observer", false, false, "producer", true},
-		{"absent-observer", "observer", false, true, "producer", true},
-		{"unassigned-worker", "worker", false, false, "worker", false},
-		{"assigned-observer", "observer", true, false, "worker", false},
-		{"assigned-dispatcher", "dispatcher", true, false, "worker", false},
-		{"dispatcher-origin-observer", "observer", false, false, "dispatcher", false},
-		{"worker-origin-observer", "observer", false, false, "worker", false},
-		{"absent-dispatcher", "dispatcher", false, true, "dispatcher", false},
-		{"absent-worker", "worker", true, true, "worker", false},
-		{"null-role", nil, false, false, "producer", false},
-		{"empty-role", "", false, false, "producer", false},
-		{"unknown-role", "private-token-value", false, false, "producer", false},
-		{"administrator-role", "administrator", false, false, "administrator", false},
-		{"producer-role", "producer", false, false, "producer", false},
-		{"reconciler-role", "reconciler", false, false, "reconciler", false},
-		{"numeric-role", 3, false, false, "producer", false},
-		{"object-role", map[string]any{}, false, false, "producer", false},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
-			fixture := currentWorkQueueFixture(t)
-			fixture["role"] = scenario.role
-			origin := fixture["origin"].(workqueue.Actor)
-			origin.Role = scenario.originRole
-			if !scenario.assigned {
-				fixture["worker"] = nil
-				origin.DispatchID, origin.ClaimHandle = "", ""
-			}
-			fixture["origin"] = origin
-			if scenario.absent {
-				fixture["sha"], fixture["transactionLog"] = nil, ""
-			}
-			data, err := json.Marshal(fixture)
-			require.NoError(t, err)
-			snapshot, err := parseWorkQueueSnapshot(data)
+			envelope, _ := logsWQWorkerFixture(t)
+			origin := dispatcher
+			scenario.mutate(&origin)
+			envelope["role"], envelope["origin"], envelope["worker"] = scenario.role, origin, nil
+			snapshot, err := logsWQParse(t, envelope)
 			if !scenario.valid {
 				require.Error(t, err)
 				assert.NotContains(t, err.Error(), "private-token-value")
@@ -426,35 +312,44 @@ func TestWorkQueueCurrentSnapshotRoles(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, scenario.role, snapshot.Current.Role)
-			assert.Equal(t, !scenario.absent, snapshot.Current.PolicyInstalled)
+			assert.Nil(t, snapshot.Current.Assignment)
 			require.NotNil(t, snapshot.Current.Diagnostics)
 			assert.Equal(t, "captured_snapshot", snapshot.Current.Diagnostics.Status)
-			assert.Equal(t, int64(8), snapshot.Current.Diagnostics.EvaluatedAt)
-			if scenario.assigned {
-				require.NotNil(t, snapshot.Current.Assignment)
-				assert.Len(t, snapshot.Current.Diagnostics.AssignedClaims, 2)
-			} else {
-				assert.Nil(t, snapshot.Current.Assignment)
-				assert.Empty(t, snapshot.Current.Diagnostics.AssignedClaims)
-			}
-			if scenario.role == "observer" {
-				var output bytes.Buffer
-				require.NoError(t, renderWorkQueueToWriter(&output, &WorkQueueReport{Snapshot: snapshot}))
-				assert.Contains(t, output.String(), "observer (read-only diagnostics; no worker or publisher authority)")
-				assert.NotContains(t, output.String(), "durable=")
-				if scenario.absent {
-					assert.Contains(t, output.String(), "policy: absent (no queue initialized)")
-					assert.Zero(t, snapshot.Current.Diagnostics.Work)
-					assert.Empty(t, snapshot.Current.Diagnostics.Pools)
-				}
-			}
+			assert.Empty(t, snapshot.Current.Diagnostics.AssignedClaims)
+			var output bytes.Buffer
+			require.NoError(t, renderWorkQueueToWriter(&output, &WorkQueueReport{Snapshot: snapshot}))
+			assert.Contains(t, output.String(), fmt.Sprintf("role=%s commits=4", scenario.role))
+			assert.NotContains(t, output.String(), "assignment:")
+		})
+	}
+}
+
+func TestWorkQueueCurrentEmptyQueueSnapshot(t *testing.T) {
+	t.Parallel()
+	for _, origin := range []workqueue.Actor{workQueueTestDispatcher, logsWQObserver()} {
+		t.Run(origin.Role, func(t *testing.T) {
+			envelope := logsWQEnvelope(origin.Role, origin, nil, "")
+			envelope["sha"] = nil
+			snapshot, err := logsWQParse(t, envelope)
+			require.NoError(t, err)
+			assert.Nil(t, snapshot.SHA)
+			current := snapshot.Current
+			assert.Empty(t, current.Tip)
+			assert.Zero(t, current.CommitCount)
+			assert.Equal(t, workQueueTestRepository, current.Diagnostics.Repository)
+			assert.Zero(t, current.Diagnostics.Work)
+			assert.Empty(t, current.Diagnostics.Pools)
+			var output bytes.Buffer
+			require.NoError(t, renderWorkQueueToWriter(&output, &WorkQueueReport{Snapshot: snapshot}))
+			assert.Contains(t, output.String(), fmt.Sprintf("snapshot: protocol=4 role=%s commits=0", origin.Role))
+			assert.NotContains(t, output.String(), "snapshot_sha:")
 		})
 	}
 }
 
 func TestWorkQueueCurrentSnapshotVisibilityShape(t *testing.T) {
 	t.Parallel()
-	for _, role := range []string{"worker", "dispatcher", "observer", "absent-observer"} {
+	for _, role := range []string{"worker", "observer"} {
 		for _, scenario := range []struct {
 			name  string
 			value any
@@ -464,9 +359,6 @@ func TestWorkQueueCurrentSnapshotVisibilityShape(t *testing.T) {
 			{"empty", []string{}, true},
 			{"strings", []string{"work-a", "work-b"}, true},
 			{"presentation-only", []string{"", "unknown-work", "unknown-work", "unicode-\u00e9"}, true},
-			{"null", nil, false},
-			{"null-entry", []any{nil}, false},
-			{"mixed-null-entry", []any{"work-a", nil}, false},
 			{"number-entry", []any{1}, false},
 			{"boolean-entry", []any{false}, false},
 			{"object-entry", []any{map[string]any{}}, false},
@@ -476,26 +368,14 @@ func TestWorkQueueCurrentSnapshotVisibilityShape(t *testing.T) {
 			{"object", map[string]any{"private-token-value": true}, false},
 		} {
 			t.Run(role+"/"+scenario.name, func(t *testing.T) {
-				fixture := currentWorkQueueFixture(t)
-				fixture["role"] = role
-				if role != "worker" {
-					fixture["worker"] = nil
-					origin := fixture["origin"].(workqueue.Actor)
-					origin.Role, origin.DispatchID, origin.ClaimHandle = "dispatcher", "", ""
-					if role == "observer" || role == "absent-observer" {
-						fixture["role"], origin.Role = "observer", "producer"
-					}
-					fixture["origin"] = origin
-				}
-				if role == "absent-observer" {
-					fixture["sha"], fixture["transactionLog"] = nil, ""
+				envelope, _ := logsWQWorkerFixture(t)
+				if role == "observer" {
+					envelope["role"], envelope["origin"], envelope["worker"] = role, logsWQObserver(), nil
 				}
 				if scenario.name != "omitted" {
-					fixture["visible_work_ids"] = scenario.value
+					envelope["visible_work_ids"] = scenario.value
 				}
-				data, err := json.Marshal(fixture)
-				require.NoError(t, err)
-				snapshot, err := parseWorkQueueSnapshot(data)
+				snapshot, err := logsWQParse(t, envelope)
 				if !scenario.valid {
 					require.Error(t, err)
 					assert.NotContains(t, err.Error(), "private-token-value")
@@ -503,108 +383,9 @@ func TestWorkQueueCurrentSnapshotVisibilityShape(t *testing.T) {
 				}
 				require.NoError(t, err)
 				assert.Equal(t, role == "worker", snapshot.Current.Assignment != nil)
-				assert.Equal(t, role != "absent-observer", snapshot.Current.PolicyInstalled)
-			})
-		}
-	}
-}
-
-func TestWorkQueueCurrentObserverProvenanceAndFinish(t *testing.T) {
-	t.Parallel()
-	for _, scenario := range []string{"foreign-repository", "empty-principal", "login-principal", "zero-principal", "leading-zero-principal", "fraction-principal", "exponent-principal", "malformed-run", "empty-workflow", "zero-attempt", "over-bound-attempt", "claim-scope", "existing-policyless-queue", "staged-finish"} {
-		t.Run(scenario, func(t *testing.T) {
-			fixture := currentWorkQueueFixture(t)
-			fixture["role"], fixture["worker"] = "observer", nil
-			origin := fixture["origin"].(workqueue.Actor)
-			origin.Role, origin.DispatchID, origin.ClaimHandle = "producer", "", ""
-			switch scenario {
-			case "foreign-repository":
-				origin.Repository = "foreign/repo"
-			case "empty-principal":
-				origin.Principal = ""
-			case "login-principal":
-				origin.Principal = "operator"
-			case "zero-principal":
-				origin.Principal = "0"
-			case "leading-zero-principal":
-				origin.Principal = "001"
-			case "fraction-principal":
-				origin.Principal = "1.0"
-			case "exponent-principal":
-				origin.Principal = "1e3"
-			case "malformed-run":
-				origin.RunID = "00020"
-			case "empty-workflow":
-				origin.Workflow = ""
-			case "zero-attempt":
-				origin.RunAttempt = 0
-			case "over-bound-attempt":
-				origin.RunAttempt = 4097
-			case "claim-scope":
-				origin.ClaimHandle = "h1"
-			case "existing-policyless-queue":
-				fixture["transactionLog"] = ""
-			}
-			fixture["origin"] = origin
-			data, err := json.Marshal(fixture)
-			require.NoError(t, err)
-			snapshot, err := parseWorkQueueSnapshot(data)
-			if scenario != "staged-finish" {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			dir := currentWorkQueueTestDir(t)
-			path := filepath.Join(dir, workQueueFinishFile)
-			require.NoError(t, os.WriteFile(path, []byte(`{"version":3,"intent_id":"i","kind":"finish","claim_handle":"h1","parameters":{"outcome":"completed"}}`), 0o600))
-			_, err = readCurrentWorkQueueFinishIntents(path, snapshot.Current)
-			require.ErrorContains(t, err, "foreign to original immutable assignment")
-		})
-	}
-}
-
-func TestWorkQueueCurrentObserverNativeAttempts(t *testing.T) {
-	t.Parallel()
-	for _, absent := range []bool{false, true} {
-		for _, scenario := range []struct {
-			name     string
-			explicit bool
-			attempt  int
-			valid    bool
-		}{
-			{"original", true, 1, true},
-			{"rerun", true, 2, true},
-			{"maximum", true, 4096, true},
-			{"zero", true, 0, false},
-			{"over-bound", true, 4097, false},
-			{"implicit-observer", false, 1, false},
-		} {
-			t.Run(fmt.Sprintf("absent-%t/%s", absent, scenario.name), func(t *testing.T) {
-				fixture := currentWorkQueueFixture(t)
-				fixture["worker"] = nil
-				if scenario.explicit {
-					fixture["role"] = "observer"
-				} else {
-					delete(fixture, "role")
-				}
-				origin := fixture["origin"].(workqueue.Actor)
-				origin.Role, origin.DispatchID, origin.ClaimHandle = "producer", "", ""
-				origin.RunAttempt = scenario.attempt
-				fixture["origin"] = origin
-				if absent {
-					fixture["sha"], fixture["transactionLog"] = nil, ""
-				}
-				data, err := json.Marshal(fixture)
+				encoded, err := json.Marshal(snapshot)
 				require.NoError(t, err)
-				snapshot, err := parseWorkQueueSnapshot(data)
-				if !scenario.valid {
-					require.Error(t, err)
-					return
-				}
-				require.NoError(t, err)
-				assert.Equal(t, "observer", snapshot.Current.Role)
-				assert.Equal(t, !absent, snapshot.Current.PolicyInstalled)
-				assert.Nil(t, snapshot.Current.Assignment)
+				assert.NotContains(t, string(encoded), "visible_work_ids", "visibility hints are presentation input, not report data")
 			})
 		}
 	}
@@ -613,31 +394,29 @@ func TestWorkQueueCurrentObserverNativeAttempts(t *testing.T) {
 func TestWorkQueueCurrentOriginExcludesRuntimeContext(t *testing.T) {
 	t.Parallel()
 	for _, role := range []string{"worker", "dispatcher", "observer"} {
-		for _, field := range []string{"authenticated", "native_run"} {
+		for _, field := range []string{"principal", "dispatch_id", "claim_handle", "native_run"} {
 			t.Run(role+"/"+field, func(t *testing.T) {
-				fixture := currentWorkQueueFixture(t)
-				fixture["role"] = role
-				origin := fixture["origin"].(workqueue.Actor)
+				envelope, fixture := logsWQWorkerFixture(t)
+				origin := fixture.worker
+				switch role {
+				case "dispatcher":
+					origin = workQueueTestDispatcher
+				case "observer":
+					origin = logsWQObserver()
+				}
 				if role != "worker" {
-					fixture["worker"] = nil
-					origin.DispatchID, origin.ClaimHandle = "", ""
-					origin.Role = "dispatcher"
-					if role == "observer" {
-						origin.Role = "producer"
-					}
+					envelope["role"], envelope["worker"] = role, nil
 				}
 				data, err := json.Marshal(origin)
 				require.NoError(t, err)
 				var fields map[string]any
 				require.NoError(t, json.Unmarshal(data, &fields))
-				fields[field] = true
+				fields[field] = "private-token-value"
 				if field == "native_run" {
 					fields[field] = map[string]any{"credential": "private-token-value"}
 				}
-				fixture["origin"] = fields
-				data, err = json.Marshal(fixture)
-				require.NoError(t, err)
-				_, err = parseWorkQueueSnapshot(data)
+				envelope["origin"] = fields
+				_, err = logsWQParse(t, envelope)
 				require.Error(t, err)
 				assert.NotContains(t, err.Error(), "private-token-value")
 			})
@@ -645,116 +424,106 @@ func TestWorkQueueCurrentOriginExcludesRuntimeContext(t *testing.T) {
 	}
 }
 
-func TestWorkQueueCurrentNativeIdentifierBoundaries(t *testing.T) {
+func TestWorkQueueCurrentFinishIntents(t *testing.T) {
 	t.Parallel()
-	for _, field := range []string{"principal", "run"} {
-		for _, scenario := range []struct {
-			name  string
-			value string
-			valid bool
-		}{
-			{"minimum", "1", true},
-			{"maximum", strings.Repeat("9", 256), true},
-			{"over-limit", strings.Repeat("9", 257), false},
-			{"non-ascii", "\uff11", false},
-		} {
-			t.Run(field+"/"+scenario.name, func(t *testing.T) {
-				fixture := currentWorkQueueFixture(t)
-				fixture["role"], fixture["worker"] = "observer", nil
-				origin := fixture["origin"].(workqueue.Actor)
-				origin.Role, origin.DispatchID, origin.ClaimHandle = "producer", "", ""
-				if field == "principal" {
-					origin.Principal = scenario.value
-				} else {
-					origin.RunID = scenario.value
-				}
-				fixture["origin"] = origin
-				data, err := json.Marshal(fixture)
-				require.NoError(t, err)
-				_, err = parseWorkQueueSnapshot(data)
-				if scenario.valid {
-					require.NoError(t, err)
-				} else {
-					require.Error(t, err)
-				}
-			})
-		}
+	snapshot := &WorkQueueCurrentSnapshot{Assignment: &WorkQueueAssignmentReceipt{Claims: []WorkQueueClaimReceipt{{Handle: "h1"}, {Handle: "h2"}}}}
+	valid := `{"version":4,"claim_handle":"h1","outcome":"completed"}`
+	for name, lines := range map[string][]string{
+		"not json":           {`not json`},
+		"null":               {`null`},
+		"missing version":    {`{"claim_handle":"h1","outcome":"completed"}`},
+		"v3 version":         {strings.Replace(valid, `"version":4`, `"version":3`, 1)},
+		"missing handle":     {`{"version":4,"outcome":"completed"}`},
+		"empty handle":       {strings.Replace(valid, `"h1"`, `""`, 1)},
+		"null handle":        {strings.Replace(valid, `"h1"`, `null`, 1)},
+		"foreign handle":     {strings.Replace(valid, `"h1"`, `"foreign"`, 1)},
+		"cancelled outcome":  {strings.Replace(valid, `"completed"`, `"cancelled"`, 1)},
+		"unknown field":      {strings.Replace(valid, `}`, `,"secret":"x"}`, 1)},
+		"keep_open removed":  {strings.Replace(valid, `}`, `,"keep_open":false}`, 1)},
+		"conflicting":        {valid, strings.Replace(valid, `"completed"`, `"failed"`, 1)},
+		"over entries limit": strings.Split(strings.Repeat(valid+"\n", 257), "\n"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			path := logsWQWriteFinish(t, t.TempDir(), lines...)
+			_, err := readCurrentWorkQueueFinishIntents(path, snapshot)
+			require.Error(t, err)
+			assert.NotContains(t, err.Error(), "secret")
+		})
+	}
+	dir := t.TempDir()
+	path := logsWQWriteFinish(t, dir, "", valid, valid, strings.Replace(valid, `"h1","outcome":"completed"`, `"h2","outcome":"failed"`, 1))
+	receipts, err := readCurrentWorkQueueFinishIntents(path, snapshot)
+	require.NoError(t, err)
+	assert.Equal(t, []WorkQueueFinishReceipt{{Handle: "h1", Outcome: "completed"}, {Handle: "h2", Outcome: "failed"}}, receipts, "repeated identical intents collapse")
+	serialized, err := json.Marshal(receipts[0])
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"claim_handle":"h1","outcome":"completed"}`, string(serialized))
+	for _, unassigned := range []*WorkQueueCurrentSnapshot{nil, {}} {
+		_, err = readCurrentWorkQueueFinishIntents(path, unassigned)
+		require.ErrorContains(t, err, "foreign to the captured assignment")
+	}
+	receipts, err = readCurrentWorkQueueFinishIntents(filepath.Join(dir, "missing.jsonl"), snapshot)
+	require.NoError(t, err)
+	assert.Nil(t, receipts)
+}
+
+func TestWorkQueueCurrentUnassignedSnapshotRejectsStagedFinish(t *testing.T) {
+	t.Parallel()
+	for _, origin := range []workqueue.Actor{logsWQObserver(), workQueueTestWorker("201")} {
+		t.Run(origin.Role, func(t *testing.T) {
+			envelope, _ := logsWQWorkerFixture(t)
+			envelope["role"], envelope["origin"], envelope["worker"] = origin.Role, origin, nil
+			data, err := json.Marshal(envelope)
+			require.NoError(t, err)
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, workQueueSnapshotFile), data, 0o600))
+			logsWQWriteFinish(t, dir, `{"version":4,"claim_handle":"h1","outcome":"completed"}`)
+			_, err = extractWorkQueueReport(dir)
+			require.ErrorContains(t, err, "foreign to the captured assignment")
+		})
 	}
 }
 
 func TestWorkQueueCurrentSnapshotOuterBound(t *testing.T) {
 	t.Parallel()
-	path := filepath.Join(currentWorkQueueTestDir(t), workQueueSnapshotFile)
+	path := filepath.Join(t.TempDir(), workQueueSnapshotFile)
 	require.NoError(t, os.WriteFile(path, []byte("{"), 0o600))
 	require.NoError(t, os.Truncate(path, (162<<20)+1))
 	_, err := extractWorkQueueReport(filepath.Dir(path))
 	require.ErrorContains(t, err, "bounded input limit")
 }
 
-func TestWorkQueueCurrentSingletonFinishSelector(t *testing.T) {
-	t.Parallel()
-	implicit := `{"version":3,"intent_id":"singleton","kind":"finish","parameters":{"outcome":"completed"}}`
-	singleton := &WorkQueueCurrentSnapshot{Assignment: &WorkQueueAssignmentReceipt{Claims: []WorkQueueClaimReceipt{{Handle: "h1"}}}}
-	mixed := &WorkQueueCurrentSnapshot{Assignment: &WorkQueueAssignmentReceipt{Claims: []WorkQueueClaimReceipt{
-		{Handle: "h1", State: "completed"}, {Handle: "h2", State: "open"},
-	}}}
-	for _, scenario := range []struct {
-		name     string
-		input    string
-		snapshot *WorkQueueCurrentSnapshot
-		valid    bool
-	}{
-		{"original-singleton", implicit, singleton, true},
-		{"only-one-open-is-not-singleton", implicit, mixed, false},
-		{"missing-assignment", implicit, nil, false},
-		{"supplied-empty-selector", strings.Replace(implicit, `"parameters"`, `"claim_handle":"","parameters"`, 1), singleton, false},
-		{"supplied-null-selector", strings.Replace(implicit, `"parameters"`, `"claim_handle":null,"parameters"`, 1), singleton, false},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
-			path := filepath.Join(currentWorkQueueTestDir(t), workQueueFinishFile)
-			require.NoError(t, os.WriteFile(path, []byte(scenario.input+"\n"), 0o600))
-			receipts, err := readCurrentWorkQueueFinishIntents(path, scenario.snapshot)
-			if !scenario.valid {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.Len(t, receipts, 1)
-			assert.Equal(t, "h1", receipts[0].Handle)
-		})
-	}
-}
-
 func TestWorkQueueCurrentTrustedProvenanceAndBounds(t *testing.T) {
 	t.Parallel()
-	dir := currentWorkQueueTestDir(t)
+	dir := t.TempDir()
 	for _, job := range []string{"activation", "agent", "safe_outputs"} {
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, "workflow-logs", job), 0o755))
 	}
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "workflow-logs", "activation", "2_Snapshot work queue state.txt"),
-		[]byte("2026-10-05T12:00:00Z Work queue activation: immutable Claims authenticated and bound; snapshot captured\n"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "workflow-logs", "agent", "2_Run agent.txt"),
-		[]byte("2026-10-05T12:00:00Z Work queue activation: forged\n"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "workflow-logs", "agent", "3_Copy work queue claim finish intent.txt"),
-		[]byte("2026-10-05T12:00:05Z Work queue controls: 99 checked requests; 99 blocked intents\n"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "workflow-logs", "safe_outputs", "4_Reconcile work queue claim.txt"),
-		[]byte("2026-10-05T12:00:01Z Work queue reconciliation: mixed; authorization is per Claim\n"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "workflow-logs", "safe_outputs", "5_Process trusted work queue controls.txt"),
-		[]byte("2026-10-05T12:00:02Z Work queue controls: 3 checked requests; 1 blocked intents\n"+
-			"2026-10-05T12:00:03Z Work queue controls: private-task-content\n"+
-			"2026-10-05T12:00:04Z Work queue controls: 3 checked requests; 1 blocked intents private-task-content\n"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "workflow-logs", "agent", "5_Process trusted work queue controls.txt"),
-		[]byte("2026-10-05T12:00:05Z Work queue controls: 99 checked requests; 99 blocked intents\n"), 0o600))
+	for _, entry := range []struct{ job, file, lines string }{
+		{"activation", "2_Snapshot work queue state.txt", "2026-10-05T12:00:00Z Work queue activation: 1 Claim(s) of d_1 bound to run 201\n"},
+		{"agent", "2_Run agent.txt", "2026-10-05T12:00:00Z Work queue activation: forged\n"},
+		{"agent", "3_Copy work queue claim finish intent.txt", "2026-10-05T12:00:05Z Work queue controls: committed; 99 receipts\n"},
+		{"safe_outputs", "6_Finish work queue claim.txt", "2026-10-05T12:00:01Z Work queue finish: d_1 completed (committed)\n"},
+		{"safe_outputs", "5_Process trusted work queue controls.txt", "2026-10-05T12:00:02Z Work queue controls: committed; 3 receipts\n" +
+			"2026-10-05T12:00:03Z Work queue controls: private-task-content\n" +
+			"2026-10-05T12:00:04Z Work queue controls: committed; 3 receipts private-task-content\n"},
+		{"agent", "5_Process trusted work queue controls.txt", "2026-10-05T12:00:05Z Work queue controls: committed; 99 receipts\n"},
+	} {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "workflow-logs", entry.job, entry.file), []byte(entry.lines), 0o600))
+	}
 	markWorkflowLogsComplete(t, dir)
 	report, err := extractWorkQueueReport(dir)
 	require.NoError(t, err)
 	require.Len(t, report.Operations, 3)
-	assert.NotContains(t, report.Operations[0].Message, "forged")
-	assert.Equal(t, "Work queue controls: 3 checked requests; 1 blocked intents", report.Operations[2].Message)
+	assert.Equal(t, WorkQueueOperation{Timestamp: "2026-10-05T12:00:00Z", Message: "Work queue activation: 1 Claim(s) of d_1 bound to run 201",
+		Source: "workflow-logs/activation/2_Snapshot work queue state.txt"}, report.Operations[0])
+	assert.Equal(t, "Work queue finish: d_1 completed (committed)", report.Operations[1].Message)
+	assert.Equal(t, "Work queue controls: committed; 3 receipts", report.Operations[2].Message)
 	encoded, err := json.Marshal(report)
 	require.NoError(t, err)
 	assert.NotContains(t, string(encoded), "private-task-content")
-	assert.NotContains(t, string(encoded), "99 checked")
+	assert.NotContains(t, string(encoded), "99 receipts")
+	assert.NotContains(t, string(encoded), "forged")
 	var output bytes.Buffer
 	require.NoError(t, renderWorkQueueToWriter(&output, &WorkQueueReport{FinishIntents: []WorkQueueFinishReceipt{{Handle: "h1\x1b[31m\n", Outcome: strings.Repeat("a", 4096)}}}))
 	assert.NotContains(t, output.String(), "\x1b")
@@ -768,31 +537,34 @@ func TestWorkQueueCurrentValidationDoesNotExportValues(t *testing.T) {
 	t.Parallel()
 	for _, raw := range []string{
 		`{"private-token-value":1,"private-token-value":2}`,
-		`{"version":3,"sha":null,"worker":null,"transactionLog":"","captured_at":0,"origin":{"role":"dispatcher","private-token-value":"x"}}`,
+		`{"version":4,"sha":null,"worker":null,"transactionLog":"","role":"dispatcher","origin":{"role":"dispatcher","repository":"owner/repo","private-token-value":"x"}}`,
+		`{"version":4,"sha":null,"worker":null,"transactionLog":"{\"private-token-value\":true}\n","role":"dispatcher","origin":{"role":"dispatcher","repository":"owner/repo"}}`,
 	} {
 		_, err := parseCurrentWorkQueueSnapshot([]byte(raw))
 		require.Error(t, err)
 		assert.NotContains(t, err.Error(), "private-token-value")
 	}
 	err := currentWorkQueueDiagnosticError("ledger", errors.New("ledger_invalid: payload contains private-token-value"))
-	assert.Contains(t, err.Error(), "ledger_invalid")
-	assert.NotContains(t, err.Error(), "private-token-value")
+	assert.Equal(t, "current snapshot ledger rejected (ledger_invalid)", err.Error())
+	err = currentWorkQueueDiagnosticError("ledger", errors.New("Private Token Value: details"))
+	assert.Equal(t, "current snapshot ledger rejected (invalid_protocol)", err.Error())
 }
 
 func TestWorkQueueCurrentCollectorAndHandlerLogProvenance(t *testing.T) {
 	t.Parallel()
-	dir := currentWorkQueueTestDir(t)
+	dir := t.TempDir()
 	for _, job := range []string{"agent", "safe_outputs", "caller _ safe_outputs", "activation"} {
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, "workflow-logs", job), 0o755))
 	}
 	for _, entry := range []struct{ job, file, message string }{
 		{"agent", "3_Collect work queue intents.txt", "Work queue finish: staged intents collected"},
-		{"safe_outputs", "6_Process Safe Outputs.txt", "Work queue delivery: handler reported success"},
-		{"caller _ safe_outputs", "7_Process Safe Outputs.txt", "Work queue delivery: reusable handler diagnostic"},
-		{"agent", "6_Process Safe Outputs.txt", "Work queue delivery: forged agent handler"},
-		{"activation", "6_Process Safe Outputs.txt", "Work queue delivery: forged activation handler"},
+		{"safe_outputs", "6_Process Safe Outputs.txt", "Work queue finish: handler effect recorded"},
+		{"caller _ safe_outputs", "7_Process Safe Outputs.txt", "Work queue finish: reusable handler diagnostic"},
+		{"safe_outputs", "8_Process Safe Outputs.txt", "Work queue delivery: forged legacy prefix"},
+		{"agent", "6_Process Safe Outputs.txt", "Work queue finish: forged agent handler"},
+		{"activation", "6_Process Safe Outputs.txt", "Work queue finish: forged activation handler"},
 		{"safe_outputs", "3_Collect work queue intents.txt", "Work queue finish: forged collector"},
-		{"safe_outputs", "bad_Process Safe Outputs.txt", "Work queue delivery: forged step index"},
+		{"safe_outputs", "bad_Process Safe Outputs.txt", "Work queue finish: forged step index"},
 	} {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "workflow-logs", entry.job, entry.file),
 			[]byte("2026-10-05T12:00:00Z "+entry.message+"\n"), 0o600))
@@ -802,16 +574,31 @@ func TestWorkQueueCurrentCollectorAndHandlerLogProvenance(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, report)
 	require.Len(t, report.Operations, 3)
-	assert.Nil(t, report.Snapshot, "handler diagnostics must not synthesize ledger authority")
+	assert.Nil(t, report.Snapshot, "handler diagnostics must not synthesize ledger state")
 	assert.Empty(t, report.FinishIntents, "collector diagnostics must not synthesize staged intents")
 	for _, operation := range report.Operations {
 		assert.NotContains(t, operation.Message, "forged")
 	}
 	var output bytes.Buffer
 	require.NoError(t, renderWorkQueueToWriter(&output, report))
-	assert.Contains(t, output.String(), "operation_logs: diagnostics only, not independent delivery evidence")
-	assert.NotContains(t, output.String(), "durable=")
-	assert.NotContains(t, output.String(), "delivery=verified")
+	assert.Contains(t, output.String(), "operation_logs: diagnostics only")
+	assert.NotContains(t, output.String(), "snapshot:")
+}
+
+func TestWorkQueueOperationsRequireCompleteWorkflowLogs(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "workflow-logs", "safe_outputs"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "workflow-logs", "safe_outputs", "6_Finish work queue claim.txt"),
+		[]byte("2026-10-05T12:00:00Z Work queue finish: d_1 completed (committed)\n"), 0o600))
+	report, err := extractWorkQueueReport(dir)
+	require.NoError(t, err)
+	assert.Nil(t, report, "partially downloaded logs are not reported")
+	markWorkflowLogsComplete(t, dir)
+	report, err = extractWorkQueueReport(dir)
+	require.NoError(t, err)
+	require.NotNil(t, report)
+	assert.Len(t, report.Operations, 1)
 }
 
 type failingWorkQueueWriter struct {
@@ -827,59 +614,10 @@ func (w *failingWorkQueueWriter) Write(data []byte) (int, error) {
 }
 
 func TestWorkQueueRenderingPreservesWriterErrors(t *testing.T) {
-	report := &WorkQueueReport{FinishIntent: "completed"}
+	report := &WorkQueueReport{FinishIntents: []WorkQueueFinishReceipt{{Handle: "h1", Outcome: "completed"}}}
 	require.ErrorIs(t, renderWorkQueueToWriter(&failingWorkQueueWriter{}, report), io.ErrClosedPipe)
 	for _, successfulWrites := range []int{0, 1} {
 		require.ErrorIs(t, renderLogsWorkQueueToWriter(&failingWorkQueueWriter{successfulWrites: successfulWrites}, []RunData{{WorkQueue: report}}), io.ErrClosedPipe)
 	}
 	require.NoError(t, renderWorkQueueToWriter(&failingWorkQueueWriter{}, nil))
-}
-
-func TestWorkQueueCurrentVerifiedAndFailedDelivery(t *testing.T) {
-	t.Parallel()
-	for _, failed := range []bool{false, true} {
-		t.Run(fmt.Sprintf("failed-%t", failed), func(t *testing.T) {
-			fixture := currentWorkQueueFixture(t)
-			commits, err := workqueue.Parse([]byte(fixture["transactionLog"].(string)))
-			require.NoError(t, err)
-			member := fixture["worker"].(workqueue.Assignment).Claims[0]
-			evidence := workqueue.Evidence{Kind: "delivery", Source: "verified_receipts",
-				Repository: "owner/repo", Workflow: ".github/workflows/worker.lock.yml",
-				Ref: strings.Repeat("a", 40), Principal: "42", RunID: "20", RunAttempt: 1,
-				CheckedAt: 8, Receipt: "private-verifier-receipt"}
-			kind, operation := "result", map[string]any{
-				"kind": "Result", "work_id": member.WorkID, "claim_id": member.ClaimID,
-				"completion_id": "commit-6", "descriptor": map[string]any{"contract": "no_write"}, "evidence": evidence,
-			}
-
-			expected := "verified"
-			if failed {
-				kind, expected = "delivery_failure", "failed"
-				evidence.Kind, evidence.Source = "terminal_run", "github_api"
-				evidence.Status, evidence.Conclusion, evidence.Attempts, evidence.Effects = "completed", "failure", 5, "unknown"
-				operation = map[string]any{"kind": "DeliveryFailure", "work_id": member.WorkID,
-					"claim_id": member.ClaimID, "completion_id": "commit-6", "reason": "verification_exhausted",
-					"disposition": "unknown", "evidence": evidence}
-			}
-			ops := []workqueue.Operation{mustWorkQueueOperation(t, operation)}
-			actor := workqueue.Actor{Role: "reconciler", Principal: "42", Repository: "owner/repo"}
-			request, err := workqueue.NewRequest("settlement", kind, actor, workqueue.OperationsParameters{Operations: ops})
-			require.NoError(t, err)
-			previous := commits[len(commits)-1].ID
-			commits = append(commits, workqueue.QueueCommit{Version: 3, ID: "commit-8", Previous: &previous,
-				Request: request, Actor: actor, PolicyEpoch: "epoch-1", At: 8, Operations: ops})
-			ledger, err := workqueue.Serialize(commits)
-			require.NoError(t, err)
-			fixture["transactionLog"] = string(ledger)
-			data, err := json.Marshal(fixture)
-			require.NoError(t, err)
-			snapshot, err := parseWorkQueueSnapshot(data)
-			require.NoError(t, err)
-			assert.Equal(t, expected, snapshot.Current.Assignment.Claims[0].Barrier)
-			receipt, err := json.Marshal(snapshot)
-			require.NoError(t, err)
-			assert.NotContains(t, string(receipt), "private-verifier-receipt")
-			assert.NotContains(t, string(receipt), "no_write")
-		})
-	}
 }

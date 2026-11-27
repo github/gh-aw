@@ -91,6 +91,10 @@ A service that implements the Model Context Protocol to provide specific capabil
 
 The only supported mode for the built-in `tools.playwright` tool. The compiler installs `@playwright/cli` as a global npm package on the runner, and the agent drives browser automation by invoking `playwright-cli <command>` (for example `goto`, `snapshot`, `screenshot`, `eval`, `run-code`) from bash instead of loading MCP tool schemas into context. Built-in Playwright MCP support was removed; `mode: mcp` is now a compile-time error, and workflows that still require an MCP-backed Playwright must configure it explicitly as a custom `mcp-servers` entry. When the workflow runs inside the [AWF](#awf-agent-workflow-firewall) sandbox, the compiler injects an additional policy prompt that reinforces binding local servers to `127.0.0.1`, waiting for loopback readiness before navigating, and never installing packages or browsers at runtime. See [Playwright Reference](/gh-aw/reference/playwright/).
 
+### Required Author (`required-author`)
+
+A safe-output gate on `push-to-pull-request-branch` and `update-pull-request` that restricts changes to pull requests opened by a specific GitHub login. Use `app/<slug>` to match a GitHub App bot (login `<slug>[bot]`). Comparison is case-insensitive; a missing or different author rejects or skips the operation before any write. Complements `required-title-prefix` and `required-labels`, which other PRs can share. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/).
+
 ### Required Field (`required`)
 
 An MCP server field that controls startup criticality. By default every configured MCP server is startup-critical: the agent job fails if the server cannot be reached during the pre-flight connectivity check. Setting `required: false` marks a server as best-effort, so an unreachable server logs a warning and the workflow continues without it, rather than aborting the run. At least one server must still connect successfully for startup to proceed. See [MCPs Guide](/gh-aw/guides/mcps/).
@@ -323,6 +327,10 @@ A feature flag that enables GitHub reactions (👍, ❤️, 👎, 😕) to promo
 ### Soft-Skip
 
 A safe output processing behavior where a handler skips an operation with a warning message instead of failing the workflow step. A soft-skip occurs when a condition prevents execution but is not considered a hard error — for example, when `target: triggering` is configured but no triggering PR context exists, or when `resolveReviewThread` is rejected by the GitHub API due to token scope limitations. Soft-skips allow the workflow to continue processing other safe outputs rather than aborting entirely. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/).
+
+### Planning Status (`planning-status`)
+
+A native GitHub issue status (for example `Todo`) that `safe-outputs.create-issue` can set when it creates an issue, selected by name or numeric ID. The `set-issue-status` safe output changes the status of existing issues with explicit state-transition authorization. See [Safe Outputs](/gh-aw/reference/safe-outputs/#initial-planning-status).
 
 ### Status Comment
 
@@ -1038,6 +1046,10 @@ models:
 
 An experimental feature that chooses a model and reasoning effort for the main agent on each run. Set `model: router` to let the task determine the level. Choose `router/economy`, `router/balanced`, or `router/robust` for a fixed level, or use `model-routing: false` to disable implicit routing without pinning a model. See [Model Routing](/gh-aw/reference/model-routing/).
 
+### Adaptive Routing (`model-routing.learning`)
+
+Set `learning: observe` under `model-routing` to record the selected model and reasoning effort, the outcome and the cost of each eligible run in [repo-memory](/gh-aw/reference/repo-memory/). Observation does not change the router's pick. A run that did not route or whose agent made no request is recorded as `no_agent` and does not count as a success or failure. Inspect results with `gh aw routing status`. See [Adaptive Routing](/gh-aw/reference/adaptive-routing/).
+
 ### Default AI Credits Pricing (`models.default-ai-credits-pricing`)
 
 A `models:` frontmatter field that provides a fallback per-token pricing rate (in $/1M tokens) for models not present in the AWF built-in pricing table. When the AWF API proxy encounters an unrecognized model — such as a self-hosted BYOK Ollama or vLLM instance — it normally rejects the request with HTTP 400 `unknown_model_ai_credits`. Setting `default-ai-credits-pricing` supplies `input` and `output` rates that the proxy uses instead, preventing the rejection. Set both to `0` for free or local models.
@@ -1494,6 +1506,10 @@ A custom Go static-analysis linter (`pkg/linters/blankassigncomma`) that reports
 
 Checking workflow files for errors, security issues, and best practices. Occurs during compilation and can be enhanced with strict mode and security scanners.
 
+### `file-access` Lint Rule
+
+A built-in AW lint rule that warns when prompt instructions would be blocked by the simulated file-access model, such as writing files when neither the edit tool nor a write-capable `bash` command is available, writing under read-only system paths, or using unconfigured cache-memory or repo-memory directories. See [Workflow Linters](/gh-aw/reference/workflow-linters/).
+
 ### `gh aw lint`
 
 A CLI command that runs all registered built-in Actions/AW AST rules and actionlint on existing `.lock.yml` workflow files without recompiling the source Markdown. `--rules secret-leak` selects the AST taint checker without external actionlint; `--list-rules` lists registered checks and `--json` emits structured AST diagnostics. The default mode supports actionlint's `--shellcheck` and `--pyflakes` integrations. Neither mode runs `zizmor` or `poutine`. See [CLI Reference](/gh-aw/setup/cli/).
@@ -1830,15 +1846,15 @@ A catalog of built-in configuration fragments under `.github/workflows/shared/gr
 
 ### Work Queue (`tools.work-queue`)
 
-A native, Git-backed queue for fair scheduling of [Work](#claim-work-queue) with immutable task dependency graphs. Its only source of authority is the `work-queue.jsonl` transaction log. The first accepted producer or dispatcher submission initializes the queue with a Policy and Work; Issues and pull requests can be dependency nodes but cannot store the queue. Distinct from the lightweight issue-checklist approach in [WorkQueueOps](#workqueueops). See [Work Queues](/gh-aw/reference/work-queue/) and the [specification](/gh-aw/specs/work-queue-specification/).
+A native, Git-backed queue for priority-FIFO scheduling of [Work](#claim-work-queue) with immutable task dependency graphs. Its only source of authority is the append-only `work-queue.jsonl` log on the `work-queue` branch; each line is one commit published by compare-and-swap. Scheduling settings come from the `work_queue` section of `aw.json`, not from the ledger. Issues and pull requests can be dependency nodes but cannot store the queue. Distinct from the lightweight issue-checklist approach in [WorkQueueOps](#workqueueops). See [Work Queues](/gh-aw/reference/work-queue/) and the [specification](/gh-aw/specs/work-queue-specification/).
 
 ### Claim (Work Queue)
 
-Authorization for one attempt at a Work item in a native [work queue](#work-queue-toolswork-queue), identified by its original `claim_handle`. Worker effects are scoped to the Claim, and a Result is recorded only after independently verified delivery of those effects. See [Work Queues](/gh-aw/reference/work-queue/).
+Ownership of one attempt at a Work item in a native [work queue](#work-queue-toolswork-queue), granted by a dispatcher together with a Dispatch and addressed by the worker through its `claim_handle`. Worker effects are authorized only while the Claim is open and its Dispatch is bound to the worker's run. A completed Claim records the applied effects; a cancelled Claim returns its Work to the pool until `max_attempts` is reached. See [Work Queues](/gh-aw/reference/work-queue/).
 
-### Delivery Evidence (Work Queue)
+### Dispatch (Work Queue)
 
-A ledger record of delivery observations for a [Claim](#claim-work-queue)'s effects, persisted in the `work-queue.jsonl` transaction log so verification survives restarts and checkpoints. Delivery Evidence alone does not establish a Result: maintenance must perform fresh, independent native readback, and changed or unavailable resources remain unverified. Pending Delivery Evidence keeps the delivery barrier in place until bounded verification records a Result or a `DeliveryFailure`; uncertain delivery is never retried by rerunning effects. See [Work Queues](/gh-aw/reference/work-queue/).
+One worker launch reserved by a dispatcher for a [Claim](#claim-work-queue). A Dispatch moves from `reserved` to `started` after `workflow_dispatch` succeeds, to `bound` when the worker run binds to it, and to `closed` once its Claims are terminal or it is released. See [Work Queues](/gh-aw/reference/work-queue/).
 
 ## Operational Patterns
 

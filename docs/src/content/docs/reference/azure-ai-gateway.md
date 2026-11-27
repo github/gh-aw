@@ -58,7 +58,10 @@ not allow `login.microsoftonline.com`. Only the selected profile's
 credential is used; there is no credential fallback.
 
 Use the protocol the deployed alias supports. `engine.model` supplies Copilot
-model metadata; `engine.inference.model` is the exact approved wire alias.
+model metadata; `engine.inference.model` is the exact approved wire alias,
+compiled to `COPILOT_PROVIDER_WIRE_MODEL`. The connector leaves
+`COPILOT_PROVIDER_MODEL_ID` unset so it defaults to `COPILOT_MODEL` for agent
+configuration and token limits.
 The gateway has no `/models` route, so the connector sets
 `engine.model-catalog: false` and `engine.model` is passed through verbatim
 rather than resolved as a gh-aw alias. Direct BYOK must set it explicitly.
@@ -110,7 +113,7 @@ or use a literal gateway URL. A `network.allowed` entry alone does not bypass th
 
 Select `responses` only for an alias that exposes Responses; use `completions`
 for Chat Completions. If the gateway alias differs from the model ID, set
-`COPILOT_PROVIDER_MODEL_ID` to the alias. Gateway keys use `Authorization: Bearer`,
+`COPILOT_PROVIDER_WIRE_MODEL` to the alias. Gateway keys use `Authorization: Bearer`,
 not Azure OpenAI's `api-key` header: keep the provider type `openai`, not `azure`.
 
 For keyless Codex inference, use the existing

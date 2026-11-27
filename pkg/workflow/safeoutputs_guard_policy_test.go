@@ -112,6 +112,34 @@ func TestDeriveSafeOutputsGuardPolicyFromGitHub(t *testing.T) {
 			description: "github.repository expression should map to runtime repository scope",
 		},
 		{
+			name: "duplicate allowed repos as []any",
+			githubTool: map[string]any{
+				"allowed-repos": []any{"github/*", "microsoft/copilot", "github/*", "microsoft/copilot"},
+				"min-integrity": "approved",
+			},
+			expectedPolicies: map[string]any{
+				"write-sink": map[string]any{
+					"accept":          []string{"private:github", "private:microsoft/copilot"},
+					"sink-visibility": sinkVisibilityExpr,
+				},
+			},
+			description: "Duplicate transformed patterns should be removed in first-seen order",
+		},
+		{
+			name: "duplicate allowed repos as []string",
+			githubTool: map[string]any{
+				"allowed-repos": []string{"github/gh-aw", "github/copilot*", "github/gh-aw"},
+				"min-integrity": "approved",
+			},
+			expectedPolicies: map[string]any{
+				"write-sink": map[string]any{
+					"accept":          []string{"private:github/gh-aw", "private:github/copilot*"},
+					"sink-visibility": sinkVisibilityExpr,
+				},
+			},
+			description: "Duplicate string patterns should be removed in first-seen order",
+		},
+		{
 			name: "multiple repo patterns as []any",
 			githubTool: map[string]any{
 				"repos": []any{

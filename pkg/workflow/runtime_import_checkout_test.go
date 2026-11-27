@@ -278,7 +278,7 @@ strict: false
 // to work correctly, since the activation job always has contents: read added to it.
 func TestActivationJobCheckoutWithoutExplicitContentsRead(t *testing.T) {
 	// This workflow only has issues: read permission, no explicit contents: read
-	// The activation job should still have the checkout step because it always gets
+	// The activation job should still have a checkout step because it always gets
 	// contents: read added for GitHub API access and runtime imports
 	frontmatter := `---
 on:
@@ -340,15 +340,19 @@ strict: false
 
 	activationJobSection := lockContentStr[activationJobStart:activationJobEnd]
 
-	// Verify activation can snapshot all symlink targets without explicit contents: read permission.
-	checkoutParts := strings.SplitN(activationJobSection, "name: Checkout base repository snapshot", 2)
+	// Without contents: read there is no base restore, so activation uses the sparse checkout.
+	if strings.Contains(activationJobSection, "name: Checkout base repository snapshot") {
+		t.Error("Activation job should not use the full base snapshot checkout without a base restore")
+	}
+
+	checkoutParts := strings.SplitN(activationJobSection, "name: Checkout .github and .agents folders", 2)
 	if len(checkoutParts) != 2 {
-		t.Error("Activation job should contain the base snapshot checkout step")
+		t.Error("Activation job should contain the sparse .github and .agents checkout step")
 		t.Logf("Activation job section:\n%s", activationJobSection)
 		return
 	}
 
-	if strings.Contains(strings.SplitN(checkoutParts[1], "\n      - name:", 2)[0], "sparse-checkout:") {
-		t.Error("Base snapshot checkout must include symlink targets outside agent folders")
+	if !strings.Contains(strings.SplitN(checkoutParts[1], "\n      - name:", 2)[0], "sparse-checkout:") {
+		t.Error("Sparse checkout step should include sparse-checkout configuration")
 	}
 }

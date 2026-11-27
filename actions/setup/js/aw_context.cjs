@@ -192,10 +192,23 @@ function readInboundAwContext(payload) {
   return parseInboundAwContext(payload?.inputs?.aw_context) || parseInboundAwContext(payload?.client_payload?.aw_context);
 }
 
+/**
+ * The dispatched worker input `work_queue_assignment` is exactly `{"version":4,"dispatch_id":"d_…"}`;
+ * the worker loads its Claims from the ledger by `dispatch_id`.
+ * @returns {{version: 4, dispatch_id: string}}
+ */
 function parseWorkQueueAssignment(raw) {
-  const { parseStrictJSON } = require("./work_queue_codec.cjs");
-  const { normalizeAssignment } = require("./work_queue_claim_scope.cjs");
-  return normalizeAssignment(typeof raw === "string" ? parseStrictJSON(raw) : raw);
+  const { identity, parseStrictJSON } = require("./work_queue_codec.cjs");
+  let value;
+  try {
+    value = typeof raw === "string" ? parseStrictJSON(raw) : raw;
+    if (!isRecord(value) || Object.keys(value).length !== 2 || value.version !== 4 || !Object.hasOwn(value, "dispatch_id")) throw new Error("shape");
+    identity(value.dispatch_id, "dispatch_id");
+  } catch {
+    throw new TypeError("work_queue_assignment_invalid");
+  }
+  // prettier-ignore
+  return Object.freeze({ version: /** @type {const} */ (4), dispatch_id: /** @type {string} */ (value.dispatch_id) });
 }
 
 function readInboundWorkQueueAssignment(payload) {
@@ -297,6 +310,7 @@ function normalizeLegacyWorkQueueContext(awContext, rawClaim) {
  *   item_number: string,
  *   comment_id: string,
  *   comment_node_id: string,
+ *   issue_status?: {snapshot: any, event?: any, previous?: any},
  *   pr_head_sha: string,
  *   comment_updated_at: string,
  *   deployment_state: string,
@@ -439,6 +453,22 @@ function buildAwContext() {
     item_number,
     comment_id,
     comment_node_id,
+    // Both are delivery-time evidence, never a claim about the latest API state.
+    ...(context.payload?.issue && !context.payload.issue.pull_request
+      ? {
+          issue_status: {
+            snapshot: context.payload.issue.status ?? null,
+            ...(context.eventName === "issues" && context.payload.action === "status_changed" ? { event: context.payload.status ?? null, previous: context.payload.changes?.status?.from ?? null } : {}),
+          },
+        }
+      : isRecord(inheritedContext?.issue_status)
+        ? {
+            issue_status: {
+              snapshot: inheritedContext.issue_status.snapshot ?? null,
+              ...(Object.hasOwn(inheritedContext.issue_status, "event") ? { event: inheritedContext.issue_status.event ?? null, previous: inheritedContext.issue_status.previous ?? null } : {}),
+            },
+          }
+        : {}),
     // Only event-recorded revisions are propagated; an API read of today's head
     // cannot reconstruct the revision when an earlier issue comment was posted.
     pr_head_sha:

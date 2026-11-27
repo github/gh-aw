@@ -1,613 +1,315 @@
 // @ts-check
 "use strict";
-const { SAFE_OUTPUT_E001 } = require("./error_codes.cjs");
-const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
-// @safe-outputs-exempt SEC-005 — authorizeWorkerClaim enforces the authenticated profile.effect_scope allowlist for assertClaimAuthorized callers, rejecting foreign message and resource repositories with E004.
+// @safe-outputs-exempt SEC-005 — authorizeWorkerClaim enforces the compiled profile effect_scope for assertClaimAuthorized callers, rejecting foreign message and resource repositories with E004.
+const fs = require("fs");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("claims");
 
-const { isProxy } = require("node:util").types;
-const queue = require("./work_queue_replay.cjs");
-const store = require("./work_queue_store.cjs");
-const { canonical, closed, digest, integer, parseStrictJSON } = require("./work_queue_codec.cjs");
+const { canonicalBytes, parseStrictJSON, queueError } = require("./work_queue_codec.cjs");
+const { EFFECTS_BYTES } = require("./work_queue_limits.cjs");
 const { normalizeAssignment, normalizeClaimScope } = require("./work_queue_claim_scope.cjs");
-const { actorFromContext, dispatchPrincipal } = require("./work_queue_policy.cjs");
-const { DEFAULT_FINISH_INTENT_PATH, loadWorkQueueSnapshot } = require("./work_queue_mcp_server.cjs");
-const { readIntentLines, requestForIntent } = require("./work_queue_intents.cjs");
-const { bindWorkerAssignment, loadQueue, publishOperations, validateStoredAssignment, expectedWorkerRun, bindingForRun } = require("./work_queue_binding.cjs");
-const { authenticatePublisher, fetchNativeRunAttempt, validateNativeRun } = require("./work_queue_native.cjs");
+const { policyAllowsWorker, readWorkQueuePolicyEnv } = require("./work_queue_policy.cjs");
+const { openClaim } = require("./work_queue_replay.cjs");
+const { exhaustedCancellation, loadQueue, publishRequest } = require("./work_queue_binding.cjs");
+const { readFinishIntents } = require("./work_queue_intents.cjs");
+const { DEFAULT_FINISH_INTENT_PATH } = require("./work_queue_mcp_server.cjs");
+const { effectsPath } = require("./work_queue_effect_client.cjs");
+const { readInboundWorkQueueAssignment } = require("./aw_context.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { claimControlReceipts } = require("./work_queue_control_receipts.cjs");
-const { validateDeliveryContract, isTrustedClaimDelivery } = require("./work_queue_delivery.cjs");
 const { getPromptPath, renderTemplateFromFile } = require("./messages_core.cjs");
+const { nodeId } = require("./work_queue_graph.cjs");
+const {
+  admissionInputs,
+  admissionRequirement,
+  authorizationProtocol,
+  authorizeAdmission,
+  continuationOperations,
+  matchContinuation,
+  parseContinuationReceipt,
+  readContinuationConfig,
+  readContinuationRequest,
+  readHandlerConfig,
+} = require("./work_queue_continuation.cjs");
 
-const SNAPSHOT_PATH = "/tmp/gh-aw/work-queue.snapshot.json";
-const FINISH_INTENT_PATH = DEFAULT_FINISH_INTENT_PATH;
+/** Max effects-file size read by the finish step (raw lines before the EFFECTS_BYTES Completion bound). */
+const MAX_EFFECTS_FILE_BYTES = 1024 * 1024;
 
-/** @typedef {Record<string, unknown> & {verified: true, contractVerified: true, receipt: string, descriptor: object, effects: "none" | "partial"}} VerifiedClaimEffects */
-
-/**
- * @param {Record<string, unknown> | null} value
- * @returns {value is VerifiedClaimEffects}
- */
-function verifiedClaimEffects(value) {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    value.verified === true &&
-    value.contractVerified === true &&
-    typeof value.receipt === "string" &&
-    value.receipt.length > 0 &&
-    value.descriptor !== null &&
-    typeof value.descriptor === "object" &&
-    !Array.isArray(value.descriptor) &&
-    (value.effects === "none" || value.effects === "partial")
-  );
-}
-
-/** @param {VerifiedClaimEffects} proof */
-function snapshotClaimDelivery(proof) {
-  const ancestors = new Set();
-  /**
-   * @param {unknown} value
-   * @param {number} depth
-   */
-  function inspect(value, depth) {
-    if (value === null || typeof value !== "object") return;
-    if (depth > 64 || ancestors.has(value) || isProxy(value)) throw new Error(`${SAFE_OUTPUT_E001}: work_queue_delivery_proof_invalid`);
-    ancestors.add(value);
-    for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value))) {
-      if (descriptor.get || descriptor.set) throw new Error("work_queue_delivery_proof_invalid");
-      if (descriptor.enumerable) inspect(descriptor.value, depth + 1);
-    }
-    ancestors.delete(value);
-  }
-  inspect(proof, 0);
-  return JSON.parse(canonical(proof));
-}
-
-function readWorkerSnapshot(snapshotPath = process.env.GH_AW_WORK_QUEUE_SNAPSHOT || SNAPSHOT_PATH) {
-  return loadWorkQueueSnapshot(snapshotPath).worker;
-}
-
-function readFinishIntent(filename = process.env.GH_AW_WORK_QUEUE_FINISH_INTENT || FINISH_INTENT_PATH, assignment) {
-  const intents = new Map();
-  const errors = [];
-  const lines = readIntentLines(filename);
-  for (const event of iterateJsonlEvents(lines)) {
-    if (event.type === "invalid" && event.reason === "blank") continue;
-    const index = event.lineNumber - 1;
-    let handle = null;
-    try {
-      const intent = parseStrictJSON(event.rawLine);
-      closed(intent, ["version", "intent_id", "kind", "parameters"], ["claim_handle"], "finish intent");
-      if (intent.version !== 3 || intent.kind !== "finish" || typeof intent.intent_id !== "string" || !intent.intent_id) throw new Error("work_queue_finish_invalid");
-      closed(intent.parameters, ["outcome"], ["keep_open"], "finish parameters");
-      if (!["completed", "cancelled"].includes(intent.parameters.outcome)) throw new Error("work_queue_finish_invalid");
-      if (Object.hasOwn(intent.parameters, "keep_open") && typeof intent.parameters.keep_open !== "boolean") throw new Error("work_queue_finish_invalid");
-      if (intent.parameters.keep_open === true && intent.parameters.outcome !== "completed") throw new Error("work_queue_finish_invalid");
-      const scoped = normalizeClaimScope({ ...intent.parameters, ...(Object.hasOwn(intent, "claim_handle") ? { claim_handle: intent.claim_handle } : {}) }, assignment);
-      handle = scoped.claim_handle;
-      const previous = intents.get(handle);
-      if (previous && (previous.outcome !== scoped.outcome || previous.keep_open !== (scoped.keep_open === true))) throw new Error("work_queue_finish_conflict");
-      intents.set(handle, { intent_id: intent.intent_id, outcome: scoped.outcome, keep_open: scoped.keep_open === true });
-    } catch {
-      errors.push({ line: index + 1, claim_handle: handle, code: handle ? "work_queue_finish_conflict" : "work_queue_finish_scope_invalid" });
-    }
-  }
-  for (const error of errors) if (error.claim_handle) intents.delete(error.claim_handle);
-  return { intents, errors };
+function finishIntentPath() {
+  return process.env.GH_AW_WORK_QUEUE_FINISH_INTENT || DEFAULT_FINISH_INTENT_PATH;
 }
 
 function runtimeOptions(options) {
-  return { ...options, githubClient: options.githubClient || options.github || global.github, context: options.context || global.context, core: options.core || global.core };
+  return { githubClient: options.queueClient || options.githubClient || options.github || global.github, context: options.context || global.context, core: options.core || global.core, branch: options.branch };
 }
 
-function queueFileUrl(configured, ref, line) {
-  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(ref) || !Number.isSafeInteger(line) || line < 1) throw new Error("work_queue_footer_location_invalid");
-  const server = new URL(process.env.GITHUB_SERVER_URL || "https://github.com");
-  if (server.protocol !== "https:" || server.username || server.password || server.pathname !== "/" || server.search || server.hash) throw new Error("work_queue_footer_url_invalid");
-  const repository = [configured.context.repo.owner, configured.context.repo.repo].map(encodeURIComponent).join("/");
-  return new URL(`${repository}/blob/${encodeURIComponent(ref)}/work-queue.jsonl#L${line}`, `${server.origin}/`).href;
+function denied() {
+  return Object.assign(new Error("work_queue_effect_scope_denied"), { code: "E004" });
 }
 
-async function claimFooterLinks(latest, member, configured) {
-  try {
-    const origins = await store.resolveWorkQueueEventLocations({
-      githubClient: configured.queueClient || configured.githubClient,
-      owner: configured.context.repo.owner,
-      repo: configured.context.repo.repo,
-      ...(configured.branch === undefined ? {} : { branch: configured.branch }),
-      latest,
-      work_id: member.work_id,
-      claim_id: member.claim_id,
-    });
-    const links = {
-      ...(origins?.work_created ? { work_created: queueFileUrl(configured, origins.work_created.sha, origins.work_created.line) } : {}),
-      ...(origins?.claim_finished ? { claim_finished: queueFileUrl(configured, origins.claim_finished.sha, origins.claim_finished.line) } : {}),
-    };
-    return Object.keys(links).length ? links : undefined;
-  } catch {
-    log.debug("claim.footer.link.unavailable");
-    return;
-  }
+/** Every repository named by the message or resolved resource must equal the profile's effect scope. */
+function assertEffectScope(normalized, resource, effectScope) {
+  const targets = [normalized.repository, normalized.repo, normalized.target_repo, normalized["target-repo"]].filter(value => value !== undefined);
+  if (targets.some(target => typeof target !== "string" || target !== effectScope)) throw denied();
+  if (resource === undefined) return;
+  if (!resource || typeof resource !== "object" || Array.isArray(resource)) throw denied();
+  const resourceTargets = [resource.repository, resource.repo].filter(value => value !== undefined);
+  if (!resourceTargets.length || resourceTargets.some(target => typeof target !== "string" || target !== effectScope)) throw denied();
 }
 
-function trustedClaimFooterLinks(handle, configured) {
-  try {
-    const raw = process.env.GH_AW_CLAIM_FOOTER_LINKS;
-    if (!raw || Buffer.byteLength(raw, "utf8") > 64 * 1024) return;
-    const values = JSON.parse(raw);
-    if (!values || typeof values !== "object" || Array.isArray(values)) return;
-    if (!Object.hasOwn(values, handle)) return;
-    const candidate = values[handle];
-    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return;
-    const server = new URL(process.env.GITHUB_SERVER_URL || "https://github.com");
-    if (server.protocol !== "https:" || server.username || server.password || server.pathname !== "/" || server.search || server.hash) return;
-    const repository = [configured.context.repo.owner, configured.context.repo.repo].map(encodeURIComponent).join("/");
-    const expectedPath = new RegExp(`^/${repository.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/blob/(?:[a-f0-9]{40}|[a-f0-9]{64})/work-queue\\.jsonl$`);
-    const links = {};
-    for (const [field, value] of Object.entries({ work_created: candidate.work_created, claim_finished: candidate.claim_finished })) {
-      if (typeof value !== "string") continue;
-      const url = new URL(value);
-      if (url.origin === server.origin && !url.username && !url.password && !url.search && expectedPath.test(url.pathname) && /^#L[1-9]\d*$/.test(url.hash)) links[field] = url.href;
-    }
-    return Object.keys(links).length ? links : undefined;
-  } catch {
-    return;
-  }
-}
-
-async function loadClaimAuthorization(options, { role, allowReleased }) {
+/**
+ * Authorize one Claim-scoped output: the Claim is open, its Dispatch is bound to this
+ * run attempt, the finish intent for its handle is `completed` (unless
+ * `requireCompletion:false`), the compiled policy env still routes the Dispatch's pool
+ * to its worker, and every target repository equals that policy's `effect_scope`.
+ */
+async function authorizeWorkerClaim(options = {}) {
   const configured = runtimeOptions(options);
   const assignment = normalizeAssignment(options.assignment);
   const normalized = normalizeClaimScope(Object.hasOwn(options, "message") ? options.message : Object.hasOwn(options, "claim_handle") ? { claim_handle: options.claim_handle } : {}, assignment);
   if (Object.hasOwn(options, "claim_handle") && normalized.claim_handle !== options.claim_handle) throw new Error("work_queue_claim_scope_invalid");
   const member = assignment.claims.find(claim => claim.handle === normalized.claim_handle);
-  const latest = await loadQueue(configured);
-  const { dispatch, profile } = validateStoredAssignment(latest.projection, assignment, { allowReleased });
-  const trustedContext = await authenticatePublisher({ ...configured, role, dispatch_id: assignment.dispatch_id, claim_handle: member.handle });
-  const claim = latest.projection.claims.get(member.claim_id);
-  const work = latest.projection.works.get(member.work_id);
-  return { configured, assignment, normalized, member, latest, dispatch, profile, trustedContext, claim, work };
-}
-
-function claimEffectTarget(normalized, resource, effectScope) {
-  const targets = [normalized.repository, normalized.repo, normalized.target_repo, normalized["target-repo"]].filter(value => value !== undefined);
-  if (targets.some(target => typeof target !== "string" || target !== effectScope)) throw Object.assign(new Error("work_queue_effect_scope_denied"), { code: "E004" });
-  if (resource === undefined) return undefined;
-  if (!resource || typeof resource !== "object" || Array.isArray(resource)) throw new Error("work_queue_effect_scope_denied");
-  const resourceTargets = [resource.repository, resource.repo].filter(value => value !== undefined);
-  if (!resourceTargets.length || resourceTargets.some(target => typeof target !== "string" || target !== effectScope)) throw Object.assign(new Error("work_queue_effect_scope_denied"), { code: "E004" });
-  const canonicalResource = { ...resource, repository: resourceTargets[0] };
-  delete canonicalResource.repo;
-  return canonicalResource;
-}
-
-async function authorizeWorkerClaim(options = {}) {
-  log.debug("claim.authorize.start");
-  const { configured, assignment, normalized, member, latest, dispatch, profile, trustedContext, claim, work } = await loadClaimAuthorization(options, { role: "worker", allowReleased: false });
-  const expected = expectedWorkerRun(assignment, profile, configured.context, trustedContext.repository, dispatchPrincipal(dispatch));
-  const native = validateNativeRun(trustedContext.native_run, { ...expected, run_id: trustedContext.run_id });
-  if (!dispatch.run || dispatch.state !== "bound" || canonical(dispatch.run) !== canonical(bindingForRun(native, expected))) throw new Error("work_queue_binding_not_durable");
-  const resource = claimEffectTarget(normalized, options.resource, profile.effect_scope);
-  const base = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, run_id: native.run_id, run_attempt: 1, effect_scope: profile.effect_scope };
-  if (claim?.state === "cancelled") return { ...base, authorized: false, suppressed: true, state: "cancelled" };
-  if (options.requireCompletion !== false && claim?.state !== "completed") return { ...base, authorized: false, state: "open" };
-  if (options.requireCompletion !== false && claim?.keep_open && claim.barrier !== "pending")
-    return { ...base, authorized: false, suppressed: claim.barrier === "verified", state: claim.barrier === "verified" ? "result" : "delivery_failed" };
-  if (options.requireCompletion !== false && work.barrier !== "pending") {
-    if (work.state !== "completed" || work.claim_id !== member.claim_id) throw new Error("work_queue_claim_ownership_invalid");
-    return { ...base, authorized: false, suppressed: work.barrier === "verified", state: work.barrier === "verified" ? "result" : "delivery_failed" };
+  const { state } = await loadQueue({ githubClient: configured.githubClient, context: configured.context, role: "worker", core: configured.core, ...(configured.branch === undefined ? {} : { branch: configured.branch }) });
+  const claim = state.claims.get(member.claim_id);
+  const dispatch = state.dispatches.get(assignment.dispatch_id);
+  if (!claim || !dispatch || claim.dispatch_id !== dispatch.dispatch_id || claim.work_id !== member.work_id || claim.handle !== member.handle) throw new Error("work_queue_claim_ownership_invalid");
+  const runId = String(configured.context.runId);
+  const runAttempt = Number(configured.context.runAttempt ?? 1);
+  const base = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, run_id: runId, run_attempt: runAttempt };
+  if (claim.state !== "open") return { ...base, authorized: false, suppressed: true, state: claim.state };
+  if (dispatch.state !== "bound" || dispatch.run?.run_id !== runId || dispatch.run.run_attempt !== runAttempt) return { ...base, authorized: false, state: "unbound" };
+  const policy = options.policy ?? readWorkQueuePolicyEnv();
+  if (!policy || !policyAllowsWorker(policy, dispatch.pool, dispatch.worker_profile)) throw denied();
+  const effectScope = policy.effect_scope;
+  assertEffectScope(normalized, options.resource, effectScope);
+  if (options.requireCompletion !== false) {
+    const intents = options.finishIntents ?? readFinishIntents(options.finishIntentPath ?? finishIntentPath());
+    if (intents.get(member.handle) !== "completed") return { ...base, effect_scope: effectScope, authorized: false, suppressed: true, state: "failed" };
   }
-  queue.validateClaimAuthority(latest.projection, member.claim_id, trustedContext, {
-    requireCompletion: options.requireCompletion !== false,
-    ...(resource === undefined ? {} : { resource }),
-  });
   log.debug("claim.authorize.complete", { require_completion: options.requireCompletion !== false });
-  let footer_links;
-  if (options.requireCompletion !== false && options.includeFooterLinks !== false) {
-    try {
-      footer_links = trustedClaimFooterLinks(member.handle, configured);
-    } catch {
-      log.debug("claim.footer.link.unavailable");
-    }
-  }
-  return { ...base, authorized: true, state: options.requireCompletion === false ? "open" : "completed", ...(footer_links ? { footer_links } : {}) };
-}
-
-async function authorizeReconcilerClaimReadback(options = {}) {
-  const { configured, normalized, member, latest, dispatch, profile, claim, work } = await loadClaimAuthorization(options, { role: "reconciler", allowReleased: true });
-  const evidence = latest.projection.deliveryEvidence.get(member.claim_id);
-  const pending = claim?.keep_open ? claim.barrier === "pending" : work?.barrier === "pending";
-  if (!dispatch.run || claim?.state !== "completed" || work?.claim_id !== member.claim_id || !pending || evidence?.completion_id !== work?.completion_id || evidence?.run_id !== dispatch.run.run_id)
-    throw new Error("work_queue_claim_ineffective");
-  const resource = claimEffectTarget(normalized, options.resource, profile.effect_scope);
-  if (resource !== undefined) require("./work_queue_resource_scope.cjs").validateEffectResourceAuthority(latest.projection, { claim, work, dispatch }, resource);
-  return {
-    claim_handle: member.handle,
-    claim_id: member.claim_id,
-    work_id: member.work_id,
-    run_id: dispatch.run.run_id,
-    run_attempt: 1,
-    effect_scope: profile.effect_scope,
-    authorized: true,
-    state: "completed",
-    footer_links: trustedClaimFooterLinks(member.handle, configured),
-  };
-}
-
-async function reconcileWorkerClaim(options = {}) {
-  log.debug("claims.reconcile.start");
-  const configured = runtimeOptions(options);
-  const supplied = options.assignment ?? (options.worker === undefined ? readWorkerSnapshot(options.snapshotPath) : options.worker);
-  if (!supplied) return { version: 3, status: options.requireAssignment ? "missing" : "unassigned", claims: {}, errors: [] };
-  const assignment = normalizeAssignment(supplied);
-  const staged = readFinishIntent(options.finishIntentPath, assignment);
-  log.debug("claims.reconcile.intents", { claims: assignment.claims.length, intents: staged.intents.size, errors: staged.errors.length });
-  const states = Object.create(null);
-  if (isStagedMode(options) || isStagedMode(options.config)) {
-    const latest = await loadQueue(configured);
-    const { dispatch } = validateStoredAssignment(latest.projection, assignment);
-    for (const member of assignment.claims) states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: "staged_preview", authorized: false };
-    return { version: 3, dispatch_id: assignment.dispatch_id, ...(dispatch.run ? { run_id: dispatch.run.run_id, run_attempt: 1 } : {}), status: "staged_preview", claims: states, errors: staged.errors };
-  }
-  const admitted = await bindWorkerAssignment({ ...configured, assignment });
-  const blocked = new Set(staged.errors.map(error => error.claim_handle).filter(Boolean));
-  for (const member of assignment.claims) {
-    try {
-      if (blocked.has(member.handle)) throw new Error("work_queue_finish_conflict");
-      const eventIds = [{ work_id: member.work_id, claim_id: member.claim_id }];
-      let latest = await loadQueue({ ...configured, eventIds });
-      const claim = latest.projection.claims.get(member.claim_id);
-      const work = latest.projection.works.get(member.work_id);
-      const intent = staged.intents.get(member.handle);
-      if (claim?.state === "completed") {
-        if (intent && (intent.outcome === "cancelled" || intent.keep_open !== (claim.keep_open === true))) throw new Error("work_queue_finish_conflict");
-        const barrier = claim.keep_open ? claim.barrier : work.barrier;
-        const authorized = barrier === "pending";
-        const footer_links = authorized ? await claimFooterLinks(latest, member, configured) : undefined;
-        states[member.handle] = {
-          claim_handle: member.handle,
-          claim_id: member.claim_id,
-          work_id: member.work_id,
-          state: barrier === "verified" ? "result" : barrier === "failed" ? "delivery_failed" : "completed",
-          authorized,
-          ...(footer_links ? { footer_links } : {}),
-        };
-        continue;
-      }
-      if (claim?.state === "cancelled") {
-        if (intent?.outcome === "completed") throw new Error("work_queue_finish_conflict");
-        states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: "cancelled", authorized: false };
-        continue;
-      }
-      const trustedContext = { ...admitted.trustedContext, claim_handle: member.handle };
-      queue.validateClaimAuthority(latest.projection, member.claim_id, trustedContext, { requireCompletion: false });
-      const outcome = intent?.outcome ?? "cancelled";
-      const intentId = intent?.intent_id ?? `wrapup:${digest({ dispatch_id: assignment.dispatch_id, handle: member.handle })}`;
-      const request = requestForIntent(trustedContext, intentId, "finish", { dispatch_id: assignment.dispatch_id, claim_handle: member.handle, outcome, ...(intent?.keep_open ? { keep_open: true } : {}) });
-      await (configured.publishWorkQueueRequest || store.publishWorkQueueRequest)({
-        githubClient: configured.queueClient || configured.githubClient,
-        owner: configured.context.repo.owner,
-        repo: configured.context.repo.repo,
-        ...(configured.branch === undefined ? {} : { branch: configured.branch }),
-        context: trustedContext,
-        actor: actorFromContext(trustedContext),
-        request,
-        core: configured.core,
-      });
-      latest = await loadQueue({ ...configured, eventIds });
-      const verified = latest.projection.claims.get(member.claim_id);
-      if (verified?.state !== outcome || (verified.keep_open === true) !== (intent?.keep_open === true)) throw new Error("work_queue_finish_not_durable");
-      log.debug("claim.finish.persisted", { completed: outcome === "completed", cancelled: outcome === "cancelled" });
-      const authorized = outcome === "completed";
-      const footer_links = authorized ? await claimFooterLinks(latest, member, configured) : undefined;
-      states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: outcome, authorized, ...(footer_links ? { footer_links } : {}) };
-    } catch (error) {
-      log.failure("claim.finish.blocked", error);
-      states[member.handle] = { claim_handle: member.handle, claim_id: member.claim_id, work_id: member.work_id, state: "blocked", authorized: false };
-    }
-  }
-  const values = Object.values(states);
-  const completed = values.filter(state => ["completed", "result", "delivery_failed"].includes(state.state)).length;
-  const cancelled = values.filter(state => state.state === "cancelled").length;
-  const status = completed + cancelled !== values.length ? "pending" : completed && cancelled ? "completed_with_cancellations" : completed ? "completed" : "cancelled";
-  log.debug("claims.reconcile.complete", { completed, cancelled, pending: completed + cancelled !== values.length });
-  return { version: 3, dispatch_id: assignment.dispatch_id, run_id: admitted.binding.run_id, run_attempt: 1, status, claims: states, errors: staged.errors };
+  return { ...base, effect_scope: effectScope, authorized: true, state: "open" };
 }
 
 /**
- * @param {(member: object, context: Record<string, unknown> & {signal: AbortSignal}) => Record<string, unknown> | null | Promise<Record<string, unknown> | null>} verifier
- * @param {object} member
- * @param {Record<string, unknown>} context
- * @param {number} remainingMs
- * @returns {Promise<Record<string, unknown> | null>}
+ * Effects-file lines grouped by Claim handle, without `claim_handle`.
+ * @param {string} filename
+ * @returns {Map<string, Array<{kind: string, resource: unknown}>>}
  */
-async function verifyWithinBudget(verifier, member, context, remainingMs) {
-  const controller = new AbortController();
-  let timer;
+function readClaimEffects(filename) {
+  const effects = new Map();
+  if (!fs.existsSync(filename)) return effects;
+  const stat = fs.lstatSync(filename);
+  if (!stat.isFile() || stat.size > MAX_EFFECTS_FILE_BYTES) throw new Error("work_queue_effects_invalid");
+  for (const line of fs.readFileSync(filename, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    const entry = parseStrictJSON(line);
+    if (!entry || typeof entry !== "object" || typeof entry.claim_handle !== "string" || typeof entry.kind !== "string") throw new Error("work_queue_effects_invalid");
+    const list = effects.get(entry.claim_handle) ?? [];
+    list.push({ kind: entry.kind, resource: entry.resource ?? null });
+    effects.set(entry.claim_handle, list);
+  }
+  return effects;
+}
+
+/** Effects over EFFECTS_BYTES are dropped (Completion carries `[]`) with a warning. */
+function boundedEffects(entries, handle, coreApi) {
+  if (canonicalBytes(entries) <= EFFECTS_BYTES) return entries;
+  coreApi?.warning?.(`Claim ${handle}: ${entries.length} recorded effects exceed ${EFFECTS_BYTES} bytes; the Completion records no effects`);
+  return [];
+}
+
+/**
+ * @typedef {{
+ *   config: import("./work_queue_continuation.cjs").ContinuationConfig,
+ *   entry: import("./work_queue_continuation.cjs").ContinuationEntry | null | undefined,
+ *   verify?: (child: any, claim: any) => void
+ * }} FinishContinuations
+ */
+
+/**
+ * Operations of one `finish` commit for the Dispatch's open Claim: Completion for a
+ * `completed` intent, else ClaimCancellation{worker_failed} plus
+ * WorkCancellation{attempts_exhausted} on the last attempt. With a routed
+ * continuation, the Completion is followed immediately by at most one successor
+ * Work; a request without a receipt fails the plan.
+ * @param {any} state
+ * @param {string} dispatchId
+ * @param {Map<string, string>} intents
+ * @param {Map<string, Array<unknown>>} effects bounded effects per handle
+ * @param {import("./work_queue_policy.cjs").PolicyEnv | null} policy
+ * @param {FinishContinuations} [continuations]
+ */
+function finishOperations(state, dispatchId, intents, effects, policy, continuations = undefined) {
+  const dispatch = state.dispatches.get(dispatchId);
+  if (!dispatch) throw queueError("dispatch_missing", "the assigned Dispatch is not in the ledger");
+  const claim = openClaim(state, dispatch);
+  if (!claim) return [];
+  if (intents.get(claim.handle) !== "completed") return [{ kind: "ClaimCancellation", work_id: claim.work_id, claim_id: claim.claim_id, reason: "worker_failed" }, ...exhaustedCancellation(state, claim, policy)];
+  const completion = { kind: "Completion", work_id: claim.work_id, claim_id: claim.claim_id, dispatch_id: dispatchId, claim_handle: claim.handle, effects: effects.get(claim.handle) ?? [] };
+  if (continuations?.entry === undefined) return [completion];
+  const { config, entry, verify } = continuations;
+  if (entry === null) throw queueError("continuation_receipt_missing", `completed Claim ${claim.handle} requested a continuation without an accepted receipt`);
+  const [child] = continuationOperations(state, claim, entry, config, policy);
+  if (!child) return [completion];
+  // A successor requires the policy; it replaces its completing parent, so the pool's pending count is unchanged.
+  // prettier-ignore
+  const { pending_limit: limit } = /** @type {NonNullable<typeof policy>} */ (policy);
+  const pool = state.works.get(claim.work_id).pool;
+  let pending = 0;
+  for (const work of state.works.values()) if (work.pool === pool && (work.state === "available" || work.state === "claimed")) pending++;
+  if (pending > limit) throw queueError("work_queue_pending_limit", `pool ${pool} would exceed its pending_limit of ${limit}`);
+  verify?.(child, claim);
+  return [completion, child];
+}
+
+/**
+ * Read the routed request evidence and receipt for this Dispatch's Claim and, when
+ * global authorization is configured, authorize its successor's admission now.
+ * @returns {Promise<{continuations: FinishContinuations, admission: {decision: any, digest: string, evidencePath: string} | null} | null>}
+ */
+async function prepareContinuations({ env, githubClient, context, coreApi, branch, dispatchId, intents, effects, policy, authorization }) {
+  const config = readContinuationConfig(env);
+  if (!config) return null;
+  const { state } = await loadQueue({ githubClient, context, role: "worker", core: coreApi, ...(branch === undefined ? {} : { branch }) });
+  const dispatch = state.dispatches.get(dispatchId);
+  if (!dispatch) throw queueError("work_queue_assignment_unknown", "the assigned Dispatch is not in the ledger");
+  const claim = state.claims.get(dispatch.claims[0]);
+  const { available, evidence, request } = readContinuationRequest({ env, context, claim });
+  if (!available) coreApi.info("Work queue finish: no bound agent output; no continuation can be admitted");
+  const entry = matchContinuation({ config, request, receipt: parseContinuationReceipt(env.GH_AW_WORK_QUEUE_CONTINUATIONS), intent: intents.get(claim.handle), claim });
+  /** @type {FinishContinuations} */
+  const continuations = { config, entry };
+  const handlerConfig = readHandlerConfig(env);
+  const requirement = admissionRequirement(handlerConfig);
+  if (!requirement || !entry) return { continuations, admission: null };
+  const repository = `${context.repo.owner}/${context.repo.repo}`;
+  const inputsFor = (child, parent) => admissionInputs({ child, claim: parent, dispatchId, repository, evidence, entry });
+  // A finish already committed plans no successor here: recovery is a read.
+  const [, child] = finishOperations(state, dispatchId, intents, effects, policy, continuations);
+  const admission = child ? await authorizeAdmission({ requirement, inputs: inputsFor(child, claim), handlerConfig, config, core: coreApi, env, authorization }) : null;
+  const { assertAuthorizationBatchFresh, canonicalDigest } = authorizationProtocol();
+  continuations.verify = (planned, parent) => {
+    if (!admission || admission.digest !== canonicalDigest(inputsFor(planned, parent))) throw queueError("continuation_authorization_scope_changed", "the successor no longer matches its authorized admission");
+    assertAuthorizationBatchFresh({ authorizations: [admission.decision] });
+  };
+  return { continuations, admission };
+}
+
+function recordAdmissionOutcomes(prepared, operationStatus, coreApi) {
+  if (!prepared?.admission) return;
+  const { decision, evidencePath } = prepared.admission;
+  authorizationProtocol().recordAuthorizationOutcome({ evidencePath, authorization: decision, operationStatus, core: coreApi });
+}
+
+/**
+ * The committed successor of this Dispatch's completed Claim (zero or one result), reported only after the finish commit.
+ * @param {any} state
+ * @param {FinishContinuations | undefined} continuations
+ * @returns {Array<{claim_handle: string, status: "admitted" | "depth_limit", work_id?: string, approval_issue?: number}>}
+ */
+function continuationResults(state, continuations) {
+  const entry = continuations?.entry;
+  if (!entry) return [];
+  const { claim_handle: handle, claim_id: claimId, issue, status } = entry.receipt;
+  const claim = state.claims.get(claimId);
+  const childId = claim && nodeId(state.works.get(claim.work_id).graph_id, `continuation:${claim.work_id}`);
+  const child = childId && state.works.get(childId);
+  if (child) return [{ claim_handle: handle, status: "admitted", work_id: child.work_id, ...(issue ? { approval_issue: Number(issue.number) } : {}) }];
+  return status === "depth_limit" && claim?.state === "completed" ? [{ claim_handle: handle, status: "depth_limit" }] : [];
+}
+
+/** The approval Issue the manager created for this run; after a failed finish it pins no successor. */
+function orphanApprovalIssues(env) {
+  if (env.GH_AW_CONTINUATION_ROUTE !== "issue") return [];
   try {
-    /** @type {Promise<null>} */
-    const timeout = new Promise(resolve => {
-      timer = setTimeout(
-        () => {
-          log.debug("delivery.verifier.timed_out");
-          controller.abort();
-          resolve(null);
-        },
-        Math.max(1, Math.min(15000, remainingMs))
-      );
-    });
-    return await Promise.race([Promise.resolve().then(() => verifier(member, { ...context, signal: controller.signal })), timeout]);
-  } finally {
-    clearTimeout(timer);
+    const receipt = parseContinuationReceipt(env.GH_AW_WORK_QUEUE_CONTINUATIONS);
+    return receipt?.issue ? [receipt.issue.number] : [];
+  } catch {
+    return [];
   }
 }
 
-async function finalizeWorkerResults(options = {}) {
-  log.debug("results.finalize.start");
-  const configured = runtimeOptions(options);
-  const assignment = normalizeAssignment(options.assignment || readWorkerSnapshot(options.snapshotPath));
-  const initial = await loadQueue(configured);
-  const { dispatch, profile } = validateStoredAssignment(initial.projection, assignment, { allowReleased: true });
-  if (isStagedMode(options) || isStagedMode(options.config))
-    return { version: 3, dispatch_id: assignment.dispatch_id, claims: Object.fromEntries(assignment.claims.map(member => [member.handle, { state: "staged_preview", effects: "unknown" }])) };
-  const trustedContext = await authenticatePublisher({ ...configured, role: "reconciler" });
-  const expected = { ...expectedWorkerRun(assignment, profile, configured.context, trustedContext.repository, dispatchPrincipal(dispatch)), run_id: dispatch.run?.run_id };
-  if (!dispatch.run) throw new Error("work_queue_binding_not_durable");
-  const ownRun = trustedContext.run_id === dispatch.run.run_id;
-  if (ownRun && trustedContext.run_attempt !== 1) throw new Error("rerun_not_authorized");
-  const results = Object.create(null);
-  for (const member of assignment.claims) {
+function renderSummary(claims) {
+  const completed = claims.filter(claim => claim.state === "completed").length;
+  return renderTemplateFromFile(getPromptPath("work_queue_reconciliation_summary.md"), { completed_claims: completed, failed_claims: claims.length - completed }).trimEnd() + "\n\n\n";
+}
+
+/**
+ * Finish step (safe_outputs job, after Process Safe Outputs): publish one `finish`
+ * commit for this run's Dispatch and set `work_queue_outcome`.
+ */
+async function main(options = {}) {
+  const { githubClient, context, core: coreApi, branch } = runtimeOptions(options);
+  const env = options.env || process.env;
+  const reference = readInboundWorkQueueAssignment(context.payload);
+  if (!reference) {
+    coreApi.info("Work queue finish: this run has no work_queue_assignment");
+    return null;
+  }
+  if (isStagedMode(options.config)) {
+    coreApi.info("Work queue finish: staged preview; no finish commit published");
+    return null;
+  }
+  const dispatchId = reference.dispatch_id;
+  const policy = options.policy ?? readWorkQueuePolicyEnv();
+  let intents;
+  try {
+    intents = readFinishIntents(options.finishIntentPath ?? finishIntentPath());
+  } catch (error) {
+    coreApi.warning(`Work queue finish intents are invalid; every Claim fails: ${error instanceof Error ? error.message : String(error)}`);
+    intents = new Map();
+  }
+  const effects = new Map([...readClaimEffects(options.effectsPath ?? effectsPath())].map(([handle, entries]) => [handle, boundedEffects(entries, handle, coreApi)]));
+  /** @type {Awaited<ReturnType<typeof prepareContinuations>>} */
+  let prepared = null;
+  let published;
+  try {
+    prepared = await prepareContinuations({ env, githubClient, context, coreApi, branch, dispatchId, intents, effects, policy, authorization: options.authorization ?? {} });
+    const continuations = prepared?.continuations;
+    published = await publishRequest({
+      githubClient,
+      context,
+      role: "worker",
+      core: coreApi,
+      ...(branch === undefined ? {} : { branch }),
+      kind: "finish",
+      parameters: { dispatch_id: dispatchId },
+      operationsFor: state => finishOperations(state, dispatchId, intents, effects, policy, continuations),
+    });
+  } catch (error) {
+    recordAdmissionOutcomes(prepared, "skipped", coreApi);
+    const orphans = orphanApprovalIssues(env);
+    if (orphans.length) coreApi.warning(`Work queue finish was not published; continuation approval Issue(s) ${orphans.map(number => `#${number}`).join(", ")} pin no successor and cannot release work.`);
+    throw error;
+  }
+  recordAdmissionOutcomes(prepared, published.committed && !published.recovered ? "confirmed" : "skipped", coreApi);
+  const dispatch = published.state.dispatches.get(dispatchId);
+  if (!dispatch) throw queueError("work_queue_assignment_unknown", "the assigned Dispatch is not in the ledger");
+  const claims = dispatch.claims.map(id => published.state.claims.get(id));
+  const outcome = claims.length && claims.every(claim => claim.state === "completed") ? "completed" : "failed";
+  const continuations = published.committed ? continuationResults(published.state, prepared?.continuations) : [];
+  coreApi.setOutput("work_queue_outcome", outcome);
+  coreApi.info(`Work queue finish: ${dispatchId} ${outcome} (${published.committed ? (published.recovered ? "already committed" : "committed") : "nothing to finish"})`);
+  for (const result of continuations) {
+    coreApi.info(
+      result.status === "admitted"
+        ? `Work queue continuation of ${result.claim_handle}: queued Work ${result.work_id}${result.approval_issue ? ` awaiting approval Issue #${result.approval_issue}` : ""}`
+        : `Work queue continuation of ${result.claim_handle}: depth limit reached; no successor queued`
+    );
+  }
+  await coreApi.summary?.addRaw(renderSummary(claims)).write();
+  if (policy) {
     try {
-      let latest = await loadQueue(configured);
-      const work = latest.projection.works.get(member.work_id);
-      const claim = latest.projection.claims.get(member.claim_id);
-      if (claim?.state !== "completed") {
-        results[member.handle] = { state: claim?.state === "cancelled" ? "cancelled" : "pending", effects: "unknown" };
-        continue;
-      }
-      if (claim.keep_open && claim.barrier !== "pending") {
-        const terminal = latest.projection.terminalBarriers.get(member.claim_id);
-        results[member.handle] = { state: claim.barrier === "verified" ? "result" : "delivery_failed", effects: terminal?.evidence.effects ?? "unknown" };
-        continue;
-      }
-      if ((work?.state !== "completed" && !claim.keep_open) || work.claim_id !== member.claim_id || typeof work.completion_id !== "string") throw new Error("work_queue_claim_ownership_invalid");
-      if (work.barrier !== "pending") {
-        const effects = work.barrier === "verified" ? latest.projection.terminalBarriers.get(member.work_id)?.evidence.effects : work.disposition;
-        results[member.handle] = { state: work.barrier === "verified" ? "result" : "delivery_failed", effects: effects ?? "unknown" };
-        continue;
-      }
-      // Without a verifier, only an explicit expiry opt-in may settle this barrier.
-      if (typeof options.verifyEffects !== "function" && options.expireUnverified !== true) {
-        log.debug("delivery.verifier.unavailable");
-        results[member.handle] = { state: "pending", effects: "unknown", reason: "verification_unavailable" };
-        continue;
-      }
-      const contract = member.work?.effect_contract;
-      let contractSupported = true;
-      try {
-        validateDeliveryContract(contract);
-      } catch {
-        contractSupported = false;
-        log.debug("delivery.contract.invalid");
-      }
-      const policy = latest.projection.policy.pools[assignment.pool].reconciliation;
-      const beforeVerification = validateNativeRun(await fetchNativeRunAttempt(configured.githubClient, expected.repository, dispatch.run.run_id, 1, { sleepFn: configured.sleepFn }), expected);
-      if (!ownRun && !beforeVerification.terminal) {
-        log.debug("delivery.verifier.terminal_evidence_required");
-        results[member.handle] = { state: "pending", effects: "unknown", reason: "terminal_evidence_required" };
-        continue;
-      }
-      /** @type {Record<string, unknown> | null} */
-      let verification = null;
-      let attempts = 0;
-      /** @type {VerifiedClaimEffects | null} */
-      let verified = null;
-      /** @type {VerifiedClaimEffects | null} */
-      let verifiedSnapshot = null;
-      const verificationStarted = Date.now();
-      integer(work.completion_at, 0, Number.MAX_SAFE_INTEGER, "Completion timestamp");
-      // Start each worker verifier's window after preflight; maintenance and missing-verifier expiry still use Completion.
-      const checkedBeforeVerification = options.now ?? verificationStarted;
-      const verificationAnchor = ownRun && typeof options.verifyEffects === "function" ? Math.max(work.completion_at, checkedBeforeVerification) : work.completion_at;
-      const remainingDeadline = policy.deadline_ms - Math.max(0, checkedBeforeVerification - verificationAnchor);
-      // Maintenance can first observe a terminal worker after the deadline.
-      // Give its persisted receipts one bounded readback before expiring them;
-      // this does not replay effects or reopen the normal retry budget.
-      const finalEvidenceReadback = options.expireUnverified === true && latest.projection.deliveryEvidence.has(member.claim_id);
-      log.debug("delivery.verifier.budget", {
-        max_attempts: policy.max_attempts,
-        remaining_ms: Math.max(0, remainingDeadline),
-        deadline_expired: remainingDeadline <= 0,
-        contract_supported: contractSupported,
-        verifier_available: typeof options.verifyEffects === "function",
-        terminal_before_verification: beforeVerification.terminal,
-        own_run: ownRun,
-        anchor_offset_ms: verificationAnchor - work.completion_at,
-      });
-      // An explicit expiry opt-in still waits for the Completion deadline before closing the barrier.
-      if (typeof options.verifyEffects !== "function" && remainingDeadline > 0) {
-        results[member.handle] = { state: "pending", effects: "unknown", reason: "verification_unavailable" };
-        continue;
-      }
-      while (typeof options.verifyEffects === "function" && attempts < policy.max_attempts && ((attempts === 0 && finalEvidenceReadback) || Date.now() - verificationStarted < remainingDeadline)) {
-        attempts++;
-        log.debug("delivery.verifier.attempt", { attempt: attempts });
-        try {
-          const remaining = remainingDeadline - (Date.now() - verificationStarted);
-          verification = await verifyWithinBudget(options.verifyEffects, member, { assignment, contract, attempt: attempts, run: dispatch.run }, attempts === 1 && finalEvidenceReadback && remaining <= 0 ? 15000 : remaining);
-        } catch (error) {
-          log.failure("delivery.verifier.failed", error);
-          verification = null;
-        }
-        const trustedDelivery = isTrustedClaimDelivery(verification, assignment, member.handle);
-        if (verification?.verified === true && !trustedDelivery) verification = null;
-        verified = contractSupported && trustedDelivery && verifiedClaimEffects(verification) ? verification : null;
-        log.debug("delivery.verifier.checked", {
-          attempt: attempts,
-          response_present: !!verification,
-          trusted: trustedDelivery,
-          verified: !!verified,
-          contract_supported: contractSupported,
-          elapsed_ms: Math.max(0, Date.now() - verificationStarted),
-        });
-        if (verified) {
-          verifiedSnapshot = snapshotClaimDelivery(verified);
-          break;
-        }
-        if (Date.now() - verificationStarted >= remainingDeadline) break;
-        if (attempts < policy.max_attempts)
-          await (options.sleepFn || (delay => new Promise(resolve => setTimeout(resolve, delay))))(Math.min(1000, 50 * 2 ** (attempts - 1), Math.max(0, remainingDeadline - (Date.now() - verificationStarted))));
-      }
-      latest = await loadQueue(configured);
-      validateStoredAssignment(latest.projection, assignment, { allowReleased: true });
-      const currentWork = latest.projection.works.get(member.work_id);
-      const currentClaim = latest.projection.claims.get(member.claim_id);
-      if (currentClaim?.keep_open && currentClaim.barrier !== "pending") {
-        const terminal = latest.projection.terminalBarriers.get(member.claim_id);
-        results[member.handle] = { state: currentClaim.barrier === "verified" ? "result" : "delivery_failed", effects: terminal?.evidence.effects ?? "unknown" };
-        continue;
-      }
-      if (
-        currentClaim?.state !== "completed" ||
-        currentClaim.dispatch_id !== assignment.dispatch_id ||
-        (currentWork?.state !== "completed" && !currentClaim.keep_open) ||
-        currentWork.claim_id !== member.claim_id ||
-        currentWork.completion_id !== work.completion_id
-      )
-        throw new Error("work_queue_claim_ownership_changed");
-      if (currentWork.barrier !== "pending") {
-        const effects = currentWork.barrier === "verified" ? latest.projection.terminalBarriers.get(member.work_id)?.evidence.effects : currentWork.disposition;
-        results[member.handle] = { state: currentWork.barrier === "verified" ? "result" : "delivery_failed", effects: effects ?? "unknown" };
-        continue;
-      }
-      const native = validateNativeRun(await fetchNativeRunAttempt(configured.githubClient, expected.repository, dispatch.run.run_id, 1, { sleepFn: configured.sleepFn }), expected);
-      const controls = claimControlReceipts(latest.projection, assignment, member.handle);
-      const controlsDigest = digest(controls);
-      const verifiedControlsDigest = verifiedSnapshot?.controls_digest;
-      const verificationReceipt = typeof verification?.receipt === "string" && verification.receipt.length > 0 ? verification.receipt : undefined;
-      if (typeof verifiedControlsDigest !== "string" || !/^[0-9a-f]{64}$/.test(verifiedControlsDigest) || verifiedControlsDigest !== controlsDigest) {
-        if (verified) log.debug("delivery.verifier.controls_mismatch", { proof_verified: true, digest_present: typeof verifiedControlsDigest === "string", controls: controls.length });
-        verified = null;
-      }
-      const checkedAt = options.now ?? Date.now();
-      const base = { repository: expected.repository, workflow: expected.workflow, ref: expected.ref, principal: expected.principal_id, checked_at: checkedAt, run_id: dispatch.run.run_id, run_attempt: 1 };
-      if (verified && verifiedSnapshot) {
-        if (!isTrustedClaimDelivery(verified, assignment, member.handle)) throw new Error("work_queue_delivery_proof_changed");
-        const operation = {
-          kind: "Result",
-          work_id: member.work_id,
-          claim_id: member.claim_id,
-          completion_id: work.completion_id,
-          descriptor: verifiedSnapshot.descriptor,
-          evidence: { ...base, kind: "delivery", source: "verified_receipts", receipt: verifiedSnapshot.receipt, effects: verifiedSnapshot.effects },
-        };
-        await publishOperations(configured, trustedContext, ["result", assignment.dispatch_id, member.handle, work.completion_id], "result", [operation], state => {
-          if (!isTrustedClaimDelivery(verified, assignment, member.handle)) throw new Error("work_queue_delivery_proof_changed");
-          validateStoredAssignment(state, assignment, { allowReleased: true });
-          if (digest(claimControlReceipts(state, assignment, member.handle)) !== verifiedSnapshot.controls_digest) throw new Error("work_queue_control_inventory_changed");
-        });
-        results[member.handle] = { state: "result", effects: verifiedSnapshot.effects, attempts };
-        log.debug("result.persisted");
-      } else {
-        let disposition = contractSupported && verificationReceipt && (verification?.effects === "none" || verification?.effects === "partial") ? verification.effects : "unknown";
-        if (controls.length && disposition === "none") disposition = "partial";
-        if (disposition === "none" && (!verificationReceipt || !beforeVerification.terminal)) disposition = "unknown";
-        if (!native.terminal) {
-          log.debug("delivery.settlement.native_run_pending", { attempts, contract_supported: contractSupported });
-          results[member.handle] = { state: "pending", effects: disposition, reason: contractSupported ? "terminal_evidence_required" : "effect_contract_invalid", verifier: verification?.reason ?? null, attempts };
-          continue;
-        }
-        if (attempts < policy.max_attempts && checkedAt - work.completion_at < policy.deadline_ms) {
-          log.debug("delivery.settlement.budget_remaining", { attempts, max_attempts: policy.max_attempts });
-          results[member.handle] = { state: "pending", effects: disposition, reason: "verification_budget_not_exhausted", verifier: verification?.reason ?? null, attempts };
-          continue;
-        }
-        const evidence = {
-          ...base,
-          kind: "terminal_run",
-          source: "github_api",
-          status: "completed",
-          conclusion: native.conclusion,
-          ...(attempts > 0 ? { attempts } : {}),
-          effects: disposition,
-          ...(verificationReceipt ? { receipt: verificationReceipt } : {}),
-        };
-        const operation = { kind: "DeliveryFailure", work_id: member.work_id, claim_id: member.claim_id, completion_id: work.completion_id, reason: "verification_exhausted", disposition, evidence };
-        await publishOperations(configured, trustedContext, ["delivery_failure", assignment.dispatch_id, member.handle, work.completion_id], "delivery_failure", [operation]);
-        results[member.handle] = { state: "delivery_failed", effects: disposition, verifier: verification?.reason ?? null, attempts };
-        log.diagnostic(
-          "delivery.failure.persisted",
-          {
-            attempts,
-            max_attempts: policy.max_attempts,
-            deadline_exhausted: checkedAt - work.completion_at >= policy.deadline_ms,
-            contract_supported: contractSupported,
-            receipt_present: !!verificationReceipt,
-            controls: controls.length,
-            unknown_effects: disposition === "unknown",
-          },
-          "Delivery verification exhausted; enable DEBUG=work-queue:claims,work-queue:delivery,work-queue:native_delivery for failed checks. No effects were replayed."
-        );
-      }
-      latest = await loadQueue(configured);
-      if (!["verified", "failed"].includes(latest.projection.claims.get(member.claim_id)?.barrier ?? latest.projection.works.get(member.work_id)?.barrier)) throw new Error("work_queue_result_not_durable");
+      await require("./work_queue_issues.cjs").projectIssues({ githubClient, context, core: coreApi, policy, state: published.state, ...(branch === undefined ? {} : { branch }) });
     } catch (error) {
-      log.failure("result.verification.unresolved", error);
-      results[member.handle] = { state: "pending", effects: "unknown", reason: "verification_unresolved" };
+      coreApi.warning(`Work queue Issue projection failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  log.debug("results.finalize.complete", { claims: Object.keys(results).length });
-  return { version: 3, dispatch_id: assignment.dispatch_id, claims: results };
+  return {
+    dispatch_id: dispatchId,
+    outcome,
+    committed: published.committed,
+    claims: Object.fromEntries(claims.map(claim => [claim.handle, claim.state])),
+    ...(prepared ? { continuations } : {}),
+  };
 }
 
-function renderSummary(result) {
-  const states = typeof result === "object" ? Object.values(result.claims || {}) : [];
-  const summary = renderTemplateFromFile(getPromptPath("work_queue_reconciliation_summary.md"), {
-    authorized_claims: states.filter(state => state.authorized).length,
-    unauthorized_claims: states.filter(state => !state.authorized).length,
-  });
-  return summary.trimEnd() + "\n\n\n";
-}
-
-async function main(options = {}) {
-  const coreApi = options.core || core;
-  try {
-    const result = await reconcileWorkerClaim(options);
-    coreApi.setOutput("claim_authorizations", JSON.stringify(result));
-    coreApi.setOutput(
-      "claim_footer_links",
-      JSON.stringify(
-        Object.fromEntries(
-          Object.entries(result.claims || {})
-            .filter(([, claim]) => claim.authorized && claim.footer_links)
-            .map(([handle, claim]) => [handle, claim.footer_links])
-        )
-      )
-    );
-    coreApi.info(`Work queue reconciliation: ${result.status}; authorization is per Claim`);
-    await coreApi.summary.addRaw(renderSummary(result)).write();
-    return result;
-  } catch (error) {
-    log.failure("claims.reconcile.failed", error);
-    coreApi.setOutput("claim_authorizations", JSON.stringify({ version: 3, status: "failed", claims: {} }));
-    coreApi.setOutput("claim_footer_links", "{}");
-    await coreApi.summary.addRaw(renderSummary({ claims: {} })).write();
-    throw new Error("Work queue reconciliation failed; unverified Claim effects are blocked");
-  }
-}
-
-module.exports = {
-  FINISH_INTENT_PATH,
-  SNAPSHOT_PATH,
-  main,
-  readFinishIntent,
-  readWorkerSnapshot,
-  reconcileWorkerClaim,
-  authorizeWorkerClaim,
-  authorizeReconcilerClaimReadback,
-  verifyWithinBudget,
-  finalizeWorkerResults,
-  renderSummary,
-};
+module.exports = { authorizeWorkerClaim, finishOperations, main, readClaimEffects };

@@ -93,7 +93,7 @@ func newWorkflowBuildContext(parseResult *frontmatterParseResult) *workflowBuild
 }
 
 // setupWorkflowBuildContext initializes engine/tools processing and builds base workflow data.
-func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error { //nolint:largefunc // Existing orchestration phase remains centralized; unrelated to adaptive routing.
+func (c *Compiler) setupWorkflowBuildContext(ctx *workflowBuildContext) error { //nolint:largefunc // Existing orchestration phase remains centralized.
 	connectorConfigs, err := c.resolveWorkflowConnectors(ctx.frontmatter.Frontmatter)
 	if err != nil {
 		return c.formatToolsProcessingError(ctx.cleanPath, err)
@@ -342,7 +342,7 @@ func (c *Compiler) populateWorkflowBuildContext(ctx *workflowBuildContext) error
 	// compilation resolve the implicit model-routing default identically.
 	c.applyDefaultModelRouting(ctx)
 	c.applyDynamicModelRouting(ctx)
-	return c.applyAdaptiveRouting(ctx)
+	return c.applyRoutingLearning(ctx)
 }
 
 func (c *Compiler) attachSharedActionResolver(workflowData *WorkflowData) {
@@ -915,6 +915,10 @@ func (c *Compiler) processOnSectionAndFilters( //nolint:largefunc // Existing or
 	orchestratorWorkflowLog.Print("Processing on section and filters")
 
 	var err error
+	workflowData.IssueStatusFilter, err = extractIssueStatusFilter(frontmatter)
+	if err != nil {
+		return err
+	}
 	frontmatter, err = c.processWebhookTriggers(frontmatter, workflowData)
 	if err != nil {
 		return err

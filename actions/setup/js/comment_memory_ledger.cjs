@@ -14,8 +14,32 @@ const { buildManagedMemoryBody } = require("./comment_memory.cjs");
 const { enforceCommentLimits } = require("./comment_limit_helpers.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
-const { resolveDispatchCredentialPrincipal } = require("./work_queue_dispatch_credential.cjs");
+const { GITHUB_API_VERSION } = require("./constants.cjs");
 const { createAuthenticatedGitHubClient } = require("./handler_auth.cjs");
+
+/**
+ * Numeric GitHub account ID of the token's writer: the authenticated user for an
+ * opaque token, or the `github-actions[bot]` account for the workflow token.
+ * @param {any} client
+ * @param {{kind: "github_token" | "authenticated"}} credential
+ * @returns {Promise<string>}
+ */
+async function resolveWriterPrincipal(client, credential) {
+  const parameters = { headers: { "X-GitHub-Api-Version": GITHUB_API_VERSION }, request: { retries: 0, timeout: 15000 } };
+  const users = client?.rest?.users;
+  let response;
+  if (credential.kind === "authenticated") {
+    response = await users.getAuthenticated(parameters);
+    if (response?.status !== 200 || !["User", "Bot"].includes(response.data?.type)) throw new Error("comment ledger writer identity is unverified");
+  } else {
+    const username = "github-actions[bot]";
+    response = await users.getByUsername({ ...parameters, username });
+    if (response?.status !== 200 || response.data?.type !== "Bot" || String(response.data?.login).toLowerCase() !== username) throw new Error("comment ledger writer identity is unverified");
+  }
+  const id = response.data.id;
+  if (!(Number.isSafeInteger(id) && id > 0) && !(typeof id === "string" && /^[1-9][0-9]*$/.test(id))) throw new Error("comment ledger writer identity is unverified");
+  return String(id);
+}
 
 const LEDGER_TAG = "gh-aw-comment-ledger";
 
@@ -67,6 +91,7 @@ async function materializeCommentLedger({ githubClient, config, sourceDir, comme
   if (!target) throw new TypeError(ERR_VALIDATION + ": Comment-backed ledger has no target issue/PR");
   let authorId;
   try {
+    /** @type {{kind: "github_token" | "authenticated"}} */
     const credential = { kind: process.env.GH_AW_COMMENT_MEMORY_TOKEN_SOURCE === "github_actions" ? "github_token" : "authenticated" };
     const selectedToken = process.env.GH_AW_COMMENT_MEMORY_TOKEN;
     if (credential.kind !== "authenticated" && !selectedToken) throw new Error(ERR_VALIDATION + ": Comment-backed ledger installation identity requires a bound token");
@@ -75,7 +100,7 @@ async function materializeCommentLedger({ githubClient, config, sourceDir, comme
       const authentication = await githubClient.auth({ type: "token" });
       if (authentication?.type !== "token" || authentication.token !== selectedToken) throw new Error(ERR_VALIDATION + ": Comment-backed ledger credential does not match the selected client");
     }
-    authorId = await resolveDispatchCredentialPrincipal(githubClient, credential);
+    authorId = await resolveWriterPrincipal(githubClient, credential);
   } catch (error) {
     throw new Error(ERR_VALIDATION + ": Cannot verify the authenticated comment-backed ledger writer", { cause: error });
   }

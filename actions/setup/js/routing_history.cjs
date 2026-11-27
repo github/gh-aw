@@ -25,21 +25,23 @@ const STREAK_PROVEN = 5;
 const PROVEN_RUNS = 20;
 
 /** Contract 5's bounds. Sizes are UTF-8 bytes of JSON.stringify output. */
-const BOUNDS = Object.freeze({ history: MEMORY_RUNS, pairs: 32, scopes: 4, state_bytes: 512 * 1024, runs_lines: 500, runs_bytes: 512 * 1024 });
+const BOUNDS = Object.freeze({ history: MEMORY_RUNS, pairs: 32, scopes: 4, state_bytes: 512 * 1024, runs_lines: 500, runs_bytes: 512 * 1024, unresolved_runs: 200 });
 
 /** Notes on runs.jsonl lines that did not count, besides the observation's skip reasons. */
 const NOTES = Object.freeze(["before_reset", "older_definition", "unsaved", "no_agent", "receipt_missing", "receipt_mismatch", "awaiting_success"]);
+const LIVE_ROLES = new Set(["serve", "test", "probe", "ordinary"]);
 
 /**
  * @typedef {[number, string, boolean, number | null, number | null, (number | null)[] | null]} HistoryEntry
  * @typedef {{ since_seq: number, pending: number }} Suspension
  * @typedef {{ history: HistoryEntry[], credits: number | null, model_credits: number | null, bills: number, streak: number, tests: number, suspended: Suspension | null, seen: string, summary: { runs: number, rate: number, hopeful: number } | null }} PairRecord
  * @typedef {{ incumbent: string | null, last_role: string | null, last_success_seq: number, pairs: Record<string, PairRecord> }} ScopeRecord
- * @typedef {{ v: number, workflow: string, seq: number, generation: { hash: string, since_run: number } | null, reset_after_run: number, last_run: number, unexplained: number, scopes: Record<string, ScopeRecord>, updated: { run: string | null, at: string } | null }} HistoryState
+ * @typedef {{ v: number, workflow: string, seq: number, generation: { hash: string, since_run: number } | null, reset_after_run: number, last_run: number, first_write_run?: number, reconciled_through?: number, unresolved_runs?: number[], unresolved_run_ids?: Record<string, string>, unresolved_lookup_cursor?: number, unexplained: number, scopes: Record<string, ScopeRecord>, updated: { run: string | null, at: string } | null }} HistoryState
  * @typedef {{ run: string, number: number, attempt: number | null, at: string, generation: string | null, scope: string | null, mode: string | null, role: string | null, pair: string | null, outcome: string | null, credits: number | null, counted: boolean, note: string | null }} RunLine
  * @typedef {{ credits?: number | null, model_credits?: number | null, tokens?: (number | null)[] | null }} RunCost
- * @typedef {{ id: string, number: number, conclusion: string, agent_ran?: boolean | null }} ListedRun
- * @typedef {{ workflow: string, run: { id: string, number: number, attempt: number }, at: string, generation: string, mode: string, scope: string, observation: { outcome: string, reason?: string } | null, pair: string | null, cost?: RunCost | null, receipt?: Record<string, any> | null, prepare?: { explore_allowed?: boolean } | null, listing?: ListedRun[] }} RunEvidence
+ * @typedef {{ id: string, number: number, conclusion: string, agent_ran?: boolean | null, generation?: string | null, older_definition?: boolean }} ListedRun
+ * @typedef {{ verified: boolean, ceiling?: number, unresolved?: number[], unresolved_ids?: Record<string, string>, unresolved_lookup_cursor?: number, resolved?: number[] }} ReconciliationCoverage
+ * @typedef {{ workflow: string, run: { id: string, number: number, attempt: number }, at: string, generation: string, mode: string, scope: string, observation: { outcome: string, reason?: string } | null, pair: string | null, cost?: RunCost | null, receipt?: Record<string, any> | null, prepare?: { explore_allowed?: boolean } | null, listing?: ListedRun[], reconciliation?: ReconciliationCoverage | null }} RunEvidence
  */
 
 /** @param {string} at */
@@ -91,8 +93,9 @@ function rate(wins, losses, hopeful) {
 
 /**
  * A pair's average cost over its entries, oldest first: the first known cost sets it and each
- * later one moves it by 0.9 x old + 0.1 x new. An entry with a cost but no model share counts
- * all of it as the model's.
+ * later one moves it by 0.9 x old + 0.1 x new. `model_credits` is averaged over the exact same
+ * entries that have a known total cost, falling back to total cost when the model share is null,
+ * so `0 <= model_credits <= credits` holds even for legacy partial-bill entries.
  * @param {HistoryEntry[]} entries
  */
 function averages(entries) {
@@ -103,13 +106,12 @@ function averages(entries) {
   let bills = 0;
   for (const entry of entries) {
     const cost = entry[3];
-    let model = entry[4];
     if (cost !== null) {
       credits = credits === null ? cost : 0.9 * credits + 0.1 * cost;
       bills += 1;
-      if (model === null) model = cost;
+      const model = entry[4] ?? cost;
+      modelCredits = modelCredits === null ? model : 0.9 * modelCredits + 0.1 * model;
     }
-    if (model !== null) modelCredits = modelCredits === null ? model : 0.9 * modelCredits + 0.1 * model;
   }
   return { credits, modelCredits, bills };
 }
@@ -143,13 +145,21 @@ function editScope(scope) {
   }
 }
 
+/** @param {unknown} value */
+function isPairOrNull(value) {
+  return value === null || (typeof value === "string" && value.length > 0);
+}
+
 /**
  * Whether a selection receipt belongs to this run: the same workflow, run, attempt, generation,
- * mode and scope, and the pair AWF's own selection record names.
+ * mode and scope, a valid role and incumbent object, and the pair AWF's own selection record names.
  * @param {Record<string, any> | null | undefined} receipt
  * @param {RunEvidence} run
  */
 function receiptBound(receipt, run) {
+  const validRole = run.mode === "live" ? LIVE_ROLES.has(receipt?.role) : receipt?.role === "observe";
+  const inc = receipt?.incumbent;
+  const validIncumbent = run.mode !== "live" || (!!inc && typeof inc === "object" && !Array.isArray(inc) && isPairOrNull(inc.before) && isPairOrNull(inc.after));
   return (
     !!receipt &&
     receipt.workflow === run.workflow &&
@@ -158,8 +168,22 @@ function receiptBound(receipt, run) {
     receipt.generation === run.generation &&
     receipt.mode === run.mode &&
     receipt.scope === run.scope &&
+    validRole &&
+    validIncumbent &&
+    typeof receipt.selected === "string" &&
+    receipt.selected.length > 0 &&
     receipt.selected === run.pair
   );
+}
+
+/**
+ * The base model of a pair: everything before `@` (or the whole string if no `@` is present).
+ * A suspension covers every effort of its base.
+ * @param {string} pairName
+ */
+function baseOf(pairName) {
+  const at = pairName.lastIndexOf("@");
+  return at >= 0 ? pairName.slice(0, at) : pairName;
 }
 
 /**
@@ -195,6 +219,45 @@ function recordOutcome(state, scope, pairName, ok, at, cost, events) {
     if (scope.last_success_seq > suspended.since_seq) {
       pair.history = [...pair.history.slice(pair.history.length - pending), entry()];
       pair.suspended = null;
+      pair.streak = 0;
+      events.push([pairName, "broken"]);
+      return true;
+    }
+    return false;
+  }
+  // A suspension covers every effort of its base model, so another effort of a suspended base
+  // settles the suspended sibling(s) when it runs (e.g. after the original effort left the rank).
+  const targetBase = baseOf(pairName);
+  /** @type {Array<{ record: PairRecord, suspended: Suspension }>} */
+  const siblings = [];
+  for (const [name, candidate] of Object.entries(scope.pairs)) {
+    if (name !== pairName && candidate.suspended !== null && baseOf(name) === targetBase) {
+      siblings.push({ record: candidate, suspended: candidate.suspended });
+    }
+  }
+  if (siblings.length > 0) {
+    if (ok) {
+      for (const { record, suspended: siblingSuspended } of siblings) {
+        const pending = Math.min(siblingSuspended.pending, record.history.length);
+        record.history = record.history.slice(0, record.history.length - pending);
+        record.suspended = null;
+        record.streak = 0;
+      }
+      pair.history.push(entry());
+      pair.streak = 0;
+      scope.last_success_seq = state.seq;
+      events.push([pairName, "back"]);
+      return true;
+    }
+    const dueSiblings = siblings.filter(({ suspended: siblingSuspended }) => scope.last_success_seq > siblingSuspended.since_seq);
+    if (dueSiblings.length > 0) {
+      for (const { record, suspended: siblingSuspended } of dueSiblings) {
+        const pending = Math.min(siblingSuspended.pending, record.history.length);
+        record.history = record.history.slice(record.history.length - pending);
+        record.suspended = null;
+        record.streak = 0;
+      }
+      pair.history.push(entry());
       pair.streak = 0;
       events.push([pairName, "broken"]);
       return true;
@@ -284,6 +347,23 @@ function trimRuns(runs, overrides = {}) {
 }
 
 /**
+ * Bootstrap a legacy state.json (lacking `reconciled_through`) from its generation fence when
+ * `runs.jsonl` has not evicted earlier lines, or from just below the oldest retained line when
+ * eviction occurred so previously charged evicted runs are not re-charged while newer unverified
+ * runs stay in scope.
+ * @param {HistoryState} state
+ * @param {RunLine[]} runs
+ * @param {Partial<typeof BOUNDS>} [overrides]
+ */
+function legacyReconciliationFloor(state, runs, overrides = {}) {
+  const bounds = { ...BOUNDS, ...overrides };
+  if (!state.generation) return 0;
+  const runsTrimmed = runs.length >= bounds.runs_lines || (runs.length > 0 && runs.reduce((total, entry) => total + sizeOf(entry) + 1, 0) >= bounds.runs_bytes - 1024);
+  const oldestRetained = runs.length > 0 ? runs.reduce((min, entry) => Math.min(min, entry.number), Infinity) : 0;
+  return runsTrimmed && oldestRetained > 0 ? Math.max(state.generation.since_run, oldestRetained - 1) : state.generation.since_run;
+}
+
+/**
  * Apply one finished run. Returns the new state and the lines to append to runs.jsonl; the
  * inputs are not modified.
  * @param {HistoryState} input
@@ -332,10 +412,80 @@ function applyRun(input, runs, run, options = {}) {
     return { state, lines };
   };
 
+  const hasReconciliation =
+    (run.reconciliation !== undefined && run.reconciliation !== null) ||
+    typeof input.reconciled_through === "number" ||
+    Array.isArray(input.unresolved_runs) ||
+    (input.unresolved_run_ids !== undefined && input.unresolved_run_ids !== null) ||
+    typeof input.unresolved_lookup_cursor === "number";
+  const legacyFloor = legacyReconciliationFloor(state, runs, bounds);
+  const prevReconciled = Math.max(typeof state.reconciled_through === "number" ? state.reconciled_through : legacyFloor, state.reset_after_run);
+  const prevUnresolved = new Set((Array.isArray(state.unresolved_runs) ? state.unresolved_runs : []).filter(n => Number.isInteger(n) && n > state.reset_after_run));
+  /** @type {Record<string, string>} */
+  const knownUnresolvedIds = {};
+  if (state.unresolved_run_ids && typeof state.unresolved_run_ids === "object") {
+    for (const [key, value] of Object.entries(state.unresolved_run_ids)) {
+      if (typeof value === "string" && value) knownUnresolvedIds[key] = value;
+    }
+  }
+  if (run.reconciliation?.unresolved_ids && typeof run.reconciliation.unresolved_ids === "object") {
+    for (const [key, value] of Object.entries(run.reconciliation.unresolved_ids)) {
+      if (typeof value === "string" && value) knownUnresolvedIds[key] = value;
+    }
+  }
+  const recLookupCursor = run.reconciliation?.unresolved_lookup_cursor;
+  const prevLookupCursor = state.unresolved_lookup_cursor;
+  const nextLookupCursor =
+    typeof recLookupCursor === "number" && Number.isInteger(recLookupCursor) && recLookupCursor > 0
+      ? recLookupCursor
+      : typeof prevLookupCursor === "number" && Number.isInteger(prevLookupCursor) && prevLookupCursor > 0
+        ? prevLookupCursor
+        : null;
+
+  /** @param {number[]} kept */
+  const applyUnresolvedIds = kept => {
+    /** @type {Record<string, string>} */
+    const nextIds = {};
+    for (const num of kept) {
+      const idValue = knownUnresolvedIds[String(num)];
+      if (idValue) nextIds[String(num)] = idValue;
+    }
+    if (Object.keys(nextIds).length > 0) {
+      state.unresolved_run_ids = nextIds;
+      if (nextLookupCursor !== null) {
+        state.unresolved_lookup_cursor = nextLookupCursor;
+      } else {
+        delete state.unresolved_lookup_cursor;
+      }
+    } else {
+      delete state.unresolved_run_ids;
+      delete state.unresolved_lookup_cursor;
+    }
+  };
+
+  /**
+   * Persist bounded reconciliation coverage without advancing `reconciled_through` on fenced-off runs,
+   * while clearing this run's own number if it was previously tracked as unresolved.
+   */
+  const preserveReconciliation = () => {
+    if (!hasReconciliation) return;
+    let ceiling = prevReconciled;
+    let kept = [...prevUnresolved].filter(n => n !== number && n <= ceiling).sort((a, b) => a - b);
+    if (kept.length > bounds.unresolved_runs) {
+      const cutoff = kept[bounds.unresolved_runs];
+      ceiling = Math.max(state.reset_after_run, Math.min(ceiling, cutoff - 1));
+      kept = kept.slice(0, bounds.unresolved_runs).filter(n => n <= ceiling);
+    }
+    state.reconciled_through = ceiling;
+    state.unresolved_runs = kept;
+    applyUnresolvedIds(kept);
+  };
+
   // Written before, perhaps on an attempt whose acknowledgment was lost.
   if (runs.some(entry => entry.run === id)) return { state, lines: [] };
   if (number <= state.reset_after_run) {
     lines.push(own("before_reset"));
+    preserveReconciliation();
     return finish();
   }
   if (state.generation === null) {
@@ -343,6 +493,7 @@ function applyRun(input, runs, run, options = {}) {
   } else if (run.generation !== state.generation.hash) {
     if (number <= state.generation.since_run) {
       lines.push(own("older_definition"));
+      preserveReconciliation();
       return finish();
     }
     for (const scope of Object.values(state.scopes)) editScope(scope);
@@ -350,12 +501,63 @@ function applyRun(input, runs, run, options = {}) {
     state.generation = { hash: run.generation, since_run: number };
   }
 
+  // Compute the clamped reconciliation ceiling before charging newly covered runs so no charge
+  // lands above the persisted ceiling where runs.jsonl eviction could later duplicate it.
+  const verifiedScan = run.reconciliation?.verified === true;
+  let finalCeiling = prevReconciled;
+  /** @type {number[]} */
+  let finalUnresolved = [];
+  if (hasReconciliation) {
+    const rec = run.reconciliation;
+    const requestedCeiling = verifiedScan ? Math.max(prevReconciled, typeof rec?.ceiling === "number" && Number.isInteger(rec.ceiling) ? Math.min(number, rec.ceiling) : number) : prevReconciled;
+    const writtenNumbers = new Set(runs.map(entry => entry.number));
+    writtenNumbers.add(number);
+    const resolved = new Set(Array.isArray(rec?.resolved) ? rec.resolved.filter(n => Number.isInteger(n) && n < number) : []);
+    for (const other of run.listing || []) {
+      if (other.number > state.reset_after_run && other.number < number && (prevUnresolved.has(other.number) || (verifiedScan && other.number <= requestedCeiling))) {
+        resolved.add(other.number);
+      }
+    }
+    const nextUnresolved = new Set([...prevUnresolved].filter(n => !resolved.has(n) && !writtenNumbers.has(n)));
+    let ceiling = requestedCeiling;
+    if (verifiedScan) {
+      for (const n of Array.isArray(rec?.unresolved) ? rec.unresolved : []) {
+        if (Number.isInteger(n) && n > state.reset_after_run && n < number && n <= ceiling && !writtenNumbers.has(n) && !resolved.has(n)) {
+          nextUnresolved.add(n);
+        }
+      }
+    }
+    let kept = [...nextUnresolved].filter(n => n <= ceiling).sort((a, b) => a - b);
+    // Bound unresolved_runs without falsely marking dropped runs as reconciled.
+    if (kept.length > bounds.unresolved_runs) {
+      const cutoff = kept[bounds.unresolved_runs];
+      ceiling = Math.max(state.reset_after_run, Math.min(ceiling, cutoff - 1));
+      kept = kept.slice(0, bounds.unresolved_runs).filter(n => n <= ceiling);
+    }
+    finalCeiling = ceiling;
+    finalUnresolved = kept;
+  }
+
   // Completed runs that wrote no line are charged after the fences, in the right generation.
   const written = new Set(runs.map(entry => entry.run));
   const sinceRun = state.generation.since_run;
   for (const other of [...(run.listing || [])].sort((left, right) => left.number - right.number)) {
-    if (written.has(other.id) || other.id === id || other.number <= state.reset_after_run || other.number <= sinceRun) continue;
+    if (written.has(other.id) || other.id === id || other.number <= state.reset_after_run) continue;
+    if (hasReconciliation) {
+      // Never let an older writer consume a newer run (which may belong to a later generation),
+      // and never charge a newly covered run above the final clamped ceiling.
+      if (other.number >= number) continue;
+      const tracked = prevUnresolved.has(other.number);
+      if (!tracked && (!verifiedScan || other.number <= prevReconciled || other.number > finalCeiling)) continue;
+    } else if (other.number <= sinceRun) {
+      continue;
+    }
     if (["success", "skipped", "neutral"].includes(other.conclusion)) continue;
+    if (hasReconciliation && other.generation && (other.older_definition || (other.number <= sinceRun && other.generation !== state.generation.hash))) {
+      lines.push(line("older_definition", { run: other.id, number: other.number, attempt: 1, generation: other.generation }));
+      written.add(other.id);
+      continue;
+    }
     if (other.agent_ran) {
       lines.push(line("unsaved", { run: other.id, number: other.number, attempt: 1 }));
       state.unexplained += 1;
@@ -365,7 +567,17 @@ function applyRun(input, runs, run, options = {}) {
     written.add(other.id);
   }
 
-  if (!run.observation) {
+  if (hasReconciliation) {
+    state.reconciled_through = finalCeiling;
+    if (input.generation === null && finalCeiling < number) state.first_write_run = number;
+    // A late writer can reach the first write while newer saved rows are still outside coverage.
+    if (state.first_write_run !== undefined && finalCeiling >= Math.max(number, state.last_run)) delete state.first_write_run;
+    state.unresolved_runs = finalUnresolved;
+    applyUnresolvedIds(finalUnresolved);
+  }
+
+  const live = run.mode === "live";
+  if (!run.observation && !live) {
     lines.push(own("no_agent"));
     return finish();
   }
@@ -388,8 +600,7 @@ function applyRun(input, runs, run, options = {}) {
   }
 
   const { receipt } = run;
-  const pairName = run.pair;
-  const live = run.mode === "live";
+  const pairName = run.pair ?? null;
   const bound = receiptBound(receipt, run);
   /** @type {string | null} */
   let role = null;
@@ -407,6 +618,10 @@ function applyRun(input, runs, run, options = {}) {
     const pair = scope.pairs[pairName] || (scope.pairs[pairName] = newPair(at));
     pair.tests += 1;
     pair.seen = at;
+  }
+  if (!run.observation) {
+    lines.push(own("no_agent", { role, pair: pairName }));
+    return finish();
   }
   if (live && bound && receipt) {
     const { before, after } = receipt.incumbent;
@@ -438,8 +653,10 @@ module.exports = {
   BOUNDS,
   NOTES,
   applyRun,
+  averages,
   counts,
   emptyState,
+  legacyReconciliationFloor,
   memory,
   rate,
   receiptBound,

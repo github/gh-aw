@@ -2,57 +2,27 @@
 "use strict";
 
 const { TextDecoder } = require("node:util");
-const { createHash } = require("node:crypto");
 const log = require("./work_queue_logging.cjs").createWorkQueueLogger("store");
 const { canonical, identity, integer, queueError } = require("./work_queue_codec.cjs");
-const { actorFromContext, validatePolicy, validateRequestRole, validateTrustedContext } = require("./work_queue_policy.cjs");
-const { assignmentsForRequest } = require("./work_queue_scheduler.cjs");
-const { validateEffectResource } = require("./work_queue_resource_scope.cjs");
-const { verifyWorkerRoute, verifyWorkerRoutes } = require("./work_queue_provisioning.cjs");
-const { serializeDeployments } = require("./work_queue_deployment.cjs");
+const { LEDGER_BYTES } = require("./work_queue_limits.cjs");
+const { validateActor } = require("./work_queue_policy.cjs");
 const { writeWorkQueueUpdateSummary } = require("./work_queue_summary_renderer.cjs");
-const { queueAuthenticationScope } = require("./work_queue_auth_cache.cjs");
-const { queueGitScope, queueLedgerClient } = require("./work_queue_git_transport.cjs");
-const { expirationView } = require("./work_queue_expiration.cjs");
+const { queueLedgerClient } = require("./work_queue_git_transport.cjs");
 const { observeQueueOperation, publicationAttempt, publicationRecovery } = require("./work_queue_telemetry.cjs");
-const {
-  appendCommit,
-  causalChain,
-  compactTransactions,
-  generateRequestOperations,
-  newRequest,
-  newState,
-  parseTransactionRecords,
-  reconstructCheckpoint,
-  proposedCommitId,
-  replayTransactionLog,
-  replayCheckpointSource,
-  replayTransactions,
-  validateClaimAuthority,
-  validateRequest,
-  validateRequestContext,
-  validateWorkerContinuation,
-} = require("./work_queue_replay.cjs");
+const { appendCommit, buildCommit, checkpointCommit, committedRequest, newRequest, newState, replayTransactionLog } = require("./work_queue_replay.cjs");
 
 const WORK_QUEUE_BRANCH = "work-queue";
 const WORK_QUEUE_LOG_PATH = "work-queue.jsonl";
-const LEGACY_BRANCHES = ["dispatch-coordinator", "gh-aw-work-queue"];
-const LEGACY_LOGS = ["dispatch-work-coordinator.jsonl"];
-// Contended publications routinely need 10+ fast-forward attempts; exponential backoff caps at 1 s, so 33 attempts bound a publication to ~30 s of sleep.
-const DEFAULT_MAX_RETRIES = 32;
-const DEFAULT_COMPACTION_MAX_RETRIES = 5;
-/** @type {WeakMap<object, {scope: object, proofs: Set<string>}>} */
-const verifiedCheckpointHistory = new WeakMap();
-/** @type {WeakMap<object, {scope: object, repository: string, sha: string, treeSha: string, contents: string}>} */
-const verifiedQueueContents = new WeakMap();
-/** @type {WeakMap<object, Map<string, {work_created?: {sha: string, line: number}, claim_finished?: {sha: string, line: number}}>>} */
-const immutableWorkQueueOrigins = new WeakMap();
+// Each failed compare-and-swap re-reads the ledger before retrying; the re-read is the backoff.
+const CAS_ATTEMPTS = 8;
 
-/** @typedef {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, eventIds?: Array<{work_id: string, claim_id: string}>, core?: import("./work_queue_summary_renderer.cjs").SummaryCore & {info(message: string): void}}} QueueReadOptions */
+/**
+ * @typedef {{githubClient: any, owner: string, repo: string, branch?: string, core?: any}} QueueReadOptions
+ * @typedef {{sha: string | null, treeSha: string | null, contents: string, protocol: number | null, transactions: Array<any>, state: any, branch: string, logPath: string}} QueueLog
+ */
 
 function validateBranch(branch) {
   identity(branch, "queue branch");
-  if (LEGACY_BRANCHES.includes(branch)) throw queueError("unsupported_protocol", "legacy queue branches are unsupported; explicit new queue initialization is required");
   if (
     branch === "@" ||
     branch.startsWith("-") ||
@@ -86,34 +56,26 @@ function ambiguousWrite(error) {
 }
 
 async function verifyRepository(githubClient, owner, repo) {
-  log.debug("repository.verify.start");
   let response;
   try {
     response = await githubClient.rest.repos.get({ owner, repo });
   } catch (error) {
-    log.failure("repository.verify.failed", error);
     throw queueError("repository_unavailable", `cannot establish queue repository visibility (${httpStatus(error) ?? "transport"})`);
   }
   if (!response?.data || typeof response.data.full_name !== "string" || response.data.full_name.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw queueError("repository_unavailable", "repository identity does not match the queue");
-  // Installation-token collaborator flags are not token scopes; Git reads establish contents access.
-  log.debug("repository.verify.complete");
   return response.data;
 }
 
 async function readRef(githubClient, owner, repo, branch) {
-  log.debug("ref.read.start");
   try {
     const response = await githubClient.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
     const sha = response?.data?.object?.sha;
     if (typeof sha !== "string" || !sha) throw queueError("ledger_invalid", "queue branch returned no commit identity");
-    log.debug("ref.read.complete");
     return sha;
   } catch (error) {
-    log.failure("ref.read.failed", error);
     if (httpStatus(error) === 404) return null;
     if (httpStatus(error) === 409) {
       // GitHub returns 409 rather than 404 for refs in a branchless repository.
-      // A generic conflict is not proof of absence: confirm the native state.
       const response = await githubClient.graphql("query WorkQueueEmptyRepository($owner:String!,$repo:String!) { repository(owner:$owner,name:$repo) { nameWithOwner isEmpty } }", { owner, repo });
       if (response?.repository?.nameWithOwner?.toLowerCase() === `${owner}/${repo}`.toLowerCase() && response.repository.isEmpty === true) return null;
     }
@@ -121,519 +83,79 @@ async function readRef(githubClient, owner, repo, branch) {
   }
 }
 
-/** @param {QueueReadOptions} options */
-async function readWorkQueueLog(options) {
-  return observeQueueOperation("read", options, () => readWorkQueueLogImpl(options));
-}
-
-/** @param {QueueReadOptions} options */
-async function readWorkQueueLogImpl({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, eventIds, core: coreApi = undefined }) {
-  log.debug("ledger.read.start");
-  validateBranch(branch);
-  if (eventIds !== undefined && (!Array.isArray(eventIds) || eventIds.length > 256 || eventIds.some(member => !member || typeof member.work_id !== "string" || typeof member.claim_id !== "string")))
-    throw queueError("resource_limit", "queue event-location request is invalid or oversized");
-  githubClient = queueLedgerClient(githubClient, owner, repo, branch);
-  const repository = await verifyRepository(githubClient, owner, repo);
-  const sha = await readRef(githubClient, owner, repo, branch);
-  if (!sha) {
-    if (repository.size !== 0 && (typeof repository.default_branch !== "string" || !repository.default_branch || !(await readRef(githubClient, owner, repo, repository.default_branch))))
-      throw queueError("repository_unavailable", "cannot establish contents access before treating a queue ref as absent");
-    // Detect but never adopt/copy/upgrade known unsupported storage.
-    if (branch === WORK_QUEUE_BRANCH) {
-      for (const legacy of LEGACY_BRANCHES) if (await readRef(githubClient, owner, repo, legacy)) throw queueError("unsupported_protocol", "a legacy queue exists; no implicit storage migration is permitted");
-    }
-    log.debug("ledger.read.absent");
-    return { sha: null, treeSha: null, transactions: [], state: newState(), branch, logPath: WORK_QUEUE_LOG_PATH };
-  }
-  return readVerifiedQueueAtSHA({ githubClient, owner, repo, branch, repository, coreApi }, sha, true, true, eventIds);
-}
-
-/**
- * @param {QueueReadOptions & {repository: {full_name: string}, coreApi?: import("./work_queue_summary_renderer.cjs").SummaryCore & {info(message: string): void}}} options
- * @param {string} sha
- * @param {boolean} [verify]
- * @param {boolean} [recover]
- * @param {Array<{work_id: string, claim_id: string}> | undefined} [eventIds]
- */
-async function readVerifiedQueueAtSHA(options, sha, verify = true, recover = true, eventIds = undefined) {
-  const { githubClient, branch, repository, coreApi } = options;
-  const scope = queueGitScope(githubClient) || (await queueAuthenticationScope(githubClient));
-  const previous = verifiedQueueContents.get(githubClient);
-  if (!scope || previous?.scope !== scope) verifiedQueueContents.delete(githubClient);
-  const cached = scope && previous?.scope === scope ? previous : undefined;
-  const immutable = cached && cached.repository === repository.full_name.toLowerCase() && cached.sha === sha ? cached : await readQueueContentsAtSHA(options, sha);
-  const { treeSha, contents } = immutable;
-  const { state, checkpointRecovered } = await replayVerifiedQueueLog(options, sha, contents, verify, recover);
-  const transactions = state.transactions;
-  const bytes = Buffer.byteLength(contents, "utf8");
-  if (verify && scope && bytes <= 4 * 1024 * 1024 && (queueGitScope(githubClient) || (await queueAuthenticationScope(githubClient))) === scope)
-    verifiedQueueContents.set(githubClient, { scope, repository: repository.full_name.toLowerCase(), sha, treeSha, contents });
-  coreApi?.info(`Work queue: validated ${transactions.length} causal commits`);
-  log.debug("ledger.read.complete", { bytes, transactions: transactions.length, works: state.works.size, claims: state.claims.size });
-  const eventLookupDeadline = eventIds?.length ? Date.now() + 1000 : undefined;
-  const eventLocations = eventLookupDeadline ? locateQueueEventLocations(contents, eventIds, sha, eventLookupDeadline) : undefined;
-  return {
-    sha,
-    treeSha,
-    transactions,
-    state,
-    branch,
-    logPath: WORK_QUEUE_LOG_PATH,
-    ...(eventLocations ? { eventLocations, eventLookupDeadline } : {}),
-    ...(checkpointRecovered ? { checkpointRecovered: true } : {}),
-  };
-}
-
-/**
- * @param {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string}} options
- * @param {string} sha
- * @param {Record<string, unknown> | undefined} [request]
- * @param {(code: string, message: string) => Error} [onInvalid]
- * @param {Map<string, string> | undefined} [knownPrefixes]
- * @throws {Error} If queue contents are invalid, using onInvalid when provided.
- */
-async function readQueueContentsAtSHA({ githubClient, owner, repo }, sha, request = undefined, onInvalid = undefined, knownPrefixes = undefined) {
-  /**
-   * @type {(code: string, message: string) => never}
-   * @throws {Error} Always throws the error from onInvalid or queueError.
-   */
-  const fail = (code, message) => {
-    throw onInvalid ? onInvalid(code, message) : queueError(code, message);
-  };
-  const requestOptions = request ? { request } : {};
-  const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: sha, ...requestOptions });
+/** @returns {Promise<{treeSha: string, contents: string}>} */
+async function readQueueContentsAtSHA({ githubClient, owner, repo }, sha) {
+  const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: sha });
   const treeSha = commit?.data?.tree?.sha;
-  if (typeof treeSha !== "string" || !treeSha) fail("ledger_invalid", "queue commit has no tree");
-  const response = await githubClient.rest.git.getTree({ owner, repo, tree_sha: treeSha, ...requestOptions });
-  if (response?.data?.truncated === true || !Array.isArray(response?.data?.tree)) fail("ledger_invalid", "queue tree is missing or truncated");
-  const entries = response.data.tree;
-  if (entries.length > 16384) fail("resource_limit", "queue tree entry limit exceeded");
-  if (entries.some(entry => LEGACY_LOGS.includes(entry.path))) fail("unsupported_protocol", "legacy transaction log cannot be adopted");
-  const logs = entries.filter(entry => entry.path === WORK_QUEUE_LOG_PATH);
-  if (logs.length !== 1 || logs[0].type !== "blob" || typeof logs[0].sha !== "string" || logs[0].mode !== "100644") fail("ledger_invalid", "existing queue must contain exactly one regular canonical log");
-  const known = knownPrefixes?.get(logs[0].sha);
-  if (known !== undefined) return { treeSha, contents: known, prefixVerified: true };
-  const blob = await githubClient.rest.git.getBlob({ owner, repo, file_sha: logs[0].sha, ...requestOptions });
-  if (blob?.data?.encoding !== "base64" || typeof blob.data.content !== "string") fail("ledger_invalid", "queue blob encoding is unsupported");
+  if (typeof treeSha !== "string" || !treeSha) throw queueError("ledger_invalid", "queue commit has no tree");
+  const response = await githubClient.rest.git.getTree({ owner, repo, tree_sha: treeSha });
+  if (response?.data?.truncated === true || !Array.isArray(response?.data?.tree)) throw queueError("ledger_invalid", "queue tree is missing or truncated");
+  const logs = response.data.tree.filter(entry => entry.path === WORK_QUEUE_LOG_PATH);
+  if (logs.length !== 1 || logs[0].type !== "blob" || typeof logs[0].sha !== "string" || logs[0].mode !== "100644") throw queueError("ledger_invalid", "existing queue must contain exactly one regular log");
+  const blob = await githubClient.rest.git.getBlob({ owner, repo, file_sha: logs[0].sha });
+  if (blob?.data?.encoding !== "base64" || typeof blob.data.content !== "string") throw queueError("ledger_invalid", "queue blob encoding is unsupported");
   const encoded = blob.data.content.replace(/\s/g, "");
-  if (encoded.length > Math.ceil((80 * 1024 * 1024) / 3) * 4) fail("resource_limit", "queue blob exceeds cold parser limit");
-  const paddingAt = encoded.indexOf("=");
-  // A repeated quartet regexp over multi-MiB ledgers overflows V8's regexp stack.
-  if (encoded.length % 4 !== 0 || /[^A-Za-z0-9+/=]/.test(encoded) || (paddingAt !== -1 && (paddingAt < encoded.length - 2 || !["=", "=="].includes(encoded.slice(paddingAt))))) fail("ledger_invalid", "malformed queue blob base64");
+  if (encoded.length > Math.ceil(LEDGER_BYTES / 3) * 4) throw queueError("resource_limit", "queue blob exceeds the ledger bound");
   const bytes = Buffer.from(encoded, "base64");
-  if (bytes.toString("base64") !== encoded) fail("ledger_invalid", "malformed queue blob base64");
-  if (bytes.length > 80 * 1024 * 1024 || (typeof blob.data.size === "number" && blob.data.size !== bytes.length)) fail("ledger_invalid", "queue blob is oversized or truncated");
+  if (bytes.toString("base64") !== encoded) throw queueError("ledger_invalid", "malformed queue blob base64");
+  if (bytes.length > LEDGER_BYTES || (typeof blob.data.size === "number" && blob.data.size !== bytes.length)) throw queueError("ledger_invalid", "queue blob is oversized or truncated");
   let contents;
   try {
     contents = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
   } catch {
-    fail("ledger_invalid", "queue blob contains malformed UTF-8");
+    throw queueError("ledger_invalid", "queue blob contains malformed UTF-8");
   }
   return { treeSha, contents };
 }
 
-function locateQueueEventLocations(contents, eventIds, sha, deadline = Number.POSITIVE_INFINITY) {
-  const requestedWorks = new Set(eventIds.map(member => member.work_id));
-  const requestedClaims = new Set(eventIds.map(member => JSON.stringify([member.work_id, member.claim_id])));
-  const locations = {};
-  let checkpointPriorGitSHA;
-  let offset = 0;
-  let line = 0;
-  while (offset < contents.length) {
-    if (Date.now() >= deadline) break;
-    const newline = contents.indexOf("\n", offset);
-    if (newline === -1) break;
-    line++;
-    let record;
-    try {
-      record = JSON.parse(contents.slice(offset, newline));
-    } catch {
-      return {};
-    }
-    for (const operation of record.operations || []) {
-      if (operation.kind === "Work" && requestedWorks.has(operation.work_id) && !locations.work_created) locations.work_created = { sha, line };
-      if (operation.kind === "Completion" && requestedClaims.has(JSON.stringify([operation.work_id, operation.claim_id])) && !locations.claim_finished) locations.claim_finished = { sha, line };
-      if (record.previous === null && operation.kind === "Checkpoint" && !checkpointPriorGitSHA) checkpointPriorGitSHA = operation.prior_git_sha;
-    }
-    offset = newline + 1;
-    if (locations.work_created && locations.claim_finished) break;
-  }
-  return { ...locations, ...(checkpointPriorGitSHA ? { checkpoint_prior_git_sha: checkpointPriorGitSHA } : {}) };
+/**
+ * Protocol version of a canonical log. Canonical JSON sorts `version` last, so the
+ * first line ends with its version; anything else is left to the strict parser.
+ * @param {string} contents
+ * @returns {number | null}
+ */
+function ledgerProtocol(contents) {
+  if (!contents) return null;
+  const end = contents.indexOf("\n");
+  const line = end === -1 ? contents : contents.slice(0, end);
+  const match = /,"version":([0-9]+)}\r?$/.exec(line.slice(-32));
+  return match ? Number(match[1]) : null;
 }
 
 /**
- * Resolve exact physical JSONL locations, following checkpoint ancestry only when the current log omits an event.
- * @param {{githubClient: Parameters<typeof verifyRepository>[0], owner: string, repo: string, branch?: string, latest: {sha?: string | null, eventLocations?: {work_created?: {sha: string, line: number}, claim_finished?: {sha: string, line: number}, checkpoint_prior_git_sha?: string}, eventLookupDeadline?: number}, work_id: string, claim_id: string, timeoutMs?: number}} options
+ * Read and replay the ledger. A v3 head is returned unreplayed only when `allowLegacy`
+ * (the converter); every other reader gets unsupported_protocol.
+ * @param {QueueReadOptions & {allowLegacy?: boolean}} options
+ * @returns {Promise<QueueLog>}
  */
-async function resolveWorkQueueEventLocations({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, latest, work_id, claim_id, timeoutMs = 1000 }) {
-  const key = JSON.stringify([owner.toLowerCase(), repo.toLowerCase(), branch, work_id, claim_id]);
-  let cached = immutableWorkQueueOrigins.get(githubClient);
-  if (!cached) {
-    cached = new Map();
-    immutableWorkQueueOrigins.set(githubClient, cached);
-  }
-  const previous = cached.get(key) || {};
-  const current = latest.eventLocations || {};
-  const resolved = {
-    ...(previous.work_created ? { work_created: previous.work_created } : {}),
-    ...(previous.claim_finished ? { claim_finished: previous.claim_finished } : {}),
-    ...(current.work_created ? { work_created: current.work_created } : {}),
-    ...(current.claim_finished ? { claim_finished: current.claim_finished } : {}),
-  };
-  const remember = origins => {
-    if (origins.work_created || origins.claim_finished) {
-      cached.set(key, {
-        ...(origins.work_created ? { work_created: origins.work_created } : {}),
-        ...(origins.claim_finished ? { claim_finished: origins.claim_finished } : {}),
-      });
-      while (cached.size > 256) {
-        const oldest = cached.keys().next().value;
-        if (oldest === undefined) break;
-        cached.delete(oldest);
-      }
-    }
-  };
-  if (latest.sha && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(latest.sha)) return Object.keys(resolved).length ? resolved : undefined;
-  if (!latest.sha) return Object.keys(resolved).length ? resolved : undefined;
-  if (resolved.work_created && resolved.claim_finished) {
-    remember(resolved);
-    return resolved;
-  }
-
-  const deadline = Math.min(latest.eventLookupDeadline ?? Number.POSITIVE_INFINITY, Date.now() + Math.min(Math.max(timeoutMs, 0), 1000));
-  const controller = new AbortController();
-  let timer;
-  const timedOut = new Promise(resolve => {
-    timer = setTimeout(
-      () => {
-        controller.abort();
-        resolve(undefined);
-      },
-      Math.max(0, deadline - Date.now())
-    );
-  });
-  const lookup = (async () => {
-    let priorSHA = current.checkpoint_prior_git_sha;
-    const visited = new Set([latest.sha]);
-    while (typeof priorSHA === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(priorSHA) && !visited.has(priorSHA) && Date.now() < deadline && !(resolved.work_created && resolved.claim_finished)) {
-      visited.add(priorSHA);
-      const request = { signal: controller.signal, timeout: Math.max(1, deadline - Date.now()) };
-      const { contents } = await readQueueContentsAtSHA({ githubClient, owner, repo }, priorSHA, request);
-      if (Date.now() >= deadline) break;
-      const found = locateQueueEventLocations(contents, [{ work_id, claim_id }], priorSHA, deadline);
-      if (!resolved.work_created && found.work_created) resolved.work_created = found.work_created;
-      if (!resolved.claim_finished && found.claim_finished) resolved.claim_finished = found.claim_finished;
-      priorSHA = found.checkpoint_prior_git_sha;
-    }
-    return resolved;
-  })();
-  let found;
-  try {
-    found = await Promise.race([lookup, timedOut]);
-  } catch {
-    found = undefined;
-  } finally {
-    clearTimeout(timer);
-  }
-  if (found) {
-    remember(found);
-    return Object.keys(found).length ? found : undefined;
-  }
-  return Object.keys(resolved).length ? { ...resolved } : undefined;
+async function readWorkQueueLog(options) {
+  return observeQueueOperation("read", options, () => readWorkQueueLogImpl(options));
 }
 
-async function replayVerifiedQueueLog(options, sha, contents, verify = true, recover = true) {
-  options = { ...options, githubClient: queueLedgerClient(options.githubClient, options.owner, options.repo, options.branch) };
-  let state;
-  let checkpointRecovered = false;
-  try {
-    state = replayTransactionLog(contents);
-  } catch (error) {
-    if (!recover || !(error instanceof Error) || !("code" in error) || error.code !== "checkpoint_invalid") throw error;
-    state = await recoverDeploymentCheckpoint(options, sha, contents, error);
-    checkpointRecovered = true;
-  }
-  if (state.transactions.some(transaction => transaction.actor.repository.toLowerCase() !== options.repository.full_name.toLowerCase())) throw queueError("actor_unauthorized", "queue log contains an actor from another repository");
-  if (verify && !checkpointRecovered && state.transactions[0]?.operations[0]?.kind === "Checkpoint") await verifyCheckpointGitHistory(options, sha, state.transactions);
-  return { state, checkpointRecovered };
-}
-
-async function recoverDeploymentCheckpoint(options, sha, contents, failure) {
-  const transactions = causalChain(parseTransactionRecords(contents));
-  const damaged = transactions[0];
-  if (damaged?.operations[0]?.kind !== "Checkpoint" || transactions.length < 2) throw failure;
-  const { githubClient, owner, repo, coreApi } = options;
-  const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: sha });
-  const parents = commit?.data?.parents;
-  if (!Array.isArray(parents) || parents.length !== 1 || typeof parents[0]?.sha !== "string" || parents[0].sha === sha) throw failure;
-  const parent = parents[0].sha;
-  const original = await readVerifiedQueueAtSHA({ ...options, coreApi: undefined }, parent, false, false);
-  const root = original.transactions[0];
-  if (root?.id !== damaged.id || root.operations[0]?.kind !== "Checkpoint") throw failure;
-  const normalized = structuredClone(damaged);
-  normalized.operations[0].state.deployments = structuredClone(root.operations[0].state.deployments);
-  if (canonical(normalized) !== canonical(root)) throw failure;
-  const repaired = [root, ...transactions.slice(1)];
-  validateExtendingPrefix(original.transactions, repaired, "checkpoint recovery cannot change accepted history");
-  const state = replayTransactions(repaired);
-  if (canonical(damaged.operations[0].state.deployments) !== canonical(serializeDeployments(state))) throw failure;
-  await verifyCheckpointGitHistory(options, parent, original.transactions);
-  const message = "Work queue: recovered aliased checkpoint deployments from its verified Git parent; the next checked publication will persist the unchanged checkpoint and retained requests.";
-  if (typeof coreApi?.warning === "function") coreApi.warning(message);
-  else coreApi?.info(message);
-  return state;
-}
-
-async function verifyCheckpointGitHistory(options, head, transactions) {
-  options = { ...options, githubClient: queueLedgerClient(options.githubClient, options.owner, options.repo, options.branch) };
-  const { githubClient, owner, repo } = options;
-  const invalid = () => queueError("checkpoint_invalid", "checkpoint does not match its Git parent history");
-  const visited = new Set();
-  const scope = queueGitScope(githubClient) || (await queueAuthenticationScope(githubClient));
-  const cached = verifiedCheckpointHistory.get(githubClient);
-  if (!scope || cached?.scope !== scope) verifiedCheckpointHistory.delete(githubClient);
-  const verified = cached && scope && cached.scope === scope ? cached.proofs : new Set();
-  const pending = new Set();
-  let root = transactions[0];
-  let lines = transactions.map(transaction => canonical(transaction) + "\n");
-  verification: while (root?.operations?.[0]?.kind === "Checkpoint") {
-    const checkpoint = root.operations[0];
-    // lines[0] is canonical(root) + "\n", so this equals digest(root) without a second canonical pass.
-    const checkpointDigest = createHash("sha256").update(lines[0].slice(0, -1), "utf8").digest("hex");
-    const rootBytes = Buffer.byteLength(lines[0], "utf8");
-    let validatedPrefix = lines.join("");
-    let prefixes = queueGitScope(githubClient) ? canonicalGitPrefixes(lines, head.length) : undefined;
-    let current = head;
-    for (;;) {
-      // Git reads recheck repository access; other transports require static auth.
-      const proof = `${owner.toLowerCase()}/${repo.toLowerCase()}:${current}:${checkpointDigest}`;
-      if (verified.has(proof)) break verification;
-      pending.add(proof);
-      if (visited.has(current)) throw invalid();
-      visited.add(current);
-      const commit = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: current });
-      const parents = commit?.data?.parents;
-      if (!Array.isArray(parents) || parents.length !== 1 || !parents[0]?.sha || parents[0].sha === current) throw invalid();
-      const parent = parents[0].sha;
-      const cachedParent = verifiedQueueContents.get(githubClient);
-      const immutable =
-        cachedParent && scope && cachedParent.scope === scope && cachedParent.repository === options.repository.full_name.toLowerCase() && cachedParent.sha === parent
-          ? cachedParent
-          : await readQueueContentsAtSHA(options, parent, undefined, undefined, prefixes);
-      const { contents } = immutable;
-      // Exact canonical causal prefixes inherit validation, not mutable projections.
-      if (("prefixVerified" in immutable && immutable.prefixVerified) || (contents.endsWith("\n") && Buffer.byteLength(contents, "utf8") >= rootBytes && validatedPrefix.startsWith(contents))) {
-        current = parent;
-        continue;
-      }
-      if (parent === checkpoint.prior_git_sha) {
-        try {
-          const source = replayCheckpointSource(contents, parent, root);
-          head = parent;
-          transactions = source.state.transactions;
-          root = transactions[0];
-          lines = source.lines;
-          break;
-        } catch (error) {
-          // Preserve the existing deployment-checkpoint recovery path.
-          if (error?.code !== "checkpoint_invalid") throw error;
-        }
-      }
-      const { state } = await replayVerifiedQueueLog({ ...options, coreApi: undefined }, parent, contents, false);
-      const previous = { transactions: state.transactions, state };
-      if (previous.transactions[0]?.id === root.id) {
-        const previousLines = previous.transactions.map(transaction => canonical(transaction) + "\n");
-        if (previousLines[0] !== lines[0]) throw invalid();
-        lines = previousLines;
-        validatedPrefix = lines.join("");
-        prefixes = queueGitScope(githubClient) ? canonicalGitPrefixes(lines, head.length) : undefined;
-        current = parent;
-        continue;
-      }
-      const previousLines = previous.transactions.map(transaction => canonical(transaction) + "\n");
-      if (parent !== checkpoint.prior_git_sha || !previous.transactions.length || createHash("sha256").update(previousLines.join(""), "utf8").digest("hex") !== checkpoint.history_sha256) throw invalid();
-      if (previous.state.tip !== checkpoint.prior_tip || reconstructCheckpoint(previous.transactions, parent, root.actor, root.at, checkpoint.state_sha256)[0].operations[0].state_sha256 !== checkpoint.state_sha256) throw invalid();
-      head = parent;
-      transactions = previous.transactions;
-      root = previous.transactions[0];
-      lines = previousLines;
-      break;
-    }
-  }
-  if (!scope || (queueGitScope(githubClient) || (await queueAuthenticationScope(githubClient))) !== scope) return;
-  // Traversal runs newest to oldest; retain the head when ancestry exceeds the cache.
-  for (const proof of [...pending].reverse()) {
-    verified.add(proof);
-    if (verified.size > 128) {
-      const oldest = verified.values().next().value;
-      if (oldest !== undefined) verified.delete(oldest);
-    }
-  }
-  verifiedCheckpointHistory.set(githubClient, { scope, proofs: verified });
-}
-
-function canonicalGitPrefixes(lines, oidLength) {
-  if (lines.length > 256 || ![40, 64].includes(oidLength)) return undefined;
-  const contents = lines.join("");
-  const bytes = Buffer.from(contents, "utf8");
-  const prefixes = new Map();
-  let offset = 0;
-  let end = 0;
-  for (const line of lines) {
-    offset += Buffer.byteLength(line, "utf8");
-    end += line.length;
-    const oid = createHash(oidLength === 40 ? "sha1" : "sha256")
-      .update(`blob ${offset}\0`, "utf8")
-      .update(bytes.subarray(0, offset))
-      .digest("hex");
-    prefixes.set(oid, contents.slice(0, end));
-  }
-  return prefixes;
-}
-
-function stableRequestResult(current, request, actor) {
-  const commit = current.state.requests.get(request.id);
-  if (!commit) return null;
-  if (commit.request.fingerprint !== request.fingerprint || canonical(commit.actor) !== canonical(actor) || commit.request.kind !== request.kind)
-    throw queueError("request_reused", "stable request identity has different actor/kind/validated semantics");
-  const assignments = assignmentsForRequest(current.state, request.id);
-  log.debug("request.recovered", { assignments: assignments.length, operations: commit.operations.length });
-  return { ...current, commit, assignments, operations: commit.operations, publishedNow: false, reused: true, persisted: false, recovered: true, idempotent: true, rejected: [] };
-}
-
-function validateExtendingPrefix(previous, current, message) {
-  if (previous.some((commit, index) => !current[index] || canonical(current[index]) !== canonical(commit))) {
-    if (current[0]?.request.kind === "checkpoint") {
-      const { history_sha256, prior_tip } = current[0].operations[0];
-      if (
-        previous.length &&
-        previous.at(-1).id === prior_tip &&
-        createHash("sha256")
-          .update(previous.map(commit => canonical(commit)).join("\n") + "\n", "utf8")
-          .digest("hex") === history_sha256 &&
-        reconstructCheckpoint(previous, current[0].operations[0].prior_git_sha, undefined, current[0].at, current[0].operations[0].state_sha256)[0].operations[0].state_sha256 === current[0].operations[0].state_sha256
-      )
-        return;
-    }
-    throw queueError("ledger_invalid", message);
-  }
-}
-
-async function validateCompactionExtension(previous, current, { githubClient, owner, repo, sha, branch = WORK_QUEUE_BRANCH }, message, depth = 0) {
-  githubClient = queueLedgerClient(githubClient, owner, repo, branch);
-  try {
-    validateExtendingPrefix(previous, current, message);
-    return;
-  } catch (error) {
-    if (error?.code !== "ledger_invalid" || current[0]?.request.kind !== "checkpoint" || depth >= 8) throw error;
-  }
-  const checkpoint = current[0].operations[0];
-  let ancestor = sha;
-  for (let step = 0; ancestor !== checkpoint.prior_git_sha && step < 1024; step++) {
-    const parent = await githubClient.rest.git.getCommit({ owner, repo, commit_sha: ancestor });
-    if (parent?.data?.parents?.length !== 1 || typeof parent.data.parents[0].sha !== "string") throw queueError("ledger_invalid", message);
-    ancestor = parent.data.parents[0].sha;
-  }
-  if (ancestor !== checkpoint.prior_git_sha) throw queueError("ledger_invalid", message);
-  const { contents } = await readQueueContentsAtSHA({ githubClient, owner, repo }, checkpoint.prior_git_sha, undefined, () => queueError("ledger_invalid", message));
-  const source = replayTransactionLog(contents);
-  if (
-    source.repository.toLowerCase() !== `${owner}/${repo}`.toLowerCase() ||
-    source.tip !== checkpoint.prior_tip ||
-    createHash("sha256")
-      .update(source.transactions.map(commit => canonical(commit)).join("\n") + "\n", "utf8")
-      .digest("hex") !== checkpoint.history_sha256
-  )
-    throw queueError("ledger_invalid", message);
-  if (reconstructCheckpoint(source.transactions, checkpoint.prior_git_sha, undefined, current[0].at, checkpoint.state_sha256)[0].operations[0].state_sha256 !== checkpoint.state_sha256) throw queueError("ledger_invalid", message);
-  await validateCompactionExtension(previous, source.transactions, { githubClient, owner, repo, sha: checkpoint.prior_git_sha, branch }, message, depth + 1);
-}
-
-/** Checkpoint validated history against the current Git HEAD and publish by fast-forward CAS. */
-async function compactWorkQueue(options) {
-  return observeQueueOperation("compact", options, () => compactWorkQueueImpl(options));
-}
-
-async function compactWorkQueueImpl({ githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, maxRetries = DEFAULT_COMPACTION_MAX_RETRIES, now = Date.now }) {
-  const actor = actorFromContext(context);
-  validateTrustedContext(context, actor);
-  if (actor.role !== "administrator" || actor.repository.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw queueError("actor_unauthorized", "checkpoint requires an authenticated queue administrator");
-  let observedPrefix = [];
-  let lastCandidate;
-  let lastBaseSHA;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    publicationAttempt();
-    const current = await readWorkQueueLog({ githubClient, owner, repo, branch });
-    if (!current.sha) throw queueError("queue_missing", "checkpoint requires an existing queue");
-    await validateCompactionExtension(observedPrefix, current.transactions, { githubClient, owner, repo, sha: current.sha, branch }, "queue history was rewritten during checkpoint publication");
-    observedPrefix = current.transactions;
-    if (lastCandidate && current.transactions[0]?.request.kind === "checkpoint" && current.transactions[0].operations[0].prior_git_sha === lastBaseSHA) {
-      return { ...current, publishedNow: false, recovered: canonical(current.transactions[0]) === canonical(lastCandidate) };
-    }
-    if (current.transactions.length === 1 && current.transactions[0].request.kind === "checkpoint") return { ...current, publishedNow: false };
-    const transactions = compactTransactions(current.transactions, current.sha, actor, now());
-    lastCandidate = transactions[0];
-    lastBaseSHA = current.sha;
-    try {
-      const sha = await writeCandidate({ githubClient, owner, repo, current, transactions });
-      return { ...current, sha, transactions, state: replayTransactionLog(transactions.map(commit => canonical(commit)).join("\n") + "\n"), publishedNow: true };
-    } catch (error) {
-      if (!refConflict(error) && !ambiguousWrite(error)) throw error;
-      publicationRecovery(refConflict(error) ? "conflict" : "ambiguous");
-      if (attempt === maxRetries) {
-        const refreshed = await readWorkQueueLog({ githubClient, owner, repo, branch });
-        await validateCompactionExtension(observedPrefix, refreshed.transactions, { githubClient, owner, repo, sha: refreshed.sha, branch }, "queue history was rewritten during checkpoint publication");
-        if (refreshed.transactions[0]?.request.kind === "checkpoint" && refreshed.transactions[0].operations[0].prior_git_sha === current.sha) {
-          return { ...refreshed, publishedNow: false, recovered: canonical(refreshed.transactions[0]) === canonical(transactions[0]) };
-        }
-        throw error;
-      }
-    }
-  }
-  throw queueError("checkpoint_invalid", "checkpoint retries exhausted");
-}
-
-/**
- * @param {QueueReadOptions & {context: Parameters<typeof actorFromContext>[0]}} options
- * @returns {(resource: unknown) => Promise<ReturnType<typeof validateClaimAuthority>>}
- */
-function freshAuthorizer({ githubClient, owner, repo, context, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined }) {
+/** @param {QueueReadOptions & {allowLegacy?: boolean}} options */
+async function readWorkQueueLogImpl({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, core: coreApi = undefined, allowLegacy = false }) {
   validateBranch(branch);
-  const actor = actorFromContext(context);
-  const trusted = validateTrustedContext(context, actor);
-  if (actor.role !== "worker" || actor.repository.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw queueError("actor_unauthorized", "effect authorization requires the authenticated original worker repository");
-  if (!actor.claim_handle) throw queueError("claim_scope_required", "effect authorization requires immutable Claim scope");
-  if (trusted.event !== "workflow_dispatch" || !trusted.ref || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(trusted.ref)) throw queueError("run_binding_conflict", "effect authorization requires the original immutable native event and revision");
-  const protectedContext = Object.freeze({ ...trusted, authenticated: true, roles: Object.freeze([actor.role]) });
-  let observedPrefix = [];
-  return async resource => {
-    log.debug("effect.authorize.start");
-    const target = validateEffectResource(resource);
-    const current = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
-    validateExtendingPrefix(observedPrefix, current.transactions, "queue history was rewritten during effect authorization");
-    observedPrefix = current.transactions;
-    const member = current.state.dispatches.get(actor.dispatch_id)?.claims.find(candidate => candidate.handle === actor.claim_handle);
-    if (!member) throw queueError("claim_scope_invalid", "effect target has no original immutable assignment member");
-    const authority = structuredClone(validateClaimAuthority(current.state, member.claim_id, protectedContext, { requireCompletion: true, resource: target }));
-    log.debug("effect.authorize.complete");
-    return authority;
-  };
-}
-
-async function writeCandidate({ githubClient, owner, repo, current, transactions }) {
-  githubClient = queueLedgerClient(githubClient, owner, repo, current.branch);
-  if (!githubClient.writeFiles && current.sha && process.env.GH_AW_WORK_QUEUE_CHECKED_TRANSPORT === "graphql") return require("./work_queue_checked_transport.cjs").writeCheckedCandidate({ githubClient, owner, repo, current, transactions });
-  // appendCommit already checked this candidate; never replay its history again.
-  const content = transactions.map(commit => canonical(commit)).join("\n") + "\n";
-  log.debug("candidate.write.start", { transactions: transactions.length, bytes: Buffer.byteLength(content, "utf8"), initialized: !!current.sha });
-  const blob = await githubClient.rest.git.createBlob({ owner, repo, content, encoding: "utf-8" });
-  const tree = await githubClient.rest.git.createTree({ owner, repo, ...(current.treeSha ? { base_tree: current.treeSha } : {}), tree: [{ path: WORK_QUEUE_LOG_PATH, mode: "100644", type: "blob", sha: blob.data.sha }] });
-  const commit = await githubClient.rest.git.createCommit({ owner, repo, message: "Publish checked fair work queue request", tree: tree.data.sha, parents: current.sha ? [current.sha] : [] });
-  log.debug("candidate.ref.publish.start", { initialized: !!current.sha });
-  if (current.sha) await githubClient.rest.git.updateRef({ owner, repo, ref: `heads/${current.branch}`, sha: commit.data.sha, force: false });
-  else await githubClient.rest.git.createRef({ owner, repo, ref: `refs/heads/${current.branch}`, sha: commit.data.sha });
-  log.debug("candidate.write.complete");
-  return commit.data.sha;
+  githubClient = queueLedgerClient(githubClient, owner, repo, branch);
+  // Also refreshes the Git transport's ref advertisement before reading the head.
+  const repository = await verifyRepository(githubClient, owner, repo);
+  const sha = await readRef(githubClient, owner, repo, branch);
+  if (!sha) {
+    if (repository.size !== 0 && (typeof repository.default_branch !== "string" || !repository.default_branch || !(await readRef(githubClient, owner, repo, repository.default_branch))))
+      throw queueError("repository_unavailable", "cannot establish contents access before treating the queue as absent");
+    return { sha: null, treeSha: null, contents: "", protocol: null, transactions: [], state: newState(), branch, logPath: WORK_QUEUE_LOG_PATH };
+  }
+  const { treeSha, contents } = await readQueueContentsAtSHA({ githubClient, owner, repo }, sha);
+  // A conversion that carried no Work leaves an empty v4 log.
+  if (!contents) return { sha, treeSha, contents, protocol: 4, transactions: [], state: newState(), branch, logPath: WORK_QUEUE_LOG_PATH };
+  const protocol = ledgerProtocol(contents);
+  if (protocol !== null && protocol < 4) {
+    if (allowLegacy) return { sha, treeSha, contents, protocol, transactions: [], state: null, branch, logPath: WORK_QUEUE_LOG_PATH };
+    throw queueError("unsupported_protocol", "work queue protocol v4 required; run the v3 converter");
+  }
+  const state = replayTransactionLog(contents);
+  coreApi?.info?.(`Work queue: replayed ${state.transactions.length} commits`);
+  log.debug("ledger.read.complete", { bytes: Buffer.byteLength(contents, "utf8"), transactions: state.transactions.length, works: state.works.size });
+  return { sha, treeSha, contents, protocol: 4, transactions: state.transactions, state, branch, logPath: WORK_QUEUE_LOG_PATH };
 }
 
 async function prepareEmptyRepository(githubClient, owner, repo, branch) {
@@ -648,210 +170,128 @@ async function prepareEmptyRepository(githubClient, owner, repo, branch) {
       repo,
       path: ".gh-aw/work-queue-bootstrap",
       message: "Initialize repository for work queue",
-      content: Buffer.from("The work-queue branch holds the authoritative queue ledger.\n").toString("base64"),
+      content: Buffer.from("The work-queue branch holds the work queue ledger.\n").toString("base64"),
     });
   } catch (error) {
-    // A lost response or concurrent initializer is only acceptable if the
-    // default branch is now readable; it never substitutes for a queue commit.
     if (!(await readRef(githubClient, owner, repo, repository.default_branch))) throw error;
   }
 }
 
 /**
- * @param {QueueReadOptions & {
- * request: ReturnType<typeof newRequest>,
- * context: Parameters<typeof actorFromContext>[0],
- * actor?: import("./work_queue_policy.cjs").QueueActor,
- * generateOperations?: typeof generateRequestOperations,
- * refreshObservations?: (state: Parameters<typeof generateRequestOperations>[0], request: ReturnType<typeof newRequest>, actor: import("./work_queue_policy.cjs").QueueActor) => Promise<unknown>,
- * remediationVerifier?: (state: Parameters<typeof generateRequestOperations>[0], node: Parameters<typeof import("./work_queue_graph.cjs").validateWork>[0], context: ReturnType<typeof validateTrustedContext>) => boolean | Promise<boolean>,
- * policyProposal?: Parameters<typeof validatePolicy>[0],
- * initializationContext?: Parameters<typeof actorFromContext>[0],
- * initializeOnly?: boolean, maxRetries?: number, now?: () => number,
- * commitId?: typeof proposedCommitId, sleepFn?: (delay: number) => Promise<void>
- * }} options
+ * Write `content` as the whole log in one commit whose parent is the observed head
+ * (compare-and-swap via a non-forced ref update).
+ * @param {{githubClient: any, owner: string, repo: string, branch: string, parent: string | null, treeSha: string | null, content: string, message: string}} options
+ * @returns {Promise<string>}
+ */
+async function writeQueueContent({ githubClient, owner, repo, branch, parent, treeSha, content, message }) {
+  if (Buffer.byteLength(content, "utf8") > LEDGER_BYTES) throw queueError("ledger_limit", "the ledger would exceed its byte bound; a checkpoint is required");
+  githubClient = queueLedgerClient(githubClient, owner, repo, branch);
+  if (!parent) await prepareEmptyRepository(githubClient, owner, repo, branch);
+  const blob = await githubClient.rest.git.createBlob({ owner, repo, content, encoding: "utf-8" });
+  const tree = await githubClient.rest.git.createTree({ owner, repo, ...(treeSha ? { base_tree: treeSha } : {}), tree: [{ path: WORK_QUEUE_LOG_PATH, mode: "100644", type: "blob", sha: blob.data.sha }] });
+  const commit = await githubClient.rest.git.createCommit({ owner, repo, message, tree: tree.data.sha, parents: parent ? [parent] : [] });
+  if (parent) await githubClient.rest.git.updateRef({ owner, repo, ref: `heads/${branch}`, sha: commit.data.sha, force: false });
+  else await githubClient.rest.git.createRef({ owner, repo, ref: `refs/heads/${branch}`, sha: commit.data.sha });
+  return commit.data.sha;
+}
+
+/**
+ * @typedef {{committed: boolean, recovered: boolean, commit: any, state: any, sha: string | null, request: {id: string, kind: string, parameters: any}}} PublishResult
+ */
+
+/**
+ * Publish one request. `operationsFor(state, request)` is re-evaluated against every
+ * re-read head, so a lost compare-and-swap never commits a stale decision. An empty
+ * operation list commits nothing.
+ * @param {QueueReadOptions & {actor: import("./work_queue_policy.cjs").QueueActor, request: {kind: string, parameters: Record<string, any>}, operationsFor: (state: any, request: {id: string, kind: string, parameters: any}) => Array<any> | Promise<Array<any>>, maxAttempts?: number, now?: () => number, message?: string}} options
+ * @returns {Promise<PublishResult>}
  */
 async function publishWorkQueueRequest(options) {
   return observeQueueOperation("publish", options, () => publishWorkQueueRequestImpl(options));
 }
 
 /** @param {Parameters<typeof publishWorkQueueRequest>[0]} options */
-async function publishWorkQueueRequestImpl({
-  githubClient,
-  owner,
-  repo,
-  branch = WORK_QUEUE_BRANCH,
-  request,
-  context,
-  actor = actorFromContext(context),
-  generateOperations = generateRequestOperations,
-  refreshObservations = undefined,
-  remediationVerifier = undefined,
-  policyProposal = undefined,
-  initializationContext = undefined,
-  initializeOnly = false,
-  maxRetries = DEFAULT_MAX_RETRIES,
-  now = Date.now,
-  commitId = proposedCommitId,
-  sleepFn = delay => new Promise(resolve => setTimeout(resolve, delay)),
-  core: coreApi = undefined,
-}) {
-  log.debug("request.publish.start", { max_retries: maxRetries, initialize_only: initializeOnly });
+async function publishWorkQueueRequestImpl({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, actor, request, operationsFor, core: coreApi = undefined, maxAttempts = CAS_ATTEMPTS, now = Date.now, message = undefined }) {
   validateBranch(branch);
-  integer(maxRetries, 0, 128, "publication retries");
-  validateTrustedContext(context, actor);
-  if (actor.repository.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw queueError("actor_unauthorized", "authenticated context belongs to another repository");
-  validateRequest(request, actor);
-  validateRequestRole(actor, request.kind);
-  if (initializationContext !== undefined || initializeOnly) throw queueError("unsupported_protocol", "standalone Policy seeding is unsupported; submit Work with the approved Policy proposal");
-  if (refreshObservations && (typeof refreshObservations !== "function" || request.kind !== "dispatch_next")) throw queueError("request_invalid", "observation refresh is only supported for stable dispatch_next requests");
-  if (remediationVerifier !== undefined && typeof remediationVerifier !== "function") throw queueError("request_invalid", "remediation verification requires a trusted host capability");
-  // Capture stable semantic data once. A generator receives a copy, not authority.
-  const stable = parseStrictRequest(request);
-  const stableActor = structuredClone(actor);
-  let observedPrefix = [];
-  let lastConflict;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+  integer(maxAttempts, 1, CAS_ATTEMPTS, "publication attempts");
+  validateActor(actor);
+  if (actor.repository.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) throw queueError("actor_unauthorized", "actor belongs to another repository");
+  if (typeof operationsFor !== "function") throw queueError("request_invalid", "publication requires an operationsFor(state) planner");
+  const stable = newRequest(request.kind, actor, request.parameters);
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     publicationAttempt();
-    log.debug("request.publish.attempt", { attempt: attempt + 1 });
-    let current = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
-    validateExtendingPrefix(observedPrefix, current.transactions, "refreshed queue history does not extend the previously validated prefix");
-    observedPrefix = current.transactions;
-    const recovered = stableRequestResult(current, stable, stableActor);
-    if (recovered) return recovered;
-    let bootstrapOperation;
-    if (!current.sha) {
-      if (stableActor.role === "worker") throw queueError("claim_scope_invalid", "a worker cannot have effective Claim authority in an uninitialized queue");
-      if (stable.kind === "submit" && ["producer", "dispatcher"].includes(stableActor.role)) {
-        if (policyProposal === undefined) throw queueError("policy_missing", "first producer submission requires a compiler-approved Policy proposal");
-        const policy = validatePolicy(structuredClone(policyProposal));
-        const seed = createHash("sha256").update(stable.id, "utf8").digest("hex");
-        bootstrapOperation = { kind: "Policy", epoch: `epoch_${seed}`, policy };
-        current = {
-          ...current,
-          state: { ...current.state, repository: stableActor.repository, policy, policy_epoch: bootstrapOperation.epoch },
-        };
-      } else throw queueError("queue_missing", "submit Work to bootstrap an absent queue; standalone Policy seeding is unsupported");
+    const current = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
+    const prior = committedRequest(current.state, stable.id);
+    if (prior !== undefined) {
+      if (attempt > 1) publicationRecovery("ambiguous");
+      return { committed: true, recovered: true, commit: prior, state: current.state, sha: current.sha, request: stable };
     }
-    // Defer admission quotas until the candidate's trusted decision time, but
-    // retain dispatch scope validation before any native dependency reads.
-    if (stable.kind !== "submit") validateRequestContext(current.state, stable, stableActor);
-    if (stableActor.role === "worker" && ["submit", "dispatch_next", "observe"].includes(stable.kind)) validateWorkerContinuation(current.state, context);
-    if (stable.kind === "submit")
-      for (const node of stable.parameters.nodes) {
-        const failed = node.replacement_of && current.state.works.get(node.replacement_of.work_id);
-        if (!failed || failed.disposition === "none") continue;
-        if (!remediationVerifier) throw queueError("remediation_verifier_required", "partial/unknown effects require trusted domain-specific remediation proof");
-        let verified = false;
-        try {
-          verified = (await remediationVerifier(structuredClone(current.state), structuredClone(node), validateTrustedContext(context, stableActor))) === true;
-        } catch {
-          throw queueError("remediation_invalid", "trusted replacement proof verification failed");
-        }
-        if (!verified) throw queueError("remediation_invalid", "trusted replacement proof was not independently confirmed");
-      }
-    const refresh = refreshObservations ? await refreshObservations(structuredClone(current.state), structuredClone(stable), structuredClone(stableActor)) : [];
-    const observations = Array.isArray(refresh) ? refresh : refresh && typeof refresh === "object" && "operations" in refresh ? refresh.operations : undefined;
-    if (!Array.isArray(observations) || observations.some(operation => operation?.kind !== "Observation")) throw queueError("request_invalid", "observation refresh must return only typed Observation operations");
-    const at = integer(now(), 0, Number.MAX_SAFE_INTEGER, "trusted publication time");
-    if (stable.kind === "submit") validateRequestContext(expirationView(current.state, at), stable, stableActor);
-    const id = identity(commitId(commitId === proposedCommitId ? current.state : structuredClone(current.state), structuredClone(stable)), "candidate commit ID");
-    const generated = await generateOperations(generateOperations === generateRequestOperations ? current.state : structuredClone(current.state), structuredClone(stable), structuredClone(stableActor), at, id, structuredClone(observations));
-    const decision = Array.isArray(generated) ? { operations: generated } : generated;
-    if (!decision || !Array.isArray(decision.operations)) throw queueError("request_invalid", "candidate generator must return operations");
-    if (bootstrapOperation) decision.operations.unshift(bootstrapOperation);
-    log.debug("request.candidate.generated", { operations: decision.operations.length, observations: observations.length });
-    if (!decision.operations.length) {
-      log.debug("request.publish.no_operations");
-      return { ...decision, ...current, operations: [], assignments: [], publishedNow: false, reused: false, persisted: false, recovered: false, idempotent: "idempotent" in decision && decision.idempotent === true, rejected: [] };
-    }
-    if (observations.length && canonical(decision.operations.slice(0, observations.length)) !== canonical(observations)) throw queueError("request_invalid", "candidate must bind every refreshed observation before its Claim prefix");
-    const policyOp = decision.operations.find(operation => operation.kind === "Policy");
-    const candidate = { version: 3, id, previous: current.state.tip || null, request: stable, actor: stableActor, policy_epoch: policyOp?.epoch ?? current.state.policy_epoch, at, operations: decision.operations };
-    const checked = appendCommit(current.transactions, candidate);
-    log.debug("request.candidate.checked", { operations: checked.commit.operations.length });
-    if (bootstrapOperation) await prepareEmptyRepository(githubClient, owner, repo, branch);
-    if (policyOp) {
-      if (policyOp.policy.authorization === "aw") {
-        const verified = new Set();
-        for (const operation of checked.commit.operations) {
-          if (operation.kind !== "Work") continue;
-          const profile = policyOp.policy.pools[operation.pool].profiles[operation.worker_profile];
-          const route = `${profile.workflow}@${profile.ref}`;
-          if (verified.has(route)) continue;
-          await verifyWorkerRoute({ githubClient, owner, repo, profile });
-          verified.add(route);
-        }
-      } else await verifyWorkerRoutes({ githubClient, owner, repo, policy: checked.state.policy });
-    }
-    let sha;
+    const operations = await operationsFor(current.state, stable);
+    if (!Array.isArray(operations)) throw queueError("request_invalid", "operationsFor must return an operation array");
+    if (!operations.length) return { committed: false, recovered: false, commit: null, state: current.state, sha: current.sha, request: stable };
+    const commit = buildCommit(current.state, actor, stable, operations, now());
+    const state = appendCommit(current.state, commit);
     try {
-      // Regenerate immediately with fresh time to exclude expired Work from the next
-      // candidate; no ref write was attempted here, so contention backoff is unnecessary.
-      if (require("./work_queue_expiration.cjs").expiringGrant(current.state, checked.commit.operations, now)) continue;
-      sha = await writeCandidate({ githubClient, owner, repo, current, transactions: checked.transactions });
+      const sha = await writeQueueContent({
+        githubClient,
+        owner,
+        repo,
+        branch,
+        parent: current.sha,
+        treeSha: current.treeSha,
+        content: current.contents + canonical(commit) + "\n",
+        message: message ?? `work queue: ${stable.kind}`,
+      });
+      coreApi?.info?.(`Work queue: committed ${stable.kind} (${operations.length} operations)`);
+      await writeWorkQueueUpdateSummary(coreApi, state, commit);
+      return { committed: true, recovered: false, commit, state, sha, request: stable };
     } catch (error) {
-      log.failure("request.publish.write_failed", error);
-      log.debug("request.publish.recovery", { conflict: refConflict(error), ambiguous: ambiguousWrite(error), retry_available: attempt < maxRetries });
-      if (!refConflict(error) && !ambiguousWrite(error)) throw new Error("Failed to publish checked work queue request", { cause: error });
+      if (!refConflict(error) && !ambiguousWrite(error)) throw error;
       publicationRecovery(refConflict(error) ? "conflict" : "ambiguous");
-      lastConflict = error;
-      // A lost response is not permission to choose another request. Refresh
-      // before another candidate, and at exhaustion before reporting uncertainty.
-      const refreshed = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
-      validateExtendingPrefix(observedPrefix, refreshed.transactions, "queue history was rewritten during publication");
-      const committed = stableRequestResult(refreshed, stable, stableActor);
-      if (committed) {
-        await writeWorkQueueUpdateSummary(coreApi, committed.state, committed.commit);
-        return committed;
-      }
-      observedPrefix = refreshed.transactions;
-      if (attempt < maxRetries) {
-        const delay = Math.min(1000, 50 * 2 ** attempt);
-        log.debug("request.publish.backoff", { delay_ms: delay });
-        await sleepFn(delay);
-      }
-      continue;
+      log.debug("request.publish.retry", { attempt, conflict: refConflict(error) });
     }
-    coreApi?.info(`Work queue: published checked request (${decision.operations.length} operations)`);
-    await writeWorkQueueUpdateSummary(coreApi, checked.state, checked.commit);
-    log.debug("request.publish.complete", { operations: decision.operations.length, attempt: attempt + 1 });
-    return { ...decision, ...checked, assignments: assignmentsForRequest(checked.state, stable.id), sha, publishedNow: true, reused: false, persisted: true, recovered: false, rejected: [] };
   }
-  log.debug("request.publish.exhausted", { attempts: maxRetries + 1 });
-  throw new Error("publication_unresolved: queue CAS retries exhausted without a committed stable request", { cause: lastConflict });
+  const latest = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
+  const prior = committedRequest(latest.state, stable.id);
+  if (prior !== undefined) return { committed: true, recovered: true, commit: prior, state: latest.state, sha: latest.sha, request: stable };
+  throw queueError("cas_exhausted", `work queue head changed on all ${maxAttempts} publication attempts`);
 }
 
-function parseStrictRequest(request) {
-  // Canonical round-trip rejects undefined/prototypes before retry capture.
-  const { parseStrictJSON } = require("./work_queue_codec.cjs");
-  return parseStrictJSON(canonical(request));
-}
-
-function applyAndPublishWorkQueueTransactions(options) {
-  if (!options?.request || !options.context || Object.hasOwn(options, "intents")) throw queueError("unsupported_protocol", "fixed standalone intents cannot publish Claims; use stable request + authenticated context");
-  return publishWorkQueueRequest(options);
-}
-
-/** @param {unknown} _options */
-async function initializeWorkQueue(_options) {
-  throw queueError("unsupported_protocol", "standalone Policy seeding is unsupported; submit Work with the approved Policy proposal");
+/**
+ * Replace the log with one Checkpoint commit (Git history keeps the prior content).
+ * @param {QueueReadOptions & {actor: import("./work_queue_policy.cjs").QueueActor, minimumLines?: number, now?: () => number}} options
+ * @returns {Promise<{checkpointed: boolean, sha: string | null, state: any}>}
+ */
+async function publishWorkQueueCheckpoint({ githubClient, owner, repo, branch = WORK_QUEUE_BRANCH, actor, minimumLines = 0, core: coreApi = undefined, now = Date.now }) {
+  validateBranch(branch);
+  validateActor(actor);
+  for (let attempt = 1; attempt <= CAS_ATTEMPTS; attempt++) {
+    const current = await readWorkQueueLog({ githubClient, owner, repo, branch, core: coreApi });
+    if (!current.sha || current.state.transactions.length <= Math.max(1, minimumLines)) return { checkpointed: false, sha: current.sha, state: current.state };
+    const checkpoint = checkpointCommit(current.state, actor, now());
+    try {
+      const sha = await writeQueueContent({ githubClient, owner, repo, branch, parent: current.sha, treeSha: current.treeSha, content: canonical(checkpoint) + "\n", message: "work queue: checkpoint" });
+      coreApi?.info?.(`Work queue: checkpointed ${current.state.transactions.length} lines`);
+      return { checkpointed: true, sha, state: current.state };
+    } catch (error) {
+      if (!refConflict(error) && !ambiguousWrite(error)) throw error;
+    }
+  }
+  throw queueError("cas_exhausted", `work queue head changed on all ${CAS_ATTEMPTS} checkpoint attempts`);
 }
 
 module.exports = {
+  CAS_ATTEMPTS,
   WORK_QUEUE_BRANCH,
   WORK_QUEUE_LOG_PATH,
-  applyAndPublishWorkQueueTransactions,
-  compactWorkQueue,
-  freshAuthorizer,
-  initializeWorkQueue,
+  ambiguousWrite,
+  ledgerProtocol,
+  publishWorkQueueCheckpoint,
   publishWorkQueueRequest,
+  readQueueContentsAtSHA,
   readWorkQueueLog,
-  locateQueueEventLocations,
-  resolveWorkQueueEventLocations,
-  replayVerifiedQueueLog,
-  stableRequestResult,
-  verifyRepository,
-  verifyCheckpointGitHistory,
+  refConflict,
   validateBranch,
+  verifyRepository,
+  writeQueueContent,
 };

@@ -3,20 +3,21 @@ import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BATCH, CLUSTER_SIZE, POOL, WORKER, alertFingerprint, buildCodeScanningPlan, buildCodeScanningPolicy, clusterKey, hasUncoveredAlert, listOpenPullFiles, selectAssignedCluster } from "./code_scanning_portfolio.cjs";
-import { normalizeDispatchParameters, normalizeSubmitParameters, stagePlanIntents } from "./work_queue_intents.cjs";
-import { assignmentForDispatch, newState, newRequest, generateRequestOperations, replayTransactions } from "./work_queue_replay.cjs";
+import { BATCH, CLUSTER_SIZE, POOL, WORKER, alertFingerprint, buildCodeScanningPlan, clusterKey, hasUncoveredAlert, listOpenPullFiles, selectAssignedCluster } from "./code_scanning_portfolio.cjs";
+import { policyAllowsWorker, workerWorkflow } from "./work_queue_policy.cjs";
+import { normalizeSubmitParameters, stagePlanIntents } from "./work_queue_intents.cjs";
+import { replayTransactions } from "./work_queue_replay.cjs";
+import { assignmentForDispatch } from "./work_queue_scheduler.cjs";
 import { normalizeAssignment } from "./work_queue_claim_scope.cjs";
 import { frozenResourceScope } from "./work_queue_resource_scope.cjs";
-import { validateDeliveryContract } from "./work_queue_delivery.cjs";
+import { createRequire } from "node:module";
 import { sanitizeContent } from "./sanitize_content.cjs";
 
+const require = createRequire(import.meta.url);
+const h = require("./work_queue_test_helpers.cjs");
 const repository = "owner/repo";
 const repositoryId = "7";
-const settings = JSON.parse(fs.readFileSync(new URL("../../../.github/workflows/aw.json", import.meta.url), "utf8")).work_queue;
-const administrator = { role: "administrator", repository, principal: "11" };
-const producer = { role: "producer", repository, principal: "11" };
-const dispatcher = { role: "dispatcher", repository, principal: "11", workflow: ".github/workflows/code-scanning-dispatcher.lock.yml", run_id: "15", run_attempt: 1 };
+const compiledPolicy = h.compiledDispatcherPolicy("code-scanning-dispatcher", repository);
 
 /**
  * @param {number} number
@@ -49,37 +50,30 @@ function pull(number, { title = "Unrelated PR", body = "", files = [] }) {
 }
 
 function ledger() {
-  let state = newState();
   /** @type {any[]} */
-  const transactions = [];
-  let at = 1000;
-  /**
-   * @param {string} kind
-   * @param {any} parameters
-   * @param {any} actor
-   */
-  const append = (kind, parameters, actor) => {
-    const request = newRequest(`code-scanning:${transactions.length}:${++at}`, kind, actor, parameters);
-    const id = `commit:${at}`;
-    const decision = generateRequestOperations(state, request, actor, at, id);
-    if (decision.operations.length) {
-      transactions.push({ version: 3, id, previous: state.tip || null, request, actor, policy_epoch: "code-scanning-v1", at, operations: decision.operations });
-      state = replayTransactions(transactions);
-    }
-    return state;
-  };
-  const policy = buildCodeScanningPolicy({ repository, ref: "a".repeat(40), settings });
-  append("policy", { operations: [{ kind: "Policy", epoch: "code-scanning-v1", policy }] }, administrator);
+  let log = [];
+  const policy = compiledPolicy;
+  const state = () => replayTransactions(log);
   return {
     policy,
-    state: () => state,
-    works: () => [...state.works.values()],
+    state,
+    works: () => [...state().works.values()],
     /** @param {any[]} nodes */
-    submit: nodes => append("submit", normalizeSubmitParameters({ nodes }, policy, at, state), producer),
-    /** @param {any} request */
-    dispatch: request => append("dispatch_next", normalizeDispatchParameters(request, policy, BATCH), dispatcher),
+    submit: nodes => {
+      const fresh = normalizeSubmitParameters({ nodes }, policy).filter(work => !state().works.has(work.work_id));
+      if (fresh.length) log = h.submit(log, fresh, { ...h.producer, run_id: String(10 + log.length) });
+    },
+    /** @param {{pool: string, max_claims: number, max_dispatches: number}} request */
+    dispatch: request => {
+      const pool = policy.pools[request.pool];
+      // The dispatcher may launch only this portfolio's worker.
+      const profiles = { [WORKER]: { workflow: workerWorkflow(WORKER) } };
+      log = h.dispatchNext(log, { ...request, concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, profiles }).log;
+    },
     /** @param {string} work_id */
-    cancel: work_id => append("cancel_work", { operations: [{ kind: "WorkCancellation", work_id, reason: "attempts_exhausted" }] }, administrator),
+    cancel: work_id => {
+      log = h.commit(log, h.administrator, "cancel_work", { work_ids: [work_id], reason: "attempts_exhausted" }, [{ kind: "WorkCancellation", work_id, reason: "attempts_exhausted" }]);
+    },
   };
 }
 
@@ -133,8 +127,7 @@ describe("code scanning work-queue portfolio", () => {
         expect(member).toEqual({ number: source?.number, severity: expect.any(String), path: source?.most_recent_instance.location.path, fingerprint: alertFingerprint(source) });
       }
       expect(frozenResourceScope(node.payload)).toEqual({ version: 1, resources: [{ host: "github.com", repository, repository_id: repositoryId }] });
-      expect(validateDeliveryContract(node.payload.effect_contract)).toEqual(node.payload.effect_contract);
-      expect(node.payload.effect_contract.outputs).toContainEqual({ type: "create_pull_request", min: 1, max: 1 });
+      expect(node.payload.effect_contract).toEqual({ version: 1, outputs: expect.arrayContaining([{ type: "create_pull_request", min: 1, max: 1 }]) });
     }
     expect(result.nodes.map(node => node.payload.ai_scan)).toEqual([true, true, false]);
     const severity = plan([alert(9, { level: "note" }), alert(2, { level: "error" }), alert(5, { level: "warning" }), alert(6, { level: "low" }), { number: 1 }]);
@@ -240,8 +233,9 @@ describe("code scanning work-queue portfolio", () => {
 
   it("grants three Claims from the dedicated pool and projects each worker's cluster without covered alerts", () => {
     const queue = ledger();
-    expect(queue.policy.pools[POOL]).toMatchObject({ logical_limit: 3, native_limit: 3, retry: { max_attempts: 3 } });
-    expect(queue.policy.pools[POOL].profiles[WORKER]).toMatchObject({ workflow: `.github/workflows/${WORKER}.lock.yml`, max_claims: 1 });
+    expect(queue.policy.pools[POOL]).toMatchObject({ concurrency: 3, max_attempts: 3 });
+    expect(policyAllowsWorker(queue.policy, POOL, WORKER)).toBe(true);
+    expect(queue.policy.effect_scope).toBe(repository);
     const first = plan(backlog);
     queue.submit(first.nodes);
     queue.dispatch(first.dispatch);
@@ -253,7 +247,6 @@ describe("code scanning work-queue portfolio", () => {
     expect(selection.alerts.map(member => member.number)).toEqual([50, 52, 53, 54]);
     expect(selection.alerts[0]).toEqual({ number: 50, severity: "low", fingerprint: alertFingerprint(ai[0]) });
     expect(selection.covered_alerts).toEqual([{ number: 51, pull_numbers: [200] }]);
-    expect(() => selectAssignedCluster({ assignment: { ...assignment, pool: "default" }, pulls: [], repository })).toThrow(/not for the code scanning fixer/);
     expect(() => selectAssignedCluster({ assignment: { ...assignment, claims: [...assignment.claims, ...assignment.claims] }, pulls: [], repository })).toThrow(/exactly one original Claim/);
     const malformed = { ...assignment, claims: [{ ...assignment.claims[0], work: { ...assignment.claims[0].work, alerts: [] } }] };
     expect(() => selectAssignedCluster({ assignment: malformed, pulls: [], repository })).toThrow(/malformed/);

@@ -77,6 +77,7 @@ describe("manager prepared authorization boundary", () => {
     ["link_sub_issue", "sub_issue_number", "'aw_later'"],
     ["assign_milestone", "issue_number", "  AW_later  "],
     ["assign_to_agent", "issue_number", "#AW_later"],
+    ["set_issue_status", "issue_number", '"AW_later"'],
     ["set_issue_type", "issue_number", '"AW_later"'],
     ["set_issue_field", "issue_number", "'aw_later'"],
     ["update_discussion", "discussion_number", "  AW_later  "],
@@ -833,5 +834,19 @@ describe("remove_labels authorization-to-execution consistency", () => {
     expect(factory).not.toHaveBeenCalled();
     expect(client.rest.issues.removeLabel).not.toHaveBeenCalled();
     expect(results[0]).toMatchObject({ success: true, staged: true, authorization: { state: "skipped_staged" } });
+  });
+
+  it.each(["create_issue", "set_issue_status"])("runs %s read-only validation for protected staged previews", async type => {
+    const validatePreview = vi.fn().mockResolvedValue({ success: false, error: "invalid planning status" });
+    const handler = vi.fn();
+    handler.validatePreview = validatePreview;
+    vi.spyOn(require(`./${type}.cjs`), "main").mockResolvedValue(handler);
+    const authorize = deny();
+    const handlers = await loadHandlers({ [type]: { authorization: requirement, staged: true } });
+    const { results } = await processMessages(handlers, [{ type, status: "bad", planning_status: "bad" }]);
+    expect(validatePreview).toHaveBeenCalledOnce();
+    expect(handler).not.toHaveBeenCalled();
+    expect(authorize).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({ success: false, staged: true, error: "invalid planning status" });
   });
 });

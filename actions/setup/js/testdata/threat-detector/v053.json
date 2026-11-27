@@ -1,0 +1,20 @@
+{
+  "warnings": [
+    {
+      "field": "prompt_import_tree",
+      "code": "ERR_VALIDATION",
+      "message": "Missing or empty prompt analysis artifact: aw-prompts/prompt-import-tree.json. Trusted-vs-untrusted prompt analysis is degraded; ensure the host stages it non-empty. This failure is not itself evidence of a threat."
+    }
+  ],
+  "scenarios": [
+    { "name": "clean", "exit": 0, "attempts": 1, "reason": "result_recorded", "hostReason": "" },
+    { "name": "correct", "exit": 1, "attempts": 1, "reason": "result_recorded", "hostReason": "threat_detected" },
+    { "name": "absent", "exit": 2, "attempts": 1, "reason": "invalid_report_exhausted", "hostReason": "parse_error" },
+    { "name": "incorrect", "exit": 2, "attempts": 1, "reason": "invalid_report_exhausted", "hostReason": "parse_error" },
+    { "name": "retry", "retries": 1, "exit": 1, "attempts": 2, "reason": "result_recorded", "hostReason": "threat_detected" },
+    { "name": "timeout", "retries": 2, "timeout": "150ms", "exit": 2, "attempts": 1, "reason": "engine_timeout", "hostReason": "agent_failure" },
+    { "name": "recorded-at-deadline", "retries": 2, "timeout": "150ms", "exit": 1, "attempts": 1, "reason": "result_recorded", "hostReason": "threat_detected" },
+    { "name": "failed", "retries": 2, "exit": 2, "attempts": 1, "reason": "engine_error", "hostReason": "agent_failure" },
+    { "name": "strict-warning", "exit": 2, "attempts": 0, "reason": "config_error", "hostReason": "agent_failure" }
+  ]
+}

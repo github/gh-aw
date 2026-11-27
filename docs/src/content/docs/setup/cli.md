@@ -37,15 +37,31 @@ The `--timeout` flag uses different formats depending on the command:
 | `value` | Positive Go duration | `5m` | `--timeout 10m` | Rejected |
 | `connector test` | Go duration greater than zero and at most `20s` | `20s` | `--timeout 10s` | Rejected |
 | `logs episode` | Go duration | `5m` | `--timeout 10m` | Rejected |
-| `logs`, `forecast` | Integer minutes | `0` | `--timeout 5` | No timeout |
-| `trial` | Integer minutes | `30` | `--timeout 10` | No timeout |
+| `logs`, `forecast` | Integer minutes or whole-minute duration | `0` | `--timeout 5` or `--timeout 5m` | No timeout |
+| `trial` | Integer minutes or whole-minute duration | `30` | `--timeout 10` or `--timeout 10m` | No timeout |
+
+### Dry-run flag meanings
+
+`--dry-run` is command-specific, not a universal no-write guarantee:
+
+| Command | Behavior |
+|---------|----------|
+| `compile` | Emits specially configured lock files for development testing; does not dispatch them. |
+| `edit` | Validates and prints changed workflow content without writing or compiling. |
+| `run` | Previews dispatch without triggering a run; preparation can still compile, enable, or push workflows. |
+| `logs` | Filters for dry-run workflow runs; does not preview log collection. |
+
+Other commands describe their own preview behavior in their help.
+
+> [!WARNING]
+> With `run --dry-run --enable-if-needed`, a disabled workflow is enabled on GitHub even though no run is dispatched. Restoration is attempted after preparation succeeds; an error during preparation can leave it enabled.
 
 ## Utility and advanced commands
 
 | Command | Description | When to use |
 |---------|-------------|-------------|
 | [`gh aw skill`](#skill) | Print the bundled agentic-workflows skill | Loading instructions into an agent without adding repository files |
-| [`gh aw work-queue`](#work-queue) | Experimental Git-backed DAG work queue | Managing queue policy, scheduling, and operator recovery |
+| [`gh aw work-queue`](#work-queue) | Experimental Git-backed priority-FIFO work queue with dependencies | Inspecting queue state and operator recovery |
 
 ## Installation
 
@@ -299,9 +315,10 @@ Create or update a repository secret (from stdin, flag, or environment variable)
 ```bash wrap
 gh aw secrets set MY_SECRET                                    # From stdin (current repo)
 gh aw secrets set MY_SECRET --repo myorg/myrepo                # Specify target repo
-gh aw secrets set MY_SECRET --value "secret123"                # From flag
 gh aw secrets set MY_SECRET --value-from-env MY_TOKEN          # From env var
 ```
+
+Avoid passing secret values with `--value`: command-line arguments can appear in shell history and process listings. Omit the flag to prompt securely or read from stdin.
 
 **Options:** `--repo/-r`, `--value`, `--value-from-env`, `--api-url`
 
@@ -449,7 +466,7 @@ gh aw compile --actions-lock               # Update the standard Actions depende
 gh aw compile --purge                      # Remove orphaned .lock.yml files
 ```
 
-For `--zizmor` and `--poutine`, compilation automatically uses a binary on `PATH` when its version is at least 1.32.0 or 1.1.6, respectively. The version is checked with `zizmor --version` or `poutine version --disable-version-check`. If the binary is missing, too old, or its version cannot be determined, the scanner uses the pinned Docker image instead. Other Docker-based checks still require Docker.
+For `--zizmor` and `--poutine`, compilation automatically uses a binary on `PATH` when its version is at least 1.33.1 or 1.1.6, respectively. The version is checked with `zizmor --version` or `poutine version --disable-version-check`. If the binary is missing, too old, or its version cannot be determined, the scanner uses the pinned Docker image instead. Other Docker-based checks still require Docker.
 
 If the repository root contains an [`aw.yml` manifest](/gh-aw/reference/aw-yml-package-manifest/), `gh aw compile` validates it before compiling workflows.
 
@@ -582,7 +599,7 @@ gh aw trial ./workflow.md --dry-run                # Preview without executing
 
 Unlike `run --repo/-r`, `trial` has no `--repo/-r`: `--logical-repo/-l` sets the simulated `github.repository` context, while `--host-repo` selects where the trial actually runs. `--json/-j` is available for trial output.
 
-`--timeout` sets the execution timeout in integer minutes (default: `30`; `0` disables the timeout). For example, use `--timeout 10`, not `--timeout 10m`.
+`--timeout` sets the execution timeout in minutes (default: `30`; `0` disables the timeout). Both `--timeout 10` and `--timeout 10m` are accepted. Durations must resolve to whole minutes; sub-minute values such as `30s` are rejected.
 
 By default, the host repository is retained after the trial. Specify
 `--delete-host-repo-after` to delete it when the trial completes, including an existing
@@ -610,6 +627,7 @@ gh aw run workflow --json                   # Output triggered workflow results 
 When `--json` is set, a JSON array of triggered workflow results is written to stdout.
 
 When `--push` is used, automatically recompiles outdated `.lock.yml` files, stages all transitive imports, and triggers workflow run after successful push. Without `--push`, warnings are displayed for missing or outdated lock files.
+`--approve` applies to safe-update checks during compilation with `--push`; it has no effect without `--push`. `--dry-run` skips dispatch, but preparation may still compile, enable, or push workflows.
 
 > [!NOTE]
 > Codespaces Permissions
@@ -809,7 +827,7 @@ gh aw logs --runtime cloud-hypervisor                    # Filter to runs using 
 
 `logs` defaults `--artifacts` to `usage` for faster, compact downloads. When usage lacks `aw_info.json`, metadata is fetched from the compact `info` artifact before falling back to legacy activation artifacts. The `--last` flag is an alias for `--count/-c`.
 `--dry-run` selects only dry-run runs; `--no-dry-run` excludes them. These flags are mutually exclusive and work with workflow targets or `--stdin`. Older valid metadata without `dry_run` counts as a normal run; missing or malformed `aw_info.json` is excluded when either filter is active. Unified sessions preserve the flag as `workflow.info.data.dryRun`, and audit engine configuration exposes `dry_run`.
-When multiple targets run concurrently, `--count` limits the combined number of workflow runs and `--timeout` limits the total wall-clock download time across all targets. `--timeout` accepts integer minutes (for example, `--timeout 10`); the default `0` disables the timeout.
+When multiple targets run concurrently, `--count` limits the combined number of workflow runs and `--timeout` limits the total wall-clock download time across all targets. `--timeout` accepts integer minutes or whole-minute durations (for example, `--timeout 10` or `--timeout 10m`); the default `0` disables the timeout.
 `--retained` refreshes due retained deliveries without discovering or downloading runs. It requires `--adoption` and `--repo`; `--count` limits delivery checks.
 
 `--evals` and `--graders` each pull in a matching artifact set automatically: `--evals` includes results from `evals.jsonl`, `--graders` includes deterministic grader results and their artifacts. `--audit` generates `audit.json` in each downloaded run's cache directory (comparisons use only the runs downloaded in that invocation). `--ignore-workflow-runs` excludes specific run IDs (or `slug/ID` values, where the slug is informational and matching uses the numeric ID) from an otherwise matching set.
@@ -898,6 +916,9 @@ gh aw logs episode 1234567890 --repo owner/repo \
 | `--timeout` | `5m` | Collection deadline, expressed as a duration. |
 | `--output/-o` | `.github/aw/logs` | Compact artifacts, isolated by host, repository, run, attempt, and immutable artifact ID. |
 | `--json/-j` | Disabled | Standard logs JSON plus `episode_retrieval` bounds, counters, stop reasons, and evidence gaps. |
+| `--delivery` | Disabled | Report safe-output delivery for episode members. |
+| `--adoption` | Disabled | Refresh adoption for episode members within the remaining retrieval bounds. |
+| `--adoption-dir` | None | Write outcome JSONL observations to this directory. Requires `--adoption`. |
 | `--view` | `summary` | Display `summary` or recorded `hops`; JSON includes both views' data. |
 | `--refresh` | Disabled | Recollect instead of reading the cached episode snapshot; immutable artifact downloads are still reused. |
 
@@ -1073,6 +1094,8 @@ Read native delivery, adoption, recorded grades and independently measured outco
 gh aw value weekly-research --repo owner/repo --json
 ```
 
+**Options:** `--start`, `--end` (snapshot dates at 12:00 UTC), `--daily` (daily measurements), `--ref` (local history ref), `--timeout` (collection deadline), `--recipe` (report recipe), `--evidence` (typed observations), `--value-function` (value evaluator definition), `--logs-dir` (native lifecycle records), `--repo/-r`, `--json/-j`.
+
 See [Value report](/gh-aw/reference/value/) for collection, options and attribution limits.
 
 #### `graders`
@@ -1235,7 +1258,7 @@ Revision reads prefer committed Git objects in the current checkout when its ori
 
 Shows success/failure rates, trend indicators (↑ improving, → stable, ↓ degrading), execution duration, token usage, costs, and warnings when success rate drops below threshold.
 
-When a selected workflow's published default-branch lock file enables work-queue, health also reads and validates the repository's current `work-queue` ledger once. This includes workflows without recent runs. Text `[health_work_queue]` and JSON `collection.work_queue` report backlog, eligible and blocked work by pool, oldest available work, pauses, native reservations, and pending, verified, or failed delivery. Pauses and failed deliveries produce `attention_required`; an otherwise readable snapshot is `observed`, not proof of live worker health. Detection warnings do not change the status of a successfully read ledger. Missing or invalid definitions, policy, ledger, or credentials remain explicit, privacy-safe warnings rather than healthy results. Queue diagnostics are current ledger evidence independent of `--days` or date bounds, do not download artifacts, and do not mutate the queue or launch workers. Optional workflow detection runs after primary Actions collection, uses its remaining API budget, and reuses downloaded lock content. The ledger uses the authenticated, isolated Git transport without fetching into the checkout, and validates resource references against the selected GitHub host. Actions rates and fleet workflow counts remain unchanged.
+When a selected workflow's published default-branch lock file enables work-queue, health also reads and validates the repository's current `work-queue` ledger once. This includes workflows without recent runs. Text `[health_work_queue]` and JSON `collection.work_queue` report the detected workflows and `gh aw work-queue stats` counts: Work, Claims, and dispatches by state, cancellation reasons, and per-pool eligible, blocked, and next eligible Work. Work cancelled with `attempts_exhausted` produces `attention_required`; an otherwise readable ledger is `observed`, not proof of live worker health. Missing or invalid definitions, ledger, or credentials remain explicit, privacy-safe warnings rather than healthy results. Queue diagnostics are current ledger evidence independent of `--days` or date bounds, do not download artifacts, and do not mutate the queue or launch workers. Optional workflow detection runs after primary Actions collection and uses its remaining API budget. The ledger uses the authenticated, isolated Git transport without fetching into the checkout. Actions rates and fleet workflow counts remain unchanged.
 
 Health also reads matching `run_summary.json` files from `--logs-dir` (default: `.github/aw/logs`) for failed sub-agent invocations, including workflows whose Actions conclusion is `success`. An affected current revision can have status `subagent_failures_observed`; its Actions counts and rate remain unchanged. Workflow evidence includes `subagent_failure_count` (invocations), `subagent_failure_runs` (distinct runs), and `subagent_failures` with run URLs, agent names, and requested models.
 
@@ -1282,7 +1305,7 @@ gh aw forecast --eval                       # Backtest forecast quality against 
 
 The `--days` flag accepts only `7` or `30` (default: `30`). Other values produce an error.
 
-`--timeout` gracefully stops computation after the specified number of integer minutes (for example, `--timeout 10`). The default `0` disables the timeout.
+`--timeout` gracefully stops computation after the specified number of minutes or whole-minute duration (for example, `--timeout 10` or `--timeout 10m`). The default `0` disables the timeout.
 
 #### `experiments`
 
@@ -1296,7 +1319,7 @@ gh aw experiments analyze my-workflow --json  # Analyze one experiment workflow 
 gh aw experiments analyze my-workflow --repo owner/repo  # Analyze experiments in another repository
 ```
 
-**Options:** all `experiments` commands accept `--repo/-r`, `--json/-j`
+**Options:** all `experiments` commands accept `--repo/-r`, `--json/-j`. `experiments analyze` also accepts `--adoption` to evaluate live adoption-backed metrics using additional GitHub API requests.
 
 #### `routing`
 
@@ -1543,6 +1566,20 @@ gh aw connector linear setup --input 'reader-secret="LINEAR_DEV_READ_KEY"'
 
 See [Local setup and conformance](/gh-aw/reference/connectors/#local-setup-and-conformance) for complete test examples and provisioning limits. The separate plural `gh aw connectors` command validates and inspects raw connector definitions and runs compiler-frozen plans in trusted hosts; use `gh aw connectors --help` and subcommand help for those low-level options.
 
+#### `connectors`
+
+Inspect experimental raw connector documents or run compiler-frozen plans in trusted hosts:
+
+| Command | Behavior |
+|---------|----------|
+| `connectors validate <file>...` | Validate local connector definitions; `--json/-j` emits results as JSON. |
+| `connectors schema <kind>` | Print the structural schema for `ConnectorSpec`, `ConnectorConnection`, or `ConnectorBinding`. |
+| `connectors plan <binding>` | Validate a binding and print its frozen plan digest; `--root` sets the repository root for definition and connection paths. |
+| `connectors serve` | Serve a compiler-frozen read-only connector over stdio MCP. |
+| `connectors invoke <context\|safe-output> <operation>` | Execute a compiler-frozen operation with JSON arguments on stdin. |
+
+`invoke --allow-writes` authorizes a safe-output effect in the trusted host. `invoke --stage` validates and returns a safe-output intent without resolving credentials or making requests; it requires the `safe-output` phase and cannot be combined with `--allow-writes`. Serving and invocation require a compiler-frozen plan and appropriate host configuration.
+
 #### `mcp`
 
 Manage MCP (Model Context Protocol) servers in workflows. `mcp inspect` auto-detects mcp-scripts.
@@ -1595,11 +1632,11 @@ gh aw mcp-server --validate-actor     # Enable actor validation
 
 **Options:** `--port/-p` (HTTP server port), `--cmd` (custom subprocess command), `--allow-write-tools` (enable workflow-writing tools for trusted clients), `--validate-actor` (enforce actor validation for logs, audit, audit-diff, and enabled workflow-writing tools)
 
-**Available Tools:** status, compile, logs, audit, checks, work-queue (read-only), mcp-inspect, add, update, fix
+**Available Tools:** status, health, compile, logs, audit, audit-diff, checks, work-queue (read-only), mcp-inspect, add, update, fix
 
 The `compile` tool uses a dedicated read-only mode with `--no-emit` by default; remote imports and nested body-level includes must already be cached, and container validation never pulls Docker images. Ordinary CLI `compile --no-emit` and `validate` retain import-cache population. Workflow-writing tools (`add`, `update`, and `fix`), emitted compilation, dry-run compilation, and external scanners require `--allow-write-tools`. Enable writes only for trusted MCP clients and workflow sources.
 
-When `--validate-actor` is enabled, logs and audit tools require write+ repository access via GitHub API (permissions cached for 1 hour). See [MCP Server Guide](/gh-aw/reference/gh-aw-as-mcp-server/).
+When `--validate-actor` is enabled, logs, audit, and audit-diff tools require write+ repository access via GitHub API (permissions cached for 1 hour). See [MCP Server Guide](/gh-aw/reference/gh-aw-as-mcp-server/).
 
 #### `domains`
 
@@ -1620,42 +1657,34 @@ When no workflow is specified, lists all workflows with a summary of allowed and
 
 #### `work-queue`
 
-This command is experimental. Inspect and publish the fair Git-backed DAG work queue. The alias `work` accepts the same subcommands and flags. Direct claims and operator finishes are not supported; `dispatch-next` grants scheduled work.
+This command is experimental. Inspect and operate the Git-backed priority-FIFO work queue (protocol v4). The alias `work` accepts the same subcommands and flags. Dispatchers claim and launch Work; workers bind and finish their own Claims. Operator commands publish as the repository administrator.
 
 ```bash wrap
 gh aw work-queue state --repo owner/repo --json
-gh aw work-queue explain --repo owner/repo --work-id my-work
+gh aw work-queue inspect --repo owner/repo --work-id <work-id>
 gh aw work-queue stats --repo owner/repo
 ```
 
-**Persistent options:** `--branch` (queue branch, default `work-queue`), `--json/-j`, `--repo/-r` (explicit `owner/repo` for repository operations; no host prefix or current-repository default), `--request-id` (publication handle or committed request selector), `--storage` (`git` only).
+**Persistent options:** `--repo/-r` (`owner/repo`; defaults to the current repository), `--branch` (queue branch, default `work-queue`), `--json/-j`.
 
-**Subcommands:** `cancel-claim`, `cancel-work`, `clear`, `compact`, `control`, `deploy`, `dispatch`, `dispatch-next`, `evidence`, `explain`, `inspect`, `policy`, `reconcile`, `replay`, `reprioritize`, `state`, `stats`, `submit-work`, `submit-graph`, `sync-issues`, `trace`, `tui`. Use `gh aw work-queue <subcommand> --help` for all subcommand-specific options.
+**Subcommands:** `replay`, `stats`, `state`, `inspect`, `tui`, `submit-work`, `submit-graph`, `cancel-work`, `release`, `clear`, `compact`, `dispatch`. Use `gh aw work-queue <subcommand> --help` for all subcommand-specific options.
 
 | Subcommand | Options and behavior |
 | --- | --- |
-| `sync-issues` | `--request-id ID` selects one committed terminal request for repair of eligible existing Issue mirrors. See [Synchronization and recovery](/gh-aw/reference/work-queue/#synchronization-and-recovery) for projection and authorization rules. |
-| `replay` (`read`) | `--run-id` or `--file` selects a captured snapshot. `--pool`, `--max-claims`, and `--max-dispatches` add a bounded scheduling prediction to a snapshot replay. |
-| `state` | `--graph`, `--pool`, `--state`, and `--search` filter rows; `--offset` and `--limit` paginate the result. |
-| `inspect` | Exactly one of `--work-id` or `--claim-id` selects the Work or Claim to inspect. |
-| `explain` | `--pool` predicts live eligibility; `--work-id` inspects one Work, `--before-claim ID` explains the exact predecessor state of a committed Claim, and `--request-id` selects a committed request. |
-| `trace` | Exactly one of `--request-id` or `--claim-id` selects history; `--offset` and `--limit` paginate events. |
-| `submit-work` | `--graph-id` sets a nonempty graph namespace (default: canonical payload SHA-256); `--node-key` sets a nonempty node identity within the graph (default: `root`). `--fairness-key` selects an entitled accounting key (default: one shared bucket). `--pool` selects an approved pool; `--priority` sets the entitled priority (1–5); `--worker-profile` selects an approved profile; `--execution-ref` pins an immutable worker SHA; `--expires-at` sets a Unix-millisecond deadline. |
-| `submit-graph` | `--pool`, `--max-claims`, and `--max-dispatches` set the pool and logical-Claim/native-dispatch budgets for an atomically admitted graph. |
-| `dispatch-next` | `--pool`, `--max-claims`, and `--max-dispatches` bound the pool's logical Claim grants and native dispatch reservations. `--max-bytes` limits assignment bytes (default: 49,152), subject to policy and host limits. Does not launch workflows. |
-| `dispatch <dispatcher>` | Starts a verified dispatcher at the repository's default-branch snapshot revision. `--dry-run` previews the route without granting Claims or launching workflows; `--wait` waits for the dispatcher, not verification of worker Results. |
-| `deploy` | `--from-config` is required; `--pool` and `--worker-profile` optionally limit deployment updates. |
-| `policy` | `--epoch` is required; choose `--from-config` or `--file` to supply the policy. |
-| `cancel-work --obsolete` | Selects one checked batch of obsolete worker-contract Work; `--limit` bounds the batch and `--dry-run` previews it without publishing. |
-| `cancel-claim` | `--claim-id` selects Claims to cancel; `--reason` is required. |
-| `reprioritize` | `--work-id` selects Work and `--priority` sets its new priority; `--reason` is required. |
-| `control` | `--name credential_generation` requires `--generation`, an opaque identifier for an equivalent-scope credential generation, never a secret. Pause controls (`admission_paused`, `grants_paused`) require explicit `--paused=true` or `--paused=false`. All controls require `--reason`. |
-| `reconcile` | `--cancel-reserved` requires `--dispatch-id` and cancels only when compare-and-set proves no launch-start marker exists. It cannot force-release a possible native run and cannot be combined with `--work-id`. |
-| `clear` | Requires maintain or admin permission and `--reason CODE`. `--dry-run` validates and previews without publishing; `--hard` resets a paused, fully settled ledger. All modes, including previews, refuse CI. Mutations require interactive confirmation. |
+| `replay` (`read`) | Validates the ledger and lists Work states. `--run-id` or `--file` replays a captured activation snapshot (read only). `--pool` adds a scheduling prediction; `--max-claims` (default: 1), `--max-dispatches` (default: 1), and `--concurrency` (default: 16) bound it. |
+| `stats` | Counts Work, Claims, and dispatches per pool. |
+| `state` | `--graph`, `--pool`, `--state`, and `--search` filter rows; `--offset` (default: 0) and `--limit` (1–256, default: 80) paginate the result. |
+| `inspect` | Exactly one of `--work-id` or `--claim-id` selects the Work or Claim; shows metadata, dependencies, dispatch, run, and effects. |
+| `tui` (`interactive`) | Keyboard-driven Work/Claim browser with checked operator actions. |
+| `submit-work` | `--file` reads the JSON payload object (`-` for stdin); `--worker-profile` (required) names the worker workflow. `--graph-id` sets the graph namespace (default: canonical payload SHA-256), `--node-key` the node identity (default: `root`), `--pool` the pool (default: `default`), `--priority` 1–5 (default: 3; 1 is dispatched first), and `--fairness-key` the account key for `per_account_limit` (default: one shared bucket). |
+| `submit-graph` | `--file` reads a JSON array of 1–256 complete v4 Work operations, admitted atomically. |
+| `cancel-work` | `--work-id` selects available Work (comma-separated or repeated, maximum 256); `--reason` defaults to `operator`. Claimed Work must be released first. |
+| `release` | `--dispatch-id` selects a dispatch; `--reason` defaults to `operator`. Its open Claims' Work returns to the pool, or is cancelled after `max_attempts`. |
+| `clear` | Releases every non-closed dispatch and cancels all available Work with reason `operator`. `--dry-run` previews without publishing. Refuses CI, including previews; mutations require interactive confirmation. |
+| `compact` | Replaces the ledger with one Checkpoint commit; Git history keeps the prior log. `--min-lines` (default: 1) checkpoints only longer ledgers. |
+| `dispatch <dispatcher>` | Runs a dispatcher workflow to claim and launch the next Work. `--dry-run` previews without launching; `--wait` waits for the dispatcher run, not for workers. |
 
-Normal `clear` cancels unfinished snapshot Work without pending deliveries and preserves completed Work, history, fairness debt, and native reservations. It neither stops native runs nor pauses admission or grants. `--hard` requires admission and grants already paused, all reservations released, and all effects settled; it forgets active identities and fairness debt while retaining Git ancestry, so old identities can be submitted again and repeat effects. See [clearing unfinished Work](/gh-aw/reference/work-queue/#clear-unfinished-work) for limits and operator procedures.
-
-Single-item selectors (`inspect --work-id`, `inspect --claim-id`, `explain --work-id`, `explain --before-claim`, and `trace --claim-id`) take one ID. `cancel-claim --claim-id` and `reprioritize --work-id` accept repeated or comma-separated IDs for batch operations.
+`clear` does not stop running workflows: a late worker finds its Claims closed and cannot complete them. Completed Work and ledger history are retained. See [clearing unfinished Work](/gh-aw/reference/work-queue/#clear-unfinished-work) for operator procedures.
 
 #### `version`
 

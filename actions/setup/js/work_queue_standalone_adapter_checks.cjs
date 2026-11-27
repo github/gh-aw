@@ -4,27 +4,15 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const zlib = require("node:zlib");
-const { withClaimExecution, claimArtifactPath, readClaimScopeContext, assertClaimArtifactFile } = require("./work_queue_claim_scope.cjs");
+const { withClaimExecution, claimArtifactPath, assertClaimArtifactFile } = require("./work_queue_claim_scope.cjs");
 const { wrapClaimEffectClient } = require("./work_queue_effect_client.cjs");
-const { verifyClaimDelivery } = require("./work_queue_delivery.cjs");
 const scanning = require("./work_queue_code_scanning.cjs");
 const coverage = require("./work_queue_code_coverage.cjs");
 
-function assigned(type) {
-  return {
-    version: 3,
-    dispatch_id: "dispatch",
-    request_id: "request",
-    commit_id: "commit",
-    policy_epoch: "epoch",
-    pool: "default",
-    worker_profile: "default",
-    claims: ["h1", "h2"].map(handle => {
-      /** @type {Record<string, unknown>} */
-      const effect_contract = { version: 1, outputs: [{ type, min: 1, max: 1 }] };
-      return { handle, claim_id: `claim:${handle}`, work_id: `work:${handle}`, work: { effect_contract }, result_refs: [] };
-    }),
-  };
+function assigned(type, dispatch = "dispatch") {
+  /** @type {Record<string, unknown>} */
+  const effect_contract = { version: 1, outputs: [{ type, min: 1, max: 1 }] };
+  return { dispatch_id: dispatch, claims: [{ handle: "h1", claim_id: `claim:${dispatch}`, work_id: `work:${dispatch}`, work: { effect_contract }, result_refs: [] }] };
 }
 
 async function nativeEnvironment(callback) {
@@ -41,57 +29,28 @@ async function nativeEnvironment(callback) {
 
 function registerTests({ describe, it }) {
   describe("trusted standalone native Claim adapters", () => {
-    it("rejects symlinked Claim roots and parent directories rather than consuming a sibling artifact", async () => {
+    it("rejects symlinked Claim roots and parent directories rather than consuming another Dispatch's artifact", async () => {
       const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("queue-isolation");
       const assignment = assigned("noop");
+      // A concurrent Dispatch reusing handle h1 owns a different full-identity namespace.
       const first = claimArtifactPath(root, "h1", assignment);
-      const sibling = claimArtifactPath(root, "h2", assignment);
+      const other = claimArtifactPath(root, "h1", assigned("noop", "other-dispatch"));
+      assert.notEqual(first, other);
       try {
         fs.mkdirSync(first, { recursive: true });
-        fs.mkdirSync(sibling, { recursive: true });
+        fs.mkdirSync(other, { recursive: true });
         fs.writeFileSync(path.join(first, "own.json"), "{}");
-        fs.writeFileSync(path.join(sibling, "sibling.json"), "{}");
+        fs.writeFileSync(path.join(other, "other.json"), "{}");
         await withClaimExecution({ assignment, claim_handle: "h1" }, async () => {
           assertClaimArtifactFile(path.join(first, "own.json"), first);
-          fs.symlinkSync(sibling, path.join(first, "redirect"));
-          assert.throws(() => assertClaimArtifactFile(path.join(first, "redirect", "sibling.json"), first), /escapes|redirects/);
+          assert.throws(() => assertClaimArtifactFile(path.join(other, "other.json"), other), /outside its original Claim namespace/);
+          fs.symlinkSync(other, path.join(first, "redirect"));
+          assert.throws(() => assertClaimArtifactFile(path.join(first, "redirect", "other.json"), first), /escapes|redirects/);
           fs.rmSync(first, { recursive: true });
-          fs.symlinkSync(sibling, first);
-          assert.throws(() => assertClaimArtifactFile(path.join(first, "sibling.json"), first), /redirects/);
+          fs.symlinkSync(other, first);
+          assert.throws(() => assertClaimArtifactFile(path.join(first, "other.json"), first), /redirects/);
         });
       } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-      }
-    });
-
-    it("uses only explicit closed current snapshots and leaves non-queue runs unaffected", () => {
-      const fixture = require("./work_queue_lifecycle.test_helpers.cjs").queueFixture({ granted: false });
-      const transactionLog = require("./work_queue_replay.cjs").serializeTransactionLog(fixture.transactions);
-      const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("queue-snapshot");
-      const keys = ["GH_AW_WORK_QUEUE_ENABLED", "GH_AW_WORK_QUEUE_SNAPSHOT"];
-      const previous = keys.map(key => process.env[key]);
-      try {
-        fs.mkdirSync(root, { recursive: true });
-        const filename = path.join(root, "snapshot.json");
-        process.env.GH_AW_WORK_QUEUE_SNAPSHOT = filename;
-        const snapshot = { version: 3, sha: "a".repeat(40), transactionLog, captured_at: fixture.at, origin: fixture.dispatcher, worker: assigned("noop") };
-        fs.writeFileSync(filename, JSON.stringify(snapshot));
-        process.env.GH_AW_WORK_QUEUE_ENABLED = "true";
-        const scope = readClaimScopeContext();
-        assert.ok(scope);
-        assert.equal(scope.assignment.claims.length, 2);
-        fs.writeFileSync(filename, JSON.stringify({ ...snapshot, version: 2 }));
-        assert.throws(readClaimScopeContext, /current closed version-3/);
-        fs.writeFileSync(filename, JSON.stringify({ ...snapshot, transactionLog: [] }));
-        assert.throws(readClaimScopeContext, /current closed version-3/);
-        fs.writeFileSync(filename, JSON.stringify({ ...snapshot, transactionLog: "" }));
-        assert.throws(readClaimScopeContext, /policy_missing/);
-        fs.writeFileSync(filename, JSON.stringify({ ...snapshot, worker: { assignment: snapshot.worker } }));
-        assert.throws(readClaimScopeContext, /immutable array/);
-        delete process.env.GH_AW_WORK_QUEUE_ENABLED;
-        assert.equal(readClaimScopeContext(), null);
-      } finally {
-        keys.forEach((key, index) => (previous[index] === undefined ? delete process.env[key] : (process.env[key] = previous[index])));
         fs.rmSync(root, { recursive: true, force: true });
       }
     });
@@ -117,14 +76,12 @@ function registerTests({ describe, it }) {
       });
     });
 
-    it("verifies exact SARIF analysis, immutable revision, category and finding instead of job success", () =>
+    it("uploads exact SARIF with a per-Claim category bound to the immutable revision", () =>
       nativeEnvironment(async () => {
         const assignment = assigned("create_code_scanning_alert");
         const effects = [];
         let report;
-        let incorrect = false;
         let writes = 0;
-        let originalResult;
         let originalHandler;
         let originalCategory;
         const source = {
@@ -136,74 +93,36 @@ function registerTests({ describe, it }) {
                 report = JSON.parse(zlib.gunzipSync(Buffer.from(input.sarif, "base64")).toString("utf8"));
                 return { data: { id: "upload-1" } };
               },
-              getSarif: async () => ({ data: { processing_status: "complete", analyses_url: "https://api.github.com/repos/owner/repo/code-scanning/analyses?sarif_id=upload-1", errors: [] } }),
-              getAnalysis: async () => ({ data: incorrect ? { ...report, runs: [] } : report }),
+              getSarif: async () => ({ data: { processing_status: "complete", errors: [] } }),
             },
           },
-          request: async () => ({
-            data: [
-              {
-                sarif_id: "upload-1",
-                id: 42,
-                commit_sha: process.env.GITHUB_SHA,
-                ref: "refs/heads/approved",
-                category: report.runs[0].automationDetails.id,
-                tool: { name: report.runs[0].tool.driver.name },
-                results_count: 1,
-                error: "",
-              },
-            ],
-          }),
         };
-        const trustedContext = { repo: { owner: "owner", repo: "repo" } };
-        const authorize = async request => {
-          if (request.message.type === "work_queue_resource_verification") {
-            assert.equal(request.context, trustedContext);
-            assert.equal(request.github, source);
-          }
-          return { claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" };
-        };
+        const authorize = async request => ({ claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" });
         await withClaimExecution({ assignment, claim_handle: "h1", authorize, effects }, async () => {
           const handler = await scanning.main({ "target-ref": "refs/heads/approved" }, wrapClaimEffectClient(source, { claim_handle: "h1", authorize }));
           const message = { type: "create_code_scanning_alert", claim_handle: "h1", file: "src/one.js", line: 4, message: "Scoped finding", severity: "warning" };
           const result = await handler(message);
-          originalResult = result;
           originalHandler = handler;
           originalCategory = report.runs[0].automationDetails.id;
           assert.equal(writes, 1);
-          const options = {
-            assignment,
-            claim_handle: "h1",
-            messages: [message],
-            results: [{ messageIndex: 0, success: true, result }],
-            effects,
-            authorize,
-            context: trustedContext,
-            github: source,
-            verifyOutput: scanning.verifyCodeScanningDelivery,
-          };
-          assert.equal((await verifyClaimDelivery(options)).verification, "verified");
-          assert.equal((await scanning.verifyCodeScanningDelivery({ claim: assignment.claims[0], result: structuredClone(result), github: source })).verified, false);
-          incorrect = true;
-          assert.equal((await verifyClaimDelivery(options)).verification, "unknown");
+          assert.equal(result.sarif_id, "upload-1");
+          assert.equal(report.runs[0].results[0].message.text, "Scoped finding");
           await assert.rejects(handler({ ...message, repo: "foreign/repo" }), /conflicts/);
-          await assert.rejects(handler({ ...message, claim_handle: "h2" }), /cannot escape/);
+          await assert.rejects(handler({ ...message, claim_handle: "h2" }), /foreign/);
         });
         const next = structuredClone(assignment);
         next.dispatch_id = "next-dispatch";
         next.claims[0].claim_id = "next-claim";
-        incorrect = false;
         await withClaimExecution({ assignment: next, claim_handle: "h1", authorize, effects: [] }, async () => {
-          assert.equal((await scanning.verifyCodeScanningDelivery({ claim: next.claims[0], result: originalResult, github: source })).verified, false);
           const message = { type: "create_code_scanning_alert", claim_handle: "h1", file: "src/one.js", line: 4, message: "Scoped finding", severity: "warning" };
-          await assert.rejects(originalHandler(message), /original immutable Claim identity/);
+          await assert.rejects(originalHandler(message), /cannot escape its original immutable Claim identity/);
           const handler = await scanning.main({ "target-ref": "refs/heads/approved" }, wrapClaimEffectClient(source, { claim_handle: "h1", authorize }));
           await handler(message);
           assert.notEqual(report.runs[0].automationDetails.id, originalCategory);
         });
       }));
 
-    it("requires exact private coverage upload bytes plus independently successful service processing", () =>
+    it("uploads exact private coverage bytes and fails on a definitive processing failure", () =>
       nativeEnvironment(async () => {
         const root = require("./work_queue_effect_test_helpers.cjs").temporaryDirectory("queue-coverage");
         const assignment = assigned("upload_code_coverage");
@@ -212,7 +131,6 @@ function registerTests({ describe, it }) {
         let incorrect = false;
         let writes = 0;
         const labels = [];
-        let originalResult;
         let originalHandler;
         const source = {
           rest: { repos: { get: async () => ({ data: { id: 7, full_name: "owner/repo" } }), getCommit: async () => ({ data: { sha: process.env.GITHUB_SHA } }) } },
@@ -229,40 +147,21 @@ function registerTests({ describe, it }) {
             return { data: { processing_status: incorrect ? "failed" : "succeeded", errors: [] } };
           },
         };
-        const trustedContext = { repo: { owner: "owner", repo: "repo" } };
-        const authorize = async request => {
-          if (request.message.type === "work_queue_resource_verification") {
-            assert.equal(request.context, trustedContext);
-            assert.equal(request.github, source);
-          }
-          return { claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" };
-        };
+        const authorize = async request => ({ claim_handle: request.claim_handle, authorized: request.message.repo === undefined || request.message.repo === "owner/repo" });
         try {
           const directory = claimArtifactPath(root, "h1", assignment);
           fs.mkdirSync(directory, { recursive: true });
           fs.writeFileSync(path.join(directory, "coverage.info"), bytes);
           await withClaimExecution({ assignment, claim_handle: "h1", authorize, effects }, async () => {
-            const handler = await coverage.main({ "target-ref": "refs/heads/approved", "coverage-dir": root, "wait-for-processing-timeout": 0 }, wrapClaimEffectClient(source, { claim_handle: "h1", authorize }));
+            const handler = await coverage.main({ "target-ref": "refs/heads/approved", "coverage-dir": root, max: 3 }, wrapClaimEffectClient(source, { claim_handle: "h1", authorize }));
             const message = { type: "upload_code_coverage", claim_handle: "h1", file: "coverage.info", language: "c", label: "native" };
             const result = await handler(message);
-            originalResult = result;
             originalHandler = handler;
             assert.equal(writes, 1);
-            const options = {
-              assignment,
-              claim_handle: "h1",
-              messages: [message],
-              results: [{ messageIndex: 0, success: true, result }],
-              effects,
-              authorize,
-              context: trustedContext,
-              github: source,
-              verifyOutput: coverage.verifyCodeCoverageDelivery,
-            };
-            assert.equal((await verifyClaimDelivery(options)).verification, "verified");
-            assert.equal((await coverage.verifyCodeCoverageDelivery({ claim: assignment.claims[0], result: structuredClone(result), github: source })).verified, false);
+            assert.equal(result.report_id, "report-1");
             incorrect = true;
-            assert.equal((await verifyClaimDelivery(options)).verification, "unknown");
+            await assert.rejects(handler(message), /failed processing/);
+            incorrect = false;
             await assert.rejects(handler({ ...message, repo: "foreign/repo" }), /conflicts/);
           });
           const next = structuredClone(assignment);
@@ -271,15 +170,13 @@ function registerTests({ describe, it }) {
           const nextDirectory = claimArtifactPath(root, "h1", next);
           fs.mkdirSync(nextDirectory, { recursive: true });
           fs.writeFileSync(path.join(nextDirectory, "coverage.info"), bytes);
-          incorrect = false;
           await withClaimExecution({ assignment: next, claim_handle: "h1", authorize, effects: [] }, async () => {
-            assert.equal((await coverage.verifyCodeCoverageDelivery({ claim: next.claims[0], result: originalResult, github: source })).verified, false);
             const message = { type: "upload_code_coverage", claim_handle: "h1", file: "coverage.info", language: "c", label: "native" };
-            await assert.rejects(originalHandler(message), /original immutable Claim identity/);
-            const handler = await coverage.main({ "target-ref": "refs/heads/approved", "coverage-dir": root, "wait-for-processing-timeout": 0 }, wrapClaimEffectClient(source, { claim_handle: "h1", authorize }));
+            await assert.rejects(originalHandler(message), /cannot escape its original immutable Claim identity/);
+            const handler = await coverage.main({ "target-ref": "refs/heads/approved", "coverage-dir": root }, wrapClaimEffectClient(source, { claim_handle: "h1", authorize }));
             await handler(message);
-            assert.equal(labels.length, 2);
-            assert.notEqual(labels[0], labels[1]);
+            assert.equal(labels.length, 3);
+            assert.notEqual(labels[0], labels[2]);
           });
         } finally {
           fs.rmSync(root, { recursive: true, force: true });

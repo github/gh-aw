@@ -174,4 +174,19 @@ describe("parsed prompt condition operands", () => {
     expect(output.includes("````markdown")).toBe(variant === "detailed");
     expect(output).toContain("direct dependencies");
   });
+
+  it.each(["concise", "detailed"])("renders the Issue Arborist %s task", async variant => {
+    const workflow = fs.readFileSync(path.resolve(__dirname, "../../..", ".github/workflows/issue-arborist.md"), "utf8");
+    const body = workflow
+      .split(/^---\s*$/m)
+      .slice(2)
+      .join("---");
+    process.env.GH_AW_EXPERIMENTS_PROMPT_STYLE = variant;
+    const output = await render(body);
+    expect(output).toContain("issues-data/issues.json");
+    expect(output).toContain(variant === "concise" ? "Use `jq` to identify clusters of 5+ related issues" : "Analyze the last 100 open issues");
+    expect(output.includes("## Process")).toBe(variant === "detailed");
+    expect(output.includes("Your goal:")).toBe(variant === "concise");
+    expect(output).not.toMatch(/\{\{#?(?:if|else)\b|\{\{\/if\}\}/);
+  });
 });

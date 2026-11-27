@@ -4,9 +4,9 @@ spec: true
 description: Draft contract for canonical traces, full unified artifacts, and bounded compact unified sessions.
 sidebar:
   order: 1365
-version: "2.15.0"
+version: "2.15.1"
 status: Draft
-publication_date: "2026-11-23"
+publication_date: "2026-11-24"
 editors:
   - name: GitHub Agentic Workflows Team
     organization: GitHub
@@ -14,9 +14,9 @@ editors:
 
 # Unified Agent Session Specification
 
-**Version**: 2.15.0<br>
+**Version**: 2.15.1<br>
 **Status**: Draft<br>
-**Publication Date**: 2026-11-23<br>
+**Publication Date**: 2026-11-24<br>
 **Editors**: GitHub Agentic Workflows Team (GitHub)<br>
 **This Version**: [unified-agent-session-specification](/gh-aw/specs/unified-agent-session-specification/)<br>
 **Latest Version**: This document
@@ -31,7 +31,7 @@ This specification defines the session traces used by GitHub Agentic Workflows: 
 
 This is a **GitHub Agentic Workflows project specification**, written using W3C-inspired document conventions. It is **not an official W3C standard**, W3C publication, or W3C-endorsed recommendation.
 
-Version 2.15.0 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
+Version 2.15.1 is a draft governed by the project's normal review process. It may be updated, replaced, or superseded. The accompanying implementation and regression suites exercise this contract, including the sampled CI sessions identified in Section 9.4. This is not a blanket declaration of conformance for every engine version or source format. Section 10 records historical pre-implementation gaps, not current defects. Approval and ongoing compliance testing remain project responsibilities.
 
 The specification version belongs to this document. The unified file's leading
 `session.format` record carries an independent numeric serialization-format
@@ -1199,16 +1199,18 @@ ran, reached a clean result. Rules apply in order:
 2. For a run that did not succeed, `skip` with `infrastructure` for platform
    failures: startup failures, interrupted harness attempts, crash signals, engine
    outages and timeouts, a safe-output gateway that registered no tools,
-   authentication and policy rejections, provider 5xx responses that the engine or
-   AWF recorded for an agent request, and harness infrastructure failure classes.
+   authentication and policy rejections (including `model_policy_violation`),
+   model/endpoint incompatibilities (including `model_endpoint_mismatch_error`),
+   provider 5xx responses that the engine or AWF recorded for an agent request,
+   and harness infrastructure failure classes.
    Then `skip` with `rate_limited` for such 429 responses and quota or rate-limit
-   categories and classes. A generic authentication or proxy-guard rejection, or a
-   transient API error such as an HTML challenge, beside a confirmed limit belongs
-   to the limit, not the platform. An incomplete report
-   whose reason claims an infrastructure error is neither the agent's own report nor
-   platform evidence, because runtimes use that reason for budgets and rate-limit
-   waits too and the agent can file it. A run that succeeded is not re-examined for
-   transient errors it recovered from.
+   categories and classes. A generic authentication or proxy-guard rejection
+   (including `model_policy_violation`), or a transient API error such as an HTML
+   challenge, beside a confirmed limit belongs to the limit, not the platform. An
+   incomplete report whose reason claims an infrastructure error is neither the
+   agent's own report nor platform evidence, because runtimes use that reason for
+   budgets and rate-limit waits too and the agent can file it. A run that
+   succeeded is not re-examined for transient errors it recovered from.
 3. `skip` with `pair_mismatch` when an agent request ran another model or effort,
    and `skip` with `unknown_evidence` when the requests cannot be attributed.
 4. `skip` with `unknown_evidence` when threat detection flagged the output.
@@ -2870,6 +2872,11 @@ Malformed logs and very large records can exhaust memory or produce misleading s
 Native IDs can collide, timestamps can be out of order, and a trace can contain ambiguous concurrent calls. Exact-ID pairing avoids attributing a failure or output to the wrong tool. Cross-session concatenation requires an external boundary policy; this specification does not invent a wrapper or fabricated session IDs to resolve such ambiguity.
 
 ## 13. Change Log (Informative)
+
+### Version 2.15.1 - Draft (2026-11-24)
+
+- Clarified that `routing.observation` treats `model_endpoint_mismatch_error` and `model_policy_violation` execution categories as infrastructure, with `model_policy_violation` yielding to a confirmed behavioral limit like a generic authentication or proxy-guard rejection (T-UAS-094).
+- Retained serialization-format version 1.
 
 ### Version 2.15.0 - Draft (2026-11-23)
 

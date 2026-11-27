@@ -8,6 +8,46 @@ This action runs in all workflow jobs to provide scripts that can be used instea
 
 The action copies runtime `.cjs` JavaScript files (excluding tests) from the `js/` directory and `.sh` shell scripts from the `sh/` directory.
 
+### Sandboxed threat detector
+
+`detect_threats.cjs` is the sandbox-side producer for `conclude_threat_detection.cjs`.
+It is bundled but not yet selected by the workflow compiler. The host passes a
+trusted launch descriptor separately from the agent's staged artifacts:
+
+```sh
+node detect_threats.cjs --launch-config launch.json \
+  --output detection_result.json artifacts/
+```
+
+For a gh-aw harness, the descriptor supplies `command` and an `args` prefix
+(for example, `node` and `["/opt/gh-aw/copilot_harness.cjs", "copilot"]`).
+`convention` (`copilot`, `claude`, or `codex`) selects the argument and prompt
+transport independently of the executable name. Optional `model`, `provider`,
+`env`, and `cwd` are host-resolved values. Set `mode` to `direct` for a bare
+CLI that reads its prompt on stdin instead of a harness that takes `--prompt-file`.
+Never load this descriptor from model-authored artifacts.
+
+The detector converts supported Git bundles to diff text offline, in a
+disposable object store. Incremental bundles need their prerequisite objects
+in the local `$GITHUB_WORKSPACE` checkout; the detector never fetches them.
+An unreadable or over-limit bundle is an inspection warning, not evidence of
+a clean patch or a threat.
+
+On Linux the supervisor uses Python 3 and `/proc` to reap descendants owned
+by the attempt, including tools that start a separate process group.
+Engine output is not forwarded to Actions logs: it can contain private evidence.
+Codex runs with the private output directory as its writable workspace, not
+the repository; the general temporary directories are not granted for writing.
+
+Only `detection_result.json` is publishable. The adjacent
+`detection_result_full.json` contains private reasons and must stay local.
+Both destinations are invalidated at the start of each assessment, so a
+failed rerun cannot publish an earlier verdict.
+The detector checks each attempt's private sink against the original artifact
+eligibility, even when the reporting command accepted it. Exit codes are 0
+(clean), 1 (finding), and 2 (no usable verdict); stderr ends with a
+`THREAT_DETECTION_STATUS:` line for the host conclusion.
+
 JavaScript reads compiled lock metadata and manifests through the bounded JSON
 header helper, without parsing the workflow body. The runtime lives entirely in
 this action and consumes compiler-produced JSON metadata. Setup does not compile

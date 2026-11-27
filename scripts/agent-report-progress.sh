@@ -203,7 +203,7 @@ is_linter_summary_line() {
     [[ "$line" =~ ^[0-9]+[[:space:]]issues?:$ ]] ||
         [[ "$line" =~ ^\*[[:space:]][^:]+:[[:space:]][0-9]+$ ]] ||
         [[ "$line" = "Building custom linters..." ]] ||
-        [[ "$line" = "Running custom linters (largefunc max-lines=60)..." ]] ||
+        [[ "$line" =~ ^Running\ custom\ linters\ \((tier=[^,]+,\ )?largefunc\ max-lines=[0-9]+\)\.\.\.$ ]] ||
         [[ "$line" =~ ^make\[[0-9]+\]:[[:space:]]\*\*\*[[:space:]]\[Makefile:[0-9]+:[[:space:]]golint-custom\][[:space:]]Error[[:space:]][0-9]+$ ]]
 }
 
@@ -267,7 +267,7 @@ run_change_scoped_go_linter() {
 lint_go_packages() {
     GOPATH=$(go env GOPATH)
     if command -v golangci-lint >/dev/null 2>&1 || [ -x "$GOPATH/bin/golangci-lint" ]; then
-        run_change_scoped_go_linter "Go linter" env PATH="$GOPATH/bin:$PATH" golangci-lint run "${go_packages[@]}"
+        run_change_scoped_go_linter "Go linter" env PATH="$GOPATH/bin:$PATH" golangci-lint run --timeout=40m "${go_packages[@]}"
     else
         echo "golangci-lint is not installed. Run 'make deps-dev' to install dependencies." >&2
         return 1
@@ -306,8 +306,11 @@ test_setup_javascript() {
     (
         cd actions/setup/js
         npm run typecheck --silent
+        # Runs beside the CPU-bound custom-linter job; lock-parsing tests that take
+        # ~1s alone have exceeded vitest's 10s default there.
         npm run test:js -- \
             --no-file-parallelism \
+            --testTimeout=30000 \
             --passWithNoTests \
             "${JS_TEST_EXCLUDES[@]}" \
             "${setup_js_files[@]}"

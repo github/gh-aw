@@ -176,7 +176,7 @@ func TestAuxiliaryWorkflowPermissionComments(t *testing.T) {
 		"issue_comment": {}, "pull_request": {}, "discussion": {},
 	}, "ubuntu-latest", "./actions/setup", nil, true, false)
 	require.NoError(t, err)
-	queue, err := buildWorkQueueEventWorkflowYAML(ActionModeDev, "./actions/setup", nil, false)
+	queue, err := buildWorkQueueEventWorkflowYAML(ActionModeDev, "./actions/setup", nil, false, "")
 	require.NoError(t, err)
 	update, err := buildAutoUpdateWorkflowYAML("37 0 * * *", "./actions/setup", getActionPin("actions/github-script"), "", "gh aw", true, nil, false)
 	require.NoError(t, err)

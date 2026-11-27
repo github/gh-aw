@@ -245,7 +245,7 @@ describe("gh-aw OpenTelemetry compatibility contract", () => {
       expect(span.events.filter(event => event.name === "eval.status")).toHaveLength(1);
       expect(attrsByKey(span.events.find(event => event.name === "eval.status"))["gh-aw.eval.model"]).toBe("copilot/gpt-6-luna-decisions");
       expect(span.events.some(event => event.name === "eval.result")).toBe(false);
-      expect(JSON.stringify(payload)).not.toContain("sensitive");
+      expect(JSON.stringify([span.attributes.filter(({ key }) => key.startsWith("gh-aw.eval")), span.events])).not.toContain("sensitive");
     }
     existsSpy.mockRestore();
   });

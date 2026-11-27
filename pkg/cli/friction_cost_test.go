@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const frictionSummaryJSON = `{
@@ -56,148 +58,106 @@ func writeUsageSummary(t *testing.T, contents string) string {
 	t.Helper()
 	runDir := t.TempDir()
 	activityDir := filepath.Join(runDir, "usage", "activity")
-	if err := os.MkdirAll(activityDir, 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(activityDir, "summary.json"), []byte(contents), 0o600); err != nil {
-		t.Fatalf("write summary: %v", err)
-	}
+	require.NoError(t, os.MkdirAll(activityDir, 0o755), "mkdir")
+	require.NoError(t, os.WriteFile(filepath.Join(activityDir, "summary.json"), []byte(contents), 0o600), "write summary")
 	return runDir
 }
 
 func TestLoadUsageActivitySummaryDecodesFriction(t *testing.T) {
 	summary, err := loadUsageActivitySummary(writeUsageSummary(t, frictionSummaryJSON))
-	if err != nil {
-		t.Fatalf("loadUsageActivitySummary: %v", err)
-	}
-	if summary.Friction == nil {
-		t.Fatal("expected friction section")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, summary.Friction, "expected friction section")
 	f := summary.Friction
-	if f.MeasurementState != FrictionStateStatistical {
-		t.Errorf("measurement_state = %q", f.MeasurementState)
-	}
-	if f.CanonicalUnit != "aic" {
-		t.Errorf("canonical_unit = %q", f.CanonicalUnit)
-	}
-	if f.Cost.AIC != 1.25 {
-		t.Errorf("cost.aic = %v", f.Cost.AIC)
-	}
-	if f.Cost.Tokens.Total != 256 || f.Cost.Tokens.CacheRead != 10 || f.Cost.Tokens.Reasoning != 4 {
-		t.Errorf("token classes = %+v", f.Cost.Tokens)
-	}
-	if f.Cost.Turns != 1 || f.Cost.ToolCalls != 3 || f.Cost.LatencyMS != 550 {
-		t.Errorf("dimensions = %+v", f.Cost)
-	}
-	if f.CountedOccurrences != 3 || f.SuppressedOccurrences != 1 {
-		t.Errorf("occurrence accounting = counted %d suppressed %d", f.CountedOccurrences, f.SuppressedOccurrences)
-	}
-	if f.TotalRunAIC == nil || *f.TotalRunAIC != 2.5 || !f.TotalRunAICPartial || f.FrictionRatio == nil || *f.FrictionRatio != 0.5 {
-		t.Errorf("run AIC coverage = total %v partial %v ratio %v", f.TotalRunAIC, f.TotalRunAICPartial, f.FrictionRatio)
-	}
+	assert.Equal(t, FrictionStateStatistical, f.MeasurementState)
+	assert.Equal(t, "aic", f.CanonicalUnit)
+	assert.Equal(t, 1.25, f.Cost.AIC)
+	assert.Equal(t, int64(256), f.Cost.Tokens.Total)
+	assert.Equal(t, int64(10), f.Cost.Tokens.CacheRead)
+	assert.Equal(t, int64(4), f.Cost.Tokens.Reasoning)
+	assert.Equal(t, 1, f.Cost.Turns)
+	assert.Equal(t, 3, f.Cost.ToolCalls)
+	assert.Equal(t, int64(550), f.Cost.LatencyMS)
+	assert.Equal(t, 3, f.CountedOccurrences)
+	assert.Equal(t, 1, f.SuppressedOccurrences)
+	require.NotNil(t, f.TotalRunAIC)
+	assert.Equal(t, 2.5, *f.TotalRunAIC)
+	assert.True(t, f.TotalRunAICPartial)
+	require.NotNil(t, f.FrictionRatio)
+	assert.Equal(t, 0.5, *f.FrictionRatio)
 	aic, ok := f.Uncertainty["aic"]
-	if !ok || aic.RelativeError == nil || *aic.RelativeError != 0.3 || aic.Method != "mean_invocation_apportionment" || aic.SampleSize != 2 {
-		t.Errorf("aic uncertainty = %+v", aic)
-	}
-	if len(f.Drivers) != 2 || len(f.Groups) != 1 || len(f.Events) != 2 {
-		t.Fatalf("drivers=%d groups=%d events=%d", len(f.Drivers), len(f.Groups), len(f.Events))
-	}
-	if f.Events[1].SuppressedBy != "causal-group:tool_failure" {
-		t.Errorf("suppressed_by = %q", f.Events[1].SuppressedBy)
-	}
-	if f.Groups[0].CountedOccurrences != 3 {
-		t.Errorf("group counted = %d", f.Groups[0].CountedOccurrences)
-	}
-	if len(f.UnmeasuredDrivers) != 1 || f.UnmeasuredDrivers[0].Reason != "source_unavailable:firewall" {
-		t.Errorf("unmeasured drivers = %+v", f.UnmeasuredDrivers)
-	}
-	if f.Derived {
-		t.Error("precomputed friction must not be marked derived")
-	}
+	require.True(t, ok, "expected aic uncertainty")
+	require.NotNil(t, aic.RelativeError)
+	assert.Equal(t, 0.3, *aic.RelativeError)
+	assert.Equal(t, "mean_invocation_apportionment", aic.Method)
+	assert.Equal(t, 2, aic.SampleSize)
+	require.Len(t, f.Drivers, 2)
+	require.Len(t, f.Groups, 1)
+	require.Len(t, f.Events, 2)
+	assert.Equal(t, "causal-group:tool_failure", f.Events[1].SuppressedBy)
+	assert.Equal(t, 3, f.Groups[0].CountedOccurrences)
+	require.Len(t, f.UnmeasuredDrivers, 1)
+	assert.Equal(t, "source_unavailable:firewall", f.UnmeasuredDrivers[0].Reason)
+	assert.False(t, f.Derived, "precomputed friction must not be marked derived")
 }
 
 func TestApplyUsageActivitySummaryPrefersPrecomputedFriction(t *testing.T) {
 	summary, err := loadUsageActivitySummary(writeUsageSummary(t, frictionSummaryJSON))
-	if err != nil {
-		t.Fatalf("loadUsageActivitySummary: %v", err)
-	}
+	require.NoError(t, err)
 	result := &DownloadResult{}
 	applyUsageActivitySummaryToResult(summary, result, true)
-	if result.Friction == nil {
-		t.Fatal("expected friction on download result")
-	}
-	if result.Friction.Cost.AIC != 1.25 {
-		t.Errorf("cost.aic = %v", result.Friction.Cost.AIC)
-	}
+	require.NotNil(t, result.Friction, "expected friction on download result")
+	assert.Equal(t, 1.25, result.Friction.Cost.AIC)
 
 	// A derived fallback must never replace a precomputed section.
 	derived := deriveFrictionFromLogs(&MCPToolUsageData{ToolCalls: []MCPToolCall{{ToolCallID: "c9", Status: "error"}}}, summary.Session)
-	if derived == nil {
-		t.Fatal("expected derived fallback for the historical path")
-	}
-	if result.Friction.Derived {
-		t.Error("precomputed friction was overwritten by a derived summary")
-	}
+	require.NotNil(t, derived, "expected derived fallback for the historical path")
+	assert.False(t, result.Friction.Derived, "precomputed friction was overwritten by a derived summary")
 }
 
 func TestHistoricalRunsWithoutPrecomputedFrictionDeriveFallback(t *testing.T) {
 	legacy := `{"schema":"usage-activity-summary/v1","session":{"total_events":3,"turns":2},"working_set":{"measurement_state":"measured","cumulative_input_tokens":10,"peak_input_tokens":10,"rebuild_excess_tokens":0,"invocations":1}}`
 	summary, err := loadUsageActivitySummary(writeUsageSummary(t, legacy))
-	if err != nil {
-		t.Fatalf("loadUsageActivitySummary: %v", err)
-	}
-
-	if summary.Friction != nil {
-		t.Fatal("legacy summary must not synthesize a friction section")
-	}
+	require.NoError(t, err)
+	assert.Nil(t, summary.Friction, "legacy summary must not synthesize a friction section")
 	result := &DownloadResult{}
 	applyUsageActivitySummaryToResult(summary, result, true)
-	if result.Friction == nil || !result.Friction.Derived || result.Friction.CountedOccurrences != 0 {
-		t.Errorf("expected a derived zero-count friction fallback, got %+v", result.Friction)
-	}
+	require.NotNil(t, result.Friction, "expected a derived zero-count friction fallback")
+	assert.True(t, result.Friction.Derived)
+	assert.Equal(t, 0, result.Friction.CountedOccurrences)
 	// Every consumer helper must tolerate the nil section.
-	if got := frictionDisplayValue(nil); got != "" {
-		t.Errorf("frictionDisplayValue(nil) = %q", got)
-	}
-	if got := frictionSummaryLine(nil); got != "" {
-		t.Errorf("frictionSummaryLine(nil) = %q", got)
-	}
-	if got := frictionRelativeError(nil); got != "" {
-		t.Errorf("frictionRelativeError(nil) = %q", got)
-	}
+	assert.Empty(t, frictionDisplayValue(nil))
+	assert.Empty(t, frictionSummaryLine(nil))
+	assert.Empty(t, frictionRelativeError(nil))
 	renderConsoleFriction(nil)
 }
 
 func TestHistoricalFrictionFallbackUsesAvailableUsageAndLogs(t *testing.T) {
 	summaryJSON := `{"schema":"usage-activity-summary/v1","session":{"failed_tool_executions":1}}`
 	summary, err := loadUsageActivitySummary(writeUsageSummary(t, summaryJSON))
-	if err != nil {
-		t.Fatalf("loadUsageActivitySummary: %v", err)
-	}
+	require.NoError(t, err)
 	result := &DownloadResult{
 		RunAnalysis: RunAnalysis{
 			MCPToolUsage: &MCPToolUsageData{ToolCalls: []MCPToolCall{{ToolCallID: "c1", ServerName: "github", ToolName: "issue_read", Status: "error"}}},
 		},
 	}
 	applyUsageActivitySummaryToResult(summary, result, true)
-	if result.Friction == nil || !result.Friction.Derived {
-		t.Fatalf("expected historical fallback, got %+v", result.Friction)
-	}
-	if result.Friction.TotalOccurrences != 2 || result.Friction.CountedOccurrences != 1 {
-		t.Errorf("fallback occurrences = %d counted = %d", result.Friction.TotalOccurrences, result.Friction.CountedOccurrences)
-	}
+	require.NotNil(t, result.Friction, "expected historical fallback")
+	assert.True(t, result.Friction.Derived)
+	assert.Equal(t, 2, result.Friction.TotalOccurrences)
+	assert.Equal(t, 1, result.Friction.CountedOccurrences)
 
 	result = &DownloadResult{RunAnalysis: RunAnalysis{
 		MCPToolUsage: &MCPToolUsageData{ToolCalls: []MCPToolCall{{ToolCallID: "c2", Status: "failed"}}},
 	}}
-	if !backfillCacheHitIfNeeded(result, t.TempDir(), false) || result.Friction == nil || !result.Friction.Derived {
-		t.Fatalf("expected no-summary cache fallback, got %+v", result.Friction)
-	}
+	backfilled := backfillCacheHitIfNeeded(result, t.TempDir(), false)
+	assert.True(t, backfilled, "expected no-summary cache backfill")
+	require.NotNil(t, result.Friction, "expected no-summary cache fallback")
+	assert.True(t, result.Friction.Derived)
 
 	result = &DownloadResult{RunAnalysis: RunAnalysis{MCPToolUsage: &MCPToolUsageData{}}}
-	if backfillCacheHitIfNeeded(result, t.TempDir(), false) || result.Friction != nil {
-		t.Fatalf("empty cache activity should not create friction or trigger backfill: %+v", result.Friction)
-	}
+	backfilled = backfillCacheHitIfNeeded(result, t.TempDir(), false)
+	assert.False(t, backfilled, "empty cache activity should not trigger backfill")
+	assert.Nil(t, result.Friction, "empty cache activity should not create friction")
 }
 
 func TestDeriveFrictionFromLogsDeduplicatesSessionFailures(t *testing.T) {
@@ -210,52 +170,31 @@ func TestDeriveFrictionFromLogsDeduplicatesSessionFailures(t *testing.T) {
 		Integrity: &IntegrityFilterSummary{TotalFiltered: 2},
 	}
 	got := deriveFrictionFromLogs(usage, &usageActivitySession{FailedToolExecutions: 3})
-	if got == nil {
-		t.Fatal("expected derived friction")
-	}
-	if !got.Derived {
-		t.Error("derived summary must be marked derived")
-	}
-	if got.MeasurementState != FrictionStateUnavailable {
-		t.Errorf("derived AIC must be unavailable, got %q", got.MeasurementState)
-	}
-	if got.Cost.AIC != 0 {
-		t.Errorf("derived summary must not invent AIC, got %v", got.Cost.AIC)
-	}
+	require.NotNil(t, got, "expected derived friction")
+	assert.True(t, got.Derived, "derived summary must be marked derived")
+	assert.Equal(t, FrictionStateUnavailable, got.MeasurementState, "derived AIC must be unavailable")
+	assert.Equal(t, 0.0, got.Cost.AIC, "derived summary must not invent AIC")
 	// 2 gateway failures + 2 integrity filters + 3 session failures reported,
 	// of which only 1 session failure is in excess of the gateway observations.
-	if got.TotalOccurrences != 7 {
-		t.Errorf("total occurrences = %d, want 7", got.TotalOccurrences)
-	}
-	if got.CountedOccurrences != 5 {
-		t.Errorf("counted occurrences = %d, want 5", got.CountedOccurrences)
-	}
-	if got.SuppressedOccurrences != 2 {
-		t.Errorf("suppressed occurrences = %d, want 2", got.SuppressedOccurrences)
-	}
-	if got.Cost.ToolCalls != 5 {
-		t.Errorf("tool calls = %d, want 5", got.Cost.ToolCalls)
-	}
+	assert.Equal(t, 7, got.TotalOccurrences)
+	assert.Equal(t, 5, got.CountedOccurrences)
+	assert.Equal(t, 2, got.SuppressedOccurrences)
+	assert.Equal(t, 5, got.Cost.ToolCalls)
 	drivers := map[string]FrictionDriverSummary{}
 	for _, d := range got.Drivers {
 		drivers[d.Driver] = d
 	}
-	if drivers["session_tool_failure"].CountedOccurrences != 1 {
-		t.Errorf("session counted = %d, want 1", drivers["session_tool_failure"].CountedOccurrences)
-	}
-	if drivers["mcp_tool_error"].Occurrences != 2 {
-		t.Errorf("gateway occurrences = %d, want 2", drivers["mcp_tool_error"].Occurrences)
-	}
+	assert.Equal(t, 1, drivers["session_tool_failure"].CountedOccurrences)
+	assert.Equal(t, 2, drivers["mcp_tool_error"].Occurrences)
 }
 
 func TestDeriveFrictionFromLogsReturnsNilWithoutFriction(t *testing.T) {
-	if got := deriveFrictionFromLogs(nil, nil); got != nil {
-		t.Errorf("expected nil, got %+v", got)
-	}
+	assert.Nil(t, deriveFrictionFromLogs(nil, nil))
 	clean := &MCPToolUsageData{ToolCalls: []MCPToolCall{{ToolCallID: "c1", Status: "success"}}}
-	if got := deriveFrictionFromLogs(clean, &usageActivitySession{FailedToolExecutions: 0}); got == nil || got.CountedOccurrences != 0 || !got.Derived {
-		t.Errorf("expected a derived zero for a friction-free run, got %+v", got)
-	}
+	got := deriveFrictionFromLogs(clean, &usageActivitySession{FailedToolExecutions: 0})
+	require.NotNil(t, got, "expected a derived zero for a friction-free run")
+	assert.Equal(t, 0, got.CountedOccurrences)
+	assert.True(t, got.Derived)
 }
 
 func TestIsFrictionToolCallStatus(t *testing.T) {
@@ -270,9 +209,9 @@ func TestIsFrictionToolCallStatus(t *testing.T) {
 		{"success", false},
 		{"", false},
 	} {
-		if got := isFrictionToolCallStatus(tc.status); got != tc.want {
-			t.Errorf("isFrictionToolCallStatus(%q) = %v, want %v", tc.status, got, tc.want)
-		}
+		t.Run(tc.status, func(t *testing.T) {
+			assert.Equal(t, tc.want, isFrictionToolCallStatus(tc.status))
+		})
 	}
 }
 
@@ -287,55 +226,42 @@ func TestFormatAICValue(t *testing.T) {
 		{1.239, "1.24"},
 		{250.4, "250"},
 	} {
-		if got := formatAICValue(tc.in); got != tc.want {
-			t.Errorf("formatAICValue(%v) = %q, want %q", tc.in, got, tc.want)
-		}
+		assert.Equal(t, tc.want, formatAICValue(tc.in), "formatAICValue(%v)", tc.in)
 	}
 }
 
 func TestFrictionDisplayValue(t *testing.T) {
-	if got := frictionDisplayValue(&FrictionCostSummary{MeasurementState: FrictionStateUnavailable}); got != "" {
-		t.Errorf("unavailable friction should render empty, got %q", got)
-	}
-	got := frictionDisplayValue(&FrictionCostSummary{MeasurementState: FrictionStateCausal, Cost: FrictionCost{AIC: 2.5}})
-	if got != "2.50" {
-		t.Errorf("frictionDisplayValue = %q, want 2.50", got)
-	}
+	assert.Empty(t, frictionDisplayValue(&FrictionCostSummary{MeasurementState: FrictionStateUnavailable}), "unavailable friction should render empty")
+	assert.Equal(t, "2.50", frictionDisplayValue(&FrictionCostSummary{MeasurementState: FrictionStateCausal, Cost: FrictionCost{AIC: 2.5}}))
 }
 
 func TestFrictionSummaryLineIncludesEveryMeasuredDimension(t *testing.T) {
 	rel := 0.3
+	ratio := 0.5
+	lower, upper := 1.0, 1.5
 	f := &FrictionCostSummary{
 		MeasurementState:      FrictionStateStatistical,
 		CountedOccurrences:    3,
 		SuppressedOccurrences: 1,
+		FrictionRatio:         &ratio,
 		Cost:                  FrictionCost{AIC: 1.25, Tokens: FrictionTokens{Total: 256}, Turns: 1, ToolCalls: 3, LatencyMS: 550},
-		Uncertainty:           map[string]FrictionUncertain{"aic": {State: FrictionStateStatistical, RelativeError: &rel}},
+		Uncertainty:           map[string]FrictionUncertain{"aic": {State: FrictionStateStatistical, RelativeError: &rel, LowerBound: &lower, UpperBound: &upper}},
 	}
 	line := frictionSummaryLine(f)
-	for _, want := range []string{"occurrences=3", "aic=1.25", "tokens=256", "turns=1", "tool-calls=3", "latency=550ms", "state=statistical", "±30%", "deduped=1"} {
-		if !strings.Contains(line, want) {
-			t.Errorf("friction line %q missing %q", line, want)
-		}
+	for _, want := range []string{"occurrences=3", "aic=1.25", "ratio=50.0%", "range=1.00–1.50 AIC", "tokens=256", "turns=1", "tool-calls=3", "latency=550ms", "state=statistical", "±30%", "deduped=1"} {
+		assert.Contains(t, line, want)
 	}
 
 	unavailable := frictionSummaryLine(&FrictionCostSummary{MeasurementState: FrictionStateUnavailable, TotalOccurrences: 2, CountedOccurrences: 2, Derived: true})
-	if !strings.Contains(unavailable, "state=unavailable") || !strings.Contains(unavailable, "derived-from-logs") {
-		t.Errorf("unavailable friction line = %q", unavailable)
-	}
-	if strings.Contains(unavailable, "aic=") {
-		t.Errorf("unavailable friction must not report AIC: %q", unavailable)
-	}
-	if got := frictionSummaryLine(&FrictionCostSummary{MeasurementState: FrictionStateUnavailable}); got != "" {
-		t.Errorf("friction-free run should render nothing, got %q", got)
-	}
+	assert.Contains(t, unavailable, "state=unavailable")
+	assert.Contains(t, unavailable, "derived-from-logs")
+	assert.NotContains(t, unavailable, "aic=", "unavailable friction must not report AIC")
+	assert.Empty(t, frictionSummaryLine(&FrictionCostSummary{MeasurementState: FrictionStateUnavailable}), "friction-free run should render nothing")
 }
 
 func TestRenderConsoleFrictionShowsAggregateAndEvents(t *testing.T) {
 	summary, err := loadUsageActivitySummary(writeUsageSummary(t, frictionSummaryJSON))
-	if err != nil {
-		t.Fatalf("loadUsageActivitySummary: %v", err)
-	}
+	require.NoError(t, err)
 	output := captureFrictionStderr(t, func() {
 		renderConsoleMetrics(MetricsData{Friction: summary.Friction})
 		renderConsoleFriction(summary.Friction)
@@ -350,9 +276,7 @@ func TestRenderConsoleFrictionShowsAggregateAndEvents(t *testing.T) {
 		"source=mcp_gateway driver=mcp_tool_error: github/issue_read x1 counted=1 state=causal aic=0.5 tokens=128 tool-calls=1 latency=250ms",
 		"suppressed-by=causal-group:tool_failure",
 	} {
-		if !strings.Contains(output, want) {
-			t.Errorf("console output missing %q:\n%s", want, output)
-		}
+		assert.Contains(t, output, want)
 	}
 }
 
@@ -381,9 +305,7 @@ func TestRenderConsoleFrictionAttributesCostsToSource(t *testing.T) {
 		"source=firewall driver=firewall_block occurrences=2 counted=2 state=statistical aic=0.25 tokens=64",
 		"source=firewall driver=firewall_block: blocked.example x2 counted=2 state=statistical aic=0.25 tokens=64",
 	} {
-		if !strings.Contains(output, want) {
-			t.Errorf("console output missing %q:\n%s", want, output)
-		}
+		assert.Contains(t, output, want)
 	}
 }
 
@@ -397,64 +319,43 @@ func TestRenderConsoleFrictionTruncatesLongEventLists(t *testing.T) {
 		friction.Events = append(friction.Events, FrictionEvent{Driver: "firewall_block", Label: "blocked.example", Occurrences: 1, CountedOccurrences: 1, State: FrictionStateUnavailable})
 	}
 	output := captureFrictionStderr(t, func() { renderConsoleFriction(friction) })
-	if !strings.Contains(output, "... 5 more events") {
-		t.Errorf("expected console truncation notice:\n%s", output)
-	}
-	if !strings.Contains(output, "event list truncated during measurement") {
-		t.Errorf("expected measurement truncation notice:\n%s", output)
-	}
+	assert.Contains(t, output, "... 5 more events", "expected console truncation notice")
+	assert.Contains(t, output, "event list truncated during measurement", "expected measurement truncation notice")
 }
 
 func TestAuditDataSerializesFriction(t *testing.T) {
 	summary, err := loadUsageActivitySummary(writeUsageSummary(t, frictionSummaryJSON))
-	if err != nil {
-		t.Fatalf("loadUsageActivitySummary: %v", err)
-	}
+	require.NoError(t, err)
 	data := AuditData{Friction: summary.Friction, Metrics: MetricsData{Friction: summary.Friction}}
 	raw, err := json.Marshal(data)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
+	require.NoError(t, err)
 	var decoded struct {
 		Friction *FrictionCostSummary `json:"friction"`
 		Metrics  map[string]any       `json:"metrics"`
 	}
-	if err := json.Unmarshal(raw, &decoded); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if decoded.Friction == nil || decoded.Friction.Cost.AIC != 1.25 {
-		t.Fatalf("friction round-trip failed: %+v", decoded.Friction)
-	}
-	if len(decoded.Friction.Events) != 2 {
-		t.Errorf("expected event-level detail in audit JSON, got %d events", len(decoded.Friction.Events))
-	}
-	if decoded.Friction.Drivers[0].Source != "mcp_gateway" || decoded.Friction.Drivers[0].Cost.AIC != 0.5 {
-		t.Errorf("audit JSON must retain source-attributed driver cost: %+v", decoded.Friction.Drivers[0])
-	}
-	if decoded.Friction.Events[0].Source != "mcp_gateway" || decoded.Friction.Events[0].Cost.AIC != 0.5 {
-		t.Errorf("audit JSON must retain source-attributed event cost: %+v", decoded.Friction.Events[0])
-	}
-	if _, duplicated := decoded.Metrics["friction"]; duplicated {
-		t.Error("friction must be serialized once, at the top level")
-	}
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+	require.NotNil(t, decoded.Friction, "friction round-trip failed")
+	assert.Equal(t, 1.25, decoded.Friction.Cost.AIC)
+	assert.Len(t, decoded.Friction.Events, 2, "expected event-level detail in audit JSON")
+	require.NotEmpty(t, decoded.Friction.Drivers)
+	assert.Equal(t, "mcp_gateway", decoded.Friction.Drivers[0].Source, "audit JSON must retain source-attributed driver cost")
+	assert.Equal(t, 0.5, decoded.Friction.Drivers[0].Cost.AIC)
+	require.NotEmpty(t, decoded.Friction.Events)
+	assert.Equal(t, "mcp_gateway", decoded.Friction.Events[0].Source, "audit JSON must retain source-attributed event cost")
+	assert.Equal(t, 0.5, decoded.Friction.Events[0].Cost.AIC)
+	assert.NotContains(t, decoded.Metrics, "friction", "friction must be serialized once, at the top level")
 
 	// Historical audit payloads omit the key entirely.
 	legacy, err := json.Marshal(AuditData{})
-	if err != nil {
-		t.Fatalf("marshal legacy: %v", err)
-	}
-	if bytes.Contains(legacy, []byte("\"friction\"")) {
-		t.Errorf("friction must be omitted when absent: %s", legacy)
-	}
+	require.NoError(t, err)
+	assert.False(t, bytes.Contains(legacy, []byte("\"friction\"")), "friction must be omitted when absent: %s", legacy)
 }
 
 func captureFrictionStderr(t *testing.T, fn func()) string {
 	t.Helper()
 	original := os.Stderr
 	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
-	}
+	require.NoError(t, err, "pipe")
 	os.Stderr = w
 	done := make(chan string)
 	go func() {

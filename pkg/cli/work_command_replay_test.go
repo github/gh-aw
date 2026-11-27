@@ -20,23 +20,44 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func workQueueReplayTestSnapshot(t *testing.T) []byte {
+// workQueueReplayTestOrigin is the dispatcher run that captured the replay fixture.
+func workQueueReplayTestOrigin() workqueue.Actor {
+	origin := workQueueTestDispatcher
+	origin.RunID = "10"
+	return origin
+}
+
+// workQueueReplayTestLog submits two default-pool Work with private payloads.
+func workQueueReplayTestLog(t *testing.T) (*workQueueTestLog, []string) {
 	t.Helper()
-	snapshot := currentWorkQueueFixture(t)
-	commits, err := workqueue.Parse([]byte(snapshot["transactionLog"].(string)))
-	require.NoError(t, err)
-	ledger, err := workqueue.Serialize(commits[:2])
-	require.NoError(t, err)
-	snapshot["transactionLog"] = string(ledger)
-	snapshot["worker"] = nil
-	snapshot["role"] = "dispatcher"
-	snapshot["origin"] = workqueue.Actor{
-		Role: "dispatcher", Principal: "42", Repository: "owner/repo",
-		Workflow: ".github/workflows/dispatcher.lock.yml", RunID: "10", RunAttempt: 1,
+	log := newWorkQueueTestLog(t)
+	private := func(work *workqueue.WorkDefinition) {
+		work.Payload = json.RawMessage(`{"plan":"private-task-content"}`)
 	}
-	data, err := json.Marshal(snapshot)
+	return log, log.submit(log.work("a", private), log.work("b", private))
+}
+
+func workQueueReplayTestEnvelope(t *testing.T, ledger, role string, origin workqueue.Actor, worker *workqueue.Assignment) []byte {
+	t.Helper()
+	data, err := json.Marshal(map[string]any{
+		"version": workqueue.Version, "sha": nil, "transactionLog": ledger,
+		"origin": origin, "role": role, "worker": worker,
+	})
 	require.NoError(t, err)
 	return data
+}
+
+func workQueueReplayTestSnapshot(t *testing.T) []byte {
+	t.Helper()
+	log, _ := workQueueReplayTestLog(t)
+	return workQueueReplayTestEnvelope(t, log.jsonl(), "dispatcher", workQueueReplayTestOrigin(), nil)
+}
+
+func workQueueReplayTestFile(t *testing.T, data []byte) string {
+	t.Helper()
+	file := filepath.Join(t.TempDir(), workQueueSnapshotFile)
+	require.NoError(t, os.WriteFile(file, data, 0o600))
+	return file
 }
 
 func workQueueReplayTestZIP(t *testing.T, data []byte, names ...string) []byte {
@@ -54,30 +75,82 @@ func workQueueReplayTestZIP(t *testing.T, data []byte, names ...string) []byte {
 }
 
 func TestWorkQueueArtifactReplayLocalPredictsWithoutPublishingOrExposingPayloads(t *testing.T) {
+	_, ids := workQueueReplayTestLog(t)
 	data := workQueueReplayTestSnapshot(t)
-	file := filepath.Join(t.TempDir(), workQueueSnapshotFile)
-	require.NoError(t, os.WriteFile(file, data, 0o600))
+	file := workQueueReplayTestFile(t, data)
+	for _, test := range []struct {
+		flags  []string
+		works  []string
+		reason string
+	}{
+		{[]string{"--max-claims", "2", "--max-dispatches", "2"}, ids, "prefix_complete"},
+		{[]string{"--max-claims", "2"}, ids[:1], "claim_budget_reached"},
+		{[]string{"--max-claims", "2", "--max-dispatches", "2", "--concurrency", "1"}, ids[:1], "capacity_blocked"},
+	} {
+		command := NewWorkCommand()
+		var output bytes.Buffer
+		command.SetOut(&output)
+		command.SetArgs(append([]string{"--repo", "owner/repo", "--json", "replay", "--file", file, "--pool", "default"}, test.flags...))
+		require.NoError(t, command.Execute(), "%v", test.flags)
+		var result struct {
+			Status     string
+			RunID      string `json:"run_id"`
+			Stats      workqueue.Stats
+			Prediction workQueueReplayPrediction
+		}
+		require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+		require.Equal(t, "artifact_replay", result.Status)
+		require.Equal(t, "10", result.RunID)
+		require.Equal(t, 2, result.Stats.Work)
+		require.Zero(t, result.Stats.Claims)
+		require.Equal(t, test.works, result.Prediction.WorkIDs, "%v", test.flags)
+		require.Len(t, result.Prediction.Dispatches, len(test.works), "one Claim per dispatch")
+		require.Equal(t, test.reason, result.Prediction.Reason, "%v", test.flags)
+		require.NotContains(t, output.String(), "private-task-content")
+		require.NotContains(t, output.String(), "payload")
+	}
 	command := NewWorkCommand()
 	var output bytes.Buffer
 	command.SetOut(&output)
-	command.SetArgs([]string{"--repo", "owner/repo", "--json", "replay", "--file", file, "--pool", "default", "--max-claims", "2"})
+	command.SetArgs([]string{"--repo", "owner/repo", "replay", "--file", file, "--pool", "default"})
 	require.NoError(t, command.Execute())
-	var result struct {
-		Status     string
-		Stats      workqueue.Stats
-		Prediction workQueueReplayPrediction
-	}
-	require.NoError(t, json.Unmarshal(output.Bytes(), &result))
-	require.Equal(t, "artifact_replay", result.Status)
-	require.Equal(t, 2, result.Stats.Work)
-	require.Zero(t, result.Stats.Claims)
-	require.Len(t, result.Prediction.Assignments, 1)
-	require.Len(t, result.Prediction.Assignments[0].WorkIDs, 2)
-	require.NotContains(t, output.String(), "private-task-content")
-	require.NotContains(t, output.String(), "payload")
+	require.Contains(t, output.String(), "no writes or launches")
+	require.Contains(t, output.String(), "Captured scheduling prediction: claim_budget_reached, 1 dispatches")
 	after, err := os.ReadFile(file)
 	require.NoError(t, err)
 	require.Equal(t, data, after)
+}
+
+func TestWorkQueueArtifactReplayChecksWorkerAssignmentAgainstBoundRun(t *testing.T) {
+	log, ids := workQueueMixedFixture(t)
+	assignment, err := workqueue.AssignmentForDispatch(log.state(), ids["running_dispatch"])
+	require.NoError(t, err)
+	for _, test := range []struct {
+		runID string
+		err   string
+	}{{"202", ""}, {"203", "differs from the Dispatch's bound run"}} {
+		file := workQueueReplayTestFile(t, workQueueReplayTestEnvelope(t, log.jsonl(), "worker", workQueueTestWorker(test.runID), &assignment))
+		command := NewWorkCommand()
+		var output bytes.Buffer
+		command.SetOut(&output)
+		command.SetErr(io.Discard)
+		command.SilenceUsage = true
+		command.SetArgs([]string{"--repo", "owner/repo", "--json", "replay", "--file", file})
+		err := command.Execute()
+		if test.err != "" {
+			require.ErrorContains(t, err, test.err)
+			require.Empty(t, output.String())
+			continue
+		}
+		require.NoError(t, err)
+		require.Contains(t, output.String(), `"role": "worker"`)
+	}
+	file := workQueueReplayTestFile(t, workQueueReplayTestEnvelope(t, log.jsonl(), "dispatcher", workQueueReplayTestOrigin(), &assignment))
+	command := NewWorkCommand()
+	command.SetOut(io.Discard)
+	command.SetErr(io.Discard)
+	command.SetArgs([]string{"--repo", "owner/repo", "replay", "--file", file})
+	require.Error(t, command.Execute(), "a dispatcher snapshot cannot carry a worker assignment")
 }
 
 func TestWorkCommandFileReplayDoesNotRequireRepository(t *testing.T) {
@@ -349,30 +422,40 @@ func TestWorkQueueArtifactReplaySelectsCurrentAttemptWithinAggregateBounds(t *te
 }
 
 func TestWorkQueueArtifactReplayRejectsInvalidSelectorsAndSnapshots(t *testing.T) {
-	for _, flags := range [][]string{
-		{"--run-id", "0"}, {"--run-id", "-1"}, {"--file", ""},
-		{"--file", "snapshot", "--run-id", "10"},
-		{"--file", "snapshot", "--branch", "other"},
-		{"--file", "snapshot", "--request-id", "forged"},
-		{"--file", "snapshot", "--max-claims", "2"},
-		{"--file", "snapshot", "--pool", ""},
-		{"--file", "snapshot", "--pool", "default", "--max-claims", "0"},
-		{"--pool", "default"},
+	data := workQueueReplayTestSnapshot(t)
+	file := workQueueReplayTestFile(t, data)
+	for _, test := range []struct {
+		flags []string
+		err   string
+	}{
+		{[]string{"--repo", "owner/repo", "--run-id", "0"}, "choose one snapshot source"},
+		{[]string{"--repo", "owner/repo", "--run-id", "-1"}, "choose one snapshot source"},
+		{[]string{"--file", ""}, "choose one snapshot source"},
+		{[]string{"--file", file, "--run-id", "10"}, "choose one snapshot source"},
+		{[]string{"--file", file, "--branch", "other"}, "cannot use --branch"},
+		{[]string{"--file", file, "--request-id", "forged"}, "unknown flag"},
+		{[]string{"--file", file, "--max-claims", "2"}, "requires a pool name"},
+		{[]string{"--file", file, "--pool", ""}, "requires a pool name"},
+		{[]string{"--file", file, "--pool", "default", "--max-claims", "0"}, "could not predict scheduling"},
+		{[]string{"--file", file, "--pool", "default", "--concurrency", "0"}, "could not predict scheduling"},
+		{[]string{"--repo", "owner/repo", "--pool", "default"}, "require --run-id or --file"},
 	} {
 		command := NewWorkCommand()
 		command.SetOut(io.Discard)
 		command.SetErr(io.Discard)
-		command.SetArgs(append([]string{"replay"}, flags...))
-		require.Error(t, command.Execute(), "%v", flags)
+		command.SetArgs(append([]string{"replay"}, test.flags...))
+		require.ErrorContains(t, command.Execute(), test.err, "%v", test.flags)
 	}
-	data := workQueueReplayTestSnapshot(t)
+	after, err := os.ReadFile(file)
+	require.NoError(t, err)
+	require.Equal(t, data, after)
 	for _, failure := range []string{"version", "chain", "repository", "unknown"} {
 		t.Run(failure, func(t *testing.T) {
 			var snapshot map[string]any
 			require.NoError(t, json.Unmarshal(data, &snapshot))
 			switch failure {
 			case "version":
-				snapshot["version"] = 2
+				snapshot["version"] = 3
 			case "chain":
 				snapshot["transactionLog"] = `{"private":"secret"}`
 			case "repository":
@@ -382,8 +465,7 @@ func TestWorkQueueArtifactReplayRejectsInvalidSelectorsAndSnapshots(t *testing.T
 			}
 			invalid, err := json.Marshal(snapshot)
 			require.NoError(t, err)
-			file := filepath.Join(t.TempDir(), workQueueSnapshotFile)
-			require.NoError(t, os.WriteFile(file, invalid, 0o600))
+			file := workQueueReplayTestFile(t, invalid)
 			command := NewWorkCommand()
 			command.SetOut(io.Discard)
 			command.SetErr(io.Discard)

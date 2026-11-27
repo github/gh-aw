@@ -1329,7 +1329,7 @@ func TestWorkQueueOutcomeOutputIsWorkerOnly(t *testing.T) {
 			Tools:       map[string]any{"work-queue": map[string]any{"worker": worker}},
 		}, outputs)
 		if worker {
-			assert.Equal(t, "${{ steps.process_safe_outputs.outputs.work_queue_outcome }}", outputs["work_queue_outcome"])
+			assert.Equal(t, "${{ steps.work_queue_finish.outputs.work_queue_outcome }}", outputs["work_queue_outcome"])
 		} else {
 			assert.NotContains(t, outputs, "work_queue_outcome")
 		}
@@ -2407,18 +2407,21 @@ func TestWorkQueueSafeOutputsPRCheckoutFollowsAppToken(t *testing.T) {
 			GitHubApp:          &GitHubAppConfig{AppID: "${{ vars.APP_ID }}", PrivateKey: "${{ secrets.APP_PRIVATE_KEY }}"},
 			CreatePullRequests: &CreatePullRequestsConfig{},
 		},
-		Tools: map[string]any{"work-queue": map[string]any{"worker": true}},
+		Tools:           map[string]any{"work-queue": map[string]any{"worker": true}},
+		WorkQueuePolicy: &WorkQueuePolicyConfig{PolicyJSON: `{"version":4}`},
 	}
 	job, _, err := compiler.buildConsolidatedSafeOutputsJob(data, string(constants.AgentJobName), "test.md")
 	require.NoError(t, err)
 	require.NotNil(t, job)
 	steps := strings.Join(job.Steps, "")
-	reconcile := strings.Index(steps, "id: work_queue_claim_reconciliation")
 	mint := strings.Index(steps, "id: safe-outputs-app-token")
+	controls := strings.Index(steps, "id: work_queue_controls")
 	checkout := strings.Index(steps, "name: Checkout repository")
-	require.NotEqual(t, -1, reconcile)
+	finish := strings.Index(steps, "id: work_queue_finish")
 	require.NotEqual(t, -1, mint)
+	require.NotEqual(t, -1, controls)
 	require.NotEqual(t, -1, checkout)
-	assert.Less(t, reconcile, mint)
-	assert.Less(t, mint, checkout)
+	assert.Less(t, mint, controls)
+	assert.Less(t, controls, checkout)
+	assert.Less(t, checkout, finish)
 }

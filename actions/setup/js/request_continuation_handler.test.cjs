@@ -84,4 +84,25 @@ describe("request_continuation metadata handler", () => {
     expect(tool.inputSchema.properties.message.pattern).toBe("\\S");
     expect(isDependencyUnsupportedType("request_continuation")).toBe(true);
   });
+
+  it("validates routed descriptors and never treats them as advisory", async () => {
+    for (const config of [
+      { route: "elsewhere" },
+      { route: "workqueue", max: 2 },
+      { route: "workqueue", max_depth: 0 },
+      { route: "workqueue", max_depth: 17 },
+      { route: "workqueue", workflow: "summarize" },
+      { route: "issue", workflow_file: "summarize.lock.yml" },
+      { route: "dispatch", workflow: "summarize" },
+      { route: "dispatch", workflow_file: "../other.lock.yml" },
+      { route: "dispatch", workflow_file: "summarize.lock.yml", aw_context: "yes" },
+    ]) {
+      await expect(main(config)).rejects.toThrow("continuation_config_invalid");
+    }
+    const handler = await main({ route: "workqueue", max: 1, max_depth: 2 });
+    // Without output bound to this run attempt, a routed request is never accepted as metadata.
+    const result = await handler({ type: "request_continuation", message: "Continue" });
+    expect(result).toMatchObject({ success: false, skipped: true, status: "not_routed" });
+    expect(result).not.toHaveProperty("timestamp");
+  });
 });

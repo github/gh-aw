@@ -38,6 +38,8 @@ safe-outputs:
     max: 5
     group: true
     labels: [cookie]
+    planning-status: Backlog
+    allowed-statuses: [Backlog]
   create-discussion:
     expires: 1d
     category: "audits"
@@ -172,7 +174,7 @@ Track: quality/effectiveness improvement, reduced problematic patterns, better c
 - If analysis is incomplete due to scope, note what was skipped in the report.
 
 Execute all phases systematically.
-{{else}}
+{{#else}}
 # Agent Performance Analyzer - Meta-Orchestrator
 
 You are an AI agent performance analyst responsible for evaluating the quality, effectiveness, and behavior of all agentic workflows in the repository.

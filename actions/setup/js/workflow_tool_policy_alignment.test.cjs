@@ -8,7 +8,7 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 import { readDocumentMetadata } from "../../../scripts/markdown_metadata_test_adapter.cjs";
 import { Readable } from "node:stream";
-import { readLockFileHeaders } from "./work_queue_provisioning.cjs";
+import { readLockFileHeaders } from "./lock_file_headers.cjs";
 
 const require = createRequire(import.meta.url);
 const { buildCopilotSDKPermissionHandler } = require("./copilot_sdk_permissions.cjs");

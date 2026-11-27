@@ -1,8 +1,8 @@
 <details>
-<summary>Work queue reconciliation</summary>
+<summary>Work queue finish</summary>
 
-### Independent Claim reconciliation
+### Claim outcomes
 
-{authorized_claims} Claims may process scoped effects; {unauthorized_claims} Claims are cancelled, settled or blocked. Completion is not a verified Result. Shared native capacity remains reserved until exact terminal/nonlaunch evidence.
+{completed_claims} Claims completed with their recorded effects; {failed_claims} Claims failed and returned to the queue, or were cancelled after their last attempt.
 
 </details>

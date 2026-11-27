@@ -76,8 +76,9 @@ are subcommands, not standalone executables.
    `work: "__gh_aw_smoke__-${{ github.run_id }}"`. Verify the returned work is
    `absent` and that the response includes `snapshot_sha` (which is `null` when
    the queue branch does not exist).
-2. Call `work_queue_explain` for the same absent Work and confirm that its
-   explanation is explicitly snapshot-based, not a durable grant.
+2. Confirm the same `work_queue_read` response is explicitly snapshot-based,
+   not a durable grant: `view` is `activation_snapshot` and
+   `prediction.authoritative` is `false`.
 3. If `work_queue_claim_finish` is advertised, call it with
    `outcome: "completed"` and verify that the missing assignment is rejected
    without recording a finish intent. If observer tools omit this mutator,

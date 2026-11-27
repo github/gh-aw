@@ -435,7 +435,7 @@ func TestSafeOutputAuthorizationPreparedClaimAdapters(t *testing.T) {
 			require.Equal(t, config.AuthorizationCoverage["custom"], config.AuthorizationCoverage["custom:prepare_claim_adapter"])
 			configuration, err := json.Marshal(config.ClaimAdapters["custom"])
 			require.NoError(t, err)
-			job, err := NewCompiler().buildWorkQueuePreparedAdapterJob(data, "custom", 0, configuration, false)
+			job, err := NewCompiler().buildWorkQueuePreparedAdapterJob(data, "custom", configuration, false)
 			require.NoError(t, err)
 			require.Contains(t, job.Permissions, "id-token: write")
 			steps := strings.Join(job.Steps, "")
@@ -444,7 +444,7 @@ func TestSafeOutputAuthorizationPreparedClaimAdapters(t *testing.T) {
 			require.Contains(t, steps, "steps.claim_adapter_context.outputs.active == 'true' && steps.authorize_custom.outputs.authorized == 'true'")
 			staged := TemplatableBool("true")
 			config.Staged = &staged
-			stagedJob, err := NewCompiler().buildWorkQueuePreparedAdapterJob(data, "custom", 0, configuration, false)
+			stagedJob, err := NewCompiler().buildWorkQueuePreparedAdapterJob(data, "custom", configuration, false)
 			require.NoError(t, err)
 			require.NotContains(t, stagedJob.Permissions, "id-token:")
 			require.Equal(t, `"true"`, stagedJob.Env["GH_AW_SAFE_OUTPUTS_STAGED"])
@@ -457,7 +457,7 @@ func TestSafeOutputAuthorizationPreparedClaimAdapters(t *testing.T) {
 			case "scripts":
 				config.Scripts["custom"].Staged = &staged
 			}
-			localStagedJob, err := NewCompiler().buildWorkQueuePreparedAdapterJob(data, "custom", 0, configuration, false)
+			localStagedJob, err := NewCompiler().buildWorkQueuePreparedAdapterJob(data, "custom", configuration, false)
 			require.NoError(t, err)
 			require.NotContains(t, localStagedJob.Permissions, "id-token:")
 			require.Equal(t, `"true"`, localStagedJob.Env["GH_AW_CLAIM_ADAPTER_STAGED"])

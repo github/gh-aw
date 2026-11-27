@@ -29,7 +29,7 @@ Checks secret metadata and bounded existing-run evidence, not secret values.
 Custom token diagnostics reuse health's failure-first inventory and inspect
 one representative per workflow, or its latest completed run when no failure
 is listed. Available custom credentials take precedence within the budget.
-The agent must elicit the user to replace implicated tokens securely.
+Replace implicated tokens securely.
 Never use the gh auth login OAuth token as a workflow credential, run
 gh auth token, or copy CLI credentials into Actions secrets.
 
@@ -88,7 +88,7 @@ func NewDoctorCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringP("repo", "r", "", "Target repository (owner/repo format only; GHES host prefixes are not supported)")
+	cmd.Flags().StringP("repo", "r", "", repoNoHostUsage)
 	cmd.Flags().StringP("dir", "d", "", "Checkout directory to inspect (defaults to the repo name)")
 	cmd.Flags().String("require-owner-type", "any", "Require a specific owner type: any, org, or user")
 	addJSONFlag(cmd)

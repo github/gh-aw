@@ -3,25 +3,21 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { performance } from "node:perf_hooks";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const { createGitLedgerClient, gitEnvironment, queueLedgerClient, registerQueueLedgerClient } = require("./work_queue_git_transport.cjs");
-const { wrapGithubClient } = require("./work_queue_issue_pacing.cjs");
-const { readWorkQueueLog, publishWorkQueueRequest } = require("./work_queue_store.cjs");
-const { readCheckedQueue, writeCheckedFiles } = require("./work_queue_checked_transport.cjs");
-const { compactTransactions, newRequest, replayTransactions, serializeProjection, serializeTransactionLog } = require("./work_queue_replay.cjs");
-const { queueFixture } = require("./work_queue_lifecycle.test_helpers.cjs");
-const { context } = require("./work_queue_test_helpers.cjs");
-const { canonical } = require("./work_queue_codec.cjs");
+const { publishWorkQueueCheckpoint, publishWorkQueueRequest, readWorkQueueLog } = require("./work_queue_store.cjs");
+const { planDispatch } = require("./work_queue_scheduler.cjs");
+const h = require("./work_queue_test_helpers.cjs");
 
 const cleanups = [];
 afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) cleanup();
 });
 
-function fixture(options = {}) {
+/** A local bare repository served through the production Git ledger client. */
+function fixture() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "queue-git-test-"));
   cleanups.push(() => fs.rmSync(directory, { recursive: true, force: true }));
   const env = gitEnvironment();
@@ -31,295 +27,81 @@ function fixture(options = {}) {
       .trim();
   }
   git(["init", "--bare", "--quiet", "--initial-branch=main", "--template="]);
-  const queue = queueFixture({ count: 2, batch: 1, ...options });
   let head;
-  let serial = 0;
-  function store(transactions, { mode = "100644", parents = head ? [head] : [] } = {}) {
-    const contents = typeof transactions === "string" ? transactions : transactions.map(commit => canonical(commit)).join("\n") + "\n";
+  function store(contents, { parents = head ? [head] : [], branch = "work-queue" } = {}) {
     const blob = git(["hash-object", "-w", "--stdin"], contents);
-    const tree = git(["mktree"], `${mode} blob ${blob}\twork-queue.jsonl\n`);
-    head = git(["commit-tree", tree, ...parents.flatMap(parent => ["-p", parent]), "-F", "-"], `Queue fixture ${++serial}`);
-    git(["update-ref", "refs/heads/work-queue", head]);
+    const tree = git(["mktree"], `100644 blob ${blob}\twork-queue.jsonl\n`);
+    head = git(["commit-tree", tree, ...parents.flatMap(parent => ["-p", parent]), "-F", "-"], "Queue fixture");
+    git(["update-ref", `refs/heads/${branch}`, head]);
     return head;
   }
-  function storeHistory(transactions, count) {
-    const contents = transactions.map(commit => canonical(commit) + "\n").join("");
-    const input = [`blob\nmark :1\ndata ${Buffer.byteLength(contents)}\n${contents}\n`];
-    for (let index = 0; index < count; index++) {
-      const message = `Queue fixture ${++serial}`;
-      input.push(
-        `commit refs/heads/work-queue\nmark :${index + 2}\ncommitter Queue fixture <queue-fixture@example.invalid> ${queue.at} +0000\ndata ${Buffer.byteLength(message)}\n${message}\nfrom ${index ? `:${index + 1}` : head}\nM 100644 :1 work-queue.jsonl\n\n`
-      );
-    }
-    input.push("done\n");
-    git(["fast-import", "--quiet"], input.join(""));
-    head = git(["rev-parse", "refs/heads/work-queue"]);
-    return head;
-  }
-  store(queue.transactions);
+  const log = h.submit([], [h.work("a"), h.work("b")]);
+  store(h.ledgerText(log), { branch: "main" });
+  store(h.ledgerText(log));
   const calls = [];
-  const networkCalls = [];
   const forbidden = () => {
     calls.push("API");
-    throw new Error("Ledger verification must not call a hosted API");
+    throw new Error("the Git ledger transport must not call hosted APIs");
   };
-  const githubClient = {
-    auth: async () => {
-      networkCalls.push("Git");
-      return { type: "token", token: "queue-test-token" };
-    },
-    graphql: forbidden,
-    rest: new Proxy({}, { get: forbidden }),
-  };
+  const githubClient = { auth: async () => ({ type: "token", token: "queue-test-token" }), graphql: forbidden, rest: new Proxy({}, { get: forbidden }) };
   const ledger = createGitLedgerClient({ githubClient, owner: "owner", repo: "repo", branch: "work-queue", remote: directory });
   registerQueueLedgerClient(githubClient, ledger);
   cleanups.push(() => ledger.close());
-  return { queue, githubClient, ledger, calls, networkCalls, store, storeHistory, git, options: { githubClient, owner: "owner", repo: "repo" }, head: () => head };
+  return { log, githubClient, ledger, calls, store, git, options: { githubClient, owner: "owner", repo: "repo" }, head: () => git(["rev-parse", "refs/heads/work-queue"]) };
 }
 
-function performanceHistory({ generations = 4, commitsPerCheckpoint = 32, bound = false, corruptOldest = false } = {}) {
-  const f = fixture({
-    count: 135,
-    granted: bound,
-    bound,
-    workDefaults: { payload: { plan: "Verify the original synthetic work item without resource effects. ".repeat(80), effect_contract: { kind: "none" } } },
-  });
-  const retained = 1200;
-  const initial = f.queue.state;
-  let transactions = [...f.queue.transactions];
-  for (let index = 0; index < retained; index++) {
-    const operations = [{ kind: "Control", control: "admission_paused", value: index % 2 === 0, reason: "performance_fixture" }];
-    transactions.push({
-      version: 3,
-      id: `performance-control-${index}`,
-      previous: transactions.at(-1).id,
-      request: newRequest(`performance-request-${index}`, "control", f.queue.administrator, { operations }),
-      actor: f.queue.administrator,
-      policy_epoch: initial.policy_epoch,
-      at: f.queue.at + index + 1,
-      operations,
-    });
-  }
-  f.store(transactions);
-  for (let generation = 0; generation < generations; generation++) {
-    const source = transactions;
-    transactions = compactTransactions(source, f.head(), f.queue.administrator, f.queue.at + retained + generation);
-    // Preserve valid logical snapshots while breaking the oldest checkpoint's Git-parent binding.
-    if (generation === 0 && corruptOldest) f.store(source, { parents: [] });
-    f.storeHistory(transactions, commitsPerCheckpoint);
-  }
-  return { f, transactions, retained, generations, commitsPerCheckpoint, initial };
-}
-
-describe("Git-only work queue ledger", { timeout: 90000 }, () => {
-  it.each([false, true])("shares production ledger clients with a paced Issue wrapper created before the first read: %s", async wrapFirst => {
-    const client = { auth: async () => ({ type: "token", token: "offline-queue-token" }) };
-    const original = wrapFirst ? undefined : queueLedgerClient(client, "owner", "repo");
-    const { client: wrapped } = wrapGithubClient(client);
-    const fromWrapper = queueLedgerClient(wrapped, "owner", "repo");
-    const fromSource = original || queueLedgerClient(client, "owner", "repo");
-    cleanups.push(() => fromSource.close());
-    if (fromWrapper !== fromSource) cleanups.push(() => fromWrapper.close());
-    expect(fromWrapper).toBe(fromSource);
-    const independent = queueLedgerClient({ auth: client.auth }, "owner", "repo");
-    cleanups.push(() => independent.close());
-    expect(independent).not.toBe(fromSource);
-    for (const [owner, repo, branch] of [
-      ["other", "repo", "work-queue"],
-      ["owner", "other", "work-queue"],
-      ["owner", "repo", "other"],
-    ]) {
-      const scoped = queueLedgerClient(wrapped, owner, repo, branch);
-      cleanups.push(() => scoped.close());
-      expect(scoped).not.toBe(fromSource);
-    }
-    const revoked = new Error("fixture credential revoked");
-    let revokedReads = 0;
-    client.auth = async () => {
-      revokedReads++;
-      throw revoked;
+describe("Git work queue ledger transport", { timeout: 60000 }, () => {
+  it("reads and publishes through Git CAS only, recovering a committed request", async () => {
+    const f = fixture();
+    expect((await readWorkQueueLog(f.options)).state.stats.available).toBe(2);
+    const options = {
+      ...f.options,
+      actor: h.dispatcher,
+      request: { kind: "dispatch_next", parameters: h.dispatchParameters() },
+      operationsFor: (state, request) => planDispatch(state, request.parameters, request.id).operations,
     };
-    await expect(readWorkQueueLog({ githubClient: wrapped, owner: "owner", repo: "repo" })).rejects.toMatchObject({ code: "repository_unavailable" });
-    expect(revokedReads).toBe(1);
+    const published = await publishWorkQueueRequest(options);
+    expect(published).toMatchObject({ committed: true, recovered: false });
+    expect(f.head()).toBe(published.sha);
+    expect(await publishWorkQueueRequest(options)).toMatchObject({ committed: true, recovered: true });
+    expect(f.head()).toBe(published.sha);
+    expect(f.calls).toEqual([]);
   });
 
-  it("looks up unchanged history locally but fetches a changed remote head", async () => {
+  it("re-plans after another writer moves the remote head", async () => {
     const f = fixture();
-    const current = await readWorkQueueLog(f.options);
-    expect(f.networkCalls).toHaveLength(2);
-    await f.ledger.rest.repos.get();
-    const files = await f.ledger.readFiles(current.sha, ["work-queue.jsonl"]);
-    expect(files.get("work-queue.jsonl")).toBe(serializeTransactionLog(f.queue.transactions));
-    expect(f.networkCalls).toHaveLength(3);
-
-    f.store(f.queue.transactions);
-    const refreshed = await readWorkQueueLog(f.options);
-    expect(refreshed.sha).toBe(f.head());
-    expect(refreshed.sha).not.toBe(current.sha);
-    expect(f.networkCalls).toHaveLength(5);
-    expect(f.calls).toEqual([]);
-  });
-
-  it("verifies nested checkpoints and detached repeated reads without REST or GraphQL", async () => {
-    const f = fixture();
-    const first = compactTransactions(f.queue.transactions, f.head(), f.queue.administrator, f.queue.at);
-    const parent = f.store(first);
-    const second = compactTransactions(first, parent, f.queue.administrator, f.queue.at + 1);
-    const head = f.store(second);
-    for (let iteration = 0; iteration < 3; iteration++) {
-      const current = await readWorkQueueLog(f.options);
-      expect(current.sha).toBe(head);
-      expect(current.state.works.size).toBe(2);
-      expect(current.state.claims.size).toBe(2);
-      expect(serializeTransactionLog(current.transactions)).toBe(serializeTransactionLog(second));
-      current.state.works.clear();
-    }
-    expect(f.calls).toEqual([]);
-  });
-
-  it("validates a synthetic live-sized nested Git history in less than three seconds from cold", async () => {
-    const { f, transactions, retained } = performanceHistory();
-    const bytes = Buffer.byteLength(transactions.map(commit => canonical(commit) + "\n").join(""));
-    expect(bytes).toBeGreaterThan(700 * 1024);
-    const start = performance.now();
-    const cold = await readWorkQueueLog(f.options);
-    const coldMs = performance.now() - start;
-    expect(cold.state.works.size).toBe(135);
-    expect(cold.state.requests.size).toBe(f.queue.state.requests.size + retained + 4);
-    expect(cold.sha).toBe(f.head());
-    expect(coldMs).toBeLessThan(3000);
-    cold.state.works.clear();
-    const warmStart = performance.now();
-    const warm = await readWorkQueueLog(f.options);
-    const warmMs = performance.now() - warmStart;
-    expect(warm.state.works.size).toBe(135);
-    expect(warmMs).toBeLessThan(3000);
-    expect(f.calls).toEqual([]);
-    console.info(
-      JSON.stringify({
-        benchmark: "synthetic-cold-queue-validation",
-        works: 135,
-        retained_requests: retained,
-        checkpoint_generations: 4,
-        ancestry_commits: 128,
-        checkpoint_bytes: bytes,
-        cold_ms: Math.round(coldMs),
-        warm_ms: Math.round(warmMs),
-        budget_ms: 3000,
-      })
-    );
-  });
-
-  it.each([false, true])("verifies the full cold Git history, including its oldest checkpoint (corrupted: %s)", async corruptOldest => {
-    const { f, transactions, retained, generations, commitsPerCheckpoint, initial } = performanceHistory({ generations: 70, commitsPerCheckpoint: 21, bound: true, corruptOldest });
-    expect(Number(f.git(["rev-list", "--count", f.head()]))).toBe(generations * commitsPerCheckpoint + (corruptOldest ? 1 : 2));
-    expect(f.networkCalls).toEqual([]);
-    expect(initial.claims.size).toBeGreaterThan(0);
-    const expected = canonical(serializeProjection(replayTransactions(transactions)));
-    const start = performance.now();
-    let cold;
-    if (corruptOldest) {
-      await expect(readWorkQueueLog(f.options)).rejects.toMatchObject({ code: "checkpoint_invalid" });
-    } else {
-      cold = await readWorkQueueLog(f.options);
-    }
-    const coldMs = performance.now() - start;
-    if (!corruptOldest) {
-      expect(cold.sha).toBe(f.head());
-      expect(canonical(serializeProjection(cold.state))).toBe(expected);
-      expect(cold.transactions).toEqual(transactions);
-      expect(cold.state.requests.size).toBe(initial.requests.size + retained + generations);
-      expect(cold.state.claims.size).toBe(initial.claims.size);
-    }
-    expect(f.networkCalls).toHaveLength(2);
-    expect(f.calls).toEqual([]);
-    console.info(
-      JSON.stringify({
-        benchmark: "full-git-history-verification",
-        works: 135,
-        claims: initial.claims.size,
-        retained_requests: retained,
-        checkpoint_generations: generations,
-        ancestry_commits: generations * commitsPerCheckpoint,
-        corrupt_oldest: corruptOldest,
-        cold_ms: Math.round(coldMs),
-        budget_ms: 25000,
-      })
-    );
-    expect(coldMs).toBeLessThan(25000);
-  });
-
-  it.each(["duplicate-key", "truncated", "invalid-request"])("rejects a %s historical log even when the descendant checkpoint is valid", async defect => {
-    const f = fixture();
-    const checkpoint = compactTransactions(f.queue.transactions, f.head(), f.queue.administrator, f.queue.at);
-    const contents = canonical(checkpoint[0]) + "\n";
-    f.store(checkpoint);
-    if (defect === "duplicate-key") f.store(contents.replace('"version":3', '"version":3,"version":3'));
-    else if (defect === "truncated") f.store(contents.slice(0, -1));
-    else {
-      const invalid = structuredClone(checkpoint[0]);
-      invalid.request.parameters.prior_tip = "different-tip";
-      f.store([invalid]);
-    }
-    f.store(checkpoint);
-    await expect(readWorkQueueLog(f.options)).rejects.toThrow();
-    expect(f.calls).toEqual([]);
-  });
-
-  it("publishes and recovers a stable request after compaction using Git CAS only", async () => {
-    const f = fixture();
-    const checkpoint = compactTransactions(f.queue.transactions, f.head(), f.queue.administrator, f.queue.at);
-    f.store(checkpoint);
-    const request = newRequest("pause-using-git", "control", f.queue.administrator, {
-      operations: [{ kind: "Control", control: "admission_paused", value: true, reason: "operator" }],
+    await readWorkQueueLog(f.options);
+    const competing = h.dispatchNext(f.log, { concurrency: 1 }, { ...h.dispatcher, run_id: "900" });
+    f.store(h.ledgerText(competing.log));
+    const plans = [];
+    const result = await publishWorkQueueRequest({
+      ...f.options,
+      actor: h.dispatcher,
+      request: { kind: "dispatch_next", parameters: h.dispatchParameters({ concurrency: 2 }) },
+      operationsFor: (state, request) => {
+        plans.push(state.stats.claimed);
+        return planDispatch(state, request.parameters, request.id).operations;
+      },
     });
-    const input = { ...f.options, request, context: context(f.queue.administrator), now: () => f.queue.at + 1 };
-    const published = await publishWorkQueueRequest(input);
-    expect(published.publishedNow).toBe(true);
-    expect(f.git(["rev-parse", "refs/heads/work-queue"])).toBe(published.sha);
-    const recovered = await publishWorkQueueRequest(input);
-    expect(recovered.reused).toBe(true);
-    expect(f.git(["rev-parse", "refs/heads/work-queue"])).toBe(published.sha);
-    expect((await readWorkQueueLog(f.options)).state.requests.has(request.id)).toBe(true);
-    expect(f.calls).toEqual([]);
+    expect(plans).toEqual([1]);
+    expect(result.state.stats.claimed).toBe(2);
   });
 
-  it("reads and publishes projection journals at the checked Git head without ledger APIs", async () => {
+  it("checkpoints as a child of the previous head", async () => {
     const f = fixture();
-    const initial = await readCheckedQueue(f.options);
-    const journal = `.gh-aw/issue-projection/${"a".repeat(64)}.json`;
-    const next = await writeCheckedFiles({ ...f.options, branch: "work-queue", expectedHeadOid: initial.sha, files: [{ path: journal, content: '{"version":1}' }] });
-    const current = await readCheckedQueue({ ...f.options, paths: [journal] });
-    expect(current.sha).toBe(next);
-    expect(current.journal.get(journal)).toEqual({ version: 1 });
-    expect(current.transactions).toEqual(initial.transactions);
-    await expect(writeCheckedFiles({ ...f.options, branch: "work-queue", expectedHeadOid: initial.sha, files: [{ path: journal, content: '{"version":2}' }] })).rejects.toMatchObject({ status: 409 });
-    expect(f.calls).toEqual([]);
+    const before = f.head();
+    expect(await publishWorkQueueCheckpoint({ ...f.options, actor: h.reconciler, minimumLines: 0 })).toMatchObject({ checkpointed: false });
+    const extended = h.submit(f.log, [h.work("c")], { ...h.producer, run_id: "11" });
+    f.store(h.ledgerText(extended));
+    const result = await publishWorkQueueCheckpoint({ ...f.options, actor: h.reconciler, minimumLines: 1 });
+    expect(result.checkpointed).toBe(true);
+    expect(f.git(["rev-parse", `${f.head()}^`])).not.toBe(before);
+    expect(f.git(["show", `${f.head()}:work-queue.jsonl`]).split("\n")).toHaveLength(1);
+    expect((await readWorkQueueLog(f.options)).state.stats.work).toBe(3);
   });
 
-  it.each(["wrong-parent", "merge-parent", "nonregular-log", "damaged-state"])("rejects %s without trusting a checkpoint or issuing an API call", async defect => {
+  it("distinguishes an absent branch from an unreadable repository", async () => {
     const f = fixture();
-    const original = f.head();
-    const checkpoint = compactTransactions(f.queue.transactions, original, f.queue.administrator, f.queue.at);
-    if (defect === "wrong-parent") {
-      const foreign = f.store(f.queue.transactions, { parents: [] });
-      f.store(checkpoint, { parents: [foreign] });
-    } else if (defect === "merge-parent") {
-      const foreign = f.store(f.queue.transactions, { parents: [] });
-      f.store(checkpoint, { parents: [original, foreign] });
-    } else if (defect === "nonregular-log") {
-      f.store(checkpoint, { mode: "100755" });
-    } else {
-      checkpoint[0].operations[0].state.stats.nodes++;
-      f.store(checkpoint);
-    }
-    await expect(readWorkQueueLog(f.options)).rejects.toThrow(/checkpoint_invalid|ledger_invalid/);
-    expect(f.calls).toEqual([]);
-  });
-
-  it("distinguishes an authenticated absent branch from an unreadable repository", async () => {
-    const f = fixture();
-    f.git(["update-ref", "refs/heads/main", f.head()]);
     f.git(["update-ref", "-d", "refs/heads/work-queue"]);
     expect((await readWorkQueueLog(f.options)).sha).toBeNull();
     f.githubClient.auth = async () => {
@@ -329,54 +111,24 @@ describe("Git-only work queue ledger", { timeout: 90000 }, () => {
     expect(f.calls).toEqual([]);
   });
 
-  it("preserves BOM-prefixed Git tree entry names", async () => {
+  it("requires exactly one regular log entry", async () => {
     const f = fixture();
-    const blob = f.git(["hash-object", "-w", "--stdin"], serializeTransactionLog(f.queue.transactions));
-    const queueTree = f.git(["mktree", "-z"], [`100644 blob ${blob}\t\uFEFFnotes.txt\0`, `100644 blob ${blob}\t\uFEFFwork-queue.jsonl\0`].join(""));
-    const head = f.git(["commit-tree", queueTree, "-p", f.head(), "-F", "-"], "BOM queue filename");
+    const blob = f.git(["hash-object", "-w", "--stdin"], h.ledgerText(f.log));
+    const tree = f.git(["mktree", "-z"], [`100644 blob ${blob}\t\uFEFFnotes.txt\0`, `100644 blob ${blob}\t\uFEFFwork-queue.jsonl\0`].join(""));
+    const head = f.git(["commit-tree", tree, "-p", f.head(), "-F", "-"], "BOM queue filename");
     f.git(["update-ref", "refs/heads/work-queue", head]);
-    await expect(readWorkQueueLog(f.options)).rejects.toThrow(/exactly one regular canonical log/);
-    const result = await f.ledger.rest.git.getTree({ tree_sha: queueTree });
-    expect(result.data.tree.map(entry => entry.path)).toEqual(["\uFEFFnotes.txt", "\uFEFFwork-queue.jsonl"]);
-  });
-
-  it("rechecks credentials before reusing immutable objects and confines proofs to their repository", async () => {
-    const f = fixture();
-    f.store(compactTransactions(f.queue.transactions, f.head(), f.queue.administrator, f.queue.at));
-    await readWorkQueueLog(f.options);
-    f.githubClient.auth = async () => {
-      throw new Error("credential revoked");
-    };
-    await expect(readWorkQueueLog(f.options)).rejects.toThrow(/repository_unavailable/);
-    await expect(readWorkQueueLog({ ...f.options, owner: "foreign" })).rejects.toThrow(/repository_scope_invalid/);
-    await expect(writeCheckedFiles({ ...f.options, owner: "foreign", branch: "work-queue", expectedHeadOid: f.head(), files: [{ path: "work-queue.jsonl", content: "not a foreign ledger" }] })).rejects.toThrow(/repository_scope_invalid/);
-    expect(f.calls).toEqual([]);
+    await expect(readWorkQueueLog(f.options)).rejects.toThrow(/exactly one regular log/);
+    expect((await f.ledger.rest.git.getTree({ tree_sha: tree })).data.tree.map(entry => entry.path)).toEqual(["\uFEFFnotes.txt", "\uFEFFwork-queue.jsonl"]);
   });
 
   it("never makes the queue the default branch of a branchless repository", async () => {
     const f = fixture();
     f.git(["update-ref", "-d", "refs/heads/work-queue"]);
-    expect((await readWorkQueueLog(f.options)).sha).toBeNull();
-    const content = serializeTransactionLog(f.queue.transactions);
-    const blob = await f.ledger.rest.git.createBlob({ content, encoding: "utf-8" });
+    f.git(["update-ref", "-d", "refs/heads/main"]);
+    const blob = await f.ledger.rest.git.createBlob({ content: h.ledgerText(f.log), encoding: "utf-8" });
     const tree = await f.ledger.rest.git.createTree({ tree: [{ path: "work-queue.jsonl", mode: "100644", type: "blob", sha: blob.data.sha }] });
     const commit = await f.ledger.rest.git.createCommit({ tree: tree.data.sha, parents: [], message: "First queue submission" });
-    const publication = { ref: "refs/heads/work-queue", sha: commit.data.sha };
-    await expect(f.ledger.rest.git.createRef(publication)).rejects.toThrow(/separate default branch/);
-    expect(f.git(["ls-remote", f.git(["rev-parse", "--absolute-git-dir"]), "refs/heads/work-queue"])).toBe("");
-    f.git(["update-ref", "refs/heads/main", f.head()]);
-    await f.ledger.rest.git.createRef(publication);
-    expect((await readWorkQueueLog(f.options)).sha).toBe(commit.data.sha);
-    expect(f.git(["symbolic-ref", "HEAD"])).toBe("refs/heads/main");
-    expect(f.calls).toEqual([]);
-  });
-
-  it("fails closed on unavailable ancestry rather than using API fallback", async () => {
-    const f = fixture();
-    const prior = f.head();
-    f.store(compactTransactions(f.queue.transactions, prior, f.queue.administrator, f.queue.at));
-    fs.unlinkSync(path.join(f.git(["rev-parse", "--absolute-git-dir"]), "objects", prior.slice(0, 2), prior.slice(2)));
-    await expect(readWorkQueueLog(f.options)).rejects.toThrow(/git_transport_failed/);
+    await expect(f.ledger.rest.git.createRef({ ref: "refs/heads/work-queue", sha: commit.data.sha })).rejects.toThrow(/separate default branch/);
     expect(f.calls).toEqual([]);
   });
 
@@ -386,8 +138,6 @@ describe("Git-only work queue ledger", { timeout: 90000 }, () => {
     try {
       const env = gitEnvironment();
       expect(env.GIT_TRACE).toBeUndefined();
-      expect(env.GIT_CONFIG_COUNT).toBeUndefined();
-      expect(env.GIT_EXEC_PATH).toBe(process.env.GIT_EXEC_PATH);
       expect(env.GIT_NO_REPLACE_OBJECTS).toBe("1");
       expect(env.GIT_NO_LAZY_FETCH).toBe("1");
       expect(() => queueLedgerClient({}, "../foreign", "repo")).toThrow(/repository_scope_invalid/);

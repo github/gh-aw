@@ -16,7 +16,6 @@ const { logStagedPreviewInfo } = require("./staged_preview.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
 const { buildAwContext, resolveWorkQueueRuntime } = require("./aw_context.cjs");
 const { currentClaimHandle } = require("./work_queue_claim_scope.cjs");
-const { createDispatchCredentialValidator } = require("./work_queue_dispatch_credential.cjs");
 const { loadTemporaryIdMapFromResolved, resolveIssueNumber, replaceTemporaryIdReferences } = require("./temporary_id.cjs");
 const { dispatchWorkflow } = require("./dispatch_workflow_transport.cjs");
 
@@ -174,23 +173,20 @@ async function main(config = {}) {
       if (!config.work_queue_enabled || isCrossRepoDispatch) return { success: false, error: "work_queue_dispatch_next requires a same-repository queue dispatcher" };
       try {
         const { dispatchQueueIntent } = require("./work_queue_dispatch.cjs");
-        if (!isStaged && config.work_queue_dispatch_credential === undefined) throw new Error("work_queue_dispatch_credential_binding_required");
-        const validateDispatchCredential = isStaged ? undefined : createDispatchCredentialValidator(githubClient, config.work_queue_dispatch_credential, config["github-token"]);
-        const result = await dispatchQueueIntent({
+        const receipt = await dispatchQueueIntent({
           message,
           config,
           queueClient: github,
           dispatchClient: githubClient,
-          validateDispatchCredential,
           context,
           core,
           remainingDispatches: maxCount - processedCount - queueDispatches,
           staged: isStaged,
         });
-        queueDispatches += result.dispatches ?? 0;
-        return result;
+        queueDispatches += receipt.dispatches ?? 0;
+        return { success: true, ...receipt };
       } catch {
-        return { success: false, error: "Work queue dispatch failed closed; inspect its durable request and launch state" };
+        return { success: false, error: "Work queue dispatch was blocked; inspect the work queue ledger and control logs" };
       }
     }
     if (config.work_queue_enabled || process.env.GH_AW_WORK_QUEUE_ENABLED === "true" || currentClaimHandle()) {

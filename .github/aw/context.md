@@ -28,7 +28,7 @@ Use as `${{ <name> }}`, e.g. `${{ github.event.issue.number }}`.
 - **`${{ steps.* }}`** - Any outputs from previous steps (e.g., `${{ steps.my-step.outputs.result }}`)
 - **`${{ github.event.inputs.* }}`** - Any workflow inputs when triggered by workflow_dispatch (e.g., `${{ github.event.inputs.environment }}`)
 
-`aw_context` is reserved and injected by the compiler into supported dispatch and reusable-workflow triggers; do not declare it as a user input. Workflows with `tools.work-queue` receive a compiler-managed `work_queue_assignment` dispatch input. It is a version-3 immutable assignment containing a `claims` array; do not declare or construct it as a user input.
+`aw_context` is reserved and injected by the compiler into supported dispatch and reusable-workflow triggers; do not declare it as a user input. Workflows with `tools.work-queue` receive a compiler-managed `work_queue_assignment` dispatch input: `{"version":4,"dispatch_id":"d_…"}`. The worker reads its Claims from the queue snapshot; do not declare or construct this input.
 
 ### Sanitized Context Text (`steps.sanitized.outputs.text`)
 
@@ -86,7 +86,7 @@ Conditional blocks resolve **at runtime, before the agent sees the prompt**; the
 - **`{{#endif}}`** — closes block (**preferred** closing tag)
 - **`{{/if}}`** — alternate closing tag (also supported)
 
-Block form (tag on its own line) is recommended for readability.
+Prefer block form (tag on its own line).
 
 ### Supported Conditions
 
@@ -120,11 +120,10 @@ Include a one-paragraph executive summary at the top.
 
 ### Integration with Experiments
 
-When `experiments:` is set in frontmatter, the selected variant is substituted into `{{#if experiments.<name> == "..." }}` conditions before rendering. See [A/B Testing Experiments](../aw/experiments.md).
+When `experiments:` is set in frontmatter, the selected variant is substituted into `{{#if experiments.<name> == "..." }}` conditions before rendering. See [A/B Testing Experiments](experiments.md).
 
 ### Notes
 
 - **Malformed conditions fail compilation** — comparisons need an operator (`==`, `!=`, `===`, `!==`); invalid active conditions in the main workflow, imports, or local runtime imports block lock-file generation.
 - **Code regions** — only syntactically invalid implicit conditions inside inline code or fenced blocks stay literal; valid conditions and explicit GitHub Actions expressions there are still bound and validated.
 - **No nested conditionals** — inner tags become literal text.
-- **Tags are stripped before the agent runs** — never visible in the final prompt.

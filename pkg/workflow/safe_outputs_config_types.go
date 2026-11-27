@@ -89,6 +89,7 @@ type SafeOutputsConfig struct {
 	LinkSubIssue                           *LinkSubIssueConfig                    `yaml:"link-sub-issue,omitempty"`               // Link issues as sub-issues
 	HideComment                            *HideCommentConfig                     `yaml:"hide-comment,omitempty"`                 // Hide comments
 	SetIssueType                           *SetIssueTypeConfig                    `yaml:"set-issue-type,omitempty"`               // Set the type of an issue (empty string clears the type)
+	SetIssueStatus                         *SetIssueStatusConfig                  `yaml:"set-issue-status,omitempty"`             // Set native issue planning status
 	SetIssueField                          *SetIssueFieldConfig                   `yaml:"set-issue-field,omitempty"`              // Set a single issue field value by name/value
 	DispatchWorkflow                       *DispatchWorkflowConfig                `yaml:"dispatch-workflow,omitempty"`            // Dispatch workflow_dispatch events to other workflows
 	WorkQueueEnabled                       bool                                   `yaml:"-"`                                      // Internal work-queue dispatcher flag
@@ -98,12 +99,13 @@ type SafeOutputsConfig struct {
 	MissingData                            *MissingDataConfig                     `yaml:"report-missing-data,omitempty"`          // Optional for reporting missing data required to achieve goals
 	NoOp                                   *NoOpConfig                            `yaml:"noop,omitempty"`                         // No-op output for logging only (always available as fallback)
 	ReportIncomplete                       *ReportIncompleteConfig                `yaml:"report-incomplete,omitempty"`            // Signal that the task could not be completed due to a tool or infrastructure failure
-	RequestContinuation                    *RequestContinuationConfig             `yaml:"request-continuation,omitempty"`         // Metadata-only request for follow-up work
+	RequestContinuation                    *RequestContinuationConfig             `yaml:"request-continuation,omitempty"`         // Follow-up request: metadata only, or routed to a queue/issue/dispatch successor
 	ThreatDetection                        *ThreatDetectionConfig                 `yaml:"threat-detection,omitempty"`             // Threat detection configuration
 	Jobs                                   map[string]*SafeJobConfig              `yaml:"jobs,omitempty"`                         // Safe-jobs configuration (moved from top-level)
 	Scripts                                map[string]*SafeScriptConfig           `yaml:"scripts,omitempty"`                      // Custom inline handlers that run in the safe-output handler loop
 	ClaimAdapters                          map[string]*WorkQueueClaimAdapter      `yaml:"claim-adapters,omitempty"`               // Trusted queue-only custom preparation and independent effect verification
 	claimAdaptersParseError                error
+	workQueueApprovalReads                 bool                               // Compile-only dispatcher flag: a schedulable worker has an issue continuation route, so dependency refresh reads approval Issues
 	GitHubApp                              *GitHubAppConfig                   `yaml:"github-app,omitempty"` // GitHub App credentials for token minting
 	TokenBroker                            bool                               `yaml:"token-broker,omitempty" json:"token-broker,omitempty"`
 	URLs                                   SafeOutputsURLsPolicy              `yaml:"urls,omitempty"`                      // URL sanitization policy: SafeOutputsURLsPolicyAllowedOnly (default) or SafeOutputsURLsPolicyAllowedOrCodeRegion

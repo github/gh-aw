@@ -185,7 +185,8 @@ func TestWorkQueueSnapshotIsPreparedAndUploaded(t *testing.T) {
 	assert.Contains(t, uploadStep, "/tmp/gh-aw/work-queue.snapshot.json")
 	assert.Contains(t, job.Permissions, "contents: read")
 	assert.Contains(t, job.Permissions, "actions: read")
-	assert.Equal(t, "${{ steps.work_queue_snapshot.outputs.work_queue_origin }}", job.Outputs["work_queue_origin"])
+	assert.NotContains(t, job.Outputs, "work_queue_origin")
+	assert.NotContains(t, job.Outputs, workQueueAssignmentSettledOutput)
 }
 
 func TestWorkQueueWorkerActivationCanPublishOnlyTrustedBindingBeforeEffects(t *testing.T) {
@@ -196,6 +197,7 @@ func TestWorkQueueWorkerActivationCanPublishOnlyTrustedBindingBeforeEffects(t *t
 	assert.Contains(t, job.Permissions, "contents: write")
 	assert.Contains(t, job.Permissions, "actions: read")
 	assert.Contains(t, strings.Join(job.Steps, ""), `GH_AW_WORK_QUEUE_ROLE: "worker"`)
+	assert.Equal(t, "${{ steps.work_queue_snapshot.outputs.work_queue_assignment_settled }}", job.Outputs[workQueueAssignmentSettledOutput])
 }
 
 func TestActivationInfoArtifactUpload(t *testing.T) {

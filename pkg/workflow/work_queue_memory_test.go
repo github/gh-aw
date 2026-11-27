@@ -122,7 +122,7 @@ func TestWorkQueueMemoryGeneratedWrapper(t *testing.T) {
 	}
 	filename := filepath.Join(directory, "safe_output_script_persist_work_queue_memory.cjs")
 	require.NoError(t, os.WriteFile(filename, []byte(generateSafeOutputScriptContent("persist_work_queue_memory", data.SafeOutputs.Scripts["persist_work_queue_memory"])), 0o600))
-	assignment := `{"version":3,"dispatch_id":"d","request_id":"r","commit_id":"c","policy_epoch":"e","pool":"p","worker_profile":"w","claims":[{"handle":"h1","claim_id":"c1","work_id":"w1","work":{},"result_refs":[]}]}`
+	assignment := `{"dispatch_id":"d","claims":[{"handle":"h1","claim_id":"c1","work_id":"w1","work":{},"result_refs":[]}]}`
 	assignmentFile := filepath.Join(directory, "assignment.json")
 	require.NoError(t, os.WriteFile(assignmentFile, []byte(assignment), 0o400))
 	command := exec.Command(node, "-e", `(async()=>{const execute=await require(process.argv[1]).main();process.stdout.write(JSON.stringify(await execute({memory:{work_id:"w1"}})));})().catch(error=>{console.error(error);process.exitCode=1;});`, filename)

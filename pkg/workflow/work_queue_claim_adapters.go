@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"regexp"
 	"slices"
@@ -18,6 +19,7 @@ var workQueueAdapterVerifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9
 var workQueueAdapterNamePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z_0-9]*$`)
 var workQueueAdapterProjectionPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z_0-9]*(\.[A-Za-z][A-Za-z_0-9]*){0,7}$`)
 var workQueueAdapterBranchPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$`)
+var workQueueImmutableRevision = regexp.MustCompile(`^[a-f0-9]{40}$|^[a-f0-9]{64}$`)
 var workQueueAdapterRestRoutePattern = regexp.MustCompile(`^/repos/\{owner\}/\{repo\}/[A-Za-z0-9_{}./-]+$`)
 var workQueueAdapterRestFieldPattern = regexp.MustCompile(`\{([A-Za-z_][A-Za-z_0-9]*)\}`)
 
@@ -90,6 +92,9 @@ func parseWorkQueueClaimAdapters(value any) (map[string]*WorkQueueClaimAdapter, 
 		adapter := &WorkQueueClaimAdapter{}
 		if err := decoder.Decode(adapter); err != nil {
 			return nil, fmt.Errorf("safe-outputs.claim-adapters.%s: %w", name, err)
+		}
+		if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
+			return nil, fmt.Errorf("safe-outputs.claim-adapters.%s must be a single JSON object", name)
 		}
 		normalized := stringutil.NormalizeSafeOutputIdentifier(name)
 		if _, exists := adapters[normalized]; exists {

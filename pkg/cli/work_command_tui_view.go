@@ -56,7 +56,7 @@ func (m workQueueTUI) compactRow(row workQueueRow) string {
 		if len(key) > 18 {
 			key = append(key[:18], '.', '.', '.')
 		}
-		return fmt.Sprintf("+-- W %s [%s P%d] delivery=%s", workQueueText(string(key)), work.State, work.SchedulingPriority(), work.Barrier)
+		return fmt.Sprintf("+-- W %s [%s P%d attempts=%d]", workQueueText(string(key)), work.State, work.Priority, work.Attempts)
 	case "claim":
 		id := []rune(row.ID)
 		if len(id) > 12 {
@@ -66,7 +66,7 @@ func (m workQueueTUI) compactRow(row workQueueRow) string {
 		if row.Current {
 			owner = "current"
 		}
-		return fmt.Sprintf("|   \\-- C %s [%s %s]", workQueueText(string(id)), row.State, owner)
+		return fmt.Sprintf("|   \\-- C %s [%s %s] dispatch=%s", workQueueText(string(id)), row.State, owner, row.DispatchState)
 	default:
 		return row.Text
 	}
@@ -74,26 +74,20 @@ func (m workQueueTUI) compactRow(row workQueueRow) string {
 
 func (m workQueueTUI) actionPreview() string {
 	if m.mode == "help" {
-		return "KEYBOARD HELP\n\nUp/Down, j/k    Navigate Work and Claim attempts\nLeft/Right     Collapse/expand Claim history\nSpace          Toggle selection (including across search)\n/              Search IDs and metadata; Enter applies\nTab or Enter   Focus details; scroll with arrows/PgUp/PgDn\nr              Refresh; automatic reads every 10 seconds\nc              Review terminal cancellation of selection/cursor\np              Review priority change for available Work\nEsc            Close dialog; otherwise clear search/selection\nq              Quit (Ctrl+C may leave acknowledgment uncertain)\n\nForest branches show graph membership and Claim attempts.\nDependency edges are explicit cross-references in details.\nNo direct Claim grants, worker finish or native force-release.\n\nEsc closes help."
+		return "KEYBOARD HELP\n\nUp/Down, j/k    Navigate Work and Claim attempts\nLeft/Right     Collapse/expand Claim history\nSpace          Toggle selection (including across search)\n/              Search IDs and metadata; Enter applies\nTab or Enter   Focus details; scroll with arrows/PgUp/PgDn\nr              Refresh; automatic reads every 10 seconds\nc              Review cancellation of selected available Work\nx              Review release of selected Claims' dispatches\nEsc            Close dialog; otherwise clear search/selection\nq              Quit\n\nForest branches show graph membership and Claim attempts.\nDependency edges are explicit cross-references in details.\nWorkers finish their own Claims; operators can only cancel or release.\n\nEsc closes help."
 	}
-	title := "CANCEL WORK (terminal, not retry)"
-	explanation := "Selected current Claims lose authority; Work becomes cancelled.\nNative workers are NOT stopped or force-released. Debt is NOT refunded."
-	if m.mode == "priority" {
-		title = "REPRIORITIZE AVAILABLE WORK"
-		explanation = "Choose 1..5 (1 highest; weighted fairness, not strict priority).\nOnly future grants change; original metadata, age and debt remain."
-		if m.priority != 0 {
-			explanation += fmt.Sprintf("\nNew priority: %d", m.priority)
-		}
+	title := "CANCEL AVAILABLE WORK (terminal)"
+	explanation := "Selected Work becomes cancelled with reason operator and is never dispatched."
+	noun := "Work"
+	if m.mode == "release" {
+		title, noun = "RELEASE DISPATCHES", "dispatches"
+		explanation = "Open Claims are cancelled; their Work returns to the pool with one more attempt,\nor is cancelled at its pool's max_attempts. Running workflows are NOT stopped."
 	}
-	lines := []string{title, "Authority: " + workQueueText(m.state.Repository) + " branch=" + workQueueText(m.branch), "", explanation, "", fmt.Sprintf("Exact targets: %d Work (including hidden selections)", len(m.targets))}
+	lines := []string{title, "Repository: " + workQueueText(m.state.Repository) + " branch=" + workQueueText(m.branch), "", explanation, "", fmt.Sprintf("Exact targets: %d %s (including hidden selections)", len(m.targets), noun)}
 	for _, target := range m.targets {
-		line := "Work " + workQueueText(target.WorkID)
-		if target.ClaimID != "" {
-			line += " via Claim " + workQueueText(target.ClaimID)
-		}
-		lines = append(lines, line)
+		lines = append(lines, noun+" "+workQueueText(target))
 	}
-	lines = append(lines, "", "y publish checked atomic action | n/Esc return without changes")
+	lines = append(lines, "", "y publish checked action | n/Esc return without changes")
 	// Never hide targets behind an unscrollable destructive confirmation.
 	return strings.Join(lines, "\n")
 }
@@ -122,9 +116,9 @@ func (m workQueueTUI) View() tea.View {
 	}
 	width, height := m.width, m.height-10
 	s := m.state.Stats
-	header := fmt.Sprintf("WORK QUEUE %s branch=%s\nWork %d  available %d  claimed %d  completed %d  cancelled %d | Claims %d | native %d\n",
+	header := fmt.Sprintf("WORK QUEUE %s branch=%s\nWork %d  available %d  claimed %d  completed %d  cancelled %d | Claims %d | open dispatches %d\n",
 		workQueueText(m.state.Repository), workQueueText(m.branch), s.Work, s.Available, s.Claimed, s.Completed, s.Cancelled, s.Claims, s.Dispatches)
-	header += fmt.Sprintf("admission paused=%t | grants paused=%t | read %s | selected %d\n", m.state.AdmissionPaused, m.state.GrantsPaused, m.readAt.Format("15:04:05"), len(m.selected))
+	header += fmt.Sprintf("tip %s | read %s | selected %d\n", workQueueText(m.state.Tip), m.readAt.Format("15:04:05"), len(m.selected))
 	if m.editing {
 		header += m.search.View() + "\n"
 	} else {
@@ -156,7 +150,7 @@ func (m workQueueTUI) View() tea.View {
 	if m.lastRequest != "" {
 		footer += "Last action request=" + m.lastRequest + "\n"
 	}
-	footer += "j/k move | Space select | Tab details | / search | c cancel | p priority | r refresh | ? help | q quit"
+	footer += "j/k move | Space select | Tab details | / search | c cancel | x release | r refresh | ? help | q quit"
 	content := lipgloss.NewStyle().MaxWidth(width).MaxHeight(m.height).Render(header + body + "\n" + footer)
 	view := tea.NewView(content)
 	view.AltScreen = true

@@ -146,7 +146,7 @@ Workflow and run positional parameters must not start with `-`; use the tool's n
 The read-only `health` tool is available without `--allow-write-tools` or actor validation. It uses the server's GitHub credentials to read a bounded current-revision sample. `days` accepts 7, 30, or 90 (default 7) and is mutually exclusive with `start_date`. Date parameters accept UTC dates, RFC3339 timestamps, or relative times such as `-24h`. `threshold` defaults to 80 percent. Failure clusters and sub-agent failures use the existing `logs_dir` cache only; the tool does not download artifacts or modify cached logs.
 
 > [!NOTE]
-> The `actionlint`, `zizmor`, and `poutine` scanners used by `compile` prefer compatible local binaries on `PATH` (actionlint ≥ 1.7.12, zizmor ≥ 1.32.0, poutine ≥ 1.1.6), falling back to Docker otherwise. Docker-based scanners, including `grant`, pull images on first use. If you see a "Docker images are being downloaded" message, wait 15–30 seconds and retry.
+> The `actionlint`, `zizmor`, and `poutine` scanners used by `compile` prefer compatible local binaries on `PATH` (actionlint ≥ 1.7.12, zizmor ≥ 1.33.1, poutine ≥ 1.1.6), falling back to Docker otherwise. Docker-based scanners, including `grant`, pull images on first use. If you see a "Docker images are being downloaded" message, wait 15–30 seconds and retry.
 
 For `audit`, each run identifier may be a numeric run ID, a run URL, a job URL, or a job URL with a step anchor such as `https://github.com/owner/repo/actions/runs/123/job/456#step:7:1`.
 
@@ -183,7 +183,7 @@ The `work-queue` tool requires `operation` and `repo` (`owner/repo`), matching t
 | Operation | Options | Returns |
 | --- | --- | --- |
 | `state` | `graph`, `pool`, `state`, `search`, `offset`, `limit` | Bounded metadata-only Work/Claim forest with counts, queue tip, and `next_offset` when more rows remain. |
-| `inspect` | Exactly one of `work_id` or `claim_id` | Metadata, dependencies, assignment membership, and delivery barriers. |
+| `inspect` | Exactly one of `work_id` or `claim_id` | Metadata, dependencies, dispatch, run binding, and recorded effects. |
 
 Options belonging to another operation are rejected. For `state`, the `state` filter accepts `available`, `claimed`, `completed`, or `cancelled`. Pagination uses a nonnegative `offset` and a `limit` of 1–256 (default 80).
 
@@ -199,7 +199,7 @@ Options belonging to another operation are rejected. For `state`, the `state` fi
 }
 ```
 
-Only `state` and `inspect` are exposed through MCP. Other read-only operations (`replay`, `stats`, `explain`, `trace`, and `evidence`) remain CLI-only, as do all mutating operations.
+Only `state` and `inspect` are exposed through MCP. Other read-only operations (`replay` and `stats`) remain CLI-only, as do all mutating operations.
 
 ## Using GH-AW as an MCP from an Agentic Workflow
 

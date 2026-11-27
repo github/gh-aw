@@ -227,7 +227,7 @@ var disableCmd = &cobra.Command{
 	Short: "Disable agentic workflows",
 	Long: `Disable one or more workflows by ID, or all workflows if no IDs are provided.
 
-Any in-progress runs will be canceled before disabling.
+Any in-progress runs will be cancelled before disabling.
 
 ` + cli.WorkflowIDExplanation,
 	Example: `  ` + string(constants.CLIExtensionPrefix) + ` disable                   # Disable all workflows
@@ -259,11 +259,11 @@ The --dependabot flag generates dependency manifests when dependencies are detec
   - Cannot be used with specific workflow files or custom --dir
   - Only processes workflows in the default .github/workflows directory
 
+Unlike gh aw upgrade, gh aw compile only applies codemods when you opt in with --fix.
+
 Action mode controls how gh-aw action scripts are referenced in compiled workflows.
 Three flags govern this. --gh-aw-ref is mutually exclusive with the other two;
 --action-tag and --action-mode may be combined (e.g. --action-mode action --action-tag v1.2.3):
-
-Unlike ` + "`gh aw upgrade`" + `, ` + "`gh aw compile`" + ` only applies codemods when you opt in with ` + "`--fix`" + `.
 
   --action-mode <mode>
     Explicit mode selection. Values:
@@ -963,9 +963,9 @@ func configureOtherCommandFlags() {
 	runCmd.Flags().StringArrayP("raw-field", "F", []string{}, "Pass a workflow dispatch input in key=value format (can be specified multiple times)")
 	_ = runCmd.Flags().MarkShorthandDeprecated("raw-field", "use the long form --raw-field instead")
 	runCmd.Flags().Bool("push", false, "Commit and push workflow files (including transitive imports) before running. Refuses to proceed when unrelated files are already staged.")
-	runCmd.Flags().Bool("dry-run", false, "Preview workflow execution without triggering runs on GitHub Actions")
+	runCmd.Flags().Bool("dry-run", false, "Preview dispatch without triggering runs; preparation can still compile, enable, or push workflows")
 	runCmd.Flags().BoolP("json", "j", false, "Output results in JSON format")
-	runCmd.Flags().Bool("approve", false, "Approve all safe update changes. When strict mode is active (the default), the compiler emits warnings for new restricted secrets or unapproved action additions/removals not present in the existing gh-aw-manifest. Use this flag to approve and skip safe update enforcement")
+	runCmd.Flags().Bool("approve", false, "Approve safe update changes during compilation with --push; has no effect without --push")
 	runCmd.ValidArgsFunction = cli.CompleteWorkflowNames
 	cli.RegisterEngineFlagCompletion(runCmd)
 }

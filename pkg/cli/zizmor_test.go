@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -548,6 +549,18 @@ func TestZizmorImageIsPinnedAndValid(t *testing.T) {
 	}
 	if !strings.Contains(ref, "@sha256:") {
 		t.Fatalf("ZizmorImage must be pinned by digest, got %q", ref)
+	}
+}
+
+func TestZizmorDockerArgsPreservesDynamicValuesAsArguments(t *testing.T) {
+	t.Parallel()
+	mount := "/tmp/checkout with spaces:/workdir"
+	paths := []string{"./--help", "./file;echo unexpected.lock.yml"}
+	args := zizmorDockerArgs(ZizmorImage, mount, paths)
+	want := []string{"run", "--rm", "-v", mount, "-w", "/workdir", ZizmorImage,
+		"--persona", "auditor", "--format", "json", paths[0], paths[1]}
+	if !reflect.DeepEqual(args, want) {
+		t.Fatalf("unexpected docker arguments: got %q, want %q", args, want)
 	}
 }
 

@@ -78,6 +78,10 @@ function expandAllowedAliases(aliases) {
  * @returns {string} The sanitized content
  */
 function sanitizeContent(content, maxLengthOrOptions) {
+  if (!content || typeof content !== "string") {
+    return "";
+  }
+
   // Handle both old signature (maxLength) and new signature (options object)
   /** @type {number | undefined} */
   let maxLength;
@@ -101,10 +105,16 @@ function sanitizeContent(content, maxLengthOrOptions) {
     const normalizedAllowedAliases = normalizeAllowedAliases(maxLengthOrOptions.allowedAliases);
     allowedAliasesLowercase = expandAllowedAliases(normalizedAllowedAliases);
     maxMentions = maxLengthOrOptions.maxMentions;
+    if (maxMentions !== undefined && (!Number.isSafeInteger(maxMentions) || maxMentions < 0)) {
+      maxMentions = 0;
+    }
     maxBotMentions = maxLengthOrOptions.maxBotMentions;
     maxLines = maxLengthOrOptions.maxLines;
     deferMentions = maxLengthOrOptions.deferMentions === true;
     allowedAliasesSeen = maxLengthOrOptions.allowedAliasesSeen;
+    if (maxMentions === 0) {
+      allowedAliasesSeen = undefined;
+    }
   }
 
   // If no allowed aliases specified, use core sanitization (which neutralizes all mentions)
@@ -114,10 +124,6 @@ function sanitizeContent(content, maxLengthOrOptions) {
 
   // If allowed aliases are specified, we need custom mention filtering
   // We'll apply the same sanitization pipeline but with selective mention filtering
-
-  if (!content || typeof content !== "string") {
-    return "";
-  }
 
   // Build list of allowed domains (shared with core)
   const allowedDomains = buildAllowedDomains();

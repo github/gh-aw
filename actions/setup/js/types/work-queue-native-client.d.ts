@@ -14,6 +14,7 @@ export interface ClaimNativeClient {
     };
     codeScanning?: {
       uploadSarif?: NativeMethod<GitHubClient["rest"]["codeScanning"]["uploadSarif"], { id?: unknown }>;
+      getSarif?: NativeMethod<GitHubClient["rest"]["codeScanning"]["getSarif"], { processing_status?: string; errors?: readonly unknown[] | null }>;
     };
     git?: {
       getRef?: NativeMethod<GitHubClient["rest"]["git"]["getRef"], { object: { sha: string } }>;

@@ -50,6 +50,17 @@ func TestSecretsCommandHelp(t *testing.T) {
 	require.NoError(t, err, "Running secrets command without subcommand should show help without error")
 }
 
+func TestSecretsExamplesAvoidCommandLineValues(t *testing.T) {
+	t.Parallel()
+	for _, cmd := range []*cobra.Command{NewSecretsCommand(), newSecretsSetSubcommand()} {
+		assert.NotContains(t, cmd.Example, "--value ")
+		assert.NotContains(t, cmd.Example, "secret123")
+	}
+	cmd := newSecretsSetSubcommand()
+	assert.Contains(t, cmd.Long, "shell history and process listings")
+	assert.Contains(t, cmd.Example, "--value-from-env")
+}
+
 func TestSecretsCommandStructure(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -89,10 +89,10 @@ runner:
 ---
 ```
 
-`runner.topology: arc-dind` is required so compiled workflows enable ARC DinD split-filesystem handling (a shared runner/daemon workspace root, Docker-daemon-visible mount paths, and ARC-specific sandbox setup). The compiler handles its staging and default network isolation, but the operator must provide shared volumes, Docker socket access for the MCP gateway, and deployment-specific connectivity and policy configuration.
+`runner.topology: arc-dind` is required so compiled workflows enable ARC DinD split-filesystem handling (a shared runner/daemon workspace root, Docker-daemon-visible mount paths, and ARC-specific sandbox setup). Configure the `.md` workflow frontmatter; gh-aw generates the AWF configuration and sandbox invocation. Do not write or edit AWF configuration for this setup. The compiler handles staging and default network isolation, but the operator must provide shared volumes, Docker socket access for the MCP gateway, and deployment-specific connectivity and policy configuration.
 
 > [!TIP]
-> `runner.topology: arc-dind` enables sysroot staging and tool-cache redirection in the compiled workflow. Other ARC-specific behaviors (network isolation, chroot identity, `--docker-host` passthrough) are activated at **runtime** when the compiled workflow detects a `tcp://` value in `DOCKER_HOST`. You do not need to configure these separately.
+> `runner.topology: arc-dind` enables sysroot staging and tool-cache redirection in the compiled workflow. The default Docker sandbox uses network isolation; the compiled workflow also detects a `tcp://` value in `DOCKER_HOST` at runtime to configure split-daemon connectivity and chroot identity.
 
 After editing the frontmatter, recompile the lock file:
 
@@ -104,13 +104,13 @@ Commit both the `.md` workflow file and the generated `.lock.yml` file.
 
 ## 6. How it works
 
-When compiled workflows detect a `tcp://` value in `DOCKER_HOST` (set automatically by ARC DinD), a runtime probe activates ARC DinD handling:
+With `runner.topology: arc-dind`, the compiled workflow configures split-filesystem handling. ARC DinD normally sets `DOCKER_HOST` to a `tcp://` endpoint, which the workflow detects at runtime for split-daemon connectivity and identity:
 
 - **Sysroot staging** — AWF stages the release-tagged `build-tools` image's system binaries and libraries into a Docker named volume for the agent chroot. It does not make the runner's private `/usr`, `/lib`, `/bin`, or `/sbin` visible to the daemon. Runner-installed tools still need daemon-visible shared paths.
 - **Workspace mount** — the checked-out repository at `GITHUB_WORKSPACE` is explicitly mounted into the agent container. Both runner and daemon can see it because ARC DinD shares the `/home/runner/_work/` volume.
-- **Chroot identity** — the runner's UID/GID and home directory are patched into the AWF config so the agent runs with the correct identity inside the chroot.
+- **Chroot identity** — the generated configuration provides the runner's UID/GID and a job-scoped home for the agent inside the chroot.
 - **Artifact consolidation** — agent output files are consolidated under `${{ runner.temp }}/gh-aw/` before upload so downstream jobs (detection, safe-outputs) can find them.
-- **Network isolation** — AWF enforces egress via Docker network topology: an internal Docker network (`awf-net`) with no internet route and a dual-homed Squid proxy as the sole egress path. The runner container issues Docker API commands to the DinD sidecar daemon; the daemon creates the networks and manages all traffic enforcement. No host `iptables` rules are applied from the runner container.
+- **Network isolation** — the default Docker sandbox enforces egress via Docker network topology: an internal Docker network (`awf-net`) with no internet route and a dual-homed Squid proxy as the sole egress path. The runner container issues Docker API commands to the DinD sidecar daemon; the daemon creates the networks and manages all traffic enforcement. No host `iptables` rules are applied from the runner container.
 
 ## Network requirements
 
@@ -119,6 +119,7 @@ ARC DinD runners need outbound HTTPS (port 443) access from the runner pod. If y
 | Destination | Purpose |
 | --- | --- |
 | `github.com` (or your GHES instance) | Git clone, API calls, Actions runtime |
+| `api.github.com` | Copilot CLI release-age metadata when required by the installer |
 | `api.githubcopilot.com` (or your enterprise Copilot endpoint) | Copilot engine communication |
 | `ghcr.io` and `pkg-containers.githubusercontent.com` | Pull MCP gateway and AWF container images |
 | Domains in your workflow's `network.allowed` list | Agent egress (npm registries, PyPI, etc.) |
@@ -207,28 +208,18 @@ To migrate:
 
 ## Pod security and rootless install
 
-ARC DinD installs the Copilot CLI in rootless mode by default. If your `copilot-setup-steps` install the CLI manually, pass `--rootless` to avoid `sudo` in clusters that enforce `allowPrivilegeEscalation: false` (via PodSecurity Admission or OPA policies).
+For a runner container with `allowPrivilegeEscalation: false`, configure `runner.topology: arc-dind` in the workflow frontmatter as shown above and recompile. For the standard Copilot engine, gh-aw installs the CLI without `sudo` to `$RUNNER_TEMP/gh-aw/bin` and adds that directory to `$GITHUB_PATH`; no setup file or manual installation is required. The compiled workflow exposes the directory read-only to the sandbox. Ensure `RUNNER_TEMP` is writable and shared with the DinD daemon as described in [Tool cache redirection](#tool-cache-redirection). The DinD sidecar still requires `privileged: true`. If you supply a custom engine command, its installation is your responsibility.
 
-The `--rootless` flag installs to `$RUNNER_TEMP/gh-aw/bin` without any `sudo` calls. AWF mounts this job-scoped directory read-only; the script adds it to `$GITHUB_PATH` so subsequent steps find the binary:
+An optional `copilot-setup-steps.yml` is not a top-level gh-aw frontmatter key. To reuse such a file alongside an agentic workflow in `.github/workflows/`, explicitly import it in the workflow frontmatter:
 
-```yaml
-copilot-setup-steps:
-  runs-on: arc-runner-set
-  steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      with:
-        repository: github/gh-aw
-        path: gh-aw
-    - name: Install Copilot CLI (rootless)
-      run: bash "${GITHUB_WORKSPACE}/gh-aw/actions/setup/sh/install_copilot_cli.sh" --rootless
-      env:
-        GH_HOST: github.com
+```aw
+---
+imports:
+  - copilot-setup-steps.yml
+---
 ```
 
-In rootless mode:
-- The binary is installed to `$RUNNER_TEMP/gh-aw/bin/copilot` (no `sudo` required).
-- `$RUNNER_TEMP/gh-aw/bin` is appended to `$GITHUB_PATH` so `copilot` is on `PATH` for all later steps.
-- Ownership and cleanup operations that previously used `sudo` run as the current user (which owns the relevant files in rootless deployments).
+The file must contain `jobs.copilot-setup-steps.steps`. gh-aw imports only those steps, ignores the job's `runs-on` and other job settings, and removes all `actions/checkout` steps. Select the runner with the agentic workflow's `runs-on` instead. The similarly named [Copilot coding-agent setup file](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/customize-the-agent-environment) configures the separate coding-agent service; it is not automatically applied to gh-aw workflows, though a workflow can explicitly import its steps.
 
 ## Known limitations
 
@@ -251,7 +242,7 @@ The threat-detection job can't find the Copilot binary. This was fixed in gh-aw 
 
 ### `sudo: The "no new privileges" flag is set`
 
-The runner pod's security context has `allowPrivilegeEscalation: false`. Pass `--rootless` to the Copilot CLI install script so it installs without `sudo` — see [Pod security and rootless install](#pod-security-and-rootless-install) above.
+If the runner container has `allowPrivilegeEscalation: false`, check that the workflow uses `runner.topology: arc-dind` and has been recompiled. Check any custom install steps for `sudo` as well. See [Pod security and rootless install](#pod-security-and-rootless-install) for the rootless default.
 
 ### `awf-cli-proxy could not connect to the external DIFC proxy`
 

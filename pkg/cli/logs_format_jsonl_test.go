@@ -32,6 +32,7 @@ func TestLogsJSONLFlags(t *testing.T) {
 		{args: []string{"--format", "jsonl", "--report-file", "report.md"}, conflict: true},
 	} {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
+			t.Parallel()
 			cmd := NewLogsCommand()
 			require.NoError(t, cmd.ParseFlags(tt.args))
 			opts, err := loadCommonLogsOptions(cmd)
@@ -282,6 +283,7 @@ func TestLogsJSONLSummaryAndTerminalEvents(t *testing.T) {
 	t.Parallel()
 	for _, verbose := range []bool{false, true} {
 		t.Run(strconv.FormatBool(verbose), func(t *testing.T) {
+			t.Parallel()
 			var output bytes.Buffer
 			stream := newLogsJSONLStream(&output, verbose, true)
 			continuation := &ContinuationData{BeforeRunID: 123, Message: "Count limit reached"}
@@ -344,7 +346,7 @@ func TestLogsJSONLWorkQueueArtifactScope(t *testing.T) {
 		processConcurrentRunDownload, buildLogsProcessedRun = originalProcess, originalBuild
 	})
 	run := WorkflowRun{DatabaseID: 42, Repository: "owner/repo", WorkflowPath: ".github/workflows/test.lock.yml"}
-	queue := &WorkQueueReport{FinishIntent: "cached queue evidence"}
+	queue := &WorkQueueReport{FinishIntents: []WorkQueueFinishReceipt{{Handle: "cached queue evidence", Outcome: "completed"}}}
 	logsFetchWorkflowRunBatch = func(context.Context, LogsDownloadOptions, string, int, bool) (workflowRunBatch, error) {
 		return workflowRunBatch{runs: []WorkflowRun{run}, totalFetched: 1, batchSize: 1}, nil
 	}
@@ -400,7 +402,7 @@ func TestLogsJSONLWorkQueueArtifactScope(t *testing.T) {
 						require.NotNil(t, summary)
 						assert.Equal(t, tt.include, streamed.WorkQueue != nil)
 						assert.Equal(t, summary.WorkQueue, streamed.WorkQueue)
-						assert.Equal(t, "cached queue evidence", queue.FinishIntent, "projection must not mutate cached evidence")
+						assert.Equal(t, "cached queue evidence", queue.FinishIntents[0].Handle, "projection must not mutate cached evidence")
 					})
 				}
 			}

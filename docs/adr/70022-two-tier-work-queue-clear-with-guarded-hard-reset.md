@@ -1,5 +1,8 @@
 # ADR-70022: Two-Tier Work-Queue Clear with a Guarded Hard Reset
 
+> [!NOTE]
+> Superseded by work queue protocol v4 ([specification](../src/content/docs/specs/work-queue-specification.md)): v4 removed `clear --hard`, pause controls, and delivery barriers; `clear` releases open dispatches and cancels available Work.
+
 **Date**: 2026-10-18
 **Status**: Proposed (implemented in PR #70022; maintainer acceptance pending)
 **Deciders**: No deciders were recorded in the generated draft. This record does not assert maintainer approval.

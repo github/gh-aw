@@ -11,7 +11,7 @@ const { buildIssueReport, renderIssueParameters, createReportIssue } = require("
 const { renderReport, normalizeReport } = require("./report_ast.cjs");
 const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { createExpirationLine, extractExpirationDate } = require("./ephemerals.cjs");
-const { mutateIssues } = require("./work_queue_issue_api.cjs");
+const { createIssue } = require("./work_queue_issue_api.cjs");
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -259,20 +259,13 @@ describe("issue report publication boundary", () => {
     await expect(createReportIssue(client, { owner: "o", repo: "r", title: "Report", body: "Content" })).rejects.toBe(error);
   });
 
-  it("renders GraphQL issue creation before batching without changing other operations or retry identity", async () => {
-    const github = { graphql: vi.fn().mockResolvedValue({ m0: { issue: { id: "id" } }, m1: { issue: { id: "other" } } }) };
-    const operations = [
-      { name: "createIssue", type: "CreateIssueInput", input: { repositoryId: "repo", title: " Work\n title ", body: "<img src=x>\n\n<!-- work-id: abc -->", labelIds: ["label"] }, selection: "issue { id }" },
-      { name: "updateIssue", type: "UpdateIssueInput", input: { id: "other", state: "CLOSED" }, selection: "issue { id }" },
-    ];
-    const copy = structuredClone(operations);
-    const result = await mutateIssues(github, operations);
-    const [, variables] = github.graphql.mock.calls[0];
-    expect(variables.m0).toEqual({ ...operations[0].input, title: "Work title", body: "&lt;img src=x&gt;\n\n<!-- work-id: abc -->" });
-    expect(variables.m1).toBe(operations[1].input);
-    expect(operations).toEqual(copy);
-    expect(result.results[0].operation).toBe(operations[0]);
-    expect(result.ambiguous).toBe(false);
+  it("renders queue Issue creation through the AST publisher while keeping labels and the Work marker", async () => {
+    const create = vi.fn().mockResolvedValue({ data: { id: 1, number: 2 } });
+    const github = { rest: { issues: { create } } };
+    const issue = await createIssue(github, { owner: "o", repo: "r" }, { title: " Work\n title ", body: "<img src=x>\n\n<!-- gh-aw-work-queue-issue:w_abc -->", label: "work" });
+    expect(issue).toEqual({ id: 1, number: 2 });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0][0]).toEqual({ owner: "o", repo: "r", labels: ["work"], title: "Work title", body: "&lt;img src=x&gt;\n\n<!-- gh-aw-work-queue-issue:w_abc -->" });
   });
 });
 

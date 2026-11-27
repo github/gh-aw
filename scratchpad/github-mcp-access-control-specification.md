@@ -8,7 +8,7 @@ sidebar:
 # GitHub MCP Server Access Control Specification
 
 **Version**: 1.1.0  
-**Status**: Draft  
+**Status**: Implemented in part (compiler-side; runtime enforcement is external; Complete Conformance deferred)<br>
 **Latest Version**: [github-mcp-access-control-specification](/gh-aw/scratchpad/github-mcp-access-control-specification/)  
 **JSON Schema**: [mcp-gateway-config.schema.json](/gh-aw/schemas/mcp-gateway-config.schema.json)  
 **Editors**: GitHub Agentic Workflows Team
@@ -21,7 +21,7 @@ This specification defines access control extensions for the GitHub MCP (Model C
 
 ## Status of This Document
 
-This section describes the status of this document at the time of publication. This is a draft specification and may be updated, replaced, or made obsolete by other documents at any time.
+The compiler-side guard-policy integration is implemented; runtime enforcement is provided by the external MCP Gateway. Complete Conformance remains deferred as described in §2.1.
 
 This document is governed by the GitHub Agentic Workflows project specifications process.
 
@@ -149,8 +149,11 @@ A **Complete Conforming Implementation** MUST satisfy Basic Conformance and:
 - Enforce all access controls at runtime through gateway middleware
 - Support all configuration fields in combination
 
-These are normative target requirements, not a claim that the local `gh-aw`
-compiler implements every field. As verified on 2026-11-16, `roles` and
+These are normative target requirements. The local `gh-aw` compiler implements
+the configuration and validation portions of Basic Conformance; runtime
+enforcement and standardized responses depend on the external MCP Gateway, so
+this document does not claim end-to-end Basic Conformance for the compiler.
+Complete Conformance is not claimed. As verified on 2026-11-16, `roles` and
 `private-repos` remain deferred in the local compiler; use of either field is
 rejected rather than silently ignored. Track local support in
 [issue #78412](https://github.com/github/gh-aw/issues/78412). The local

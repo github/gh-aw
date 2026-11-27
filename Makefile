@@ -127,9 +127,9 @@ test-race:
 # Test impacted Go unit tests first for faster feedback (target budget: ~30s)
 .PHONY: test-unit
 test-unit:
-	@echo "Running impacted Go unit tests first (time budget: $(TEST_UNIT_MAX_SECONDS)s)..."; \
-	$(MAKE) --no-print-directory test-impacted-go CI_COVERAGE_ENABLED=0 GO_IMPACTED_TEST_MAX_SECONDS=$(TEST_UNIT_MAX_SECONDS) GO_IMPACTED_TEST_FALLBACK_MODE=$(TEST_UNIT_IMPACTED_FALLBACK_MODE) GO_IMPACTED_TEST_SAMPLE_PER_PACKAGE=$(GO_IMPACTED_TEST_SAMPLE_PER_PACKAGE); \
-	if [ "$(TEST_UNIT_RUN_FULL)" = "1" ]; then \
+	@echo "Running impacted Go unit tests first (time budget: $(TEST_UNIT_MAX_SECONDS)s)..."
+	@$(MAKE) --no-print-directory test-impacted-go CI_COVERAGE_ENABLED=0 GO_IMPACTED_TEST_MAX_SECONDS=$(TEST_UNIT_MAX_SECONDS) GO_IMPACTED_TEST_FALLBACK_MODE=$(TEST_UNIT_IMPACTED_FALLBACK_MODE) GO_IMPACTED_TEST_SAMPLE_PER_PACKAGE=$(GO_IMPACTED_TEST_SAMPLE_PER_PACKAGE)
+	@if [ "$(TEST_UNIT_RUN_FULL)" = "1" ]; then \
 		echo "TEST_UNIT_RUN_FULL=1 set; running full Go unit test suite after impacted tests."; \
 		$(MAKE) --no-print-directory test-unit-all; \
 	fi
@@ -516,7 +516,14 @@ test-impacted-go:
 		echo "No impacted timing data available; running up to $$SAMPLE_PER_PACKAGE sampled top-level tests per impacted package."; \
 		printf '%s\n' "$$CHANGED_GO_PACKAGES" | while IFS= read -r pkg; do \
 			[ -z "$$pkg" ] && continue; \
-			TEST_PATTERN=$$(go test -list '^Test' "$$pkg" 2>/dev/null | head -n "$$SAMPLE_PER_PACKAGE" | paste -sd'|' -); \
+			TEST_LIST=$$(go test -list '^Test' "$$pkg"); \
+			TEST_LIST_STATUS=$$?; \
+			if [ "$$TEST_LIST_STATUS" -ne 0 ]; then \
+				printf '%s\n' "$$TEST_LIST" >&2; \
+				echo "Failed to list top-level tests in $$pkg (go test -list exit $$TEST_LIST_STATUS); not treating it as a package without tests." >&2; \
+				exit 1; \
+			fi; \
+			TEST_PATTERN=$$(printf '%s\n' "$$TEST_LIST" | awk '/^Test[^[:space:]]*$$/' | head -n "$$SAMPLE_PER_PACKAGE" | paste -sd'|' -); \
 			if [ -z "$$TEST_PATTERN" ]; then \
 				echo "No top-level tests discovered in $$pkg; skipping sampled run for this package."; \
 				continue; \
@@ -992,17 +999,29 @@ golint:
 # Limit the analyzer set with: make golint-custom LINTER_FLAGS="-errstringmatch -test=false"
 # Limit analyzed packages with: make golint-custom LINTER_PACKAGES="./pkg/console ./pkg/workflow"
 # Prefix with GOOS/GOARCH to analyze alternate build targets without cross-compiling the linter runner itself.
+# Restrict execution to one performance tier with: make golint-custom LINTER_TIER=fast (or slow).
+# Tiers are defined in pkg/linters/tiers.go; fast + slow together cover every analyzer.
 MAX_LINES ?= 60
-LINTER_FLAGS ?=
+# Keep the heuristic analyzer out of default full-repository lint until audited.
+LINTER_FLAGS ?= -writefilepublicpermsensitive=false
 LINTER_PACKAGES ?= ./cmd/... ./pkg/...
+LINTER_TIER ?= all
 .PHONY: golint-custom
 golint-custom:
 	@echo "Building custom linters..."
 	@set -e; linter_dir=$$(mktemp -d); \
 	trap 'rm -rf "$$linter_dir"' EXIT; \
 	env -u GOOS -u GOARCH go build -o "$$linter_dir/gh-aw-linters" ./cmd/linters; \
-	echo "Running custom linters (largefunc max-lines=$(MAX_LINES))..."; \
-	"$$linter_dir/gh-aw-linters" $(LINTER_FLAGS) -largefunc.max-lines=$(MAX_LINES) $(LINTER_PACKAGES)
+	echo "Running custom linters (tier=$(LINTER_TIER), largefunc max-lines=$(MAX_LINES))..."; \
+	GH_AW_LINT_TIER="$(LINTER_TIER)" "$$linter_dir/gh-aw-linters" $(LINTER_FLAGS) -largefunc.max-lines=$(MAX_LINES) $(LINTER_PACKAGES)
+
+# Run only the fast or slow custom analyzer tier (see pkg/linters/tiers.go).
+.PHONY: golint-custom-fast golint-custom-slow
+golint-custom-fast:
+	@$(MAKE) --no-print-directory golint-custom LINTER_TIER=fast
+
+golint-custom-slow:
+	@$(MAKE) --no-print-directory golint-custom LINTER_TIER=slow
 
 # Run incremental linter (only changed files since BASE_REF)
 # This provides 50-75% faster linting on PRs by only checking changed files

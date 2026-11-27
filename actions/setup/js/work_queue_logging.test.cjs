@@ -1,17 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { createWorkQueueLogger, debugEnabled, queueControlErrorCode, queueControlErrorExplanation } = require("./work_queue_logging.cjs");
-const { fakeGitHub, options } = require("./work_queue_store_checks.cjs");
-const { genesis, submission, producer } = require("./work_queue_test_helpers.cjs");
+const { fakeQueueGitHub, ledgerText, producer, submit, work } = require("./work_queue_test_helpers.cjs");
 const { publishWorkQueueRequest } = require("./work_queue_store.cjs");
 const { planDispatch } = require("./work_queue_scheduler.cjs");
-const { replayTransactions } = require("./work_queue_replay.cjs");
+const { newState } = require("./work_queue_replay.cjs");
 const { performance } = require("node:perf_hooks");
-const { resolveDispatchCredentialPrincipal } = require("./work_queue_dispatch_credential.cjs");
-const { inspectClaimDelivery, createClaimDeliveryVerifier, verifyClaimDelivery } = require("./work_queue_delivery.cjs");
-const { withProjectionLocks } = require("./work_queue_issue_coordination.cjs");
-const { mutateIssues, ensureStatusLabel } = require("./work_queue_issue_api.cjs");
-const { registerQueueLedgerClient } = require("./work_queue_git_transport.cjs");
 
 describe("privacy-preserving work queue logging", () => {
   let stderr;
@@ -35,80 +29,14 @@ describe("privacy-preserving work queue logging", () => {
     expect(stderr).not.toHaveBeenCalled();
   });
 
-  it.each([
-    "run_correlation_mismatch",
-    "run_binding_conflict",
-    "run_repository_mismatch",
-    "run_repository_identity_mismatch",
-    "run_event_mismatch",
-    "run_ref_mismatch",
-    "run_workflow_mismatch",
-    "run_principal_mismatch",
-    "rerun_not_authorized",
-  ])("identifies native binding failure %s without exposing metadata", code => {
+  it.each(["run_binding_conflict", "claim_scope_invalid", "dispatch_state_conflict", "ownership_conflict", "unsupported_protocol", "cas_exhausted"])("identifies queue failure %s without exposing metadata", code => {
     const error = Object.assign(new Error(code), { request: { body: "private-token-payload" }, native_run: { display_title: "private-task-title" } });
     expect(queueControlErrorCode(error)).toBe(code);
     expect(queueControlErrorExplanation(code)).not.toContain("unclassified");
-    createWorkQueueLogger("dispatch").failure("launch.verification.failed", error, true);
+    createWorkQueueLogger("dispatch").failure("launch.failed", error, true);
     expect(output()).toContain(`${code}=true`);
     expect(output()).not.toContain("private-");
     expect(queueControlErrorCode(new Error(`${code}: private-details`))).toBe("queue_control_authority_or_publication_failed");
-  });
-
-  it("explains a delivery contract cardinality failure using only counts", async () => {
-    vi.stubEnv("DEBUG", "work-queue:delivery");
-    const assignment = {
-      version: 3,
-      dispatch_id: "private-dispatch",
-      request_id: "private-request",
-      commit_id: "private-commit",
-      policy_epoch: "private-policy",
-      pool: "private-pool",
-      worker_profile: "private-profile",
-      claims: [{ handle: "private-handle", claim_id: "private-claim", work_id: "private-work", result_refs: [], work: { effect_contract: { version: 1, outputs: [{ type: "private-output", min: 1, max: 2 }] } } }],
-    };
-    const member = assignment.claims[0];
-    const delivery = await inspectClaimDelivery({ assignment, claim_handle: member.handle, authorize: async () => ({ authorized: true, claim_handle: member.handle }), messages: [], results: [] });
-    expect(delivery.verification).toBe("unknown");
-    expect(output()).toContain("delivery.contract.cardinality_mismatch index=0 count=0 min=1 max=2");
-    expect(output()).not.toContain("private-");
-  });
-
-  it("distinguishes missing protected context from invalid bindings and unattested receipts", async () => {
-    vi.stubEnv("DEBUG", "work-queue:delivery");
-    expect(await verifyClaimDelivery({}, {})).toEqual({ verified: false, effects: "unknown" });
-    const assignment = {
-      version: 3,
-      dispatch_id: "private-dispatch",
-      request_id: "private-request",
-      commit_id: "private-commit",
-      policy_epoch: "private-policy",
-      pool: "private-pool",
-      worker_profile: "private-profile",
-      claims: [{ handle: "private-handle", claim_id: "private-claim", work_id: "private-work", result_refs: [], work: { effect_contract: { kind: "none" } } }],
-    };
-    const member = assignment.claims[0];
-    const verify = createClaimDeliveryVerifier({ assignment, recheck: async () => ({ verification: "verified", private_data: "private-token" }) });
-    const verification = { assignment, contract: member.work.effect_contract, attempt: 1, run: { run_id: "42", run_attempt: 1 } };
-    const invalidBinding = await verify(member, { ...verification, attempt: 0 });
-    expect(invalidBinding).toMatchObject({
-      verified: false,
-      effects: "unknown",
-      reason: "recheck_binding_invalid",
-      diagnostics: { original_claim: true, attempt: 0, first_run_attempt: true },
-    });
-    const unattestedReceipt = await verify(member, verification);
-    expect(unattestedReceipt).toMatchObject({
-      verified: false,
-      effects: "unknown",
-      reason: "recheck_receipt_rejected",
-      diagnostics: { receipt_present: false, readback_verified: true },
-    });
-    for (const rejection of [invalidBinding, unattestedReceipt]) {
-      expect(rejection).not.toHaveProperty("receipt");
-      expect(JSON.stringify(rejection)).not.toContain("private-");
-    }
-    expect(output()).not.toContain("private-");
   });
 
   it.each([
@@ -292,85 +220,44 @@ describe("privacy-preserving work queue logging", () => {
 
   it("reports only allowlisted static error codes without DEBUG or invoking getters", () => {
     const logger = createWorkQueueLogger("dispatch");
-    logger.failure("launch.preflight.blocked", new Error("work_queue_dispatch_credential_client_mismatch"), true);
-    expect(output()).toContain("work_queue_dispatch_credential_client_mismatch=true");
-    expect(output()).toContain("could not be bound to the compiler-selected token");
-    expect(output()).toContain("credential validation and workflow dispatch use the same selected token");
+    logger.failure("launch.blocked", new Error("work_queue_pending_limit"), true);
+    expect(output()).toContain("work_queue_pending_limit=true");
+    expect(output()).toContain(queueControlErrorExplanation("work_queue_pending_limit"));
     const getter = vi.fn(() => "private-token");
     const error = Object.defineProperties({}, { code: { get: getter }, message: { get: getter } });
     expect(queueControlErrorCode(error)).toBe("queue_control_authority_or_publication_failed");
     expect(getter).not.toHaveBeenCalled();
-    expect(queueControlErrorCode(new Error("work_queue_dispatch_credential_client_mismatch: private-token"))).toBe("queue_control_authority_or_publication_failed");
+    expect(queueControlErrorCode(new Error("work_queue_pending_limit: private-token"))).toBe("queue_control_authority_or_publication_failed");
     expect(queueControlErrorCode({ code: "private-token" })).toBe("queue_control_authority_or_publication_failed");
   });
 
-  it.each([
-    ["work_queue_pool_not_installed", "Installed pool settings and profiles must remain unchanged"],
-    ["work_queue_profile_not_approved", "registered on demand"],
-    ["work_queue_worker_not_compiler_approved", "dispatch allowlist"],
-  ])("explains installed routing failures without exposing task data: %s", (code, recovery) => {
+  it.each(["pool_invalid", "work_queue_profile_not_approved", "policy_invalid"])("explains configuration failures without exposing task data: %s", code => {
     const error = Object.assign(new Error("private-task-and-token"), { code });
     expect(queueControlErrorCode(error)).toBe(code);
-    expect(queueControlErrorExplanation(code)).toContain(recovery);
+    expect(queueControlErrorExplanation(code)).not.toContain("unclassified");
     createWorkQueueLogger("dispatch").failure("intent.process.blocked", error, true);
     expect(output()).toContain(`${code}=true`);
-    expect(output()).toContain(recovery);
+    expect(output()).toContain(queueControlErrorExplanation(code));
     expect(output()).not.toContain("private-");
     expect(queueControlErrorCode(new Error(`${code}: private-task-and-token`))).toBe("queue_control_authority_or_publication_failed");
-    expect(output()).not.toContain("private-token");
   });
 
   it.each([
-    ["work_queue_dispatch_repository_access_unavailable", "cannot check the target repository", "authenticated GitHub client"],
-    ["work_queue_dispatch_credential_client_mismatch", "could not be bound", "same selected token"],
-  ])("explains credential error %s without implying repository-role permission enforcement", (code, problem, action) => {
-    expect(queueControlErrorCode(new Error(code))).toBe(code);
-    createWorkQueueLogger("dispatch").failure("launch.preflight.blocked", new Error(code), true);
-    expect(output()).toContain(`${code}=true`);
-    expect(output()).toContain(problem);
-    expect(output()).toContain(action);
-  });
-
-  it("preserves the structured code from an unavailable opaque-token identity API", async () => {
-    let failure;
-    try {
-      await resolveDispatchCredentialPrincipal({}, { kind: "authenticated" });
-    } catch (error) {
-      failure = error;
-    }
-    expect(failure).toMatchObject({ code: "work_queue_dispatch_credential_identity_unavailable" });
-    expect(queueControlErrorCode(failure)).toBe("work_queue_dispatch_credential_identity_unavailable");
-    createWorkQueueLogger("dispatch").failure("launch.preflight.blocked", failure, true);
-    expect(output()).toContain("work_queue_dispatch_credential_identity_unavailable=true");
-    expect(output()).toContain("Check the selected token's validity and GitHub API access");
-    expect(output()).not.toContain("an opaque token requires");
-  });
-
-  it("uses an allowlisted structured code without exposing or parsing the raw message", () => {
-    const failure = Object.assign(new Error("private-token-and-task-payload"), { code: "work_queue_dispatch_credential_identity_unavailable" });
-    expect(queueControlErrorCode(failure)).toBe("work_queue_dispatch_credential_identity_unavailable");
-    createWorkQueueLogger("dispatch").failure("launch.preflight.blocked", failure, true);
-    expect(output()).toContain("work_queue_dispatch_credential_identity_unavailable=true");
-    expect(output()).not.toContain("private-token-and-task-payload");
-  });
-
-  it.each([
-    [401, "GitHub rejected the credential", "valid, and unexpired"],
-    [403, "GitHub denied the queue API request", "does not distinguish permission denial from throttling"],
-    [404, "GitHub could not find or expose", "selected token's access"],
-    [429, "GitHub rate-limited", "reconcile existing reservations"],
-    [503, "GitHub returned a server error", "launch may already have happened"],
-    [422, "GitHub rejected the queue API request", "workflow_dispatch trigger"],
-  ])("explains HTTP %s and a safe recovery action without raw provider data", (status, problem, action) => {
+    [401, "queue_control_github_authentication_failed"],
+    [403, "queue_control_github_access_denied"],
+    [404, "queue_control_github_not_found"],
+    [429, "queue_control_github_rate_limited"],
+    [503, "queue_control_github_api_unavailable"],
+    [422, "queue_control_github_request_rejected"],
+  ])("explains HTTP %s with a fixed category and no raw provider data", (status, code) => {
     const error = { status, response: { data: { message: "private-provider-body" } } };
-    const explanation = queueControlErrorExplanation(queueControlErrorCode(error));
-    expect(explanation).toContain(problem);
-    expect(explanation).toContain(action);
+    expect(queueControlErrorCode(error)).toBe(code);
+    const explanation = queueControlErrorExplanation(code);
+    expect(explanation).not.toContain("unclassified");
     createWorkQueueLogger("dispatch").failure("launch.post.failed", error, true);
     expect(output()).toContain(explanation);
     expect(output()).not.toContain("private-provider-body");
   });
-
   it("does not invoke nested response getters or print oversized error bodies in always-visible diagnostics", () => {
     const getter = vi.fn(() => {
       throw new Error("private");
@@ -475,7 +362,7 @@ describe("privacy-preserving work queue logging", () => {
     expect(output()).toContain("rate_limit_remaining=14904");
     expect(output()).toContain("sso_required=true");
     expect(output()).toContain("resource_not_accessible=true");
-    expect(output()).toContain("does not distinguish permission denial from throttling");
+    expect(output()).toContain(queueControlErrorExplanation("queue_control_github_access_denied"));
     expect(output()).not.toContain("private");
   });
 
@@ -710,33 +597,6 @@ describe("privacy-preserving work queue logging", () => {
     expect(output()).not.toMatch(/graphql_(?:lock|unlock|projection)_alias=/);
   });
 
-  it("passes the projection alias scheme from the mutation builder", async () => {
-    vi.stubEnv("DEBUG", "work-queue:issues");
-    const github = { graphql: vi.fn().mockRejectedValue({ errors: [{ type: "FORBIDDEN", path: ["m0"] }], data: { m0: null } }) };
-    await mutateIssues(github, [{ name: "closeIssue", type: "CloseIssueInput", input: { issueId: "private-issue" }, selection: "clientMutationId" }]);
-    expect(output()).toContain("graphql_projection_alias=0 graphql_operation_issue_projection=true graphql_result_present=false");
-    expect(output()).not.toContain("private-");
-  });
-
-  it.each([
-    ["createLabel", "WorkQueueTrackingLabel", "graphql_operation_create_label"],
-    ["updateLabel", "WorkQueueLabelColor", "graphql_operation_update_label"],
-  ])("passes the explicit %s operation context from the label request builder", async (operation, queryName, field) => {
-    vi.stubEnv("DEBUG", "work-queue:issues");
-    const label = operation === "updateLabel" ? { id: "private-label", name: "work:queued", color: "000000" } : null;
-    const github = {
-      graphql: vi
-        .fn()
-        .mockResolvedValueOnce({ node: { id: "private-repository", label } })
-        .mockRejectedValueOnce({ errors: [{ type: "FORBIDDEN", path: [operation], message: "private-provider-message" }], data: { [operation]: null } }),
-    };
-    await expect(ensureStatusLabel(github, "private-repository", { label: "work" }, "Queued")).rejects.toMatchObject({ code: "projection_label_pending" });
-    expect(github.graphql).toHaveBeenCalledTimes(2);
-    expect(github.graphql.mock.calls[1][0]).toContain(queryName);
-    expect(output()).toContain(`${field}=true graphql_result_present=false`);
-    expect(output()).not.toContain("private-");
-  });
-
   it.each(["l50", "m99", "u00", "l0\n", "l0\u2028", "private-alias", "private-".repeat(2000)])("does not expose or misclassify unknown GraphQL paths: %j", alias => {
     vi.stubEnv("DEBUG", "work-queue:issue_coordination");
     createWorkQueueLogger("issue_coordination").failure("projection.locks.acquire.failed", { errors: [{ type: "UNPROCESSABLE", path: [alias], message: "A reference with that name already exists." }] }, true, "lock");
@@ -882,115 +742,6 @@ describe("privacy-preserving work queue logging", () => {
     expect(output()).not.toContain("private");
   });
 
-  it("surfaces a failed GraphQL lock acquisition without authorizing projection or removing uncertain locks", async () => {
-    const operation = vi.fn();
-    const githubClient = {
-      graphql: vi.fn().mockRejectedValue({
-        status: 403,
-        response: { headers: { "x-ratelimit-remaining": "0", "x-github-request-id": "1:2:3:4:5" }, data: { message: "private-provider-body" } },
-      }),
-    };
-    const result = await withProjectionLocks({ githubClient, repositoryId: "private-repository", head: "a".repeat(40), keys: ["work:private-work"], scopes: [{ work_id: "private-work", keys: ["work:private-work"] }] }, operation);
-    expect(result.pending).toHaveLength(1);
-    expect(operation).not.toHaveBeenCalled();
-    expect(githubClient.graphql).toHaveBeenCalledTimes(1);
-    expect(output()).toContain("projection.locks.acquire.failed failed=true http_status=403 rate_limit_remaining=0");
-    expect(output()).toContain("GitHub request ID: 1:2:3:4:5.");
-    expect(output()).toContain("projection.locks.acquire.pending requested=1 acknowledged=0 pending_targets=1");
-    expect(output()).not.toContain("private");
-  });
-
-  it("distinguishes the observed two GraphQL lock rejections from throttling without retrying", async () => {
-    vi.stubEnv("DEBUG", "work-queue:issue_coordination");
-    const operation = vi.fn();
-    const githubClient = {
-      graphql: vi.fn().mockRejectedValue({
-        headers: { "x-ratelimit-limit": "10000", "x-ratelimit-remaining": "9880", "x-ratelimit-resource": "graphql", "x-github-request-id": "1:2:3:4:5" },
-        data: { l0: null, l1: null },
-        errors: ["l0", "l1"].map(alias => ({ type: "UNPROCESSABLE", path: [alias], message: "A reference with that name already exists." })),
-      }),
-    };
-    const result = await withProjectionLocks(
-      { githubClient, repositoryId: "private-repository", head: "a".repeat(40), keys: ["work:private", "issue:private"], scopes: [{ work_id: "private", keys: ["work:private", "issue:private"] }] },
-      operation
-    );
-    expect(result.pending).toHaveLength(1);
-    expect(operation).not.toHaveBeenCalled();
-    expect(githubClient.graphql).toHaveBeenCalledTimes(1);
-    expect(output()).toContain("rate_limit_remaining=9880");
-    expect(output()).toContain("graphql_errors=2 graphql_unprocessable=true");
-    expect(output()).toContain("GitHub request ID: 1:2:3:4:5.");
-    expect(output()).toContain("graphql_lock_alias=0 graphql_operation_create_ref=true graphql_result_present=false graphql_reference_already_exists=true");
-    expect(output()).toContain("graphql_lock_alias=1 graphql_operation_create_ref=true graphql_result_present=false graphql_reference_already_exists=true");
-    expect(output()).toContain("requested=2 acknowledged=0 pending_targets=1");
-    expect(output()).not.toContain("queue_control_github_rate_limited=true");
-    expect(output()).not.toContain("private");
-  });
-
-  it("passes the unlock alias scheme from the release request builder without swallowing errors", async () => {
-    vi.stubEnv("DEBUG", "work-queue:issue_coordination");
-    const failure = { errors: [{ type: "INTERNAL", path: ["u0"] }], data: { u0: null } };
-    const githubClient = {
-      graphql: vi.fn().mockImplementation(async (query, variables) => {
-        if (query.includes("WorkQueueProjectionUnlocks")) throw failure;
-        return { l0: { ref: { id: "private-ref", name: variables.l0.name.slice("refs/heads/".length), prefix: "refs/heads/", target: { oid: variables.l0.oid } } } };
-      }),
-    };
-    await expect(withProjectionLocks({ githubClient, repositoryId: "private-repository", head: "a".repeat(40), keys: ["work:private"] }, async () => ({}))).rejects.toBe(failure);
-    expect(githubClient.graphql).toHaveBeenCalledTimes(2);
-    expect(output()).toContain("projection.locks.release.failed");
-    expect(output()).toContain("graphql_unlock_alias=0 graphql_operation_delete_ref=true graphql_result_present=false");
-    expect(output()).not.toContain("private-");
-  });
-
-  it("reports partial lock acknowledgements and retains only uncertain writes", async () => {
-    vi.stubEnv("DEBUG", "work-queue:issue_coordination");
-    const githubClient = {
-      graphql: vi.fn().mockImplementation(async (query, variables) => {
-        expect(query).toContain("WorkQueueProjectionLocks");
-        const ref = { id: "private-ref", name: variables.l0.name.slice("refs/heads/".length), prefix: "refs/heads/", target: { oid: variables.l0.oid } };
-        throw { headers: { "x-github-request-id": "1:2:3:4:5" }, data: { l0: { ref }, l1: null }, errors: [{ type: "UNPROCESSABLE", path: ["l1"], message: "A reference with that name already exists." }] };
-      }),
-    };
-    const operation = vi.fn(async accepted => {
-      expect(accepted).toEqual(["private-a"]);
-      return { pending: [], ambiguous: true, retain_keys: ["work:private-a"] };
-    });
-    const result = await withProjectionLocks(
-      {
-        githubClient,
-        repositoryId: "private-repository",
-        head: "a".repeat(40),
-        keys: ["work:private-a", "work:private-b"],
-        scopes: [
-          { work_id: "private-a", keys: ["work:private-a"] },
-          { work_id: "private-b", keys: ["work:private-b"] },
-        ],
-      },
-      operation
-    );
-    expect(result.pending).toHaveLength(1);
-    expect(operation).toHaveBeenCalledTimes(1);
-    expect(githubClient.graphql).toHaveBeenCalledTimes(1);
-    expect(output()).toContain("graphql_unprocessable=true");
-    expect(output()).toContain("GitHub request ID: 1:2:3:4:5.");
-    expect(output()).toContain("graphql_lock_alias=1 graphql_operation_create_ref=true graphql_result_present=false graphql_reference_already_exists=true");
-    expect(output()).toContain("projection.locks.acquire.pending requested=2 acknowledged=1 pending_targets=1");
-    expect(output()).toContain("projection.locks.retained locks=1");
-    expect(output()).not.toContain("private");
-  });
-
-  it("surfaces REST lock acquisition errors without changing pending coordination semantics", async () => {
-    const createRef = vi.fn().mockRejectedValue({ status: 422, response: { data: { message: "private-provider-body" } } });
-    const operation = vi.fn();
-    const githubClient = { rest: { git: { createRef } } };
-    registerQueueLedgerClient(githubClient, githubClient);
-    await expect(withProjectionLocks({ githubClient, owner: "private-owner", repo: "private-repo", head: "a".repeat(40), keys: ["work:private-work"] }, operation)).rejects.toMatchObject({ code: "projection_coordination_pending" });
-    expect(operation).not.toHaveBeenCalled();
-    expect(output()).toContain("projection.locks.acquire.failed failed=true http_status=422");
-    expect(output()).not.toContain("private");
-  });
-
   it("does not invoke an error status getter or coerce invalid status values", () => {
     vi.stubEnv("DEBUG", "work-queue:*");
     const getter = vi.fn(() => {
@@ -1039,41 +790,35 @@ describe("privacy-preserving work queue logging", () => {
 
   it("traces durable publication and idempotent recovery without Work payloads or identities", async () => {
     vi.stubEnv("DEBUG", "work-queue:store");
-    const initial = [genesis()];
-    const transaction = submission(initial, ["secret-task"], { graph: "private-graph" });
-    const fake = fakeGitHub(initial);
-    const first = await publishWorkQueueRequest(options(fake, transaction.request, producer));
-    const second = await publishWorkQueueRequest(options(fake, transaction.request, producer));
-    expect(first.persisted).toBe(true);
-    expect(second.recovered).toBe(true);
-    expect(output()).toContain("request.publish.complete");
-    expect(output()).toContain("request.recovered");
-    for (const secret of ["secret-task", "private-graph", "owner/repo", transaction.request.id, transaction.operations[0].work_id]) expect(output()).not.toContain(secret);
+    const node = work("secret-task", { graph_id: "private-graph" });
+    const fake = fakeQueueGitHub(ledgerText(submit([], [work("seed")])));
+    const options = { githubClient: fake.githubClient, owner: "owner", repo: "repo", actor: producer, request: { kind: "submit", parameters: { work_ids: [node.work_id] } }, operationsFor: () => [node] };
+    const first = await publishWorkQueueRequest(options);
+    const second = await publishWorkQueueRequest(options);
+    expect(first).toMatchObject({ committed: true, recovered: false });
+    expect(second).toMatchObject({ committed: true, recovered: true });
+    expect(output()).toContain("ledger.read.complete");
+    for (const secret of ["secret-task", "private-graph", "owner/repo", first.request.id, node.work_id]) expect(output()).not.toContain(secret);
     expect(output()).not.toContain("[work-queue:replay]");
   });
 
   it("traces ambiguous-write recovery without changing publication semantics", async () => {
     vi.stubEnv("DEBUG", "work-queue:store");
-    const initial = [genesis()];
-    const transaction = submission(initial, ["private"]);
-    const fake = fakeGitHub(initial);
+    const node = work("private");
+    const fake = fakeQueueGitHub(ledgerText(submit([], [work("seed")])));
     fake.state.ambiguousOnce = true;
-    const result = await publishWorkQueueRequest(options(fake, transaction.request, producer));
-    expect(result.recovered).toBe(true);
+    const result = await publishWorkQueueRequest({ githubClient: fake.githubClient, owner: "owner", repo: "repo", actor: producer, request: { kind: "submit", parameters: { work_ids: [node.work_id] } }, operationsFor: () => [node] });
+    expect(result).toMatchObject({ committed: true, recovered: true });
     expect(fake.state.updates).toBe(1);
-    expect(output()).toContain("request.publish.write_failed failed=true http_status=502");
-    expect(output()).toContain("request.publish.recovery conflict=false ambiguous=true");
-    expect(output()).toContain("request.recovered");
+    expect(output()).toContain("request.publish.retry attempt=1 conflict=false");
     expect(output()).not.toContain("private");
   });
 
   it("reports no-grant scheduling without exposing pool or Work identities", () => {
     vi.stubEnv("DEBUG", "work-queue:scheduler");
-    const state = replayTransactions([genesis()]);
-    const decision = planDispatch(state, { pool: "default", max_claims: 1, max_dispatches: 1, max_bytes: 49152 }, { requestId: "private-request", commitId: "private-commit", at: 10 });
+    const decision = planDispatch(newState(), { pool: "default", max_claims: 1, max_dispatches: 1, concurrency: 1, per_account_limit: 0, profiles: {} }, "request:private");
     expect(decision.reason).toBe("no_work");
-    expect(output()).toContain("selection.no_grant pending=0 ineligible=false");
-    expect(output()).toContain("dispatch.plan.complete claims=0 assignments=0 no_grant=true");
+    expect(output()).toContain("dispatch.plan.complete claims=0 eligible=0");
     expect(output()).not.toContain("private");
     expect(output()).not.toContain("default");
   });

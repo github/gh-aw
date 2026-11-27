@@ -2,13 +2,13 @@ package cli
 
 import (
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/github/gh-aw/pkg/workqueue"
+	"github.com/stretchr/testify/require"
 )
 
 func tuiKey(t *testing.T, model workQueueTUI, key string) (workQueueTUI, tea.Cmd) {
@@ -34,113 +34,179 @@ func tuiKey(t *testing.T, model workQueueTUI, key string) (workQueueTUI, tea.Cmd
 	}
 	next, command := model.Update(tea.KeyPressMsg{Code: code, Text: text})
 	updated, ok := next.(workQueueTUI)
-	if !ok {
-		t.Fatal("TUI changed model type")
-	}
+	require.True(t, ok, "TUI changed model type")
 	return updated, command
 }
 
-func loadedTUI(t *testing.T, granted bool) workQueueTUI {
+func tuiLoad(t *testing.T, model workQueueTUI, message workQueueLoaded) workQueueTUI {
 	t.Helper()
-	state, _, _ := workOperatorFixture(t, granted)
-	model := newWorkQueueTUI(workQueueTUIService{}, "work-queue")
-	next, _ := model.Update(workQueueLoaded{state: &state})
-	loaded, ok := next.(workQueueTUI)
-	if !ok {
-		t.Fatal("TUI changed model type")
-	}
+	next, _ := model.Update(message)
+	updated, ok := next.(workQueueTUI)
+	require.True(t, ok, "TUI changed model type")
+	return updated
+}
+
+func loadedTUI(t *testing.T, log *workQueueTestLog) workQueueTUI {
+	t.Helper()
+	state := log.state()
+	loaded := tuiLoad(t, newWorkQueueTUI(workQueueTUIService{}, "work-queue"), workQueueLoaded{state: &state})
 	loaded.width, loaded.height = 180, 60
 	loaded.sizeDetails()
 	return loaded
 }
 
 func TestWorkTUICursorDetailsSearchCollapseAndResize(t *testing.T) {
-	m := loadedTUI(t, true)
+	log, _ := workOperatorFixture(t, true)
+	m := loadedTUI(t, log)
 	first := m.rows[m.cursor]
-	if first.Kind != "work" || !strings.Contains(m.details.GetContent(), first.ID) {
-		t.Fatal("cursor Work has no details")
-	}
+	require.Equal(t, "work", first.Kind, "the cursor skips the graph header")
+	require.Contains(t, m.details.GetContent(), first.ID)
 	m, _ = tuiKey(t, m, "down")
 	claim := m.rows[m.cursor]
-	if claim.Kind != "claim" || !strings.Contains(m.details.GetContent(), claim.ID) {
-		t.Fatal("cursor Claim did not update details")
-	}
+	require.Equal(t, "claim", claim.Kind)
+	require.Contains(t, m.details.GetContent(), claim.ID)
 	m, _ = tuiKey(t, m, "tab")
-	if !m.detailFocus {
-		t.Fatal("details cannot receive keyboard focus")
-	}
+	require.True(t, m.detailFocus, "details cannot receive keyboard focus")
 	m, _ = tuiKey(t, m, "tab")
 	m, _ = tuiKey(t, m, "h")
-	if m.rows[m.cursor].Kind != "work" || !m.collapsed[first.WorkID] {
-		t.Fatal("collapse did not retain owning Work")
-	}
+	require.Equal(t, "work", m.rows[m.cursor].Kind, "collapse must keep the owning Work under the cursor")
+	require.True(t, m.collapsed[first.WorkID])
+	require.Len(t, m.rows, 6)
 	m, _ = tuiKey(t, m, "l")
+	require.Len(t, m.rows, 7)
 	m, _ = tuiKey(t, m, "/")
+	require.True(t, m.editing)
 	m.search.SetValue(claim.ID)
 	m, _ = tuiKey(t, m, "enter")
-	if len(m.rows) != 3 || m.rows[2].ID != claim.ID {
-		t.Fatal("search lost Claim context")
-	}
+	require.Len(t, m.rows, 3, "search lost Claim context")
+	require.Equal(t, claim.ID, m.rows[2].ID)
 	m, _ = tuiKey(t, m, "esc")
-	if m.filter.Query != "" || len(m.rows) != 7 {
-		t.Fatal("Esc did not clear filter")
-	}
+	require.Empty(t, m.filter.Query)
+	require.Len(t, m.rows, 7)
+	m, _ = tuiKey(t, m, "G")
+	require.Equal(t, len(m.rows)-1, m.cursor)
+	m, _ = tuiKey(t, m, "g")
+	require.Equal(t, "work", m.rows[m.cursor].Kind, "home lands on the first Work, not the graph header")
 	for _, size := range [][2]int{{180, 60}, {100, 30}, {80, 24}, {45, 16}, {30, 10}} {
 		next, _ := m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
 		var ok bool
 		m, ok = next.(workQueueTUI)
-		if !ok {
-			t.Fatal("window update lost model")
-		}
+		require.True(t, ok, "window update lost model")
 		view := m.View()
-		if !view.AltScreen || lipgloss.Width(view.Content) > size[0] || lipgloss.Height(view.Content) > size[1] {
-			t.Fatalf("responsive frame exceeds %dx%d: %dx%d", size[0], size[1], lipgloss.Width(view.Content), lipgloss.Height(view.Content))
-		}
-		if strings.Contains(view.Content, "PAYLOAD-MUST") || strings.Contains(view.Content, "SECRET-MUST") {
-			t.Fatal("TUI leaked payloads")
-		}
+		require.True(t, view.AltScreen)
+		require.LessOrEqual(t, lipgloss.Width(view.Content), size[0], "responsive frame exceeds %dx%d", size[0], size[1])
+		require.LessOrEqual(t, lipgloss.Height(view.Content), size[1], "responsive frame exceeds %dx%d", size[0], size[1])
+		require.NotContains(t, view.Content, "PAYLOAD-MUST")
+		require.NotContains(t, view.Content, "SECRET-MUST")
 	}
 }
 
-func TestWorkTUIConfirmCancelIsScopedAndAtomic(t *testing.T) {
-	m := loadedTUI(t, true)
-	m, _ = tuiKey(t, m, "down") // Current Claim, not its Work.
-	claim := m.rows[m.cursor]
+func TestWorkTUICancelIsScopedToAvailableWorkAndConfirmed(t *testing.T) {
+	log, ids := workOperatorFixture(t, false)
+	m := loadedTUI(t, log)
+	work := m.rows[m.cursor]
+	require.Equal(t, ids[0], work.ID)
 	writes := 0
-	m.service.publish = func(id, kind string, params workqueue.OperationsParameters) (workqueue.Publication, error) {
+	m.service.publish = func(kind string, parameters any, operationsFor workqueue.OperationsFor) (workqueue.Publication, error) {
 		writes++
-		if id == "" || kind != "cancel_work" || len(params.Operations) != 1 || !strings.Contains(string(params.Operations[0]), claim.ID) {
-			t.Fatal("confirmation did not preserve exact Claim fence")
-		}
-		return workqueue.Publication{Changed: true}, nil
+		require.Equal(t, "cancel_work", kind)
+		require.Equal(t, workqueue.CancelWorkParameters{WorkIDs: []string{work.ID}, Reason: "operator"}, parameters)
+		state := log.state()
+		operations, err := operationsFor(state, workqueue.Request{})
+		require.NoError(t, err)
+		require.Len(t, operations, 1)
+		require.JSONEq(t, `{"kind":"WorkCancellation","work_id":"`+work.ID+`","reason":"operator"}`, string(operations[0]))
+		log.cancel(work.ID)
+		return workqueue.Publication{Committed: true, Request: workqueue.Request{ID: "request:cancel"}}, nil
 	}
-	m.service.read = func() (workqueue.Projection, error) { return m.state, nil }
+	m.service.read = func() (workqueue.Projection, error) { return log.state(), nil }
+	m, _ = tuiKey(t, m, " ")
+	require.Len(t, m.selected, 1)
 	m, command := tuiKey(t, m, "c")
-	if command != nil || writes != 0 || m.mode != "cancel" || len(m.targets) != 1 {
-		t.Fatal("cancel mutated before review")
-	}
+	require.Nil(t, command)
+	require.Zero(t, writes, "cancel mutated before review")
+	require.Equal(t, "cancel", m.mode)
+	require.Equal(t, []string{work.ID}, m.targets)
+	require.Contains(t, m.modalView(), "CANCEL AVAILABLE WORK")
+	require.Contains(t, m.modalView(), workQueueText(work.ID))
 	m, command = tuiKey(t, m, "n")
-	if command != nil || m.mode != "" || writes != 0 {
-		t.Fatal("cancel dismissal mutated state")
-	}
+	require.Nil(t, command)
+	require.Empty(t, m.mode)
+	require.Zero(t, writes, "cancel dismissal mutated state")
 	m, _ = tuiKey(t, m, "c")
 	m, command = tuiKey(t, m, "y")
-	if command == nil || !m.busy || writes != 0 {
-		t.Fatal("confirmation bypassed async action state")
+	require.NotNil(t, command)
+	require.True(t, m.busy)
+	require.Zero(t, writes, "confirmation bypassed async action state")
+	m, _ = tuiKey(t, m, "q")
+	require.Contains(t, m.status, "Request in flight", "quitting mid-publication must warn")
+	m = tuiLoad(t, m, command().(workQueueLoaded))
+	require.Equal(t, 1, writes, "operator action was duplicated or never executed")
+	require.False(t, m.busy)
+	require.Equal(t, "request:cancel", m.lastRequest)
+	require.Contains(t, m.status, "Committed 1 requests")
+	require.Empty(t, m.selected, "cancelled Work must leave the selection")
+	require.Equal(t, "cancelled", m.state.Works[work.ID].State)
+}
+
+func TestWorkTUIReleaseTargetsTheSelectedClaimsDispatch(t *testing.T) {
+	log, ids := workOperatorFixture(t, true)
+	m := loadedTUI(t, log)
+	m, _ = tuiKey(t, m, "c")
+	require.Empty(t, m.mode, "claimed Work cannot be cancelled directly")
+	require.Contains(t, m.status, "cancel applies to available Work only")
+	m, _ = tuiKey(t, m, "down")
+	claim := m.rows[m.cursor]
+	require.Equal(t, "claim", claim.Kind)
+	m.service.maxAttempts = func(pool string) int {
+		require.Equal(t, "default", pool)
+		return 1
 	}
-	result := command()
-	if writes != 1 {
-		t.Fatal("operator action was duplicated or never executed")
+	var released []string
+	m.service.publish = func(kind string, parameters any, operationsFor workqueue.OperationsFor) (workqueue.Publication, error) {
+		require.Equal(t, "release", kind)
+		release, ok := parameters.(workqueue.ReleaseParameters)
+		require.True(t, ok)
+		require.Equal(t, "operator", release.Reason)
+		operations, err := operationsFor(log.state(), workqueue.Request{})
+		require.NoError(t, err)
+		require.Len(t, operations, 2, "Release plus attempts_exhausted at max_attempts 1")
+		require.JSONEq(t, `{"kind":"Release","dispatch_id":"`+release.DispatchID+`","reason":"operator"}`, string(operations[0]))
+		require.Contains(t, string(operations[1]), `"attempts_exhausted"`)
+		values := make([]any, 0, len(operations))
+		for _, operation := range operations {
+			values = append(values, operation)
+		}
+		log.append(workQueueTestAdmin, "release", release, values...)
+		released = append(released, release.DispatchID)
+		return workqueue.Publication{Committed: true, Request: workqueue.Request{ID: "request:" + release.DispatchID}}, nil
 	}
-	next, _ := m.Update(result)
-	updated, ok := next.(workQueueTUI)
-	if !ok || updated.busy || updated.lastRequest == "" || !strings.Contains(updated.status, "Committed") {
-		t.Fatal("committed action has no stable status")
-	}
+	m.service.read = func() (workqueue.Projection, error) { return log.state(), nil }
+	m, _ = tuiKey(t, m, "x")
+	require.Equal(t, "release", m.mode)
+	require.Equal(t, []string{claim.DispatchID}, m.targets)
+	require.Contains(t, m.modalView(), "Running workflows are NOT stopped")
+	m, command := tuiKey(t, m, "y")
+	require.NotNil(t, command)
+	m = tuiLoad(t, m, command().(workQueueLoaded))
+	require.Equal(t, []string{claim.DispatchID}, released)
+	require.Equal(t, "request:"+claim.DispatchID, m.lastRequest)
+	require.Equal(t, "cancelled", m.state.Works[ids[0]].State)
+	require.Equal(t, "attempts_exhausted", m.state.Works[ids[0]].CancellationReason)
+	require.Equal(t, "claimed", m.state.Works[ids[1]].State, "release must touch only the selected dispatch")
+
+	m, _ = tuiKey(t, m, "x")
+	require.Empty(t, m.mode, "a closed Claim cannot be released again")
+	require.Contains(t, m.status, "release applies to open Claims")
 }
 
 func TestWorkTUIBulkPreviewCannotHideTargetsOrMutate(t *testing.T) {
-	m := loadedTUI(t, true)
+	log, ids := workOperatorFixture(t, false)
+	m := loadedTUI(t, log)
+	m.service.publish = func(string, any, workqueue.OperationsFor) (workqueue.Publication, error) {
+		t.Fatal("hidden confirmation published")
+		return workqueue.Publication{}, nil
+	}
 	for _, row := range m.rows {
 		if row.Kind == "work" {
 			m.selected[row.key()] = row
@@ -148,50 +214,57 @@ func TestWorkTUIBulkPreviewCannotHideTargetsOrMutate(t *testing.T) {
 	}
 	m.width, m.height = 45, 16
 	m, _ = tuiKey(t, m, "c")
+	require.Equal(t, "cancel", m.mode)
 	m, command := tuiKey(t, m, "y")
-	if command != nil || m.busy || !strings.Contains(m.modalView(), "ACTION DISABLED") {
-		t.Fatal("oversize/hidden confirmation published")
-	}
+	require.Nil(t, command)
+	require.False(t, m.busy)
+	require.Contains(t, m.modalView(), "ACTION DISABLED")
+	require.Contains(t, m.status, "Action disabled")
 	m.width, m.height = 180, 60
-	if !m.previewFits() || len(m.targets) != 3 {
-		t.Fatal("full-size batch review is unavailable")
+	require.True(t, m.previewFits(), "full-size batch review is unavailable")
+	require.Len(t, m.targets, len(ids))
+	for _, id := range ids {
+		require.Contains(t, m.modalView(), workQueueText(id))
 	}
 	m, _ = tuiKey(t, m, "esc")
-	m, _ = tuiKey(t, m, "p")
-	if m.mode != "" || !strings.Contains(m.status, "ineligible") {
-		t.Fatal("active Claims were reprioritized")
-	}
+	require.Empty(t, m.mode)
+	m, _ = tuiKey(t, m, "x")
+	require.Empty(t, m.mode, "available Work has no dispatch to release")
+	require.Contains(t, m.status, "release applies to open Claims")
 }
 
-func TestWorkTUIPriorityRefreshAndErrors(t *testing.T) {
-	m := loadedTUI(t, false)
-	m, _ = tuiKey(t, m, "p")
-	m, command := tuiKey(t, m, "y")
-	if command != nil {
-		t.Fatal("priority action accepted without an explicit class")
-	}
-	m, _ = tuiKey(t, m, "1")
-	if m.priority != 1 || m.pendingKind != "control" || !strings.Contains(string(m.pending.Operations[0]), `"expected_priority":3`) {
-		t.Fatal("priority review lacks prospective CAS intent")
-	}
-	m, _ = tuiKey(t, m, "esc")
+func TestWorkTUIRefreshKeepsCursorAndReportsErrors(t *testing.T) {
+	log, ids := workOperatorFixture(t, false)
+	m := loadedTUI(t, log)
+	m, _ = tuiKey(t, m, "down")
+	require.Equal(t, ids[1], m.rows[m.cursor].ID)
 	key := m.rows[m.cursor].key()
-	state := m.state
-	state.Works[m.rows[m.cursor].WorkID].EffectivePriority = 2
-	next, _ := m.Update(workQueueLoaded{state: &state})
-	var ok bool
-	m, ok = next.(workQueueTUI)
-	if !ok || m.rows[m.cursor].key() != key || !strings.Contains(m.details.GetContent(), "Priority: 2") {
-		t.Fatal("refresh lost cursor or current details")
-	}
-	next, _ = m.Update(workQueueLoaded{err: errors.New("permission denied\x1b[31m"), requestID: "stable-uncertain"})
-	m, ok = next.(workQueueTUI)
-	if !ok || !strings.Contains(m.status, "uncertain") || strings.Contains(m.status, "\x1b") || m.lastRequest != "stable-uncertain" || len(m.rows) == 0 {
-		t.Fatal("failed publication disappeared or injected terminal controls")
-	}
+	require.Len(t, log.dispatch(1), 1)
+	state := log.state()
+	m = tuiLoad(t, m, workQueueLoaded{state: &state})
+	require.Len(t, m.rows, 5, "the refreshed forest shows the new Claim")
+	require.Equal(t, key, m.rows[m.cursor].key(), "refresh lost the cursor")
+	require.Contains(t, m.details.GetContent(), workQueueText(ids[1]))
+	require.Contains(t, m.details.GetContent(), "State: available")
+
+	m = tuiLoad(t, m, workQueueLoaded{err: errors.New("permission denied\x1b[31m")})
+	require.Contains(t, m.status, "Error (view may be stale)")
+	require.NotContains(t, m.status, "\x1b")
+	require.Len(t, m.rows, 5, "a failed read must keep the last committed view")
+	m = tuiLoad(t, m, workQueueLoaded{err: errors.New("read failed\x1b[31m"), requests: []string{"request:stable"}, committed: true})
+	require.Contains(t, m.status, "Committed 1 requests, then:")
+	require.NotContains(t, m.status, "\x1b")
+	require.Equal(t, "request:stable", m.lastRequest)
+
 	m.mode = "cancel"
-	_, command = m.Update(workQueueTick(time.Now()))
-	if command == nil || m.busy {
-		t.Fatal("auto-refresh mutated a frozen review")
-	}
+	next, command := m.Update(workQueueTick(time.Now()))
+	require.NotNil(t, command, "ticks must keep scheduling")
+	frozen, ok := next.(workQueueTUI)
+	require.True(t, ok)
+	require.False(t, frozen.busy, "auto-refresh must not reload under a frozen review")
+	frozen.mode = ""
+	next, _ = frozen.Update(workQueueTick(time.Now()))
+	refreshing, ok := next.(workQueueTUI)
+	require.True(t, ok)
+	require.True(t, refreshing.busy, "idle ticks refresh the committed state")
 }

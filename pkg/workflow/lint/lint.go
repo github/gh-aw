@@ -57,6 +57,12 @@ type Input struct {
 	// ResolvedTools supplies compiler-resolved tool declarations, including imports.
 	// Standalone AW lint uses authored tools instead.
 	ResolvedTools map[string]any
+	// ResolvedAgentSandbox supplies the compiler's effective agent sandbox state.
+	// Nil means standalone lint must use authored configuration.
+	ResolvedAgentSandbox *bool
+	// ResolvedMCPScripts contains shell scripts after imports are merged.
+	// A nil map means that authored declarations should be used instead.
+	ResolvedMCPScripts map[string]string
 	// ResolvedRoles supplies the compiler's effective actor-admission roles.
 	// Standalone AW lint uses on.roles and its trusted defaults instead.
 	ResolvedRoles []string
@@ -302,12 +308,15 @@ func Default() *Runner {
 		GraderFileIORule(),
 		PullRequestTargetCheckoutRule(),
 		PromptExpressionRule(),
+		PromptConditionSyntaxRule(),
+		FileAccessRule(),
 		GatewayDispatchLiteralsRule(),
 		ArtipackedRule(),
 		CachePoisoningRule(),
 		ExcessivePermissionsRule(),
 		ObfuscationRule(),
 		BashCasePatternRule(),
+		UnquotedCommandAssignmentRule(),
 		PrivilegedCheckoutRule(),
 		ArtifactExecutionRule(),
 		BotConditionsRule(),

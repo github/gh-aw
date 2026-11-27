@@ -243,8 +243,6 @@ func (c *Compiler) addWorkQueueSnapshotStep(ctx *activationJobBuildContext) {
 	broker := usesTokenBrokerSafeOutputs(ctx.data)
 	if broker {
 		ctx.steps = append(ctx.steps, c.buildGitHubBrokerTokenStep(ctx.data, "work-queue-activation-broker-token")...)
-	} else if workQueueIssuesConfig(ctx.data) != nil && isWorkQueueParticipant(ctx.data) {
-		ctx.steps = append(ctx.steps, c.workQueueProjectorTokenSteps(ctx.data, "activation")...)
 	}
 	ctx.steps = append(ctx.steps,
 		"      - name: Snapshot work queue state\n",
@@ -252,7 +250,7 @@ func (c *Compiler) addWorkQueueSnapshotStep(ctx *activationJobBuildContext) {
 		fmt.Sprintf("        uses: %s\n", getCachedActionPin("actions/github-script", ctx.data)),
 	)
 	ctx.steps = append(ctx.steps, workQueuePolicyEnvironment(ctx.data)...)
-	if workQueueIssuesConfig(ctx.data) != nil {
+	if workQueueRequiresAssignment(ctx.data) {
 		var staged *TemplatableBool
 		if ctx.data.SafeOutputs != nil {
 			staged = ctx.data.SafeOutputs.Staged
@@ -264,7 +262,7 @@ func (c *Compiler) addWorkQueueSnapshotStep(ctx *activationJobBuildContext) {
 	ctx.steps = append(ctx.steps,
 		"        with:\n",
 	)
-	if broker || workQueueIssuesConfig(ctx.data) != nil && isWorkQueueParticipant(ctx.data) {
+	if broker {
 		c.addWorkQueueProjectorToken(&ctx.steps, ctx.data, "activation")
 	}
 	ctx.steps = append(ctx.steps,
@@ -274,7 +272,18 @@ func (c *Compiler) addWorkQueueSnapshotStep(ctx *activationJobBuildContext) {
 	if broker {
 		ctx.steps = append(ctx.steps, c.buildBrokerInvalidationStep(ctx.data)...)
 	}
-	ctx.outputs["work_queue_origin"] = "${{ steps.work_queue_snapshot.outputs.work_queue_origin }}"
+	if workQueueRequiresAssignment(ctx.data) {
+		ctx.outputs[workQueueAssignmentSettledOutput] = "${{ steps.work_queue_snapshot.outputs." + workQueueAssignmentSettledOutput + " }}"
+	}
+}
+
+// workQueueAssignmentSettledOutput is set by the worker snapshot when the
+// dispatched assignment has no open Claim left; agent and safe-output jobs skip.
+const workQueueAssignmentSettledOutput = "work_queue_assignment_settled"
+
+// workQueueAssignmentOpenCondition gates worker jobs that must not run for a settled assignment.
+func workQueueAssignmentOpenCondition() ConditionNode {
+	return BuildNotEquals(BuildPropertyAccess("needs."+string(constants.ActivationJobName)+".outputs."+workQueueAssignmentSettledOutput), BuildStringLiteral("true"))
 }
 
 func isWorkQueueEnabled(data *WorkflowData) bool {

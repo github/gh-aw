@@ -203,7 +203,7 @@ func TestCustomSecretMaskingWorkQueueUploadGates(t *testing.T) {
 	}}
 	compiler := NewCompiler()
 	compiler.stepOrderTracker = NewStepOrderTracker()
-	adapter := strings.Join(compiler.finishWorkQueuePreparedAdapterSteps(data, "test", 0, nil), "")
+	adapter := strings.Join(compiler.finishWorkQueuePreparedAdapterSteps(data, "test", nil), "")
 	assert.Contains(t, adapter, "steps.claim_adapter_context.outputs.active == 'true' && steps.redact_secrets.outcome == 'success' && steps.custom_mask.outcome == 'success'")
 	assert.Contains(t, adapter, "id: validate_recovery_envelopes\n")
 	assert.Contains(t, adapter, "steps.validate_recovery_envelopes.outcome == 'success'")

@@ -173,12 +173,12 @@ func TestCompileSafeOutputsPRCredentialsSpecificationIntegration(t *testing.T) {
 			}
 			if strings.HasPrefix(tt.fixture, "work-queue") {
 				downloadIndex, _ := findStep(safeJob.Steps, "Download agent output artifact")
-				reconcileIndex, _ := findStep(safeJob.Steps, "work_queue_claim_reconciliation")
-				assert.Less(t, downloadIndex, reconcileIndex)
-				assert.Less(t, reconcileIndex, mintIndex)
+				controlsIndex, _ := findStep(safeJob.Steps, "work_queue_controls")
+				assert.Less(t, downloadIndex, controlsIndex)
+				assert.Less(t, mintIndex, controlsIndex)
 				for index, step := range safeJob.Steps {
 					if strings.HasPrefix(step.Uses, "actions/download-artifact@") {
-						assert.Less(t, index, reconcileIndex, "artifact downloads must precede claim reconciliation")
+						assert.Less(t, index, controlsIndex, "artifact downloads must precede trusted queue controls")
 					}
 				}
 			}

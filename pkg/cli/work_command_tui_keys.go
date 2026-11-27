@@ -1,10 +1,6 @@
 package cli
 
-import (
-	"strconv"
-
-	tea "charm.land/bubbletea/v2"
-)
+import tea "charm.land/bubbletea/v2"
 
 func (m *workQueueTUI) searchKey(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
@@ -36,11 +32,7 @@ func (m *workQueueTUI) modalKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.details, command = m.details.Update(msg)
 		return command
 	}
-	if value, err := strconv.Atoi(key); m.mode == "priority" && err == nil && value >= 1 && value <= 5 {
-		m.priority = value
-		m.prepareAction()
-	}
-	if key == "y" && (m.mode == "cancel" || m.mode == "priority" && m.priority != 0) {
+	if key == "y" && (m.mode == "cancel" || m.mode == "release") {
 		if !m.previewFits() {
 			m.status = "Action disabled: resize or select a smaller batch so every target is visible"
 			return nil
@@ -88,12 +80,12 @@ func (m *workQueueTUI) key(msg tea.KeyPressMsg) tea.Cmd {
 			m.status = "Refreshing committed state..."
 			return m.read()
 		}
-	case "c", "p":
+	case "c", "x":
 		if !m.busy {
 			if key == "c" {
 				m.openAction("cancel")
 			} else {
-				m.openAction("priority")
+				m.openAction("release")
 			}
 		}
 	default:

@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	minZizmorVersion     = "1.32.0"
+	minZizmorVersion     = "1.33.1"
 	minPoutineVersion    = "1.1.6"
 	minActionlintVersion = "1.7.12"
 )

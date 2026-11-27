@@ -1,5 +1,8 @@
 # ADR-67322: AW-Managed Work Queues with Automatic Bootstrap and Deployment CAS
 
+> [!NOTE]
+> Superseded by work queue protocol v4 ([specification](../src/content/docs/specs/work-queue-specification.md)): v4 removed the installed Policy and Deployment records; the first commit needs no bootstrap and scheduling comes from compiled `aw.json` settings.
+
 **Date**: 2026-10-10
 **Status**: Draft
 **Deciders**: pelikhan (PR author); gh-aw maintainers (review pending)

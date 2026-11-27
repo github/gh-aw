@@ -12,9 +12,21 @@ const require = createRequire(import.meta.url);
 const library = path.join(root, "eslint-factory");
 const runtime = path.join(root, "actions/setup/js");
 const ts = require(require.resolve("typescript", { paths: [library] }));
-const yaml = require(require.resolve("yaml", { paths: [runtime] }));
+// The repository's Go YAML parser (pkg/parser) via the developer fixture adapter; it builds that tool on load.
+const metadataAdapter = path.join(root, "scripts/markdown_metadata_test_adapter.cjs");
+const { readDocumentMetadata } = require(metadataAdapter);
 const { ESLint } = require(require.resolve("eslint", { paths: [library] }));
 export const sha256 = value => createHash("sha256").update(value).digest("hex");
+
+function parseYAML(text, name) {
+  let parsed;
+  try {
+    parsed = readDocumentMetadata(text);
+  } catch (error) {
+    assert.fail(`${name} must be unambiguous YAML: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  return parsed.value;
+}
 
 export function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: root, encoding: "utf8", timeout: 60_000, maxBuffer: 16 * 1024 * 1024, ...options });
@@ -39,9 +51,7 @@ export function workflow(text) {
   assert.equal(lines[0], "---");
   const end = lines.indexOf("---", 1);
   assert.ok(end > 0, "Workflow frontmatter must close");
-  const parsed = yaml.parseDocument(lines.slice(1, end).join("\n"), { uniqueKeys: true });
-  assert.equal(parsed.errors.length, 0, "Workflow YAML must be unambiguous");
-  return { frontmatter: parsed.toJS(), body: lines.slice(end + 1).join("\n") };
+  return { frontmatter: parseYAML(lines.slice(1, end).join("\n"), "Workflow frontmatter"), body: lines.slice(end + 1).join("\n") };
 }
 
 export function registration(text) {
@@ -97,7 +107,12 @@ export function compareFacts(facts) {
   expect("configured rules equal registered rules", facts.configRules, facts.sourceRules);
   expect("README linked rule table covers registered rules", [...facts.readmeRuleLinks].sort(), facts.sourceRules);
   expect("README rule table targets existing sections", facts.readmeBrokenTargets, []);
-  expect("default profile is a singleton", facts.defaultProfileMax, 1);
+  expect("compiled policy approves every ESLint worker in pool default", facts.compiledPolicy.eslintWorkersApproved, [true, true, true]);
+  expect("compiled default pool limits", facts.compiledPolicy.pool, { concurrency: 3, per_account_limit: 0, max_attempts: 3 });
+  expect("dispatcher allowlist routes every ESLint worker", facts.dispatchProfiles, ["eslint-miner", "eslint-monster", "eslint-refiner"]);
+  expect("dispatcher cohort grants one Claim per Dispatch", facts.claimsPerDispatch, [1, 1, 1]);
+  expect("replay rejects a grouped Dispatch", facts.runtimeProbes.groupedDispatchError, "dispatch_state_conflict");
+  expect("snapshot assignment carries exactly one Claim", facts.runtimeProbes.assignmentClaimCount, 1);
   expect("dispatcher worker allowlist", facts.dispatchWorkers, ["eslint-miner", "eslint-monster", "eslint-refiner"]);
   expect("dispatcher run dispatch budget", facts.dispatchMax, 3);
   expect("all workers require assignments", facts.requiredAssignments, [true, true, true]);
@@ -106,9 +121,11 @@ export function compareFacts(facts) {
   expect("monster discussion safe-output maximum", facts.monsterDiscussionMax, 1);
   expect("hard HTTP response rule", facts.httpSeverity, "error");
   expect("other rules warn", facts.otherSeverities, ["warn"]);
-  expect("native collector counts each Claim separately", facts.runtimeProbes.collector.acceptedPerClaim, [3, 3]);
+  expect("native collector counts each singleton Claim separately", facts.runtimeProbes.collector.acceptedPerClaim, [3, 3]);
   expect("native collector rejects scoped overflow", facts.runtimeProbes.collector.overflowRejected, true);
-  expect("native collector checks sibling minimum independently", facts.runtimeProbes.collector.siblingMinimumRejected, true);
+  expect("native collector checks each Claim's minimum independently", facts.runtimeProbes.collector.minimumRejected, true);
+  expect("native collector rejects a foreign claim_handle", facts.runtimeProbes.collector.foreignHandleRejected, true);
+  expect("native collector rejects a multi-member assignment", facts.runtimeProbes.collector.multiMemberRejected, true);
   expect("native collector preserves one structured memory per Claim", facts.runtimeProbes.collector.memoryPerClaim, [1, 1]);
   expect("native collector rejects same-Claim memory overflow", facts.runtimeProbes.collector.memoryOverflowRejected, true);
   expect("warning-only ESLint exits zero", facts.scanProbes.warning.status, 0);
@@ -273,18 +290,26 @@ export async function analyze(artifacts) {
     write(path.join(directory, "execution.log"), result.stdout + result.stderr);
   }
 
-  const policy = require(path.join(runtime, "work_queue_policy.cjs"));
   const boundaryFunctions = {};
   for (const [file, names] of [
-    ["work_queue_claim_scope.cjs", ["normalizeAssignment", "normalizeClaimScope", "withClaimExecution", "assertClaimAuthorized"]],
-    ["work_queue_policy.cjs", ["defaultPolicy", "bindingAuthority", "claimAuthority", "validateSubmissionEntitlement"]],
-    ["work_queue_delivery.cjs", ["validateDeliveryContract", "inspectClaimDelivery", "verifyClaimDelivery"]],
+    ["work_queue_claim_scope.cjs", ["normalizeAssignment", "normalizeClaimScope", "withClaimExecution", "assertClaimAuthorized", "claimIdentity"]],
+    ["work_queue_policy.cjs", ["validatePolicyEnv", "readWorkQueuePolicyEnv", "policyAllowsWorker", "actorFromContext"]],
+    ["work_queue_intents.cjs", ["normalizeSubmitParameters"]],
+    ["work_queue_scheduler.cjs", ["planDispatch", "assignmentForDispatch"]],
+    ["work_queue_replay.cjs", ["applyClaim", "openClaim"]],
+    ["work_queue_dispatch.cjs", ["dispatchQueueIntent"]],
+    ["finish_work_queue_claim.cjs", ["authorizeWorkerClaim", "assertEffectScope"]],
   ]) {
     const text = read(path.join(runtime, file));
     boundaryFunctions[file] = Object.fromEntries(names.map(name => [name, executableFunction(text, name)]));
   }
-  const runtimeProbes = await probeRuntime(sourceFiles, artifacts);
-  const compiledRefiner = yaml.parse(read(path.join(root, ".github/workflows/eslint-refiner.lock.yml")));
+  // The compiled dispatcher policy and control config, with `${{ github.repository }}` bound to the fixture repository.
+  const compiledDispatcher = parseYAML(read(path.join(root, ".github/workflows/eslint-factory-dispatcher.lock.yml")), "Compiled dispatcher");
+  const controls = compiledDispatcher.jobs.safe_outputs.steps.find(step => step.id === "work_queue_controls");
+  assert.ok(controls?.env, "Compiled dispatcher must supply its trusted work_queue_controls step");
+  const controlEnvironment = Object.fromEntries(Object.entries(controls.env).map(([key, value]) => [key, typeof value === "string" ? value.replaceAll("${{ github.repository }}", "owner/repo") : value]));
+  const runtimeProbes = await probeRuntime(sourceFiles, artifacts, controlEnvironment);
+  const compiledRefiner = parseYAML(read(path.join(root, ".github/workflows/eslint-refiner.lock.yml")), "Compiled refiner");
   const preparation = compiledRefiner.jobs.work_queue_prepare_persist_eslint_memory_0.steps.find(step => step.id === "claim_adapter_context");
   assert.ok(preparation, "Declarative memory must lower to the protected preparation job");
   const adapter = JSON.parse(preparation.env.GH_AW_CLAIM_ADAPTER_CONFIG);
@@ -306,7 +331,9 @@ export async function analyze(artifacts) {
     monsterAssignmentMax: workflows.monster.frontmatter["safe-outputs"]["assign-to-agent"].max,
     monsterDiscussionMax: workflows.monster.frontmatter["safe-outputs"]["create-discussion"].max,
     refinerIssueMax: workflows.refiner.frontmatter["safe-outputs"]["create-issue"].max,
-    defaultProfileMax: policy.defaultPolicy({ repository: "owner/repo", principal: "11" }).pools.default.profiles.default.max_claims,
+    compiledPolicy: runtimeProbes.compiledPolicy,
+    dispatchProfiles: runtimeProbes.dispatchProfiles,
+    claimsPerDispatch: runtimeProbes.claimsPerDispatch,
     readmeRuleLinks: readmeRules.rules,
     readmeBrokenTargets: readmeRules.brokenTargets,
     coverage,
@@ -318,14 +345,14 @@ export async function analyze(artifacts) {
   };
   const mismatches = compareFacts(facts);
   const assumptions = [
-    "Policy, authorized producers, immutable worker revisions, numeric resource scope and credentials are externally provisioned; these four workflow sources do not install a miner->refiner->monster DAG.",
+    "The compiled dispatcher policy and control config are read from the checked-in lock with the repository bound to a fixture; queue-branch write access, immutable worker revisions, resource scope and credentials are externally provisioned; these four workflow sources do not install a miner->refiner->monster DAG.",
     "The model admits exactly two root Works with satisfied dependencies/capacity and fixed equal-priority order, and permits at most one protected prefix request in a modeled run.",
-    "The model projects the first compatible assignment of that request, not all native dispatches. Actual mixed-profile probes produce two singleton dispatches; leaving the other modeled profile queued is projection, not a claimed scheduler behavior.",
+    "v4 replay grants exactly one Claim per Dispatch. The actual planner grants the three-profile cohort as three singleton Dispatches and replay rejects a grouped Dispatch; the finite model's Batch configurations are a legacy abstraction, not v4 behavior. The model projects the first compatible assignment of a request, not all native dispatches.",
     "Dispatcher prompt obligations max_claims=3/max_dispatches=3 and at most one request are not inferred to be a runtime-enforced per-run request counter.",
-    "Model Effect authority abstracts successful winning Claim/native attempt/principal/resource checks; local probes do not exercise cryptographic authentication, remote APIs or concurrency.",
+    "Model Effect authority abstracts successful open-Claim/bound-run-attempt/compiled-worker-approval/effect_scope checks; local probes use an in-memory queue branch and do not exercise authentication, remote APIs or concurrency.",
     "Each modeled Claim projects one output family. Whole-contract Readback abstracts all other declared outputs, memory snapshots, resource receipts and durable queue-control inventory; no profile contract is supplied by these workflow sources.",
-    "Three total Copilot assignments, quality/build/test/low-false-positive bars, nonduplicate issues, and final-action wording are agent obligations; configured Claim counts do not imply run-wide worker caps.",
-    "Completion is distinct from independent verified delivery and Result. Probe inspectClaimDelivery is diagnostic; protected Result attestations require additional trusted inventory and channel provenance.",
+    "Three total Copilot assignments, quality/build/test/low-false-positive bars, nonduplicate issues, and final-action wording are agent obligations; one Claim per Dispatch does not imply run-wide worker caps.",
+    "Completion is distinct from verified delivery and Result. The v4 runtime has no independent delivery verifier; collector cardinality and authorization probes do not establish native writes.",
     "Warning-only diagnostics produce ESLint exit zero and monster lint-clean. Scan coverage is CJS excluding tests, not generic JS/TS goals; npm ci/build/tool failure is not evidence of defect-free source.",
     "No unbounded liveness, production refinement, AST-rule completeness, low false positives or comprehensive security guarantee is claimed.",
   ];
@@ -335,7 +362,7 @@ export async function analyze(artifacts) {
       category: "warning-short-circuit",
       observation: "Monster's clean branch discards diagnostics for successful lint, including warning-only findings. Most configured rules warn; no-ad-hoc-jsonl-parser and require-http-response-error-listener are errors.",
     },
-    { category: "prompt-ambiguity", observation: "Miner says independently process every Claim, then exactly one last create_pull_request/noop. The model does not turn that final-action prose into a global runtime output limit." },
+    { category: "prompt-ambiguity", observation: "Miner processes its one assigned Claim, then calls exactly one last create_pull_request/noop. The model does not turn that final-action prose into a global runtime output limit." },
     { category: "delegation", observation: "assign-to-agent delivery means the declared assignment was independently verified, not that a downstream Copilot remediation build/test succeeded." },
     {
       category: "rule-table",
@@ -345,9 +372,9 @@ export async function analyze(artifacts) {
     },
   ];
   for (const filename of Object.keys(require.cache)) if (filename.startsWith(runtime + path.sep) && !filename.includes(path.sep + "node_modules" + path.sep)) sourceFiles.add(filename);
-  for (const dependency of ["typescript", "eslint", "yaml"]) {
-    const base = dependency === "yaml" ? runtime : library;
-    let directory = path.dirname(require.resolve(dependency, { paths: [base] }));
+  sourceFiles.add(metadataAdapter);
+  for (const dependency of ["typescript", "eslint"]) {
+    let directory = path.dirname(require.resolve(dependency, { paths: [library] }));
     while (!fs.existsSync(path.join(directory, "package.json"))) directory = path.dirname(directory);
     sourceFiles.add(path.join(directory, "package.json"));
   }
@@ -363,7 +390,7 @@ export async function analyze(artifacts) {
     assumptions,
     documentationFindings,
     sources,
-    tool: { node: process.version, typescript: ts.version, eslint: ESLint.version, yaml: JSON.parse(fs.readFileSync(require.resolve("yaml/package.json", { paths: [runtime] }), "utf8")).version },
+    tool: { node: process.version, typescript: ts.version, eslint: ESLint.version, yaml: `${path.relative(root, metadataAdapter)} (pkg/parser)` },
     precheckTransformation: "Only /tmp/gh-aw/agent paths rebased into artifact fixtures; npm stub supplies measured scan exit/status or explicit failure. No npm ci, workflow run, network or native write executed.",
   };
   assert.equal(checkoutIdentity().head, checkout.head, "HEAD changed during comparison; rerun against a stable checkout");
@@ -371,121 +398,203 @@ export async function analyze(artifacts) {
   return report;
 }
 
-async function probeRuntime(sourceFiles, artifacts) {
+async function probeRuntime(sourceFiles, artifacts, controlEnvironment) {
   const load = file => {
     const filename = path.join(runtime, file);
     sourceFiles.add(filename);
     return require(filename);
   };
   const scope = load("work_queue_claim_scope.cjs");
-  const delivery = load("work_queue_delivery.cjs");
-  const policy = load("work_queue_policy.cjs");
-  const { queueFixture } = load("work_queue_lifecycle.test_helpers.cjs");
+  const policyModule = load("work_queue_policy.cjs");
   const replay = load("work_queue_replay.cjs");
-  const singleton = queueFixture({ count: 2, batch: 1 });
-  assert.equal(singleton.assignment.claims.length, 1);
-  const batch = queueFixture({ count: 2, batch: 2, bound: true });
-  const assignment = scope.normalizeAssignment(batch.assignment);
-  assert.equal(assignment.version, 3);
-  assert.equal(assignment.claims.length, 2);
-  assert.ok(Object.isFrozen(assignment) && Object.isFrozen(assignment.claims) && Object.isFrozen(assignment.claims[0].work));
-  assert.throws(() => scope.normalizeAssignment({ ...assignment, version: 2 }));
-  assert.throws(() => scope.normalizeClaimScope({ type: "noop" }, assignment), /original multi-Claim/);
-  assert.throws(() => scope.normalizeClaimScope({ type: "noop", claim_handle: "foreign" }, assignment));
-  for (const field of ["assignment", "work_queue_assignment", "authorized", "run_attempt"]) assert.throws(() => scope.normalizeClaimScope({ type: "noop", claim_handle: assignment.claims[0].handle, [field]: true }, assignment));
-  assert.equal(scope.normalizeClaimScope({ type: "noop" }, singleton.assignment).claim_handle, singleton.assignment.claims[0].handle);
-  const first = assignment.claims[0];
-  const second = assignment.claims[1];
-  const collector = await probeCollector(assignment, artifacts, sourceFiles);
-  const actor = { ...batch.workerActor, dispatch_id: assignment.dispatch_id, claim_handle: first.handle };
-  policy.claimAuthority(batch.state, first.claim_id, actor, false);
-  assert.throws(() => policy.claimAuthority(batch.state, first.claim_id, actor, true), /must be completed/);
-  assert.throws(() => policy.claimAuthority(batch.state, first.claim_id, { ...actor, run_attempt: 2 }, false));
-  const authorized = async request => ({ authorized: true, claim_handle: request.claim_handle });
-  await scope.withClaimExecution({ assignment, claim_handle: first.handle, authorize: authorized }, async () => {
-    await scope.assertClaimAuthorized({ type: "noop", claim_handle: first.handle });
-    await assert.rejects(scope.assertClaimAuthorized({ type: "noop", claim_handle: second.handle }), /escape/);
-    assert.throws(() => scope.withClaimExecution({ assignment, claim_handle: second.handle }, async () => {}), /nested execution/);
-    await assert.rejects(scope.assertClaimAuthorized({ type: "create_issue", claim_handle: first.handle }, { effect: true, resource: {} }), /prohibits/);
-  });
-  const completedState = structuredClone(batch.state);
-  completedState.claims.get(first.claim_id).state = "completed";
-  completedState.works.get(first.work_id).state = "completed";
-  policy.claimAuthority(completedState, first.claim_id, actor, true);
-  assert.notEqual(completedState.works.get(first.work_id).state, "result");
-  assert.throws(() => policy.claimAuthority(completedState, first.claim_id, { ...actor, principal: "999" }, true));
-  completedState.claims.get(first.claim_id).state = "cancelled";
-  assert.throws(() => policy.claimAuthority(completedState, first.claim_id, actor, true));
-  assert.throws(() => scope.normalizeClaimScope({ type: "noop" }, assignment), /original multi-Claim/);
-  const request = replay.newRequest("no-policy", "dispatch_next", batch.dispatcher, { pool: "default", max_claims: 3, max_dispatches: 3, max_bytes: 48 * 1024 });
-  assert.throws(() => replay.generateRequestOperations(replay.newState(), request, batch.dispatcher, 1000, "commit"), /policy/i);
-  const work = [...batch.state.works.values()][0];
-  assert.throws(() => policy.validateSubmissionEntitlement(batch.state, work, { ...batch.administrator, role: "producer", principal: "999" }));
-  const mixed = queueFixture({
-    count: 2,
-    batch: 2,
-    configurePolicy: value => {
-      value.pools.default.profiles.alternate = { ...value.pools.default.profiles.default, workflow: ".github/workflows/alternate.lock.yml" };
-    },
-    configureWork: (value, index) => {
-      if (index === 1) value.worker_profile = "alternate";
-    },
-  });
-  assert.equal(mixed.state.dispatches.size, 2);
-  assert.ok([...mixed.state.dispatches.values()].every(dispatch => dispatch.claims.length === 1));
-  const contract = { version: 1, outputs: [{ type: "create_issue", min: 1, max: 3 }] };
-  delivery.validateDeliveryContract(contract);
-  assert.throws(() => delivery.validateDeliveryContract({ version: 1, outputs: [{ type: "create_issue", min: 4, max: 3 }] }));
-  const adapted = structuredClone(assignment);
-  for (const claim of adapted.claims) claim.work.effect_contract = contract;
-  const perClaimCounts = [];
-  for (const claim of adapted.claims) {
-    const messages = Array.from({ length: 3 }, (_, index) => ({ type: "create_issue", claim_handle: claim.handle, title: `local-${index}` }));
-    const result = await delivery.inspectClaimDelivery({ assignment: adapted, claim_handle: claim.handle, authorize: authorized, messages, results: [] });
-    assert.equal(result.verification, "unknown");
-    assert.equal(result.reason, "Missing exact nondelegated delivery receipt");
-    perClaimCounts.push(messages.length);
-    const overflow = await delivery.inspectClaimDelivery({ assignment: adapted, claim_handle: claim.handle, authorize: authorized, messages: [...messages, messages[0]], results: [] });
-    assert.equal(overflow.reason, "Immutable output cardinality contract was not met");
-    const missing = await delivery.inspectClaimDelivery({ assignment: adapted, claim_handle: claim.handle, authorize: authorized, messages: [], results: [] });
-    assert.equal(missing.reason, "Immutable output cardinality contract was not met");
-    const nominalSuccess = await delivery.inspectClaimDelivery({
-      assignment: adapted,
-      claim_handle: claim.handle,
-      authorize: authorized,
-      messages,
-      results: messages.map((_, messageIndex) => ({ messageIndex, success: true, result: {} })),
-    });
-    assert.equal(nominalSuccess.reason, "Independent delivery verifier unavailable");
-    const facade = await delivery.verifyClaimDelivery(claim, { assignment: adapted, contract, attempt: 1, run: { run_id: "42", run_attempt: 1 }, success: true });
-    assert.deepEqual(facade, { verified: false, effects: "unknown" });
+  const scheduler = load("work_queue_scheduler.cjs");
+  const { normalizeSubmitParameters } = load("work_queue_intents.cjs");
+  const { allowedWorkerWorkflows, dispatchQueueIntent } = load("work_queue_dispatch.cjs");
+  const { authorizeWorkerClaim } = load("finish_work_queue_claim.cjs");
+  const { ESLINT_WORKERS, buildESLintFactoryPlan } = load("eslint_factory_portfolio.cjs");
+  const queue = load("work_queue_test_helpers.cjs");
+  const errorCode = action => {
+    try {
+      action();
+    } catch (error) {
+      return error.code;
+    }
+    assert.fail("Expected the v4 boundary to reject");
+  };
+  const rejectedCode = async action => {
+    try {
+      await action();
+    } catch (error) {
+      return error.code;
+    }
+    assert.fail("Expected the v4 boundary to reject");
+  };
+
+  // The compiled policy is the only policy: no ambient default, a closed shape, and the repository bound by the compiler.
+  assert.equal(policyModule.readWorkQueuePolicyEnv(process.env), null, "Run the comparison without an ambient compiled policy");
+  const policy = policyModule.readWorkQueuePolicyEnv(controlEnvironment);
+  assert.ok(policy, "Compiled dispatcher must carry GH_AW_WORK_QUEUE_POLICY");
+  assert.equal(policyModule.validatePolicyEnv(policy), policy);
+  assert.equal(policy.effect_scope, queue.repository);
+  assert.equal(
+    errorCode(() => policyModule.validatePolicyEnv({ ...policy, pools: { ...policy.pools, default: { ...policy.pools.default, default_profile: "eslint-miner" } } })),
+    "policy_invalid"
+  );
+  const controlConfig = JSON.parse(controlEnvironment.GH_AW_WORK_QUEUE_CONTROL_CONFIG);
+  const allowed = allowedWorkerWorkflows(controlConfig);
+  const profiles = Object.fromEntries(policy.workers.filter(worker => allowed.has(policyModule.workerWorkflow(worker))).map(worker => [worker, { workflow: policyModule.workerWorkflow(worker) }]));
+
+  // The dispatcher's staged cohort: submission resolves each node to an approved worker; an unapproved one is rejected.
+  const plan = buildESLintFactoryPlan({ date: "2026-11-23", repository: queue.repository, repositoryId: "1" });
+  const works = normalizeSubmitParameters({ nodes: plan.nodes }, policy);
+  assert.equal(
+    errorCode(() => normalizeSubmitParameters({ nodes: [{ ...plan.nodes[0], worker_profile: "unapproved-worker" }] }, policy)),
+    "work_queue_profile_not_approved"
+  );
+  const submitted = queue.submit([], works);
+  const pool = policyModule.poolEnv(policy, plan.dispatch.pool);
+  const parameters = { ...plan.dispatch, concurrency: pool.concurrency, per_account_limit: pool.per_account_limit, profiles };
+  const planned = queue.dispatchNext(submitted, parameters);
+  let log = planned.log;
+  let state = replay.replayTransactions(log);
+  const claimsPerDispatch = planned.decision.dispatches.map(id => state.dispatches.get(id).claims.length);
+
+  // Replay, not just the planner, refuses to group the request's Claims into one Dispatch.
+  const base = replay.replayTransactions(submitted);
+  const request = replay.newRequest("dispatch_next", queue.dispatcher, parameters);
+  const grants = scheduler.planDispatch(base, parameters, request.id).operations;
+  assert.ok(grants.length >= 2, "Grouping probe needs two grants");
+  const groupedDispatchError = errorCode(() =>
+    replay.appendCommit(
+      base,
+      replay.buildCommit(
+        base,
+        queue.dispatcher,
+        request,
+        grants.map(grant => ({ ...grant, dispatch_id: grants[0].dispatch_id })),
+        1
+      )
+    )
+  );
+
+  // Launch and bind two singleton Dispatches; both members use handle h1.
+  const [first, second] = planned.decision.dispatches;
+  const runs = { [first]: "200", [second]: "201" };
+  const workerWorkflow = id => policyModule.workerWorkflow(state.dispatches.get(id).worker_profile);
+  for (const id of [first, second]) {
+    log = queue.launch(log, id, true, queue.dispatcher, runs[id]);
+    log = queue.bind(log, id, queue.workerActor(runs[id], 1, workerWorkflow(id)));
   }
+  state = replay.replayTransactions(log);
+  const assignment = scope.normalizeAssignment(scheduler.assignmentForDispatch(state, first));
+  const sibling = scope.normalizeAssignment(scheduler.assignmentForDispatch(state, second));
+  const [member] = assignment.claims;
+  assert.ok(Object.isFrozen(assignment) && Object.isFrozen(assignment.claims) && Object.isFrozen(member.work));
+  assert.equal(member.handle, sibling.claims[0].handle, "Distinct Dispatches may reuse a handle");
+  for (const invalid of [
+    { ...assignment, claims: [member, sibling.claims[0]] },
+    { ...assignment, claims: [] },
+    { ...assignment, version: 4 },
+  ])
+    assert.equal(
+      errorCode(() => scope.normalizeAssignment(invalid)),
+      "claim_scope_invalid"
+    );
+
+  // Selection: omission picks the one member; foreign selectors and agent-supplied authority fail.
+  assert.equal(scope.normalizeClaimScope({ type: "noop" }, assignment).claim_handle, member.handle);
+  assert.throws(() => scope.normalizeClaimScope({ type: "noop", claim_handle: "foreign" }, assignment), /foreign/);
+  assert.throws(() => scope.normalizeClaimScope({ type: "noop", claim_id: sibling.claims[0].claim_id }, assignment), /conflicts/);
+  for (const field of ["assignment", "work_queue_assignment", "authorized", "run_attempt"]) assert.throws(() => scope.normalizeClaimScope({ type: "noop", [field]: true }, assignment), /trusted authority/);
+  // The full identity, not the reused handle, keys per-Claim artifacts.
+  assert.notDeepEqual(scope.claimIdentity(member.handle, assignment), scope.claimIdentity(member.handle, sibling));
+  assert.notEqual(scope.claimArtifactPath(artifacts, member.handle, assignment), scope.claimArtifactPath(artifacts, member.handle, sibling));
+
+  const authorized = async request => ({ authorized: true, claim_handle: request.claim_handle });
+  await scope.withClaimExecution({ assignment, claim_handle: member.handle, authorize: authorized }, async () => {
+    await scope.assertClaimAuthorized({ type: "noop" });
+    await assert.rejects(scope.assertClaimAuthorized({ type: "noop", claim_handle: "foreign" }), /foreign/);
+    assert.throws(() => scope.withClaimExecution({ assignment: sibling, claim_handle: member.handle }, async () => {}), /nested execution/);
+  });
+  assert.throws(() => scope.withClaimExecution({ assignment, claim_handle: "foreign" }, async () => {}), /foreign Claim/);
+  const noWrites = structuredClone(assignment);
+  noWrites.claims[0].work.effect_contract = { kind: "none" };
+  await scope.withClaimExecution({ assignment: noWrites, claim_handle: member.handle, authorize: authorized }, () => assert.rejects(scope.assertClaimAuthorized({ type: "create_issue" }, { effect: true, resource: {} }), /prohibits/));
+
+  const collector = await probeCollector([assignment, sibling], artifacts, sourceFiles);
+
+  // Native authorization against the replayed ledger on an in-memory queue branch.
+  const github = queue.fakeQueueGitHub(queue.ledgerText(log));
+  const core = { info() {}, warning() {}, debug() {}, error() {} };
+  const workerContext = (runId, runAttempt = 1) => ({ repo: { owner: "owner", repo: "repo" }, runId: Number(runId), runAttempt, payload: {} });
+  const authorize = (target, options = {}) =>
+    authorizeWorkerClaim({ githubClient: github.githubClient, context: workerContext(runs[target.dispatch_id]), assignment: target, claim_handle: target.claims[0].handle, policy, core, ...options });
+  const completedIntent = new Map([[member.handle, "completed"]]);
+  assert.equal((await authorize(assignment, { requireCompletion: false })).authorized, true);
+  assert.equal((await authorize(assignment, { finishIntents: new Map() })).state, "failed");
+  assert.equal((await authorize(assignment, { finishIntents: completedIntent })).authorized, true);
+  assert.equal((await authorize(assignment, { context: workerContext(runs[first], 2), requireCompletion: false })).state, "unbound");
+  const unapproved = { ...policy, workers: policy.workers.filter(worker => worker !== state.dispatches.get(first).worker_profile) };
+  assert.equal(await rejectedCode(() => authorize(assignment, { requireCompletion: false, policy: unapproved })), "E004");
+  assert.equal(await rejectedCode(() => authorize(assignment, { requireCompletion: false, resource: { repository: "other/repo" } })), "E004");
+
+  // Real finish commits settle exactly their own Dispatch; settled Claims are suppressed, never authorized.
+  log = queue.finish(log, first, queue.workerActor(runs[first], 1, workerWorkflow(first)));
+  log = queue.finish(log, second, queue.workerActor(runs[second], 1, workerWorkflow(second)), { [sibling.claims[0].handle]: "failed" });
+  github.install(queue.ledgerText(log));
+  state = replay.replayTransactions(log);
+  assert.equal(state.dispatches.get(first).state, "closed");
+  assert.deepEqual(scheduler.assignmentForDispatch(state, first).claims, []);
+  const completed = await authorize(assignment, { finishIntents: completedIntent });
+  assert.deepEqual([completed.authorized, completed.suppressed, completed.state], [false, true, "completed"]);
+  const cancelled = await authorize(sibling, { requireCompletion: false });
+  assert.deepEqual([cancelled.authorized, cancelled.suppressed, cancelled.state], [false, true, "cancelled"]);
+
+  // The dispatcher publishes nothing without a compiled policy or an allowlisted worker.
+  const writes = github.state.writes;
+  const dispatch = options =>
+    dispatchQueueIntent({
+      githubClient: github.githubClient,
+      context: { repo: { owner: "owner", repo: "repo" }, runId: 100, runAttempt: 1, payload: {} },
+      role: "dispatcher",
+      core,
+      config: controlConfig,
+      message: { type: "work_queue_dispatch_next", ...plan.dispatch },
+      remainingDispatches: plan.dispatch.max_dispatches,
+      ...options,
+    });
+  assert.equal(await rejectedCode(() => dispatch({ policy: null })), "policy_missing");
+  assert.equal(await rejectedCode(() => dispatch({ policy, config: { ...controlConfig, work_queue_workflows: [] } })), "work_queue_worker_not_allowlisted");
+  assert.equal(github.state.writes, writes);
+
   return {
-    assignmentProtocol: 3,
-    singletonClaimCount: singleton.assignment.claims.length,
-    permittedBatchClaimCount: assignment.claims.length,
-    mixedProfileDispatchSizes: [...mixed.state.dispatches.values()].map(dispatch => dispatch.claims.length),
+    assignmentProtocol: 4,
+    compiledPolicy: { pool, eslintWorkersApproved: ESLINT_WORKERS.map(worker => policyModule.policyAllowsWorker(policy, plan.dispatch.pool, worker)) },
+    dispatchProfiles: Object.keys(profiles).sort(),
+    claimsPerDispatch,
+    groupedDispatchError,
+    assignmentClaimCount: assignment.claims.length,
     frozenOriginal: true,
+    multiMemberAssignmentBlocked: true,
     foreignSelectorsBlocked: true,
+    reusedHandleIdentitiesDistinct: true,
     nestedClaimEscapeBlocked: true,
     agentAuthorityOverrideBlocked: true,
-    nativeAttemptAndPrincipalChecked: true,
-    completedAuthorityRequired: true,
-    cancelledAuthorityBlocked: true,
+    boundRunAttemptChecked: true,
+    completedIntentRequired: true,
+    workerApprovalAndEffectScopeChecked: true,
+    settledClaimsSuppressed: true,
     noWriteContractBlocksEffects: true,
+    unapprovedProfileBlocked: true,
     noPolicyDispatchBlocked: true,
-    unauthorizedProducerBlocked: true,
-    perClaimCounts,
+    unallowlistedDispatchBlocked: true,
     collector,
-    totalProjectedOutputs: perClaimCounts.reduce((a, b) => a + b, 0),
-    overflowAndMissingCountsBlocked: true,
-    nominalSuccessDoesNotProveDelivery: true,
     diagnosticCaveat:
-      "Positive completed state is a detached local fixture mutation to isolate claimAuthority; no durable Completion/Result was fabricated. Counts passed only the diagnostic cardinality barrier, not native effects or trusted delivery.",
+      "Authorization replays the real ledger from an in-memory queue branch with a fixture repository; Completion and ClaimCancellation are real finish commits, not mutated projections. No remote API, credential or native write is exercised.",
   };
 }
 
-async function probeCollector(assignment, artifacts, sourceFiles) {
+async function probeCollector(assignments, artifacts, sourceFiles) {
   const directory = mkdir(path.join(artifacts, "collector"));
   const filename = path.join(runtime, "collect_ndjson_output.cjs");
   sourceFiles.add(filename);
@@ -517,6 +626,8 @@ async function probeCollector(assignment, artifacts, sourceFiles) {
   const savedConfig = process.env.GH_AW_VALIDATION_CONFIG;
   const validator = nativeRequire("./safe_output_type_validator.cjs");
   const module = { exports: {} };
+  // The trusted assignment of the run being collected; each run owns exactly one Claim.
+  let assignment = assignments[0];
   // Execute unchanged collector code with explicit fixture authority and output
   // root. The legacy patch-directory existence probe never touches that path.
   vm.runInNewContext(
@@ -541,9 +652,8 @@ async function probeCollector(assignment, artifacts, sourceFiles) {
     global.core = core;
     process.env.GH_AW_VALIDATION_CONFIG = JSON.stringify(validation);
     validator.resetValidationConfigCache();
-    const members = assignment.claims;
-    const messages = members.flatMap(claim => Array.from({ length: 3 }, (_, index) => ({ type: "create_issue", claim_handle: claim.handle, title: `fixture-${claim.handle}-${index}`, body: "inert local fixture" })));
-    const collect = async (name, values) => {
+    const collect = async (target, name, values) => {
+      assignment = target;
       outputs.clear();
       write(environment.GH_AW_SAFE_OUTPUTS, values.map(value => JSON.stringify(value)).join("\n"));
       await module.exports.main();
@@ -551,46 +661,58 @@ async function probeCollector(assignment, artifacts, sourceFiles) {
       write(path.join(directory, name + ".json"), JSON.stringify(output, null, 2) + "\n");
       return output.items;
     };
-    const accepted = await collect("six-outputs", messages);
-    assert.equal(accepted.filter(item => !item._claimScopeError).length, 6);
-    const acceptedPerClaim = members.map(claim => accepted.filter(item => !item._claimScopeError && item.claim_handle === claim.handle).length);
-    assert.deepEqual(acceptedPerClaim, [3, 3]);
-    const overflow = await collect("overflow", [...messages.slice(0, 3), messages[0], ...messages.slice(3)]);
-    assert.ok(overflow.some(item => item.claim_handle === members[0].handle && item._claimScopeError?.includes("Too many items")));
-    assert.equal(overflow.filter(item => item.claim_handle === members[1].handle && !item._claimScopeError).length, 3);
-    const missing = await collect("missing-sibling", messages.slice(0, 3));
-    assert.ok(missing.some(item => item.claim_handle === members[1].handle && item._claimScopeError?.includes("Too few items")));
+    const accepted = items => items.filter(item => !item._claimScopeError);
+    const issues = target => Array.from({ length: 3 }, (_, index) => ({ type: "create_issue", title: `fixture-${target.dispatch_id}-${index}`, body: "inert local fixture" }));
+    // Two singleton Dispatches that reuse handle h1 are collected in their own runs.
+    const acceptedPerClaim = [];
+    for (const [index, target] of assignments.entries()) {
+      const items = await collect(target, `issues-${index}`, issues(target));
+      assert.ok(accepted(items).every(item => item.claim_handle === target.claims[0].handle));
+      acceptedPerClaim.push(accepted(items).length);
+    }
+    const [first, second] = assignments;
+    const overflow = await collect(first, "overflow", [...issues(first), issues(first)[0]]);
+    assert.ok(overflow.some(item => item._claimScopeError?.includes("Too many items")));
+    assert.equal(accepted(overflow).length, 3);
+    // A foreign selector is rejected and does not count toward the Claim's minimum.
+    const foreign = await collect(second, "foreign-handle", [{ ...issues(second)[0], claim_handle: "foreign" }]);
+    assert.equal(accepted(foreign).length, 0);
+    const foreignHandleRejected = foreign.some(item => item.claim_handle === "foreign" && /foreign/.test(item._claimScopeError));
+    const minimumRejected = foreign.some(item => item.claim_handle === second.claims[0].handle && item._claimScopeError?.includes("Too few items"));
+    // A snapshot assignment with two members executes nothing.
+    const multiMember = await collect({ dispatch_id: first.dispatch_id, claims: [first.claims[0], second.claims[0]] }, "multi-member", issues(first));
+    const multiMemberRejected = multiMember.length > 0 && accepted(multiMember).length === 0;
     const compiledFile = path.join(root, ".github/workflows/eslint-refiner.lock.yml");
     sourceFiles.add(compiledFile);
-    const compiled = yaml.parse(fs.readFileSync(compiledFile, "utf8"));
+    const compiled = parseYAML(fs.readFileSync(compiledFile, "utf8"), "Compiled refiner");
     const configStep = compiled.jobs.agent.steps.find(step => step.env?.GH_AW_SAFE_OUTPUTS_CONFIG);
     assert.ok(configStep, "Compiled refiner must supply its collector configuration");
     const memoryConfig = JSON.parse(configStep.env.GH_AW_SAFE_OUTPUTS_CONFIG).persist_eslint_memory;
     assert.equal(memoryConfig.max, 1);
     assert.equal(memoryConfig.inputs.memory.type, "object");
     write(environment.GH_AW_SAFE_OUTPUTS_CONFIG_PATH, JSON.stringify({ persist_eslint_memory: memoryConfig }));
-    const memories = members.map(claim => ({
-      type: "persist_eslint_memory",
-      claim_handle: claim.handle,
-      memory: { work_id: claim.work_id, strategy: "inert fixture", findings: [], metrics: {}, next_actions: [] },
-    }));
-    const acceptedMemory = await collect("memory-per-claim", memories);
-    assert.deepEqual(
-      acceptedMemory.map(item => item.memory),
-      memories.map(item => item.memory)
-    );
-    const memoryPerClaim = members.map(claim => acceptedMemory.filter(item => !item._claimScopeError && item.claim_handle === claim.handle).length);
-    assert.deepEqual(memoryPerClaim, [1, 1]);
-    const excessMemory = await collect("memory-overflow", [memories[0], memories[0], memories[1]]);
-    assert.ok(excessMemory.some(item => item.claim_handle === members[0].handle && item._claimScopeError?.includes("Too many items")));
-    assert.equal(excessMemory.filter(item => item.claim_handle === members[1].handle && !item._claimScopeError).length, 1);
+    const memory = target => ({ type: "persist_eslint_memory", memory: { work_id: target.claims[0].work_id, strategy: "inert fixture", findings: [], metrics: {}, next_actions: [] } });
+    const memoryPerClaim = [];
+    for (const [index, target] of assignments.entries()) {
+      const items = await collect(target, `memory-${index}`, [memory(target)]);
+      assert.deepEqual(
+        accepted(items).map(item => item.memory),
+        [memory(target).memory]
+      );
+      memoryPerClaim.push(accepted(items).length);
+    }
+    const excessMemory = await collect(first, "memory-overflow", [memory(first), memory(first)]);
+    assert.ok(excessMemory.some(item => item._claimScopeError?.includes("Too many items")));
+    assert.equal(accepted(excessMemory).length, 1);
     return {
       acceptedPerClaim,
       overflowRejected: true,
-      siblingMinimumRejected: true,
+      minimumRejected,
+      foreignHandleRejected,
+      multiMemberRejected,
       memoryPerClaim,
       memoryOverflowRejected: true,
-      caveat: "Actual collector main with fixture-supplied trusted assignment, artifact output root and nonexistent legacy patch directory; no live resource effect.",
+      caveat: "Actual collector main once per singleton assignment with fixture-supplied trusted assignment, artifact output root and nonexistent legacy patch directory; no live resource effect.",
     };
   } finally {
     global.core = savedCore;

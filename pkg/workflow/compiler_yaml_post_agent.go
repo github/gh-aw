@@ -334,6 +334,7 @@ func (c *Compiler) generatePostAgentCollectionAndUpload(yaml *strings.Builder, d
 	compilerYamlLog.Printf("Emitting unified agent artifact upload with %d path(s)", len(artifactPaths))
 	behaviorEngine, protectedSessionCapture := engine.(*BehaviorDefinedEngine)
 	protectedSessionCapture = protectedSessionCapture && behaviorEngine.protectedSessionCaptureEnabled()
+	c.generateContinuationEvidenceStep(yaml, data, protectedSessionCapture)
 	c.generateAgentOutputFallbackUpload(yaml, data, agentArtifactPrefix, protectedSessionCapture)
 	c.generateUnifiedArtifactUpload(yaml, artifactPaths, agentArtifactPrefix, data, protectedSessionCapture)
 

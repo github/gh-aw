@@ -52,6 +52,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/ignoredlocalerror"
 	"github.com/github/gh-aw/pkg/linters/ioutildeprecated"
 	"github.com/github/gh-aw/pkg/linters/jsondecodertrailingdataunchecked"
+	"github.com/github/gh-aw/pkg/linters/jsondecoderunknownfields"
 	"github.com/github/gh-aw/pkg/linters/jsonmarshalignoredeerror"
 	"github.com/github/gh-aw/pkg/linters/jsonunmarshalbytesconversion"
 	"github.com/github/gh-aw/pkg/linters/largefunc"
@@ -103,6 +104,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/timesleepnocontext"
 	"github.com/github/gh-aw/pkg/linters/tolowerequalfold"
 	"github.com/github/gh-aw/pkg/linters/trimleftright"
+	"github.com/github/gh-aw/pkg/linters/trimspacestringbytes"
 	"github.com/github/gh-aw/pkg/linters/typeassertionnil"
 	"github.com/github/gh-aw/pkg/linters/typeassertionokdiscarded"
 	unchecked_deferredclose "github.com/github/gh-aw/pkg/linters/unchecked-deferred-close"
@@ -113,6 +115,7 @@ import (
 	"github.com/github/gh-aw/pkg/linters/walkfuncerrshadow"
 	"github.com/github/gh-aw/pkg/linters/wgdonenotdeferred"
 	"github.com/github/gh-aw/pkg/linters/writebytestring"
+	"github.com/github/gh-aw/pkg/linters/writefilepublicpermsensitive"
 )
 
 // TestSpec tests derive from pkg/linters/README.md. They enforce the documented
@@ -128,7 +131,7 @@ type docAnalyzer struct {
 }
 
 // documentedAnalyzers returns the analyzer subpackages documented in the README
-// "Public API > Subpackages" table. The README documents 102 analyzer
+// "Public API > Subpackages" table. The README documents 104 analyzer
 // subpackages (the non-analyzer `internal` helper subpackage is excluded because
 // it exposes no Analyzer).
 //
@@ -136,12 +139,12 @@ type docAnalyzer struct {
 //
 //	appendbytestring, appendoneelement, blankassigncomma, blankassignedcleanuperror, bufferresetbeforereuse, bufioscannererunchecked, bytesbufferstring, bytescomparestring, closeerrorunchecked, contextcancelnotdeferred, ctxbackground, deferinloop, deferrerrorunchecked, errorfwrapv, excessivefuncparams, errormessage, errorsnewerrorstring,
 //	errortypeassertion, errstringmatch, execcommandoutputerrdiscard, execcommandwithoutcontext, fileclosenotdeferred, filepathwalkpreferwalkdir, fmterrorfnoverbs, formatintitoa, fprintferrorunchecked, fprintlnsprintf,
-//	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, hasprefixdotdotpathescape, httpclientnotimeout, httpnoctx, httprespbodyclose, httpstatuscode, ignoredlocalerror, ioutildeprecated, jsondecodertrailingdataunchecked, jsonmarshalignoredeerror, jsonunmarshalbytesconversion, largefunc, lenstringsplit, lenstringzero,
+//	generatedyamlheredoc, globwalkignorederror, goroutinemissingrecover, goroutineresourceleak, hardcodedfilepath, hasprefixdotdotpathescape, httpclientnotimeout, httpnoctx, httprespbodyclose, httpstatuscode, ignoredlocalerror, ioutildeprecated, jsondecodertrailingdataunchecked, jsondecoderunknownfields, jsonmarshalignoredeerror, jsonunmarshalbytesconversion, largefunc, lenstringsplit, lenstringzero,
 //	logfatallibrary, manualmutexunlock, manualpathconcat, mapclearloop, mapdeletecheck, nilctxpassed, osexitinlibrary, osgetenvlibrary, osisnotexist, osopenreadallpreferreadfile, osremoveuncheckedcleanup, osstatignoredeerrorderef, ossetenvlibrary, packagelevelmutableslicemap, panic-in-library-code, prefercutprefix, rawloginlib,
 //	readerstringconv, reflectdeepequalusage, regexpcompileinfunction, regexpdynamicpattern, seenmapbool, slicemakezerolength, sortbasicslices, sortslice, splitindexzero, splitlines-on-newline, sprintferrdot, sprintferrorsnew, sprintfbool, sprintfint, ssljson,
 //	strconvparseignorederror, stringbytesroundtrip, stringreplaceminusone, stringsconcatloop, stringscountcontains, stringsindexcontains, stringsindexhasprefix, stringsjoinone, stringssplitfirst,
 //	timeafterleak, timesleepnocontext, timenowsub,
-//	tolowerequalfold, trimleftright, typeassertionnil, typeassertionokdiscarded, unchecked_deferredclose, uncheckedflushreturn, uncheckedsliceindex, uncheckedtypeassertion, walkdirignoredeerror, walkfuncerrshadow, wgdonenotdeferred, writebytestring
+//	tolowerequalfold, trimleftright, trimspacestringbytes, typeassertionnil, typeassertionokdiscarded, unchecked_deferredclose, uncheckedflushreturn, uncheckedsliceindex, uncheckedtypeassertion, walkdirignoredeerror, walkfuncerrshadow, wgdonenotdeferred, writebytestring, writefilepublicpermsensitive
 func documentedAnalyzers() []docAnalyzer {
 	return []docAnalyzer{
 		{"appendbytestring", appendbytestring.Analyzer},
@@ -185,6 +188,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"ignoredlocalerror", ignoredlocalerror.Analyzer},
 		{"ioutildeprecated", ioutildeprecated.Analyzer},
 		{"jsondecodertrailingdataunchecked", jsondecodertrailingdataunchecked.Analyzer},
+		{"jsondecoderunknownfields", jsondecoderunknownfields.Analyzer},
 		{"jsonmarshalignoredeerror", jsonmarshalignoredeerror.Analyzer},
 		{"jsonunmarshalbytesconversion", jsonunmarshalbytesconversion.Analyzer},
 		{"largefunc", largefunc.Analyzer},
@@ -236,6 +240,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"timenowsub", timenowsub.Analyzer},
 		{"tolowerequalfold", tolowerequalfold.Analyzer},
 		{"trimleftright", trimleftright.Analyzer},
+		{"trimspacestringbytes", trimspacestringbytes.Analyzer},
 		{"typeassertionnil", typeassertionnil.Analyzer},
 		{"typeassertionokdiscarded", typeassertionokdiscarded.Analyzer},
 		{"unchecked_deferredclose", unchecked_deferredclose.Analyzer},
@@ -246,6 +251,7 @@ func documentedAnalyzers() []docAnalyzer {
 		{"walkfuncerrshadow", walkfuncerrshadow.Analyzer},
 		{"wgdonenotdeferred", wgdonenotdeferred.Analyzer},
 		{"writebytestring", writebytestring.Analyzer},
+		{"writefilepublicpermsensitive", writefilepublicpermsensitive.Analyzer},
 	}
 }
 

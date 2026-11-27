@@ -42,7 +42,6 @@ const { renderTemplateFromFile, renderFilesList, buildProtectedFileBlocks, getPr
 const { withGitHubHostToken } = require("./git_auth_helpers.cjs");
 const { COPILOT_REVIEWER_BOT, FAQ_CREATE_PR_PERMISSIONS_URL } = require("./constants.cjs");
 const { isStagedMode } = require("./safe_output_helpers.cjs");
-const { preparePullRequestDelivery, capturePullRequestDelivery } = require("./work_queue_native_creation_delivery.cjs");
 const { extractPatchBaseCommit } = require("./commit_sha_helpers.cjs");
 const { withRetry, RATE_LIMIT_RETRY_CONFIG } = require("./error_recovery.cjs");
 const { createOrUpdatePullRequest } = require("./create_or_update_pull_request.cjs");
@@ -2770,7 +2769,6 @@ async function main(config = {}) {
           throw new Error(`Pull request body exceeds GitHub's maximum length of ${MAX_GITHUB_BODY_LENGTH} characters`);
         }
         transport.assertUnchanged();
-        const preparedDelivery = await preparePullRequestDelivery(exec, baseBranch, defaultBaseBranch);
         const { data: pullRequest } = await createOrUpdatePullRequest({
           assertTransportUnchanged: transport.assertUnchanged,
           githubClient,
@@ -3013,38 +3011,18 @@ async function main(config = {}) {
 
         // Return success with PR details
         trace("capt");
-        return await capturePullRequestDelivery(
-          {
-            success: true,
-            number: pullRequest.number,
-            url: pullRequest.html_url,
-            id: pullRequest.id,
-            metadata: { node_id: pullRequest.node_id },
-            managedBody: body,
-            branch_name: branchName,
-            temporaryId: temporaryId,
-            repo: itemRepo,
-            head_repo: pushRepo,
-          },
-          message,
-          {
-            prepared: preparedDelivery,
-            id: String(pullRequest.id),
-            number: pullRequest.number,
-            url: pullRequest.html_url,
-            repository: itemRepo,
-            headRepository: pushRepo,
-            branch: branchName,
-            baseBranch,
-            transportBaseBranch: defaultBaseBranch,
-            title,
-            body,
-            draft,
-            labels,
-            assignees: configAssignees || [],
-          },
-          githubClient
-        );
+        return {
+          success: true,
+          number: pullRequest.number,
+          url: pullRequest.html_url,
+          id: pullRequest.id,
+          metadata: { node_id: pullRequest.node_id },
+          managedBody: body,
+          branch_name: branchName,
+          temporaryId: temporaryId,
+          repo: itemRepo,
+          head_repo: pushRepo,
+        };
       } catch (prError) {
         trace("pber");
         transport.assertUnchanged();

@@ -6,9 +6,19 @@ var diagnosticHandlerRegistry = map[string]handlerBuilder{
 		if cfg.RequestContinuation == nil {
 			return nil
 		}
-		return newHandlerConfigBuilder().
-			AddTemplatableInt("max", cfg.RequestContinuation.Max).
-			Build()
+		c := cfg.RequestContinuation
+		builder := newHandlerConfigBuilder().AddTemplatableInt("max", c.Max)
+		if c.Route == "" {
+			return builder.Build()
+		}
+		builder.AddIfNotEmpty("route", c.Route).
+			AddDefault("max_depth", requestContinuationMaxDepth(c))
+		if c.Route == RequestContinuationRouteDispatch {
+			builder.AddIfNotEmpty("workflow", c.Workflow).
+				AddIfNotEmpty("workflow_file", c.workflowFile).
+				AddIfTrue("aw_context", c.awContext)
+		}
+		return builder.Build()
 	},
 	"report_missing_tool": func(cfg *SafeOutputsConfig) map[string]any {
 		if cfg.MissingTool == nil {

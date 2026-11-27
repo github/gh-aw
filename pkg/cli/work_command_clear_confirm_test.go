@@ -2,268 +2,123 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
-	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/workqueue"
+	"github.com/stretchr/testify/require"
 )
 
-func TestWorkClearRequiresMaintainOrAdmin(t *testing.T) {
-	for _, role := range []string{"admin", "maintain", "write", "triage", "read", ""} {
-		for _, hard := range []bool{false, true} {
-			t.Run(role+"/hard_"+strconv.FormatBool(hard), func(t *testing.T) {
-				workClearRoleEnvironment(t, role)
-				_, commits, _ := workOperatorFixture(t, false)
-				if hard {
-					commits = workClearPause(t, commits)
-				}
-				data, err := workqueue.Serialize(commits)
-				if err != nil {
-					t.Fatal(err)
-				}
-				queue := newWorkQueueGitRemote(t, string(data))
-				confirmations := 0
-				workClearConfirmAction = func(string, string, string) (bool, error) {
-					confirmations++
-					if queue.pushes(t) != 0 {
-						t.Fatal("clear wrote before confirmation")
-					}
-					return true, nil
-				}
-				for _, dryRun := range []bool{true, false} {
-					extra := []string{}
-					if dryRun {
-						extra = append(extra, "--dry-run")
-					}
-					if hard {
-						_, err = workHardClearExecute(t, extra...)
-					} else {
-						_, err = workClearExecute(t, extra...)
-					}
-					allowed := role == "admin" || role == "maintain"
-					if (err == nil) != allowed {
-						t.Fatalf("role %q authorization differs: %v", role, err)
-					}
-					if !allowed && (!strings.Contains(err.Error(), "maintain or admin") || queue.pushes(t) != 0 || confirmations != 0) {
-						t.Fatalf("unauthorized clear accessed confirmation or publication: %v", err)
-					}
-				}
-				if (role == "admin" || role == "maintain") && (confirmations != 1 || queue.pushes(t) != 1) {
-					t.Fatal("authorized clear did not confirm exactly once before writing")
-				}
-			})
-		}
-	}
-}
-
 func TestWorkClearConfirmationAndPreview(t *testing.T) {
-	for _, hard := range []bool{false, true} {
-		for _, scenario := range []string{"yes", "no", "error", "dry_run"} {
-			t.Run("hard_"+strconv.FormatBool(hard)+"/"+scenario, func(t *testing.T) {
-				workClearOperatorEnvironment(t, true)
-				state, commits, ids := workOperatorFixture(t, false)
-				if hard {
-					commits = workClearPause(t, commits)
+	for _, scenario := range []string{"yes", "no", "error", "dry_run"} {
+		t.Run(scenario, func(t *testing.T) {
+			workClearEnvironment(t)
+			log, ids := workQueueMixedFixture(t)
+			ids["secret"] = log.submit(log.work("secret", func(work *workqueue.WorkDefinition) {
+				work.Payload = json.RawMessage(`{"task":"PAYLOAD-MUST-STAY-PRIVATE","token":"SECRET-MUST-STAY-PRIVATE"}`)
+			}))[0]
+			state := log.state()
+			ledger := log.jsonl()
+			queue := newWorkQueueGitRemote(t, ledger)
+			head := queue.head(t)
+			cmd := NewWorkCommand()
+			var output, preview bytes.Buffer
+			cmd.SetOut(&output)
+			cmd.SetErr(&preview)
+			args := []string{"--repo", workQueueTestRepository, "--json", "clear"}
+			if scenario == "dry_run" {
+				args = append(args, "--dry-run")
+			}
+			cmd.SetArgs(args)
+			confirmations := 0
+			workClearConfirmAction = func(string, string, string) (bool, error) {
+				confirmations++
+				text := preview.String()
+				for _, want := range []string{
+					`repository="owner/repo"`, "branch=" + workQueueText(workqueue.DefaultBranch), "Snapshot: " + workQueueText(state.Tip),
+					"Work: 5; available: 2; claimed: 1; completed: 1; cancelled: 1",
+					"Release 1 dispatches, then cancel 3 Work (reason operator).",
+					"RELEASE " + workQueueText(ids["running_dispatch"]) + " state=bound workflow=" + workQueueText(workQueueTestWorkerWorkflow),
+					"CANCEL " + workQueueText(ids["running"]) + " state=claimed",
+					"CANCEL " + workQueueText(ids["waiting"]) + " state=available",
+					"CANCEL " + workQueueText(ids["secret"]) + " state=available",
+				} {
+					require.Contains(t, text, want)
 				}
-				data, err := workqueue.Serialize(commits)
-				if err != nil {
-					t.Fatal(err)
+				require.NotContains(t, text, ids["done"], "preview listed completed Work")
+				require.NotContains(t, text, ids["dropped"], "preview listed cancelled Work")
+				require.NotContains(t, text, "MUST-STAY-PRIVATE", "preview leaked a Work payload")
+				require.Equal(t, head, queue.head(t), "clear wrote before confirmation")
+				require.Zero(t, output.Len(), "clear printed a result before confirmation")
+				if scenario == "error" {
+					return false, errors.New("prompt unavailable")
 				}
-				queue := newWorkQueueGitRemote(t, string(data))
-				head := queue.head(t)
-				cmd := NewWorkCommand()
-				var output, preview bytes.Buffer
-				cmd.SetOut(&output)
-				cmd.SetErr(&preview)
-				args := []string{"--repo", "owner/repo", "--json", "clear", "--reason", "operator_clear", "--request-id", "confirm-action"}
-				if hard {
-					args = append(args, "--hard")
-				}
+				return scenario == "yes", nil
+			}
+			err := cmd.Execute()
+			switch scenario {
+			case "no":
+				require.ErrorContains(t, err, "clear_cancelled")
+			case "error":
+				require.ErrorContains(t, err, "clear_confirmation_failed")
+			default:
+				require.NoError(t, err)
+			}
+			if scenario != "yes" {
+				wantConfirmations := 1
 				if scenario == "dry_run" {
-					args = append(args, "--dry-run")
+					wantConfirmations = 0
 				}
-				cmd.SetArgs(args)
-				confirmations := 0
-				workClearConfirmAction = func(string, string, string) (bool, error) {
-					confirmations++
-					text := preview.String()
-					for _, want := range append(ids, `repository="owner/repo"`, "branch="+workQueueText(workqueue.DefaultBranch), "Snapshot:", "Work: 3", "unreleased native reservations: 0") {
-						if !strings.Contains(text, want) {
-							t.Fatalf("confirmation omitted queue preview %q: %s", want, text)
-						}
-					}
-					if strings.Contains(text, "PAYLOAD-MUST") || strings.Contains(text, "SECRET-MUST") ||
-						queue.head(t) != head || queue.pushes(t) != 0 || output.Len() != 0 {
-						t.Fatal("preview leaked payload or wrote before confirmation")
-					}
-					if hard && (!strings.Contains(text, "HARD RESET") || !strings.Contains(text, "effects may repeat")) {
-						t.Fatal("hard confirmation omitted destructive identity warning")
-					}
-					if !hard && !strings.Contains(text, workQueueText(state.Tip)) {
-						t.Fatal("confirmation did not show the selected snapshot")
-					}
-					if scenario == "error" {
-						return false, errors.New("prompt unavailable")
-					}
-					return scenario == "yes", nil
-				}
-				err = cmd.Execute()
-				if scenario == "no" || scenario == "error" {
-					if err == nil || confirmations != 1 || queue.pushes(t) != 0 || queue.head(t) != head || queue.read(t) != string(data) {
-						t.Fatalf("unconfirmed clear mutated queue: %v", err)
-					}
-					return
-				}
-				if err != nil {
-					t.Fatal(err)
-				}
-				want := 1
-				if scenario == "dry_run" {
-					want = 0
-				}
-				if confirmations != want || queue.pushes(t) != want || !strings.HasPrefix(output.String(), "{") {
-					t.Fatalf("confirmation count, writes or JSON output changed: %d %d %s", confirmations, queue.pushes(t), output.String())
-				}
-			})
-		}
+				require.Equal(t, wantConfirmations, confirmations)
+				require.Zero(t, queue.pushes(t))
+				require.Equal(t, ledger, queue.read(t))
+				return
+			}
+			require.Equal(t, 1, confirmations)
+			require.Equal(t, 2, queue.pushes(t))
+			var result workClearResult
+			require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+			require.Equal(t, "cleared", result.Status)
+			require.NotContains(t, output.String(), "MUST-STAY-PRIVATE")
+		})
 	}
 }
 
 func TestWorkClearRefusesNonInteractiveConfirmation(t *testing.T) {
-	for _, hard := range []bool{false, true} {
-		t.Run(strconv.FormatBool(hard), func(t *testing.T) {
-			workClearOperatorEnvironment(t, true)
-			_, commits, _ := workOperatorFixture(t, false)
-			if hard {
-				commits = workClearPause(t, commits)
-			}
-			data, err := workqueue.Serialize(commits)
-			if err != nil {
-				t.Fatal(err)
-			}
-			queue := newWorkQueueGitRemote(t, string(data))
-			reader, writer, err := os.Pipe()
-			if err != nil {
-				t.Fatal(err)
-			}
-			stdin := os.Stdin
-			os.Stdin = reader
-			t.Cleanup(func() { os.Stdin = stdin })
-			t.Cleanup(func() { _ = reader.Close(); _ = writer.Close() })
-			workClearConfirmAction = console.ConfirmAction
-			if hard {
-				_, err = workHardClearExecute(t)
-			} else {
-				_, err = workClearExecute(t)
-			}
-			if err == nil || !strings.Contains(err.Error(), "clear_confirmation_failed") || !strings.Contains(err.Error(), "not a TTY") ||
-				queue.pushes(t) != 0 || queue.read(t) != string(data) {
-				t.Fatalf("noninteractive clear did not fail closed: %v", err)
-			}
-		})
-	}
+	workClearEnvironment(t)
+	log, _ := workQueueMixedFixture(t)
+	ledger := log.jsonl()
+	queue := newWorkQueueGitRemote(t, ledger)
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	stdin := os.Stdin
+	os.Stdin = reader
+	t.Cleanup(func() { os.Stdin = stdin })
+	t.Cleanup(func() { _ = reader.Close(); _ = writer.Close() })
+	workClearConfirmAction = console.ConfirmAction
+	_, err = workClearExecute(t)
+	require.ErrorContains(t, err, "clear_confirmation_failed")
+	require.ErrorContains(t, err, "not a TTY")
+	require.Zero(t, queue.pushes(t))
+	require.Equal(t, ledger, queue.read(t))
 }
 
-func TestWorkClearRechecksRoleAfterConfirmation(t *testing.T) {
-	for _, hard := range []bool{false, true} {
-		t.Run(strconv.FormatBool(hard), func(t *testing.T) {
-			setRole := workClearRoleEnvironment(t, "maintain")
-			_, commits, _ := workOperatorFixture(t, false)
-			if hard {
-				commits = workClearPause(t, commits)
-			}
-			data, err := workqueue.Serialize(commits)
-			if err != nil {
-				t.Fatal(err)
-			}
-			queue := newWorkQueueGitRemote(t, string(data))
-			workClearConfirmAction = func(string, string, string) (bool, error) {
-				setRole("write")
-				return true, nil
-			}
-			if hard {
-				_, err = workHardClearExecute(t)
-			} else {
-				_, err = workClearExecute(t)
-			}
-			if err == nil || !strings.Contains(err.Error(), "maintain or admin") || queue.pushes(t) != 0 || queue.read(t) != string(data) {
-				t.Fatalf("revoked role retained clear authority: %v", err)
-			}
-		})
-	}
-}
-
-func TestWorkClearNoopAndRecoveryDoNotPrompt(t *testing.T) {
-	for _, hard := range []bool{false, true} {
-		t.Run(strconv.FormatBool(hard), func(t *testing.T) {
-			workClearOperatorEnvironment(t, true)
-			_, commits, _ := workOperatorFixture(t, false)
-			if hard {
-				commits = workClearPause(t, commits)
-			}
-			data, err := workqueue.Serialize(commits)
-			if err != nil {
-				t.Fatal(err)
-			}
-			queue := newWorkQueueGitRemote(t, string(data))
-			if hard {
-				_, err = workHardClearExecute(t)
-			} else {
-				_, err = workClearExecute(t)
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			workClearConfirmAction = func(string, string, string) (bool, error) {
-				t.Fatal("read-only recovery or no-op requested confirmation")
-				return false, nil
-			}
-			if hard {
-				_, err = workHardClearExecute(t)
-			} else {
-				_, err = workClearExecute(t)
-			}
-			if err != nil || queue.pushes(t) != 1 {
-				t.Fatalf("recovery wrote or failed: %v", err)
-			}
-			if !hard {
-				if _, err := workClearExecute(t, "--request-id", "empty-action"); err != nil || queue.pushes(t) != 1 {
-					t.Fatalf("empty clear wrote or failed: %v", err)
-				}
-			}
-		})
-	}
-}
-
-func TestWorkClearHardRejectsChangesAfterConfirmationPreview(t *testing.T) {
-	workClearOperatorEnvironment(t, true)
-	_, commits, _ := workOperatorFixture(t, false)
-	commits = workClearPause(t, commits)
-	data, err := workqueue.Serialize(commits)
-	if err != nil {
-		t.Fatal(err)
-	}
-	queue := newWorkQueueGitRemote(t, string(data))
-	var changed string
+func TestWorkClearNoopDoesNotPrompt(t *testing.T) {
+	workClearEnvironment(t)
+	log, _ := workQueueMixedFixture(t)
+	queue := newWorkQueueGitRemote(t, log.jsonl())
+	_, err := workClearExecute(t)
+	require.NoError(t, err)
+	pushes := queue.pushes(t)
 	workClearConfirmAction = func(string, string, string) (bool, error) {
-		commits = workClearAppend(t, commits, workqueue.Actor{Role: "administrator", Principal: "1001", Repository: "owner/repo"},
-			"changed-during-confirmation", "control", workqueue.OperationsParameters{Operations: []workqueue.Operation{
-				mustWorkQueueOperation(t, map[string]any{"kind": "Control", "control": "credential_generation", "value": "new_generation", "reason": "rotate"}),
-			}}, 10000)
-		updated, err := workqueue.Serialize(commits)
-		if err != nil {
-			t.Fatal(err)
-		}
-		changed = string(updated)
-		queue.write(t, changed)
-		return true, nil
+		t.Fatal("clear of an already cleared queue requested confirmation")
+		return false, nil
 	}
-	if _, err := workHardClearExecute(t); err == nil || !strings.Contains(err.Error(), "hard_clear_conflict") ||
-		queue.pushes(t) != 0 || changed == "" || queue.read(t) != changed {
-		t.Fatalf("hard clear reset an unconfirmed snapshot: %v", err)
-	}
+	result, err := workClearExecute(t)
+	require.NoError(t, err)
+	require.Equal(t, "no_work", result.Status)
+	require.Equal(t, pushes, queue.pushes(t))
 }

@@ -39,6 +39,7 @@ func processWorkflowRunBatch(
 	processedRuns []ProcessedRun,
 	opts processWorkflowRunBatchOptions,
 ) ([]ProcessedRun, int, bool, bool, bool) {
+	logsOrchestratorLog.Printf("Processing workflow run batch: runs=%d processed=%d target=%d", len(batch.runs), len(processedRuns), opts.count)
 	runsRemaining := batch.runs
 	batchProcessed := 0
 	storageLimitReached := false
@@ -56,6 +57,9 @@ func processWorkflowRunBatch(
 		storageLimitReached = storageLimitReached || chunkStorageLimitReached
 		if opts.atifError != nil && *opts.atifError != nil {
 			return processedRuns, batchProcessed, false, false, storageLimitReached
+		}
+		if isDeadlineExceeded(activeCtx) {
+			return processedRuns, batchProcessed, false, true, storageLimitReached
 		}
 		if len(processedRuns) >= opts.count {
 			break

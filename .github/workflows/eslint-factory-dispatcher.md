@@ -58,12 +58,11 @@ monster. Use the exact stored UTC date, nodes, profiles, contracts, and budgets.
 Do not invent additional tasks or broaden resource scopes.
 
 Read the activation snapshot first with `work_queue_read`, using
-`{"pool":"default","limit":32}`. Check `queue_state`, not just `total`:
-`"uninitialized"` with a null snapshot SHA means the queue branch does not
-exist yet. Treat it as an empty backlog; the first trusted producer submission
-will atomically bootstrap the branch with its compiler-approved Policy and Work.
-Surface read/tool errors explicitly; never report an existing policyless ledger
-as an empty backlog.
+`{"pool":"default","limit":32}`. A null `snapshot_sha` means the queue branch
+does not exist yet.
+Treat it as an empty backlog; the first trusted producer submission
+creates the branch with its Work. Surface read/tool errors explicitly; never
+report a failed read as an empty backlog.
 
 When `<mcp-clis>` advertises the wrappers, invoke their subcommands with one JSON
 argument through the shell tool:
@@ -81,8 +80,8 @@ before its dispatch request. Do not call `work_queue_submit` or
 only. Date-keyed
 graph/node identities make repeated submissions on the same UTC day idempotent,
 including manual runs and reruns. Do not change stored task payloads on retries
-or replace admitted Work. AW authorizes trusted participants; the installed
-Policy controls scheduling for pool `default`, priority `3`, and accounting key
+or replace admitted Work. AW authorizes trusted participants; the compiled queue
+policy controls scheduling for pool `default`, priority `3`, and accounting key
 `""`. A failed admission is not permission to bypass scheduling bounds.
 Submission is a staged intent, not proof of durable admission.
 
@@ -92,7 +91,7 @@ The following request is already staged from `plan.dispatch`:
 {"pool":"default","max_claims":3,"max_dispatches":3}
 ```
 
-Keep the request within the installed pool policy and this workflow's dispatch
+Keep the request within the compiled pool limits and this workflow's dispatch
 budget. Even an empty snapshot or a prediction of no eligible Work can be stale;
 trusted processing refreshes the ledger. A response with `status: "staged"` and
 an `intent_id` is not proof of Claims, native launches, or completed Work. Report
@@ -100,27 +99,23 @@ only that the request was staged, not that workers ran or that the live queue is
 empty.
 
 Do not select Work IDs, workers, revisions, or targets from a queue snapshot.
-The scheduler selects eligible Work and launches only the compatible worker
-profile at its installed immutable workflow revision. This workflow's
+The scheduler selects eligible Work in priority, then FIFO order and launches
+the compatible worker profile from the compiled policy. This workflow's
 `safe-outputs.dispatch-workflow.workflows` list is the compiler-approved
-worker-name allowlist; it does not replace the installed policy's profile,
-revision, or Claim/run ownership. Do not call ordinary `dispatch_workflow` or typed
-per-worker dispatch tools.
+worker-name allowlist; it does not replace the compiled profiles or Claim/run
+ownership. Do not call ordinary `dispatch_workflow` or typed per-worker dispatch
+tools.
 
-Safe-output processing uses only the compiler-approved Policy proposal; never
-choose or modify Policy. If bootstrap or admission fails, report the failure; do
-not bypass it with `noop` or ordinary worker dispatch.
+Safe-output processing uses only the compiler-generated queue policy; never
+choose or modify it. If admission fails, report the failure; do not bypass it
+with `noop` or ordinary worker dispatch.
 
 Scheduling overrides are shared in `.github/workflows/aw.json` under
 `work_queue`. Trusted `safe-outputs.dispatch-workflow` processing uses the
 built-in Actions token with `actions: write`; no custom launch secret is required.
 Trusted queue admission and safe outputs use the same built-in token, not
 `GH_AW_GITHUB_TOKEN` or another custom secret.
-AW pins declared worker routes
-to the immutable workflow revision; it binds each actual native run to its
-Claim. The first accepted submission automatically creates the queue with
-compiled Policy and Work; no administrator seed is required.
-Changing economic scheduling after bootstrap requires a quiescent queue and an
-administrator Policy update. Compatible worker revisions evolve through trusted
-deployment reconciliation; editing this proposal alone cannot replace installed
-Policy.
+AW dispatches declared worker routes and binds each worker run to its dispatch.
+The first accepted submission automatically creates the queue; no
+administrator seed is required. Scheduling changes in `aw.json` take effect on
+the next run after recompilation.

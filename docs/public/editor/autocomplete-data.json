@@ -3164,6 +3164,11 @@
           "desc": "Enable AI agents to minimize (hide) comments on issues or pull requests based on relevance, spam detection, or modera...",
           "leaf": true
         },
+        "set-issue-status": {
+          "type": "null|object",
+          "desc": "Change native issue planning status, separately from legacy update-issue.status open/closed state.",
+          "leaf": true
+        },
         "set-issue-type": {
           "type": "null|object",
           "desc": "Enable AI agents to set or clear the type of GitHub issues.",
@@ -4407,6 +4412,20 @@
       "type": "string",
       "desc": "Default LLM model, overridden by nested engine.model.",
       "leaf": true
+    },
+    "model-routing": {
+      "type": "boolean|object",
+      "desc": "Set false to disable implicit main-agent routing without pinning a model, or configure the main agent's router shortl...",
+      "children": {
+        "allowed-models": {
+          "desc": "For a literal router model value, specify at least one exact model name or gh-aw alias."
+        },
+        "learning": {
+          "type": "string|boolean",
+          "desc": "Use observe to record each eligible run's model, effort, outcome and cost without changing the router's pick.",
+          "enum": ["observe", false]
+        }
+      }
     },
     "graders": {
       "type": "object",

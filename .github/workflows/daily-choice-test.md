@@ -87,11 +87,13 @@ Use the `test_environment` tool to configure a test deployment. Choose:
 1. An environment: staging or production
 2. A test type: smoke, integration, or e2e
 
+Call the tool with only the `environment` and `test_type` inputs.
+
 Make your selection based on the day of the week:
 - Monday/Wednesday/Friday: Use "staging" environment with "smoke" tests
 - Tuesday/Thursday: Use "production" environment with "integration" tests
 
-Provide a brief explanation of why you chose this configuration.
+In your final response, briefly explain why you chose this configuration.
 
 ### Output Format
 

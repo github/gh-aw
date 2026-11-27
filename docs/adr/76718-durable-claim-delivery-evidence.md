@@ -1,5 +1,8 @@
 # ADR-76718: Retain durable Claim delivery evidence
 
+> [!NOTE]
+> Superseded by work queue protocol v4 ([specification](../src/content/docs/specs/work-queue-specification.md)): v4 removed delivery evidence, delivery barriers, `DeliveryFailure`, and Results; a Completion records the applied effects directly.
+
 **Date**: 2026-11-11
 **Status**: Draft
 **Deciders**: Pending maintainer review

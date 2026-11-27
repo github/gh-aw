@@ -60,6 +60,9 @@ func TestSpec_PublicAPI_HasShellCodeEvaluation(t *testing.T) {
 	}{
 		{name: "expanded value evaluated as code", shell: `eval "$value"`, unsafe: true},
 		{name: "expanded value printed as data", shell: `printf '%s\n' "$value"`},
+		{name: "evaluation before another statement", shell: `eval "$value"; echo done`, unsafe: true},
+		{name: "evaluation after another statement", shell: `echo ready; eval "$value"`, unsafe: true},
+		{name: "multiple ordinary statements", shell: `echo ready; echo done`},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
