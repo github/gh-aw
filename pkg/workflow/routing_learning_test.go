@@ -87,13 +87,25 @@ func TestRoutingLearningObserveAddsOnlyTheWriterJob(t *testing.T) {
 	writer, added := onJobs[pushRoutingHistoryJobName]
 	require.True(t, added)
 	delete(onJobs, pushRoutingHistoryJobName)
+	// Opting in without explicit safe-outputs also emits the small fallback artifact upload
+	// on the agent job so routing observations survive an agent artifact upload timeout.
+	onAgentSteps := onJobs["agent"]["steps"].([]any)
+	fallbackStepIdx := -1
+	for i, raw := range onAgentSteps {
+		if step, ok := raw.(map[string]any); ok && step["name"] == "Upload agent output fallback artifact" {
+			fallbackStepIdx = i
+			break
+		}
+	}
+	require.GreaterOrEqual(t, fallbackStepIdx, 0, "observe must emit the fallback artifact upload when no explicit safe-outputs are declared")
+	onJobs["agent"]["steps"] = append(append([]any{}, onAgentSteps[:fallbackStepIdx]...), onAgentSteps[fallbackStepIdx+1:]...)
 	// Only conclusion's job inventory names the added job.
 	for _, jobs := range []map[string]map[string]any{offJobs, onJobs} {
 		env := jobs["conclusion"]["env"].(map[string]any)
 		delete(env, "GH_AW_JOB_DISPLAY_NAMES")
 		delete(env, "GH_AW_JOB_TIMING_ELIGIBLE")
 	}
-	assert.Equal(t, offJobs, onJobs, "observe must not change the agent job, its prompt, or any other job")
+	assert.Equal(t, offJobs, onJobs, "observe must not change the agent prompt, permissions, model selection, or any other job")
 
 	assert.Equal(t, []any{"activation", "agent", "conclusion"}, writer["needs"])
 	assert.Equal(t, "always() && needs.agent.result != 'skipped'", writer["if"])

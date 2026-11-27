@@ -115,14 +115,15 @@ func recoveryArtifactScanRoots(paths []string) []string {
 }
 
 // generateAgentOutputFallbackUpload generates a small, dedicated artifact upload containing
-// processed agent output and accounting evidence. These files are also part of the unified
-// "agent" artifact, but that artifact is large and its upload is best-effort
-// (continue-on-error). When the upload times out, downstream jobs cannot download the agent
-// artifact and every safe output is silently dropped. Uploading the few-KB payload separately
-// gives those jobs a reliable fallback source.
+// processed agent output, accounting evidence, and routing verdict recovery signals. These
+// files are also part of the unified "agent" artifact (or derived from it), but that artifact
+// is large and its upload is best-effort (continue-on-error). When the upload times out,
+// downstream jobs cannot download the agent artifact and safe outputs or routing observations
+// are dropped or misclassified. Uploading the small payload separately gives those jobs a
+// reliable fallback source.
 // prefix is prepended to the artifact name to avoid clashes in workflow_call context.
 func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data *WorkflowData, prefix string, protectedSessionCapture bool) {
-	if data.SafeOutputs == nil || data.SafeOutputs.AutoInjectedCreateIssue {
+	if (data.SafeOutputs == nil || data.SafeOutputs.AutoInjectedCreateIssue) && data.RoutingLearningMode == "" {
 		return
 	}
 
@@ -131,16 +132,22 @@ func (c *Compiler) generateAgentOutputFallbackUpload(yaml *strings.Builder, data
 		constants.TmpGhAwDirSlash + constants.SafeOutputsFilename.String(),
 		agentExecutionEvidencePath,
 		agentExecutionExitCodePath,
+		constants.TmpGhAwDirSlash + "agent-errors.jsonl",
 		constants.TmpGhAwDirSlash + "agent_usage.jsonl",
 		constants.TmpGhAwDirSlash + "agent_usage.json",
 		constants.TmpGhAwDirSlash + "agent/harness_retry.json",
 		constants.TmpGhAwDirSlash + "agent/model-endpoint-mismatch.json",
+		constants.TmpGhAwDirSlash + "agent/routing-refusal.json",
+		constants.TmpGhAwDirSlash + "agent/upstream-errors-fallback.jsonl",
 		constants.TmpGhAwDirSlash + "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
 		constants.TmpGhAwDirSlash + "sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl",
+		constants.TmpGhAwDirSlash + "sandbox/firewall-audit-logs/api-proxy-logs/adaptive-selection.jsonl",
 		path.Join(constants.AWFProxyLogsDir.String(), "api-proxy-logs/token-usage.jsonl"),
 		path.Join(constants.AWFProxyLogsDir.String(), "api-proxy-logs/model-routing.jsonl"),
+		path.Join(constants.AWFProxyLogsDir.String(), "api-proxy-logs/adaptive-selection.jsonl"),
 		path.Join(constants.AWFAuditDir.String(), "api-proxy-logs/token-usage.jsonl"),
 		path.Join(constants.AWFAuditDir.String(), "api-proxy-logs/model-routing.jsonl"),
+		path.Join(constants.AWFAuditDir.String(), "api-proxy-logs/adaptive-selection.jsonl"),
 	}
 	if isFirewallEnabled(data) {
 		paths = append(paths, constants.AWFResolvedConfigFilePath.String())

@@ -2593,3 +2593,245 @@ describe("routing history under concurrent writers", () => {
     expect(branch.state.scopes["copilot/cost/shared"].pairs[PAIR].history.map(entry => entry[0])).toEqual(Array.from({ length: 50 }, (_, index) => index + 51));
   });
 });
+
+describe("routing history writer parity between full agent artifact and fallback-only recovery", () => {
+  const { persistUpstreamErrorFallback } = req("./parse_token_usage.cjs");
+  const { persistRoutingRefusalIndicator } = req("./log_parser_bootstrap.cjs");
+  const PROXY_LOGS = "sandbox/firewall/logs/api-proxy-logs";
+  const LAYOUTS = ["sandbox/firewall/logs/api-proxy-logs", "sandbox/firewall/audit/api-proxy-logs", "sandbox/firewall-audit-logs/api-proxy-logs"];
+
+  /**
+   * Read the first adaptive-selection receipt across the three firewall log layouts,
+   * matching the precedence used for token-usage and model-routing logs.
+   * @param {string} dir
+   */
+  function readAdaptiveReceipt(dir) {
+    for (const layout of LAYOUTS) {
+      const file = path.join(dir, layout, "adaptive-selection.jsonl");
+      if (fs.existsSync(file)) return [...readJsonlFile(file, { strict: true })][0] ?? null;
+    }
+    return null;
+  }
+
+  /**
+   * Prepare paired full-artifact and fallback-only run directories from the real routed fixture,
+   * then publish `usage/aw_session.jsonl` for each so both can be fed to the routing history writer.
+   */
+  function buildParitySessions({ layout = PROXY_LOGS, agentResult = "failure", agentOutput, upstreamError, sessionEvents = [], agentExecution, receipt }) {
+    const source = fixtures.runDir(fixtures.RUNS.routed.id);
+    const awInfo = fixtures.awInfo(fixtures.RUNS.routed.id);
+    const subAgentModels = awInfo.sub_agent_models;
+    const fullDir = fs.mkdtempSync(path.join(root, "full-"));
+    const fallbackDir = fs.mkdtempSync(path.join(root, "fallback-"));
+    for (const dir of [fullDir, fallbackDir]) {
+      fs.writeFileSync(path.join(dir, "aw_info.json"), JSON.stringify(awInfo));
+      fs.writeFileSync(path.join(dir, "agent_output.json"), JSON.stringify(agentOutput));
+      fs.mkdirSync(path.join(dir, layout), { recursive: true });
+      for (const name of ["token-usage.jsonl", "model-routing.jsonl"]) {
+        fs.copyFileSync(path.join(source, PROXY_LOGS, name), path.join(dir, layout, name));
+      }
+      if (receipt) {
+        fs.writeFileSync(path.join(dir, layout, "adaptive-selection.jsonl"), JSON.stringify(receipt) + "\n");
+      }
+    }
+    if (upstreamError) {
+      fs.writeFileSync(path.join(fullDir, layout, "upstream-errors.jsonl"), JSON.stringify(upstreamError) + "\n");
+    }
+    if (sessionEvents.length > 0) {
+      fs.writeFileSync(path.join(fullDir, "agent-session.jsonl"), sessionEvents.map(e => JSON.stringify(e)).join("\n") + "\n");
+    }
+    if (agentExecution) {
+      fs.writeFileSync(path.join(fullDir, "agent-errors.jsonl"), JSON.stringify({ type: "agent.execution", data: agentExecution }) + "\n");
+    }
+    persistUpstreamErrorFallback(fullDir);
+    persistRoutingRefusalIndicator(fullDir, sessionEvents);
+    for (const rel of ["agent-errors.jsonl", "agent/upstream-errors-fallback.jsonl", "agent/routing-refusal.json"]) {
+      const src = path.join(fullDir, rel);
+      if (fs.existsSync(src)) {
+        fs.mkdirSync(path.join(fallbackDir, path.dirname(rel)), { recursive: true });
+        fs.copyFileSync(src, path.join(fallbackDir, rel));
+      }
+    }
+    const jobResults = JSON.stringify({ activation: { result: "success" }, agent: { result: agentResult } });
+    const fullSessionPath = path.join(fullDir, "usage/aw_session.jsonl");
+    const fallbackSessionPath = path.join(fallbackDir, "usage/aw_session.jsonl");
+    writeUnifiedSession({ rootDir: fullDir, outputPath: fullSessionPath, warn: () => {}, dailyAIC: {}, admission: {}, jobDurations: {}, jobResults, routingObservation: true });
+    writeUnifiedSession({ rootDir: fallbackDir, outputPath: fallbackSessionPath, warn: () => {}, dailyAIC: {}, admission: {}, jobDurations: {}, jobResults, routingObservation: true });
+    const fullEvents = [...readJsonlFile(fullSessionPath, { strict: true })];
+    const fallbackEvents = [...readJsonlFile(fallbackSessionPath, { strict: true })];
+    return { fullDir, fallbackDir, fullSessionPath, fallbackSessionPath, fullEvents, fallbackEvents, subAgentModels };
+  }
+
+  const mainRequest = [...readJsonlFile(path.join(fixtures.runDir(fixtures.RUNS.routed.id), PROXY_LOGS, "token-usage.jsonl"), { strict: true })].find(record => !record.purpose && record.model === "gpt-5.6-luna").request_id;
+
+  it.each([
+    {
+      name: "report_incomplete with AWF-only HTTP 429",
+      agentResult: "failure",
+      agentOutput: { items: [{ type: "report_incomplete" }], errors: [] },
+      upstreamError: { event: "UPSTREAM_ERROR_RESPONSE", request_id: mainRequest, status: 429, response_body: "Too Many Requests" },
+      expectedObservation: { outcome: "skip", reason: "rate_limited" },
+      expectedLine: { outcome: "skip", counted: false, note: "rate_limited" },
+    },
+    {
+      name: "failed agent with no terminal output and AWF-only HTTP 503",
+      agentResult: "failure",
+      agentOutput: { items: [], errors: [] },
+      upstreamError: { event: "UPSTREAM_ERROR_RESPONSE", request_id: mainRequest, status: 503, response_body: "Service Unavailable" },
+      expectedObservation: { outcome: "skip", reason: "infrastructure" },
+      expectedLine: { outcome: "skip", counted: false, note: "infrastructure" },
+    },
+    {
+      name: "failed agent with no terminal output and main-agent assistant.refusal",
+      agentResult: "failure",
+      agentOutput: { items: [], errors: [] },
+      sessionEvents: [{ type: "assistant.refusal", data: { reason: "content_filter", content: "Refused" } }],
+      expectedObservation: { outcome: "failure" },
+      expectedLine: { outcome: "failure", counted: true, note: null },
+    },
+    {
+      name: "failed agent with agentic_engine_timeout in agent-errors.jsonl",
+      agentResult: "failure",
+      agentOutput: { items: [], errors: [] },
+      agentExecution: { categories: ["agentic_engine_timeout"], errorCodes: [], errorTypes: [], exitCode: 124 },
+      expectedObservation: { outcome: "skip", reason: "infrastructure" },
+      expectedLine: { outcome: "skip", counted: false, note: "infrastructure" },
+    },
+    {
+      name: "successful routed run",
+      agentResult: "success",
+      agentOutput: { items: [{ type: "create_issue" }], errors: [] },
+      expectedObservation: { outcome: "success" },
+      expectedLine: { outcome: "success", counted: true, note: null },
+    },
+  ])("produces identical observe-mode verdicts and runs.jsonl rows for $name", async scenario => {
+    const { fullSessionPath, fallbackSessionPath, fullEvents, fallbackEvents, subAgentModels } = buildParitySessions(scenario);
+    const fullEvidence = sessionEvidence(fullEvents, subAgentModels);
+    const fallbackEvidence = sessionEvidence(fallbackEvents, subAgentModels);
+    expect(fullEvidence.observation).toEqual(scenario.expectedObservation);
+    expect(fallbackEvidence.observation).toEqual(fullEvidence.observation);
+    expect(fallbackEvidence.pair).toBe(fullEvidence.pair);
+    expect(fallbackEvidence.cost).toEqual(fullEvidence.cost);
+
+    const runWriter = async sessionFile => {
+      const remote = bareRemote();
+      const workspaceDir = fs.mkdtempSync(path.join(root, "writer-ws-"));
+      await main({
+        env: {
+          GH_AW_ROUTING_WORKFLOW: "triage",
+          GH_AW_ROUTING_GENERATION: GENERATION,
+          GH_AW_ROUTING_MODE: "observe",
+          GH_AW_ROUTING_ENGINE: "copilot",
+          GH_AW_ROUTING_GOAL: "cost",
+          GH_AW_ROUTING_LEVEL: "",
+          GH_AW_ROUTING_SESSION_FILE: sessionFile,
+          GH_AW_INFO_SUB_AGENT_MODELS: JSON.stringify(subAgentModels),
+          GITHUB_RUN_ATTEMPT: "1",
+          GITHUB_WORKFLOW_REF: "octo/demo/.github/workflows/triage.lock.yml@refs/heads/main",
+          GH_TOKEN: "test-token",
+          GITHUB_SERVER_URL: "https://github.com",
+        },
+        context: { repo: { owner: "octo", repo: "demo" }, runId: 9042, runNumber: 42, payload: { repository: { default_branch: "main" } } },
+        github: fakeGitHub(remote, { runs: [paginationRun(42)] }),
+        workspaceDir,
+        remoteUrl: remote,
+        pushSignedCommitsFn: signedPush(remote),
+        execGetExecOutput: lsRemote,
+        sleepFn: async () => {},
+      });
+      return remoteRuns(remote);
+    };
+
+    const fullRows = await runWriter(fullSessionPath);
+    const fallbackRows = await runWriter(fallbackSessionPath);
+    expect(fullRows).toHaveLength(1);
+    expect(fullRows[0]).toMatchObject(scenario.expectedLine);
+    expect(fallbackRows).toEqual(fullRows);
+  });
+
+  // Live-mode receipt projection into usage/aw_session.jsonl lands in AW-3; this verifies
+  // that fallback archive preservation of adaptive-selection.jsonl across all three firewall
+  // layouts feeds identical observations and bound receipts into the routing_history reducer.
+  it.each(LAYOUTS)("preserves adaptive-selection.jsonl in fallback recovery for live-mode reducer parity across %s", layout => {
+    const boundReceipt = {
+      event: "adaptive_selection",
+      v: 2,
+      workflow: "triage",
+      run: { id: "9042", attempt: 1 },
+      generation: GENERATION,
+      mode: "live",
+      scope: "copilot/cost/shared",
+      role: "test",
+      selected: "github-copilot/gpt-5.6-luna@max",
+      incumbent: { before: PAIR, after: PAIR },
+    };
+    const scenarios = [
+      {
+        agentResult: "success",
+        agentOutput: { items: [{ type: "create_issue" }], errors: [] },
+        expectedLine: { mode: "live", role: "test", outcome: "success", counted: true, note: null },
+      },
+      {
+        agentResult: "failure",
+        agentOutput: { items: [{ type: "report_incomplete" }], errors: [] },
+        upstreamError: { event: "UPSTREAM_ERROR_RESPONSE", request_id: mainRequest, status: 429, response_body: "Too Many Requests" },
+        expectedLine: { mode: "live", role: "test", outcome: "skip", counted: false, note: "rate_limited" },
+      },
+      {
+        agentResult: "failure",
+        agentOutput: { items: [], errors: [] },
+        sessionEvents: [{ type: "assistant.refusal", data: { reason: "content_filter", content: "Refused" } }],
+        expectedLine: { mode: "live", role: "test", outcome: "failure", counted: true, note: null },
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      const { fullDir, fallbackDir, fullEvents, fallbackEvents, subAgentModels } = buildParitySessions({ ...scenario, layout, receipt: boundReceipt });
+      const applyFor = (dir, events) => {
+        const ev = sessionEvidence(events, subAgentModels);
+        return applyRun(emptyState("triage"), [], {
+          workflow: "triage",
+          run: { id: "9042", number: 42, attempt: 1 },
+          at: "2026-11-27T12:00:00Z",
+          generation: GENERATION,
+          mode: "live",
+          scope: "copilot/cost/shared",
+          observation: ev.observation,
+          pair: ev.pair,
+          cost: ev.cost,
+          receipt: readAdaptiveReceipt(dir),
+          prepare: { explore_allowed: true },
+        });
+      };
+      const fullResult = applyFor(fullDir, fullEvents);
+      const fallbackResult = applyFor(fallbackDir, fallbackEvents);
+      expect(fullResult.lines).toHaveLength(1);
+      expect(fullResult.lines[0]).toMatchObject(scenario.expectedLine);
+      expect(fallbackResult.lines).toEqual(fullResult.lines);
+      expect(fallbackResult.state).toEqual(fullResult.state);
+    }
+
+    // Confirm omitting adaptive-selection.jsonl reproduces receipt_missing and unexplained +1.
+    const { fallbackDir, fallbackEvents, subAgentModels } = buildParitySessions({
+      layout,
+      agentResult: "success",
+      agentOutput: { items: [{ type: "create_issue" }], errors: [] },
+    });
+    const ev = sessionEvidence(fallbackEvents, subAgentModels);
+    const missing = applyRun(emptyState("triage"), [], {
+      workflow: "triage",
+      run: { id: "9042", number: 42, attempt: 1 },
+      at: "2026-11-27T12:00:00Z",
+      generation: GENERATION,
+      mode: "live",
+      scope: "copilot/cost/shared",
+      observation: ev.observation,
+      pair: ev.pair,
+      cost: ev.cost,
+      receipt: readAdaptiveReceipt(fallbackDir),
+      prepare: { explore_allowed: true },
+    });
+    expect(missing.lines[0]).toMatchObject({ counted: false, note: "receipt_missing" });
+    expect(missing.state.unexplained).toBe(1);
+  });
+});
