@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-11-26T18:20:34Z",
-  "run_id": "45874752294",
+  "generated_at": "2026-11-27T00:38:22Z",
+  "run_id": "45917569576",
   "source": "pr-triage",
   "open_copilot_prs": 0,
   "scanned_open_prs": 26,
@@ -36,8 +36,8 @@
   "batches": [],
   "review_status": "triaged",
   "notes": [
-    "No open PRs authored by app/github-copilot were present in github/gh-aw at triage time.",
-    "Visible open PRs were authored by gh-aw-bot, github-actions[bot], or human contributors and were excluded by the author gate.",
-    "No eligible PRs remained to label, comment on, or recommend after cooldown and author filtering."
+    "No eligible open app/github-copilot pull requests were present in github/gh-aw at triage time.",
+    "All visible open PRs were excluded by the author gate or the 1-hour cooldown policy.",
+    "No labels or comments were added to PRs because no eligible agent-authored PRs remained after filtering."
   ]
 }
