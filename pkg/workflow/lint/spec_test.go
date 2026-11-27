@@ -179,6 +179,7 @@ func TestSpec_PublicAPI_DefaultBuiltInRules(t *testing.T) {
 		{"UntrustedRolesDetectionRule", lint.UntrustedRolesDetectionRule},
 		{"PullRequestTargetCheckoutRule", lint.PullRequestTargetCheckoutRule},
 		{"BotConditionsRule", lint.BotConditionsRule},
+		{"DangerousTriggersRule", lint.DangerousTriggersRule},
 		{"NetworkScopeRule", lint.NetworkScopeRule},
 		{"PushTargetRule", lint.PushTargetRule},
 		{"AllowedLabelsRule", lint.AllowedLabelsRule},
@@ -196,6 +197,7 @@ func TestSpec_PublicAPI_DefaultBuiltInRules(t *testing.T) {
 		{"CachePoisoningRule", lint.CachePoisoningRule},
 		{"EnvironmentFileInjectionRule", lint.EnvironmentFileInjectionRule},
 		{"GraderFileIORule", lint.GraderFileIORule},
+		{"FileAccessRule", lint.FileAccessRule},
 	}
 	for _, tt := range constructors {
 		t.Run(tt.name, func(t *testing.T) {
