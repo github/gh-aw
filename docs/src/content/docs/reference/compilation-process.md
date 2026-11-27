@@ -194,7 +194,7 @@ flowchart TD
     activation["activation<br/>ubuntu-slim<br/>contents: read"] --> agent["agent<br/>ubuntu-latest<br/>READ-ONLY permissions<br/>concurrency group"]
     agent --> detection["detection<br/>ubuntu-latest<br/>contents: read<br/>concurrency group<br/>RUNS AI ENGINE"]
     agent --> conclusion["conclusion<br/>ubuntu-slim<br/>issues: write<br/>pr: write"]
-    detection --> safe_outputs["safe_outputs<br/>ubuntu-slim<br/>contents: write<br/>issues: write<br/>pr: write"]
+    detection --> safe_outputs["safe_outputs<br/>ubuntu-slim or ubuntu-latest<br/>contents: write<br/>issues: write<br/>pr: write"]
     detection --> conclusion
     safe_outputs --> conclusion
     detection --> update_cache_memory["update_cache_memory<br/>ubuntu-latest<br/>contents: read"]
@@ -215,7 +215,7 @@ A combined job would hold write permissions while running threat detection, defe
 
 - **Hard gating.** The `safe_outputs` condition `needs.detection.outputs.success == 'true'` stops the job from starting if detection fails; step-level `if` checks are weaker.
 - **`always()` for `conclusion`.** It reads `needs.agent.result` to log errors and report missing tools even when writes fail.
-- **Right-sized runners.** Detection needs `ubuntu-latest` for AI execution; safe_outputs and conclusion use the lightweight `ubuntu-slim`.
+- **Right-sized runners.** Detection defaults to `ubuntu-latest` for AI execution; conclusion and API-only safe outputs generally default to `ubuntu-slim`. Safe outputs that create or push pull requests default to `ubuntu-latest` unless the handlers are staged. Explicit timeouts over 15 minutes can also select `ubuntu-latest` when the framework runner is not overridden. See [Self-Hosted Runners](/gh-aw/reference/self-hosted-runners/#configuring-the-framework-job-runner) for runner overrides.
 - **Concurrency isolation.** Detection shares the agent's concurrency group to serialize AI execution; safe_outputs does not, so it can overlap other workflows' detection.
 - **Artifact handoff.** The agent writes `agent_output.json`, detection emits `success`, and safe_outputs downloads the artifact only if approved. A shared filesystem would allow tampering between phases.
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
@@ -55,8 +56,15 @@ func validateHostMountPath(hostPath string) (string, error) {
 		dockerArgsValidationLog.Printf("host mount path %q failed validation: %v", hostPath, err)
 		return "", fmt.Errorf("invalid host path %q: %w", hostPath, err)
 	}
-	if strings.Contains(cleanHostPath[2:], ":") || (!isWindowsDrivePath(cleanHostPath) && strings.Contains(cleanHostPath, ":")) {
+	colonPath := cleanHostPath
+	if isWindowsDrivePath(cleanHostPath) {
+		colonPath = cleanHostPath[2:]
+	}
+	if strings.Contains(colonPath, ":") {
 		return "", fmt.Errorf("host path contains unsupported ':' for docker -v mount syntax. Example: /tmp/repo or C:/repo. Got: %s", cleanHostPath)
+	}
+	if filepath.Dir(cleanHostPath) == cleanHostPath {
+		return "", fmt.Errorf("host path cannot be a filesystem root: %s", cleanHostPath)
 	}
 	return cleanHostPath, nil
 }
@@ -132,10 +140,10 @@ func isWindowsDrivePath(hostPath string) bool {
 	if len(hostPath) < 3 {
 		return false
 	}
-	driveLetter := hostPath[0]
-	return ((driveLetter >= 'a' && driveLetter <= 'z') || (driveLetter >= 'A' && driveLetter <= 'Z')) &&
-		hostPath[1] == ':' &&
-		(hostPath[2] == '\\' || hostPath[2] == '/')
+	driveLetter := strings.ToLower(hostPath[:1])
+	return strings.Contains("abcdefghijklmnopqrstuvwxyz", driveLetter) &&
+		strings.HasPrefix(hostPath[1:2], ":") &&
+		(strings.HasPrefix(hostPath[2:3], "\\") || strings.HasPrefix(hostPath[2:3], "/"))
 }
 
 func buildDockerVolumeMount(hostPath, containerPath string) (string, error) {

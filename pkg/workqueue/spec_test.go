@@ -33,6 +33,8 @@ func TestSpec_Constants_ProtocolLimits(t *testing.T) {
 		{"LedgerBytes", workqueue.LedgerBytes, 64 * 1024 * 1024},
 		{"CheckpointAfterLines", workqueue.CheckpointAfterLines, 512},
 		{"MaxPendingWork", workqueue.MaxPendingWork, 4096},
+		{"ContinuationMessageBytes", workqueue.ContinuationMessageBytes, 16384},
+		{"ContinuationRemainingMax", workqueue.ContinuationRemainingMax, 15},
 		{"RetainedRequests", workqueue.RetainedRequests, 4096},
 		{"CASAttempts", workqueue.CASAttempts, 8},
 	} {
