@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -29,10 +30,12 @@ func SourceCommandContext(ctx context.Context, remoteURL string, args ...string)
 // retries without credentials if the remote rejects the configured token.
 func SourceCommandOutputContext(ctx context.Context, remoteURL string, args ...string) ([]byte, error) {
 	cmd, hasCredentials := sourceCommandContext(ctx, remoteURL, true, args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
 	output, err := cmd.Output()
-	if err == nil || !hasCredentials || !isSourceAuthenticationError(stderr.String()) {
+	if err == nil || !hasCredentials {
+		return output, err
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || !isSourceAuthenticationError(string(exitErr.Stderr)) {
 		return output, err
 	}
 
@@ -50,7 +53,11 @@ func SourceCommandCombinedOutputContext(ctx context.Context, remoteURL string, a
 	}
 
 	anonymousCmd, _ := sourceCommandContext(ctx, remoteURL, false, args...)
-	return anonymousCmd.CombinedOutput()
+	anonymousOutput, anonymousErr := anonymousCmd.CombinedOutput()
+	if anonymousErr != nil {
+		return append(output, anonymousOutput...), anonymousErr
+	}
+	return anonymousOutput, nil
 }
 
 func sourceCommandContext(ctx context.Context, remoteURL string, includeCredentials bool, args ...string) (*exec.Cmd, bool) {
@@ -73,7 +80,11 @@ func sourceCommandContext(ctx context.Context, remoteURL string, includeCredenti
 		gitPath, err = filepath.Abs(gitPath)
 	}
 	if err == nil {
-		_, err = fileutil.ValidateExecutablePath(gitPath)
+		var validatedGitPath string
+		validatedGitPath, err = fileutil.ValidateExecutablePath(gitPath)
+		if err == nil {
+			_, err = fileutil.ValidateAbsolutePath(validatedGitPath)
+		}
 	}
 	if err != nil {
 		cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
@@ -144,11 +155,11 @@ func trustedGitExecPath(gitPath, cmdDir string, env []string) string {
 	cmd := exec.Command(gitPath, "--exec-path")
 	cmd.Dir = cmdDir
 	cmd.Env = env
-	output, err := cmd.Output()
+	output, err := cmd.Output() //nolint:execcommandoutputerrdiscard // A failed optional probe simply omits the override.
 	if err != nil {
 		return ""
 	}
-	execPath := strings.TrimSpace(string(output))
+	execPath := string(bytes.TrimSpace(output))
 	if execPath == "" {
 		return ""
 	}

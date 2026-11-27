@@ -140,10 +140,10 @@ func isWindowsDrivePath(hostPath string) bool {
 	if len(hostPath) < 3 {
 		return false
 	}
-	driveLetter := hostPath[0]
-	return ((driveLetter >= 'a' && driveLetter <= 'z') || (driveLetter >= 'A' && driveLetter <= 'Z')) &&
-		hostPath[1] == ':' &&
-		(hostPath[2] == '\\' || hostPath[2] == '/')
+	driveLetter := strings.ToLower(hostPath[:1])
+	return strings.Contains("abcdefghijklmnopqrstuvwxyz", driveLetter) &&
+		strings.HasPrefix(hostPath[1:2], ":") &&
+		(strings.HasPrefix(hostPath[2:3], "\\") || strings.HasPrefix(hostPath[2:3], "/"))
 }
 
 func buildDockerVolumeMount(hostPath, containerPath string) (string, error) {
