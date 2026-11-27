@@ -8,9 +8,9 @@ sidebar:
 
 # Safe Outputs MCP Gateway Specification
 
-**Version**: 1.35.0<br>
+**Version**: 1.36.0<br>
 **Status**: Working Draft<br>
-**Publication Date**: 2026-11-26<br>
+**Publication Date**: 2026-11-27<br>
 **Editor**: GitHub Agentic Workflows Team<br>
 **This Version**: [safe-outputs-specification](/gh-aw/specs/safe-outputs-specification/)<br>
 **Latest Published Version**: This document
@@ -2762,6 +2762,10 @@ If an optional advisory or enrichment field is declared with `x-strip-on-error: 
 
 Fields used for privileged transport metadata, including patch anchoring and upload asset file metadata, MUST be derived by trusted workflow steps or privileged processors rather than accepted from agent-controlled NDJSON.
 
+For `upload_artifact`, staging MUST select only paths and filters declared by the configured request and files declared by the applicable connector staging contract. Implementations MUST NOT upload the agent-writable staging directory wholesale. The implementation MUST copy selected files into a separate transfer directory and MUST upload only that transfer directory after preparation succeeds.
+
+During staging, every selected path MUST remain contained within the permitted staging root. Symlinks and non-regular files MUST be rejected. Any path-containment, symlink, file-type, selection, or copy failure MUST fail closed: preparation MUST abort and the artifact MUST NOT be uploaded.
+
 ### 7.0.4 Dependency and Batch Processing Semantics
 
 **Requirement DSB1 (Eligible Review Prerequisites):** Implementations MUST permit `submit_pull_request_review` and `create_pull_request_review_comment` outputs to serve as `depends-on` prerequisites.
@@ -4328,7 +4332,7 @@ authoritative credential, resource, typed-input, staging, and migration contract
 5. **Authorization**: A run is eligible only when every associated pull request is either the pull request that triggered the workflow or is listed in `allowed-pull-requests`. This permits all pending workflow runs for the triggering or explicitly allowed pull requests without authorizing mixed runs that include another pull request.
 6. **Head Repositories and Events**: The handler MUST reject `pull_request_target` events. It MUST resolve the head repository of every associated pull request and reject the run unless each head repository is the current repository or matches an `allowed-repos` entry. A pull request whose head repository is unavailable or cannot be resolved MUST be rejected.
 7. **Protected Files**: Before approval, the handler MUST list the files modified by every pull request associated with the run and reject approval when any file is protected. `protected-files.exclude` MAY remove specific filenames or path prefixes from the default protected set.
-8. **Execution**: Only after all preceding checks pass MAY the handler invoke GitHub's workflow-run approval API and consume one max-count slot.
+8. **Final Pre-Approval Verification and Execution**: Immediately before invoking GitHub's workflow-run approval API, the handler MUST re-fetch the run, workflow metadata, every associated pull request, and the changed files for every associated pull request. For each `run.pull_requests[i]`, the handler MUST compare the run entry's `head.sha` with the current head SHA of the corresponding pull request. A missing, unresolved, or mismatching head revision MUST reject approval. The handler MUST reapply the workflow, authorization, head-repository, protected-file, and awaiting-approval checks to the re-fetched state. Only after this final verification passes MAY the handler invoke the approval API and consume one max-count slot.
 9. **Comment**: After a successful approval, when `comment` is not explicitly false, the handler MUST post a comment on each pull request associated with the approved run announcing the workflow run has started, linking to the run's HTML URL, and including the standard generated attribution footer. Comment posting failures MUST be logged as warnings and MUST NOT fail the approval.
 
 **Configuration Parameters**:
@@ -8599,6 +8603,11 @@ This specification revision aligns with directly relevant `CHANGELOG.md` entries
 
 - **Added**: Optional `required-author` filters for `update_pull_request` and `push_to_pull_request_branch`, including case-insensitive GitHub author matching and `app/<slug>` GitHub App bot matching.
 - **Specified**: Live-author validation MUST occur before update or push mutations, with mismatches skipped for `update_pull_request` and rejected before push for `push_to_pull_request_branch`.
+
+**Version 1.36.0** (2026-11-27):
+
+- **Specified**: `approve_workflow_run` approval eligibility MUST be bound to the exact current head revision of every associated pull request through a final pre-approval re-verification of run, workflow, pull-request, and changed-file state.
+- **Specified**: `upload_artifact` staging MUST use configured path/filter selection and declared connector files, reject traversal, symlinks, and non-regular files, copy into a separate transfer directory, and fail closed before upload.
 
 **Version 1.34.0** (2026-11-26):
 
