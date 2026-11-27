@@ -127,6 +127,7 @@ class SuperLinterStartupTests(unittest.TestCase):
               echo "original linter output" >&2
               if [ "${MOCK_WRITE_LOG:-true}" = true ]; then
                 printf '%s' "$MOCK_LOG" > "$GITHUB_WORKSPACE/$LOG_FILE"
+                chmod 600 "$GITHUB_WORKSPACE/$LOG_FILE"
               fi
               exit "${MOCK_LINTER_EXIT:-0}"
             }
@@ -176,6 +177,7 @@ class SuperLinterStartupTests(unittest.TestCase):
         result = self.run_linter()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual((self.workspace / self.env["LOG_FILE"]).read_text(), self.env["MOCK_LOG"])
+        self.assertEqual((self.workspace / self.env["LOG_FILE"]).stat().st_mode & 0o444, 0o444)
         summary_result = self.summarize("success")
         self.assertEqual(summary_result.returncode, 0, summary_result.stdout + summary_result.stderr)
         summary = json.loads((self.artifacts / "super-linter-summary.json").read_text())
@@ -187,6 +189,7 @@ class SuperLinterStartupTests(unittest.TestCase):
             MOCK_LOG="pkg/example/example.go:5:2: unsafe conversion (gosec)\n",
         )
         self.assertEqual(result.returncode, 42)
+        self.assertEqual((self.workspace / self.env["LOG_FILE"]).stat().st_mode & 0o444, 0o444)
         startup = self.workspace / "super-linter-output/super-linter-startup.log"
         self.assertIn("original linter output", startup.read_text())
         self.assertIn("original linter output", result.stdout)
