@@ -13,6 +13,7 @@ import (
 
 	"github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/github/gh-aw/pkg/errorutil"
+	"github.com/github/gh-aw/pkg/fileutil"
 )
 
 // SourceCommandContext constructs Git commands for disposable source downloads.
@@ -67,8 +68,12 @@ func sourceCommandContext(ctx context.Context, remoteURL string, includeCredenti
 		"-c", "submodule.recurse=false",
 	}
 	cmdDir := sourceCommandWorkingDirectory()
-	gitPath := trustedGitPath()
+	gitPath, err := fileutil.ResolveExecutablePath("git")
 	cmd := exec.CommandContext(ctx, gitPath, append(base, args...)...)
+	if err != nil {
+		cmd.Err = fmt.Errorf("resolve git executable: %w", err)
+		return cmd, false
+	}
 	cmd.Dir = cmdDir
 	cmd.Env = sourceCommandEnvironment(cmdDir)
 	if gitExecPath := trustedGitExecPath(gitPath, cmdDir, cmd.Env); gitExecPath != "" {
@@ -127,20 +132,8 @@ func sourceCommandWorkingDirectory() string {
 	return safeDir
 }
 
-func trustedGitPath() string {
-	gitPath, err := exec.LookPath("git")
-	if err != nil {
-		return "git"
-	}
-	if !filepath.IsAbs(gitPath) {
-		if absolutePath, absErr := filepath.Abs(gitPath); absErr == nil {
-			return absolutePath
-		}
-	}
-	return gitPath
-}
-
 func trustedGitExecPath(gitPath, cmdDir string, env []string) string {
+	// gitPath is resolved and validated from the fixed name "git" by the caller.
 	cmd := exec.Command(gitPath, "--exec-path")
 	cmd.Dir = cmdDir
 	cmd.Env = env

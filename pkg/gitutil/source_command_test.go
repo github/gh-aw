@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -153,6 +154,60 @@ func TestSourceCommandContextRejectsExecutableTransports(t *testing.T) {
 			require.Contains(t, string(output), "not allowed")
 		})
 	}
+}
+
+func TestSourceCommandContextValidatesGitExecutable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a shell executable")
+	}
+	root := t.TempDir()
+	marker := filepath.Join(root, "called")
+	gitDir := filepath.Join(root, "bad\npath")
+	require.NoError(t, os.Mkdir(gitDir, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(gitDir, "git"), []byte("#!/bin/sh\nprintf called > \"$GH_AW_TEST_GIT_MARKER\"\n"), 0700))
+	t.Setenv("PATH", gitDir)
+	t.Setenv("GH_AW_TEST_GIT_MARKER", marker)
+
+	cmd := SourceCommandContext(context.Background(), "", "status")
+	_, err := cmd.CombinedOutput()
+	require.ErrorContains(t, err, "resolve git executable")
+	require.NoFileExists(t, marker)
+
+	t.Setenv("PATH", root)
+	cmd = SourceCommandContext(context.Background(), "", "status")
+	_, err = cmd.CombinedOutput()
+	require.ErrorContains(t, err, "resolve git executable")
+}
+
+func TestSourceCommandContextUsesFixedExecPathProbe(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a shell executable")
+	}
+	root := t.TempDir()
+	logPath := filepath.Join(root, "args")
+	gitPath := filepath.Join(root, "git")
+	script := `#!/bin/sh
+printf '%s\n' "$@" >> "$GH_AW_TEST_GIT_ARGS"
+if [ "$1" = "--exec-path" ]; then
+  printf '%s\n' "$GH_AW_TEST_GIT_EXEC_PATH"
+fi
+`
+	require.NoError(t, os.WriteFile(gitPath, []byte(script), 0700))
+	t.Setenv("PATH", root)
+	t.Setenv("GH_AW_TEST_GIT_ARGS", logPath)
+	t.Setenv("GH_AW_TEST_GIT_EXEC_PATH", root)
+
+	cmd := SourceCommandContext(context.Background(), "", "status", "a;echo unexpected")
+	resolvedGitPath, err := filepath.EvalSymlinks(gitPath)
+	require.NoError(t, err)
+	require.Equal(t, resolvedGitPath, cmd.Path)
+	require.Equal(t, root, envValue(cmd.Env, "GIT_EXEC_PATH"))
+	require.NoError(t, cmd.Run())
+	log, err := os.ReadFile(logPath)
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
+	require.Equal(t, "--exec-path", lines[0])
+	require.Equal(t, cmd.Args[1:], lines[1:])
 }
 
 func TestCreateSourceTempDirWithRelativeTMPDIR(t *testing.T) {

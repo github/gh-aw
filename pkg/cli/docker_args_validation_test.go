@@ -44,6 +44,10 @@ func TestBuildDockerVolumeMount(t *testing.T) {
 	require.ErrorContains(t, err, "invalid control characters")
 
 	if runtime.GOOS != "windows" {
+		mount, err = buildDockerVolumeMount("/", "/workdir")
+		require.NoError(t, err)
+		require.Equal(t, "/:/workdir", mount)
+
 		_, err = buildDockerVolumeMount("/tmp/repo:fixture", "/workdir")
 		require.Error(t, err)
 		require.ErrorContains(t, err, "unsupported ':'")

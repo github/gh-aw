@@ -55,7 +55,11 @@ func validateHostMountPath(hostPath string) (string, error) {
 		dockerArgsValidationLog.Printf("host mount path %q failed validation: %v", hostPath, err)
 		return "", fmt.Errorf("invalid host path %q: %w", hostPath, err)
 	}
-	if strings.Contains(cleanHostPath[2:], ":") || (!isWindowsDrivePath(cleanHostPath) && strings.Contains(cleanHostPath, ":")) {
+	colonPath := cleanHostPath
+	if isWindowsDrivePath(cleanHostPath) {
+		colonPath = cleanHostPath[2:]
+	}
+	if strings.Contains(colonPath, ":") {
 		return "", fmt.Errorf("host path contains unsupported ':' for docker -v mount syntax. Example: /tmp/repo or C:/repo. Got: %s", cleanHostPath)
 	}
 	return cleanHostPath, nil
