@@ -1508,7 +1508,7 @@ Checking workflow files for errors, security issues, and best practices. Occurs 
 
 ### `file-access` Lint Rule
 
-A built-in AW lint rule that warns when prompt instructions would be blocked by the simulated file-access model, such as writing files without an edit tool, writing under read-only system paths, or using unconfigured cache-memory or repo-memory directories. See [Workflow Linters](/gh-aw/reference/workflow-linters/).
+A built-in AW lint rule that warns when prompt instructions would be blocked by the simulated file-access model, such as writing files when neither the edit tool nor a write-capable `bash` command is available, writing under read-only system paths, or using unconfigured cache-memory or repo-memory directories. See [Workflow Linters](/gh-aw/reference/workflow-linters/).
 
 ### `gh aw lint`
 
