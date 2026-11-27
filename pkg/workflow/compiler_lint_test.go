@@ -125,6 +125,43 @@ jobs:
 	require.NoError(t, compiler.lintCompiledWorkflow(data, safe, "haiku.md"))
 }
 
+func TestCompilerLintDynamicRepositorySecretSelection(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "dynamic-secret.md")
+	source := `---
+on: workflow_dispatch
+strict: true
+engine: copilot
+permissions:
+  contents: read
+checkout:
+  repository: ${{ inputs.target_repo }}
+  github-token: ${{ vars.AUTH_MODE == 'pat' && secrets[fromJSON(vars.READ_PAT_REPOSITORIES || '{}')[inputs.target_repo]] || secrets.GITHUB_TOKEN }}
+  path: target
+tools:
+  github: false
+steps:
+  - env:
+      CONTROL_TOKEN: ${{ vars.AUTH_MODE == 'pat' && secrets[fromJSON(vars.READ_PAT_REPOSITORIES || '{}')[github.repository]] || '' }}
+      TARGET_TOKEN: ${{ vars.AUTH_MODE == 'pat' && secrets[fromJSON(vars.READ_PAT_REPOSITORIES || '{}')[inputs.target_repo || github.repository]] || '' }}
+    run: echo "Preparing workflow"
+---
+Review the repository.
+`
+	require.NoError(t, os.WriteFile(path, []byte(source), 0o600))
+	compiler := NewCompiler(WithLint(true))
+	compiler.gitRoot = dir
+	compiler.SetReadOnly(true)
+	compiler.SetSkipValidation(true)
+	require.NoError(t, compiler.CompileWorkflow(path))
+	lock, err := os.ReadFile(filepath.Join(dir, "dynamic-secret.lock.yml"))
+	require.NoError(t, err)
+	require.Contains(t, string(lock), "secrets[fromJSON(vars.READ_PAT_REPOSITORIES || '{}')[inputs.target_repo]]")
+	require.Contains(t, string(lock), "secrets[fromJSON(vars.READ_PAT_REPOSITORIES || '{}')[github.repository]]")
+	require.Contains(t, string(lock), "secrets[fromJSON(vars.READ_PAT_REPOSITORIES || '{}')[inputs.target_repo || github.repository]]")
+}
+
 func TestCompilerLintDangerousTriggers(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {

@@ -62,7 +62,7 @@ func TestCLIVersionCheckerReleaseResolutionContract(t *testing.T) {
 	}
 
 	for _, repo := range []string{
-		"github/github-mcp-server", "github/gh-aw-mcpg", "github/gh-aw-threat-detection",
+		"github/github-mcp-server", "github/gh-aw-mcpg",
 		"rhysd/actionlint", "anchore/syft", "anchore/grype", "anchore/grant",
 		"zizmorcore/zizmor", "boostsecurityio/poutine", "vigilant-llc/runner-guard",
 		"PipelineComponents/yamllint",

@@ -58,8 +58,6 @@ evidence-number-v1 consumes --evidence: a bounded, typed observation bundle
 selected by workflow, metric, scope, subject, and report dates. It evaluates
 declared measurements without fetching history or executing user code.
 Imported evidence never substitutes for native adoption or survival proof.
-The slides' schema-feature-coverage example has a built-in value function.
-Use --recipe to reproduce its author filter and selected batch/witness windows.
 
 One shared pipeline handles weekly/daily sampling, native adoption joins,
 isolated merge windows, and full-window file survival. Attribution currently
@@ -97,7 +95,7 @@ func NewValueCommand() *cobra.Command {
 	cmd.Flags().StringVar(&config.Evidence, "evidence", "", "Versioned typed observation bundle for evidence-number-v1 (not native adoption proof)")
 	cmd.Flags().BoolVar(&config.Daily, "daily", false, "Show daily Git measurements and retained human acceptance evidence at noon UTC")
 	cmd.Flags().StringVarP(&config.Repo, "repo", "r", "", repoHostUsage+". Defaults to current repository")
-	cmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Maximum report collection duration")
+	cmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Maximum report collection duration (e.g., 30s or 5m)")
 	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output results in JSON format")
 	cmd.SetOut(os.Stdout)
 	return cmd

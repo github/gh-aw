@@ -96,7 +96,7 @@ func parseRepositoryVisibility(output []byte) string {
 //     those branches at runtime. This warning is suppressed for public repositories
 //     because all PR branches are always accessible in public repos.
 //
-//  2. No constraints — target: "*" without required-title-prefix or required-labels means the agent may
+//  2. No constraints — target: "*" without required-author, required-title-prefix, or required-labels means the agent may
 //     push to any PR in the repository with no additional gating.
 func (c *Compiler) validatePushToPullRequestBranchWarnings(safeOutputs *SafeOutputsConfig, checkoutConfigs []*CheckoutConfig) {
 	if safeOutputs == nil || safeOutputs.PushToPullRequestBranch == nil {
@@ -132,15 +132,16 @@ func (c *Compiler) validatePushToPullRequestBranchWarnings(safeOutputs *SafeOutp
 	}
 
 	// Warning 2: no constraints restricting which PRs can be targeted.
-	if cfg.TitlePrefix == "" && len(cfg.RequiredLabels) == 0 {
+	if cfg.RequiredAuthor == "" && cfg.TitlePrefix == "" && len(cfg.RequiredLabels) == 0 {
 		msg := strings.Join([]string{
-			"push-to-pull-request-branch: target: \"*\" allows pushing to any PR branch with no additional constraints.",
-			"Consider adding required-title-prefix: or required-labels: to restrict which PRs can receive pushes.",
+			"push-to-pull-request-branch: target: \"*\" allows pushing to any PR branch with no author, title, or label constraints.",
+			"Consider adding required-author:, required-title-prefix:, or required-labels: to restrict which PRs can receive pushes.",
 			"",
 			"Example:",
 			"",
 			"  push-to-pull-request-branch:",
 			"    target: \"*\"",
+			"    required-author: app/workflow-bot # only PRs opened by this GitHub App",
 			"    required-title-prefix: \"[bot] \"  # only PRs whose title starts with this prefix",
 			"    required-labels: [automated]      # only PRs that carry all of these labels",
 		}, "\n")

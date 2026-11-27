@@ -17,6 +17,11 @@ Safe outputs are the write path for agentic workflows. Keep the main agent job r
 
 - Prefer the most specific built-in safe output before creating a custom job.
 - Always scope mutating operations as tightly as possible.
+- Use `set-issue-status` for native planning statuses; load the
+  [status contract](safe-outputs-automation.md#native-issue-statuses) before
+  configuring it. `update-issue.status` remains the legacy open/closed state.
+  For initial planning status use `create-issue.planning-status` and
+  `allowed-statuses`; see [content operations](safe-outputs-content.md).
 - For pull-request or branch mutation, always restrict `allowed-files`.
 - Use `noop` when no visible change is required after successful execution.
 - `target:` is enforced, not merely validated: when set to `"triggering"` or a fixed number, any issue/PR number the agent supplies in its JSON output (including temporary-id references) is ignored in favor of the configured target. Only `target: "*"` lets the agent's own output select which issue/PR is affected.

@@ -194,6 +194,9 @@ func computeEnabledToolNames(data *WorkflowData) map[string]struct {
 		enabledTools["hide_comment"] = struct {
 		}{}
 	}
+	if data.SafeOutputs.SetIssueStatus != nil {
+		enabledTools["set_issue_status"] = struct{}{}
+	}
 	if data.SafeOutputs.SetIssueType != nil {
 		enabledTools["set_issue_type"] = struct {
 		}{}

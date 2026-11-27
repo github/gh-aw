@@ -116,6 +116,10 @@ async function runHarness({ launch, prompt, artifactsDir, sink, eligibility, max
     if (launch.mode !== undefined && !["harness", "direct"].includes(launch.mode)) throw new Error("Expected launch.mode to be harness or direct");
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "threat-harness-"));
     const env = { ...process.env, ...launch.env };
+    if (launch.convention === "claude" && launch.mode !== "direct") {
+      const settings = (env.GH_AW_CLAUDE_SETTINGS || "").trim();
+      if (settings && !settings.startsWith("{")) env.GH_AW_CLAUDE_SETTINGS = path.resolve(launch.cwd || process.cwd(), settings);
+    }
     if (artifactsDir) {
       artifactsDir = path.resolve(artifactsDir);
       env.GH_AW_DETECTION_INPUT_DIR = artifactsDir;

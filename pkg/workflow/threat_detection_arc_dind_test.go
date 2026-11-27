@@ -13,10 +13,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCompileBundledDetectionFeature(t *testing.T) {
+	for _, flag := range []string{"absent", "true", "false"} {
+		t.Run(flag, func(t *testing.T) {
+			feature := ""
+			if flag != "absent" {
+				feature = "features:\n  gh-aw-detection: " + flag + "\n"
+			}
+			source := filepath.Join(t.TempDir(), "detection.md")
+			require.NoError(t, os.WriteFile(source, []byte("---\non: push\nengine: copilot\nsafe-outputs:\n  noop:\n"+feature+"---\nAssess.\n"), 0600))
+			require.NoError(t, NewCompiler().CompileWorkflow(source))
+			lock, err := os.ReadFile(strings.TrimSuffix(source, ".md") + ".lock.yml")
+			require.NoError(t, err)
+			detection := extractJobSection(string(lock), "detection")
+			require.NotEmpty(t, detection)
+			require.NotContains(t, detection, "install_threat_detect_binary")
+			require.NotContains(t, detection, "threat_detect_install")
+			require.Equal(t, flag != "false", strings.Contains(detection, "/actions/detect_threats.cjs"))
+			require.Equal(t, flag != "false", strings.Contains(detection, "conclude_threat_detection.sh"))
+			require.Equal(t, flag == "false", strings.Contains(detection, "parse_threat_detection_results.cjs"))
+		})
+	}
+}
+
 func TestCompileArcDindThreatDetectionStaging(t *testing.T) {
 	for _, engine := range []string{"copilot", "claude", "codex"} {
 		t.Run(engine, func(t *testing.T) {
-			var standardConclusion map[string]any
+
 			for _, tc := range []struct {
 				name, detectionRunner, installation string
 				arc                                 bool
@@ -55,9 +78,10 @@ func TestCompileArcDindThreatDetectionStaging(t *testing.T) {
 						}
 						return -1, nil
 					}
-					reset, resetStep := find("Reset ARC/DinD threat detection staging")
+					reset, resetStep := find("Reset threat detection staging")
 					prepare, _ := find("Prepare threat detection files")
-					install, installation := find("Install threat-detect binary")
+					install, _ := find("Install threat-detect binary")
+					require.Equal(t, -1, install)
 					execute, execution := find("Execute threat detection with AWF")
 					collect, collection := find("Collect ARC/DinD threat detection results")
 					upload, _ := find("Upload threat detection artifact")
@@ -75,8 +99,6 @@ func TestCompileArcDindThreatDetectionStaging(t *testing.T) {
 						require.NotContains(t, executionEnv, "GH_AW_DETECTION_INPUT_DIR")
 					}
 					rootless := tc.arc || tc.installation == "rootless"
-					installRun := installation["run"].(string)
-					require.Equal(t, rootless, strings.Contains(installRun, "--rootless"))
 					if engine == "copilot" {
 						_, copilotInstall := find("Install GitHub Copilot CLI")
 						require.NotNil(t, copilotInstall)
@@ -91,37 +113,27 @@ func TestCompileArcDindThreatDetectionStaging(t *testing.T) {
 						require.True(t, foundAgentInstaller)
 					}
 					if !tc.arc {
-						standardConclusion = conclusion
-						require.Equal(t, -1, reset)
+						require.Less(t, reset, prepare)
+						require.GreaterOrEqual(t, reset, 0)
 						require.Equal(t, -1, collect)
 						require.NotContains(t, execution["run"], "stage_threat_detection_arc_dind.sh")
 						require.Contains(t, execution["run"], "--output /tmp/gh-aw/threat-detection/detection_result.json /tmp/gh-aw/threat-detection-inputs")
 						if rootless {
-							env := execution["env"].(map[string]any)
-							require.Equal(t, "${{ steps.threat_detect_install.outputs.binary-path }}", env["THREAT_DETECT_BINARY"])
-							require.Contains(t, execution["run"], `cp "$detector" "${RUNNER_TEMP}/gh-aw/bin/threat-detect"`)
-							require.Contains(t, execution["run"], `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH"`)
 							require.NotContains(t, string(compiled), `"topology":"arc-dind"`)
 							require.NotContains(t, string(compiled), "Redirect tool cache to shared volume")
 						}
 						return
 					}
-					require.Equal(t, standardConclusion, conclusion, "conclusion step must remain unchanged")
+					require.Contains(t, conclusion["env"], "DETECTION_COLLECTION_OUTCOME")
 					require.GreaterOrEqual(t, reset, 0)
 					require.Less(t, reset, prepare)
-					require.Less(t, reset, install)
 					require.Equal(t, "always()", resetStep["if"], "cleanup must not depend on installation or detection being enabled")
 					require.Contains(t, resetStep["run"], "stage_threat_detection_arc_dind.sh\" reset")
-					require.Contains(t, installation["run"], "--rootless")
 					require.Greater(t, execute, prepare)
-					require.Greater(t, execute, install)
 					require.Greater(t, collect, execute)
 					require.Greater(t, upload, collect)
-					require.Equal(t, "always() && steps.threat_detect_install.outcome == 'success' && steps.detection_agentic_execution.outcome != 'skipped'", collection["if"])
-					require.Contains(t, execution["if"], "steps.threat_detect_install.outcome == 'success'")
+					require.Contains(t, collection["if"], "steps.detection_agentic_execution.outcome == 'failure'")
 					require.Contains(t, execution["if"], "steps.detection_staging_reset.outcome == 'success'")
-					env := execution["env"].(map[string]any)
-					require.Equal(t, "${{ steps.threat_detect_install.outputs.binary-path }}", env["THREAT_DETECT_BINARY"])
 					run := execution["run"].(string)
 					require.Contains(t, run, `bash "${RUNNER_TEMP}/gh-aw/actions/stage_threat_detection_arc_dind.sh" stage`)
 					require.Contains(t, run, `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH"`)

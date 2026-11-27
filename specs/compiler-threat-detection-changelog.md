@@ -26,6 +26,8 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 
 | Version | Change |
 |---|---|
+| 1.0.116 | Mapping-only: Section 7.4 records that the CTR-012 `push-target` lint accepts `required-author` (#81458) alongside title and label constraints. No new threat ID, permission grant, or lock-file schema change. |
+| 1.0.115 | Section 7.18 applies missing-save accounting to the first history write. The optional `first_write_run` field keeps its identity across workflow edits until coverage or a reset catches up with all saved runs (#81191). No permission changes. |
 | 1.0.114 | Clarifies CTR-010 compile-time and runtime-import rejection of all JavaScript line terminators (LF, CR, U+2028, U+2029) before expression trimming, with separate compile-time diagnostics rendered on one line. No new threat ID or lock-file schema change. |
 | 1.0.113 | Section 7.18 moves the unreleased `adaptive-routing` opt-in to `model-routing.learning` (#81142). `observe` records the ordinary router pick; `false` disables recording without disabling routing. The reserved history namespace, writer permissions, unified-session evidence, and dry-run guarantees are unchanged. No new threat rule or lock-file format change. |
 | 1.0.112 | Mapping-only clarification for Section 7.18 and PR #80804: `gh aw compile --dry-run` is an explicit compiler preview mode that validates adaptive-routing eligibility and configuration, preserves parsed `WorkflowData`, omits the compiler-managed `push_routing_history` job and its `contents: write`/`actions: read` permissions from emitted dry-run output, and does not charge dry-run runs as unsaved. Real failed/cancelled runs with an agent started and an existing writer whose conclusion is not success, including skipped/cancelled writers, remain unsaved. No new `CTR-*` rule or `T-CTR-*` test ID. |
@@ -121,6 +123,20 @@ The unreleased 1.0.81 merge-policy mapping also covers ambiguous check producers
 | 1.0.7–1.0.0 | Established CTR-001–015, conformance model, and daily reconciliation. |
 
 ## Mapping Audits
+
+### Mapping Audit (2026-11-27)
+
+Reviewed 11 commits from the last two days that could affect compiler-generated workflow safety: #81458, #81456, #81419, #81404, #81382, #81371, #81265, #81234, #81381, #81403, and #81485.
+
+Findings and disposition:
+
+- PR author restriction (#81458): `required-author` on `update-pull-request` and `push-to-pull-request-branch` is already handled. The CTR-012 `push-target` lint treats it as a wildcard-push constraint (`TestPushTargetRule`, `pkg/workflow/lint/policy_conversions_test.go`). Separately, `push-to-pull-request-branch` handler permissions include a `pull-requests: read` mode (`pkg/workflow/safe_outputs_permissions_test.go`); this is not an `issues: read` grant for the filter. Updated the Section 7.4 CTR-012 mapping and bumped to 1.0.116. No new `CTR-*` rule.
+- Native issue status safe output (#81265): `set-issue-status` uses the existing guarded safe-output permission logic, with close/reopen denied by default; no new compiler-detectable construct. No new `CTR-*` rule.
+- Sanitizer allowlist hardening (#81404), DIFC proxy image pull retry (#81382), enterprise-token release-check scoping (#81456), and first-write routing accounting (#81234): runtime or CLI behavior. The Section 7.16 loopback-only proxy listener and Section 7.18 history writer boundaries are unchanged. No new `CTR-*` rule.
+- `file-access` prompt lint (#81371), JSON unknown-field linter (#81419), graders accounting (#81381), and test/docs/workflow-guidance commits (#81403, #81485): advisory or repository-development tooling, not compiler-generated workflow security checks. No new `CTR-*` rule.
+- No production `threat-detection-suppress` annotation requires suppression SLA action.
+- Steering issue #81489 had no comments.
+- Go tests were not executed; only specification and changelog text changed and no implementation was modified. The GitHub integrity filter withheld pull-request file lists, so dispositions rely on PR descriptions and local source inspection. Code-scanning alerts were not retrieved separately.
 
 ### Mapping Audit (2026-11-26)
 

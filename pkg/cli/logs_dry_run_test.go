@@ -48,14 +48,14 @@ func TestDryRunMetadataAndFilters(t *testing.T) {
 
 func TestLogsDryRunFlags(t *testing.T) {
 	t.Parallel()
-	for _, flag := range []string{"dry-run", "no-dry-run"} {
+	for _, flag := range []string{"only-dry-run", "dry-run", "no-dry-run"} {
 		t.Run(flag, func(t *testing.T) {
 			t.Parallel()
 			cmd := NewLogsCommand()
 			require.NoError(t, cmd.Flags().Set(flag, "true"))
 			opts, err := loadCommonLogsOptions(cmd)
 			require.NoError(t, err)
-			assert.Equal(t, flag == "dry-run", opts.DryRun)
+			assert.Equal(t, flag != "no-dry-run", opts.DryRun)
 			assert.Equal(t, flag == "no-dry-run", opts.NoDryRun)
 			stdinOpts, err := loadStdinLogsOptions(cmd)
 			require.NoError(t, err)
@@ -68,6 +68,11 @@ func TestLogsDryRunFlags(t *testing.T) {
 		})
 	}
 	cmd := NewLogsCommand()
+	require.NoError(t, cmd.Flags().Set("only-dry-run", "true"))
+	require.NoError(t, cmd.Flags().Set("no-dry-run", "true"))
+	require.ErrorContains(t, cmd.ValidateFlagGroups(), "none of the others")
+
+	cmd = NewLogsCommand()
 	require.NoError(t, cmd.Flags().Set("dry-run", "true"))
 	require.NoError(t, cmd.Flags().Set("no-dry-run", "true"))
 	require.ErrorContains(t, cmd.ValidateFlagGroups(), "none of the others")

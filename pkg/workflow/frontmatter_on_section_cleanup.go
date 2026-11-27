@@ -15,7 +15,7 @@ func (c *Compiler) commentOutProcessedFieldsInOnSection(yamlStr string, frontmat
 
 	nativeLabelFilterSections := collectNativeLabelFilterSections(frontmatter)
 	state := newOnSectionCleanupState()
-	lines := strings.Split(yamlStr, "\n")
+	lines := splitLinesPreservingTrailingEmpty(yamlStr)
 	result := make([]string, 0, len(lines))
 
 	for _, line := range lines {
@@ -52,6 +52,24 @@ func newOnSectionLine(raw string) onSectionLine {
 	}
 }
 
+func onSectionLineAt(lines []string, index int) (string, bool) {
+	if index < 0 || index >= len(lines) {
+		return "", false
+	}
+	return lines[index], true
+}
+
+func splitLinesPreservingTrailingEmpty(value string) []string {
+	lines := make([]string, 0, strings.Count(value, "\n")+1)
+	for line := range strings.Lines(value) {
+		lines = append(lines, strings.TrimSuffix(line, "\n"))
+	}
+	if len(lines) == 0 || strings.HasSuffix(value, "\n") {
+		lines = append(lines, "")
+	}
+	return lines
+}
+
 type onSectionCleanupState struct {
 	inPullRequest                bool
 	inPullRequestTarget          bool
@@ -62,6 +80,8 @@ type onSectionCleanupState struct {
 	inDeploymentStatus           bool
 	inWorkflowRun                bool
 	inWorkflowRunConclusionArray bool
+	inIssueStatusFilterArray     bool
+	issueStatusFilterIndent      int
 	inForksArray                 bool
 	forksIndent                  int
 	inSkipIfMatch                bool
@@ -550,7 +570,16 @@ func (s *onSectionCleanupState) determineEventSectionComment(info onSectionLine,
 }
 
 func (s *onSectionCleanupState) commentPullRequestAndTriggerField(info onSectionLine) (bool, string) {
+	if s.inIssueStatusFilterArray && info.indent <= s.issueStatusFilterIndent && !strings.HasPrefix(info.trimmed, "-") {
+		s.inIssueStatusFilterArray = false
+	}
 	switch {
+	case s.inIssues && hasAnyPrefixInLine(info.trimmed, "status-ids:", "status-categories:"):
+		s.inIssueStatusFilterArray = true
+		s.issueStatusFilterIndent = info.indent
+		return true, " # Status filtering applied before activation"
+	case s.inIssueStatusFilterArray && strings.HasPrefix(info.trimmed, "-"):
+		return true, " # Status filtering applied before activation"
 	case s.inAllowedCheckouts && info.indent > s.allowedCheckoutsIndent:
 		return true, ""
 	case s.inPullRequestTarget && info.indent == 4 && strings.HasPrefix(info.trimmed, "acknowledge-risk:"):
@@ -601,8 +630,8 @@ func shouldCommentNamesArrayItem(result []string, trimmedLine string) bool {
 	if trimmedLine == "" || !strings.HasPrefix(trimmedLine, "-") {
 		return false
 	}
-	for i := range slices.Backward(result) {
-		prevTrimmed := strings.TrimSpace(result[i])
+	for _, line := range slices.Backward(result) {
+		prevTrimmed := strings.TrimSpace(line)
 		if prevTrimmed == "" {
 			continue
 		}
@@ -662,16 +691,32 @@ func (s *onSectionCleanupState) renderCommentedLine(line, commentReason string) 
 func dedentTrailingOnCommentBlock(lines []string) []string {
 	// Locate the last non-blank line; the trailing block must end in a comment.
 	last := len(lines) - 1
-	for last >= 0 && strings.TrimSpace(lines[last]) == "" {
+	for last >= 0 {
+		line, ok := onSectionLineAt(lines, last)
+		if !ok || strings.TrimSpace(line) != "" {
+			break
+		}
 		last--
 	}
-	if last < 0 || !strings.HasPrefix(strings.TrimSpace(lines[last]), "#") {
+	lastLine, ok := onSectionLineAt(lines, last)
+	if !ok {
+		return lines
+	}
+	if !strings.HasPrefix(strings.TrimSpace(lastLine), "#") {
 		return lines
 	}
 
 	// Walk back over the consecutive comment lines that form the trailing block.
 	start := last
-	for start-1 >= 0 && strings.HasPrefix(strings.TrimSpace(lines[start-1]), "#") {
+	for start > 0 {
+		previous := start - 1
+		line, ok := onSectionLineAt(lines, previous)
+		if !ok {
+			break
+		}
+		if !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			break
+		}
 		start--
 	}
 
@@ -694,30 +739,45 @@ func dedentTrailingOnCommentBlock(lines []string) []string {
 	// aligns with neither that key nor the column-0 top-level key that follows the `on:`
 	// section, and yamllint's comments-indentation rule flags it. In that case dedent to
 	// column 0 (matching the following content) to clear the warning.
-	firstLineIndent := len(lines[start]) - len(strings.TrimLeft(lines[start], " \t"))
-	if firstLineIndent > 2 {
-		// Find the nearest preceding real (non-blank) content line — the anchor the
-		// comment block visually attaches to.
-		anchor := start - 1
-		for anchor >= 0 && strings.TrimSpace(lines[anchor]) == "" {
-			anchor--
-		}
-		if anchor < 0 {
-			return lines
-		}
-		anchorIndent := len(lines[anchor]) - len(strings.TrimLeft(lines[anchor], " \t"))
-		// A sibling at the same (or deeper) indent anchors the block — leave it as-is.
-		// Only a strictly shallower anchor (the parent key) needs dedenting.
-		if anchorIndent >= firstLineIndent {
-			return lines
-		}
+	firstLine, ok := onSectionLineAt(lines, start)
+	if !ok {
+		return lines
+	}
+	firstLineIndent := len(firstLine) - len(strings.TrimLeft(firstLine, " \t"))
+	if firstLineIndent > 2 && !nestedCommentBlockNeedsDedent(lines, start, firstLineIndent) {
+		return lines
 	}
 
 	frontmatterLog.Printf("Dedenting trailing 'on' comment block: lines %d-%d", start, last)
-	for i := start; i <= last; i++ {
-		lines[i] = strings.TrimLeft(lines[i], " \t")
+	for i, line := range lines {
+		if i >= start && i <= last {
+			lines[i] = strings.TrimLeft(line, " \t")
+		}
 	}
 	return lines
+}
+
+func nestedCommentBlockNeedsDedent(lines []string, start, firstLineIndent int) bool {
+	anchor := start - 1
+	for anchor >= 0 {
+		line, ok := onSectionLineAt(lines, anchor)
+		if !ok {
+			return false
+		}
+		if strings.TrimSpace(line) != "" {
+			break
+		}
+		anchor--
+	}
+	if anchor < 0 {
+		return false
+	}
+	line, ok := onSectionLineAt(lines, anchor)
+	if !ok {
+		return false
+	}
+	anchorIndent := len(line) - len(strings.TrimLeft(line, " \t"))
+	return anchorIndent < firstLineIndent
 }
 
 // addZizmorIgnoreForWorkflowRun adds a zizmor ignore comment for workflow_run triggers
@@ -730,7 +790,7 @@ func (c *Compiler) addZizmorIgnoreForWorkflowRun(yamlStr string) string {
 	}
 	frontmatterLog.Print("Adding zizmor ignore annotation for workflow_run trigger")
 
-	lines := strings.Split(yamlStr, "\n")
+	lines := splitLinesPreservingTrailingEmpty(yamlStr)
 	var result []string
 	annotationAdded := false // Track if we've already added the annotation
 

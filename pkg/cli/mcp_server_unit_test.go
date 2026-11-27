@@ -42,6 +42,40 @@ func TestMCPServerUnit_ListTools(t *testing.T) {
 	assert.Len(t, result.Tools, len(expectedTools), "server should expose exactly %d tools", len(expectedTools))
 }
 
+func TestMCPServerUnit_AuditArtifactDescriptions(t *testing.T) {
+	t.Parallel()
+	server := createMCPServer("", "", false, false, "", nil)
+	session := connectInMemory(t, server)
+
+	result, err := session.ListTools(context.Background(), &mcp.ListToolsParams{})
+	require.NoError(t, err)
+	expected := "Artifact sets to download (default: all). Valid sets: " + strings.Join(ValidArtifactSetNames(), ", ")
+	for _, name := range []string{"audit", "audit-diff"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var tool *mcp.Tool
+			for _, candidate := range result.Tools {
+				if candidate.Name == name {
+					tool = candidate
+					break
+				}
+			}
+			require.NotNil(t, tool)
+			encoded, err := json.Marshal(tool.InputSchema)
+			require.NoError(t, err)
+			var schema struct {
+				Properties map[string]struct {
+					Description string `json:"description"`
+				} `json:"properties"`
+			}
+			require.NoError(t, json.Unmarshal(encoded, &schema))
+			artifacts, ok := schema.Properties["artifacts"]
+			require.True(t, ok)
+			assert.Equal(t, expected, artifacts.Description)
+		})
+	}
+}
+
 // TestMCPServerUnit_ServerCapabilities verifies that the server advertises the
 // Tools capability with ListChanged=false (tools are static, no notifications needed).
 func TestMCPServerUnit_ServerCapabilities(t *testing.T) {

@@ -91,6 +91,10 @@ A service that implements the Model Context Protocol to provide specific capabil
 
 The only supported mode for the built-in `tools.playwright` tool. The compiler installs `@playwright/cli` as a global npm package on the runner, and the agent drives browser automation by invoking `playwright-cli <command>` (for example `goto`, `snapshot`, `screenshot`, `eval`, `run-code`) from bash instead of loading MCP tool schemas into context. Built-in Playwright MCP support was removed; `mode: mcp` is now a compile-time error, and workflows that still require an MCP-backed Playwright must configure it explicitly as a custom `mcp-servers` entry. When the workflow runs inside the [AWF](#awf-agent-workflow-firewall) sandbox, the compiler injects an additional policy prompt that reinforces binding local servers to `127.0.0.1`, waiting for loopback readiness before navigating, and never installing packages or browsers at runtime. See [Playwright Reference](/gh-aw/reference/playwright/).
 
+### Required Author (`required-author`)
+
+A safe-output gate on `push-to-pull-request-branch` and `update-pull-request` that restricts changes to pull requests opened by a specific GitHub login. Use `app/<slug>` to match a GitHub App bot (login `<slug>[bot]`). Comparison is case-insensitive; a missing or different author rejects or skips the operation before any write. Complements `required-title-prefix` and `required-labels`, which other PRs can share. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/).
+
 ### Required Field (`required`)
 
 An MCP server field that controls startup criticality. By default every configured MCP server is startup-critical: the agent job fails if the server cannot be reached during the pre-flight connectivity check. Setting `required: false` marks a server as best-effort, so an unreachable server logs a warning and the workflow continues without it, rather than aborting the run. At least one server must still connect successfully for startup to proceed. See [MCPs Guide](/gh-aw/guides/mcps/).
@@ -323,6 +327,10 @@ A feature flag that enables GitHub reactions (👍, ❤️, 👎, 😕) to promo
 ### Soft-Skip
 
 A safe output processing behavior where a handler skips an operation with a warning message instead of failing the workflow step. A soft-skip occurs when a condition prevents execution but is not considered a hard error — for example, when `target: triggering` is configured but no triggering PR context exists, or when `resolveReviewThread` is rejected by the GitHub API due to token scope limitations. Soft-skips allow the workflow to continue processing other safe outputs rather than aborting entirely. See [Safe Outputs (Pull Requests)](/gh-aw/reference/safe-outputs-pull-requests/).
+
+### Planning Status (`planning-status`)
+
+A native GitHub issue status (for example `Todo`) that `safe-outputs.create-issue` can set when it creates an issue, selected by name or numeric ID. The `set-issue-status` safe output changes the status of existing issues with explicit state-transition authorization. See [Safe Outputs](/gh-aw/reference/safe-outputs/#initial-planning-status).
 
 ### Status Comment
 
@@ -1497,6 +1505,10 @@ A custom Go static-analysis linter (`pkg/linters/blankassigncomma`) that reports
 ### Validation
 
 Checking workflow files for errors, security issues, and best practices. Occurs during compilation and can be enhanced with strict mode and security scanners.
+
+### `file-access` Lint Rule
+
+A built-in AW lint rule that warns when prompt instructions would be blocked by the simulated file-access model, such as writing files when neither the edit tool nor a write-capable `bash` command is available, writing under read-only system paths, or using unconfigured cache-memory or repo-memory directories. See [Workflow Linters](/gh-aw/reference/workflow-linters/).
 
 ### `gh aw lint`
 

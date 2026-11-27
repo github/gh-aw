@@ -58,6 +58,7 @@ func parseEngineDefinitionFromJSON(engineJSON string) (*EngineDefinition, error)
 	// Fast path: return a deep copy of the cached definition when available.
 	if cached, ok := engineDefinitionCache.Load(engineJSON); ok {
 		if def, ok := cached.(EngineDefinition); ok {
+			behaviorDefinedEngineLog.Printf("Engine definition cache hit: id=%s", def.ID)
 			defCopy := deepCopyEngineDefinition(def)
 			return &defCopy, nil
 		}
@@ -97,6 +98,7 @@ func parseEngineDefinitionFromJSON(engineJSON string) (*EngineDefinition, error)
 	// to prevent unbounded memory growth. Store a deep copy so that any mutations the
 	// caller makes to the returned definition cannot corrupt the cached entry.
 	if _, isBuiltin := engineDefinitionBuiltinKeys.Load(engineJSON); isBuiltin {
+		behaviorDefinedEngineLog.Printf("Caching built-in engine definition: id=%s", def.ID)
 		cacheCopy := deepCopyEngineDefinition(def)
 		engineDefinitionCache.Store(engineJSON, cacheCopy)
 	}
@@ -117,6 +119,7 @@ func (c *Compiler) registerNamedEngineDefinitionFromJSON(engineJSON string) erro
 	if err != nil || !isEngineDefinitionForm(def) {
 		return err
 	}
+	behaviorDefinedEngineLog.Printf("Registering named engine definition: id=%s behaviorDefined=%t", def.ID, def.Behaviors != nil)
 	if def.Behaviors != nil {
 		engine, buildErr := NewBehaviorDefinedEngine(def)
 		if buildErr != nil {

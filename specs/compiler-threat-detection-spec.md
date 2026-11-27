@@ -7,7 +7,7 @@ sidebar:
 
 # GitHub Actions Compiler Threat Detection Specification
 
-**Version**: 1.0.114
+**Version**: 1.0.116
 **Status**: Candidate Recommendation  
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/compiler-threat-detection-spec.md  
 **Editors**: GitHub Next (GitHub, Inc.)
@@ -32,7 +32,7 @@ Each version maps to the minimum compatible binary. A version change MUST update
 
 | Versions | Minimum gh-aw |
 |---|---:|
-| `1.0.60`–`1.0.114` | Unreleased |
+| `1.0.60`–`1.0.116` | Unreleased |
 | `1.0.44`–`1.0.59` | Unreleased |
 | `1.0.40`–`1.0.43` | `v0.87.9` |
 | `1.0.39` | `v0.87.9` |
@@ -577,7 +577,7 @@ Rules with a known compiler threat mapping MUST declare its `CTR-*` ID in `Rule.
 | CTR-010 | `prompt-expression` | Authored prompt interpolations are syntactically valid and single-line, with no dot or literal-index access to the shared blocked JavaScript property names. Uses the Actions lexer, so quoted closing delimiters remain expression data. Reports prompt-relative lines without values. Does not implement the full site-specific context allowlist, evaluate computed keys, inspect frontmatter expressions, or load imported prompt content. | `pkg/workflow/lint/prompt_expression.go`, `prompt_expression_test.go`; shared `pkg/workflow/taint/text.go`; `pkg/workflow/ast_threat_policy_test.go` |
 | CTR-011 | `network-scope` | Authored `network.allowed` does not contain a bare wildcard, including alongside `defaults`. Does not infer effective firewall behavior, defaults, runtime additions, or missing prerequisites. | `pkg/workflow/lint/runtime_policy.go`, `policy_conversions_test.go`, `source_policy_test.go` |
 | CTR-011 | `firewall-ssl-bump` | Nonempty literal `--allow-urls` (separate or equals form) in authored `sandbox.agent.args`, before `--`, requires enabled `--ssl-bump` or `--ssl-bump=true`; the last SSL setting wins, including `--ssl-bump=false`. These internal overrides compile only in non-strict mode. Any legacy `network.firewall` block is schema-invalid and requires migration, even with `ssl-bump: true`. Findings are errors in either mode; imported settings and runtime HTTPS enforcement are not inferred. | `pkg/workflow/lint/firewall_ssl_bump.go`, `threat_policy_test.go`; `pkg/workflow/firewall_lint_source_test.go`, `firewall_args_integration_test.go` |
-| CTR-012 | `push-target` | A literal wildcard PR-branch target has authored title or label constraints. Defers missing-constraint findings when unresolved imports could supply them; does not infer checkout fetch coverage or repository visibility. | `pkg/workflow/lint/output_policy.go`, `policy_conversions_test.go` |
+| CTR-012 | `push-target` | A literal wildcard PR-branch target has authored author, title, or label constraints (`required-author`, `required-title-prefix`/`title-prefix`, `required-labels`/`labels`); a non-string `required-author` value fails explicitly. Defers missing-constraint findings when unresolved imports could supply them; does not infer checkout fetch coverage or repository visibility. | `pkg/workflow/lint/output_policy.go`, `policy_conversions_test.go` |
 | CTR-013 | `image-argument` | Explicit job/service and authored MCP container image operands do not start with a hyphen. Does not inspect registries, infer package-manager operands, or resolve dynamic image expressions. | `pkg/workflow/lint/image_policy.go`, `ast_policy_test.go` |
 | CTR-014 | `install-scripts` | Authored Node runtime configuration does not explicitly enable dependency install hooks. Does not infer imported runtime configuration or arbitrary package-install commands. | `pkg/workflow/lint/runtime_policy.go`, `policy_conversions_test.go`, `source_policy_test.go` |
 | CTR-015 | `allowed-labels` | Authored issue, discussion, discussion-update, and pull-request creation label allowlists do not contain a bare wildcard. Required-label names remain literal; narrower allowed-label patterns are accepted. | `pkg/workflow/lint/output_policy.go`, `policy_conversions_test.go` |
@@ -957,7 +957,8 @@ Setting `model-routing.learning` to `observe` adds a post-conclusion `push_routi
 - Emit the routing identity fields (workflow ID, definition hash, mode, engine, and goal) only as fixed, quoted compiler-derived values. Other runtime bindings, including a dynamically selected routing level, token/session-file bindings, and sub-agent declarations, are outside this requirement. The verdict MUST come from the unified session artifact, not from agent-written files.
 - Reject explicit use for the tested ineligible cases: a fixed or non-routed primary model, `workflow_call`, and missing `tools.repo-memory`. A repository default silently skips the fixed/non-routed model and `workflow_call` cases covered by regression tests. Workflows that do not opt in compile unchanged.
 - `gh aw compile --dry-run` is an explicit compiler preview mode. It MUST validate `model-routing.learning` and check workflow eligibility without mutating the parsed `WorkflowData`. The emitted dry-run workflow MUST omit the compiler-managed `push_routing_history` job and its associated `contents: write` and `actions: read` permissions. A dry-run compilation MUST NOT charge the run as unsaved.
-- For a real run, when the agent has started and an existing `push_routing_history` writer concludes with anything other than success, including skipped or cancelled conclusions, the run MUST remain unsaved. The dry-run omission does not weaken this real-run accounting requirement.
+- For a real run, when the agent has started and an existing `push_routing_history` writer concludes with anything other than success, including skipped or cancelled conclusions, a confirmed missing save MUST be recorded as `unsaved`. A job failure after its write landed is not a missing save. The dry-run omission does not weaken this real-run accounting requirement.
+- This accounting MUST apply to eligible first attempts before the first successful history write as well. A writer MAY save its own observation without verifying the backlog, but MUST NOT advance coverage over unchecked early runs or charge a missing save as a model outcome. While first-write coverage is incomplete, `first_write_run` identifies that writer across workflow edits; the field is removed once verified coverage or a deliberate reset reaches the newest saved run.
 
 | Boundary | Implementation | Regression Evidence |
 |---|---|---|

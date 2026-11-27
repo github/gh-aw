@@ -764,6 +764,9 @@ jobs:
                   "parent": {
                     "issueOrPRNumber": true
                   },
+                  "planning_status": {
+                    "stringOrInteger": true
+                  },
                   "repo": {
                     "type": "string",
                     "maxLength": 256

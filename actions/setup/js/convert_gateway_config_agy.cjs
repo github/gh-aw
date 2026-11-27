@@ -3,7 +3,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { loadGatewayContext, normalizeGatewayEntry, writeSecureOutput } = require("./convert_gateway_config_shared.cjs");
+const { loadGatewayContext, normalizeGatewayEntry, writeSecureOutput, addWebFetchMCPServer } = require("./convert_gateway_config_shared.cjs");
 const context = loadGatewayContext({ extraRequiredEnv: ["GITHUB_WORKSPACE"] });
 const raw = JSON.parse(fs.readFileSync(context.gatewayOutput, "utf8"));
 if (!raw.mcpServers || typeof raw.mcpServers !== "object" || Array.isArray(raw.mcpServers)) {
@@ -29,6 +29,7 @@ for (const [name, entry] of Object.entries(raw.mcpServers)) {
   }
   servers[name] = server;
 }
+addWebFetchMCPServer(servers, entry => entry);
 const directory = path.join(context.extraEnv.GITHUB_WORKSPACE, ".agents");
 const output = path.join(directory, "mcp_config.json");
 for (const target of [directory, output]) {

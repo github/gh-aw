@@ -10,6 +10,7 @@ import (
 // TestIsNonDispatchedConclusion verifies that conclusions for runs which never
 // dispatched a job are recognised, so they are excluded from executed-run metrics.
 func TestIsNonDispatchedConclusion(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		conclusion string
 		want       bool
@@ -26,6 +27,7 @@ func TestIsNonDispatchedConclusion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.conclusion, func(t *testing.T) {
+			t.Parallel()
 			if got := isNonDispatchedConclusion(tt.conclusion); got != tt.want {
 				t.Errorf("isNonDispatchedConclusion(%q) = %v, want %v", tt.conclusion, got, tt.want)
 			}
@@ -39,6 +41,7 @@ func TestIsNonDispatchedConclusion(t *testing.T) {
 // comments on an issue, which previously dragged their reported success rate
 // down to near zero.
 func TestIsCompletedDispatchedRunExcludesNonDispatched(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		status     string
@@ -54,6 +57,7 @@ func TestIsCompletedDispatchedRunExcludesNonDispatched(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			run := WorkflowRun{Status: tt.status, Conclusion: tt.conclusion}
 			if got := isCompletedDispatchedRun(run); got != tt.want {
 				t.Errorf("isCompletedDispatchedRun(%+v) = %v, want %v", run, got, tt.want)
