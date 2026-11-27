@@ -174,7 +174,8 @@ func (c *Compiler) addPushRoutingHistoryJob(data *WorkflowData) error {
 
 func (c *Compiler) buildPushRoutingHistorySteps(data *WorkflowData) []string {
 	var steps []string
-	if setupRef := c.resolveActionReference("./actions/setup", data); setupRef != "" || c.actionMode.IsScript() {
+	setupRef := c.resolveActionReference("./actions/setup", data)
+	if setupRef != "" || c.actionMode.IsScript() {
 		traceID := fmt.Sprintf("${{ needs.%s.outputs.setup-trace-id }}", constants.ActivationJobName)
 		steps = append(steps, c.generateCheckoutActionsFolder(data)...)
 		steps = append(steps, c.generateSetupStepForJob(pushRoutingHistoryJobName, data, setupRef, SetupActionDestination, false, traceID, setupParentSpanNeedsExpr(constants.ActivationJobName), "")...)
@@ -215,5 +216,27 @@ func (c *Compiler) buildPushRoutingHistorySteps(data *WorkflowData) []string {
 	if c.actionMode.IsDev() {
 		steps = append(steps, c.generateRestoreActionsSetupStep())
 	}
+	if c.actionMode.IsScript() {
+		steps = append(steps, c.generateScriptModeCleanupStepWithJobResult(data))
+	} else if setupRef != "" {
+		steps = append(steps, generateRecordJobResultStep())
+	}
 	return steps
+}
+
+// generateRecordJobResultStep exports the job's final GitHub Actions status to
+// GITHUB_ENV so the setup action's post-hook (actions/setup/post.js) sees it
+// without emitting a second conclusion span.
+func generateRecordJobResultStep() string {
+	return `      - name: Record job result for OTLP
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_AW_JOB_RESULT: ${{ job.status }}
+        run: | # zizmor: ignore[github-env] - job.status is set by GitHub Actions, not user input.
+          if [ -n "${GITHUB_ENV:-}" ]; then
+            echo "GH_AW_JOB_RESULT=${GH_AW_JOB_RESULT}" >> "$GITHUB_ENV"
+          fi
+`
 }

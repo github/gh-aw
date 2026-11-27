@@ -33,7 +33,7 @@ import (
 	"strconv"
 
 	"github.com/github/gh-aw/pkg/logger"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 var templatablesLog = logger.New("workflow:templatables")

@@ -15,7 +15,7 @@ const { resolveAICreditsFailureState } = require("./ai_credits_context.cjs");
 const { collectCodexMixedRecords } = require("./parse_codex_log.cjs");
 const { normalizeCodexSession } = require("./codex_session.cjs");
 const { projectSessionResult, observedSessionModel } = require("./agent_session.cjs");
-const { resolveEffectiveModel, resolveModelRoutingSummary } = require("./model_attribution.cjs");
+const { resolveEffectiveModel, resolveModelRoutingSummary, resolveRoutingObservation } = require("./model_attribution.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
@@ -2450,7 +2450,10 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   // needs.detection.outputs.* in downstream jobs (conclusion, safe_outputs, etc.).
   const detectionConclusion = process.env.GH_AW_DETECTION_CONCLUSION || "";
   const detectionReason = process.env.GH_AW_DETECTION_REASON || "";
-  const jobResult = options.jobResult || (jobName === "detection" ? detectionConclusion : "");
+  const ALLOWED_JOB_RESULTS = new Set(["success", "failure", "timed_out", "cancelled", "skipped"]);
+  const rawJobResultCandidate = (typeof options.jobResult === "string" ? options.jobResult : process.env.GH_AW_JOB_RESULT || "").trim().toLowerCase();
+  const rawJobResult = ALLOWED_JOB_RESULTS.has(rawJobResultCandidate) ? rawJobResultCandidate : "";
+  const jobResult = rawJobResult || (jobName === "detection" ? detectionConclusion : "");
   const runtimeMetrics = readAgentRuntimeMetrics(engineId);
   // Read once and reuse for both gh-aw.aic and gen_ai.usage.* attributes.
   const agentUsageFilePath = jobName === "detection" ? "/tmp/gh-aw/threat-detection/detection_usage.json" : "/tmp/gh-aw/agent_usage.json";
@@ -2516,8 +2519,20 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   if (isAgentFailure && errorMessages.length > 0) {
     statusMessage = `agent ${agentConclusion}: ${errorMessages[0]}`.slice(0, 256);
   }
+  const isNonAgentJobNonOK = jobName !== "agent" && ["failure", "timed_out", "cancelled"].includes(jobResult);
+  let jobErrorType = "";
+  if (isNonAgentJobNonOK) {
+    statusCode = 2;
+    jobErrorType = jobResult === "timed_out" ? "job_timed_out" : jobResult === "cancelled" ? "job_cancelled" : "job_failed";
+    if (!statusMessage) {
+      statusMessage = `${jobName || "job"} ${jobResult}`;
+    }
+  }
 
   const attributes = [buildAttr(OTEL_ATTR_WORKFLOW_NAME, workflowName), buildAttr(OTEL_ATTR_RUN_ID, runId), buildAttr("gh-aw.run.attempt", runAttempt), buildAttr("gh-aw.run.actor", actor), buildAttr(OTEL_ATTR_REPOSITORY, repository)];
+  if (jobErrorType) {
+    attributes.push(buildAttr(OTEL_ATTR_ERROR_TYPE, jobErrorType));
+  }
   if (jobName === "agent") {
     const durableParentRunId = readDurableParentRunId(runId, runAttempt);
     if (durableParentRunId) attributes.push(buildAttr("gh-aw.durable.parent_run_id", durableParentRunId));
@@ -2584,6 +2599,13 @@ async function sendJobConclusionSpan(spanName, options = {}) {
             attributes.push(buildAttr(attributeName, value));
           }
         }
+      }
+    }
+    const routingObservation = resolveRoutingObservation(getGhAwPath("usage/aw_session.jsonl"));
+    if (routingObservation) {
+      attributes.push(buildAttr("gh-aw.model_routing.observation.outcome", routingObservation.outcome));
+      if (routingObservation.outcome === "skip") {
+        attributes.push(buildAttr("gh-aw.model_routing.observation.skip_reason", routingObservation.skip_reason));
       }
     }
   }

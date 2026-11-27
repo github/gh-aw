@@ -1957,3 +1957,288 @@ describe("smoke_model_routing_assertions detection", () => {
     });
   });
 });
+
+describe("selection provenance and fallback smoke assertions", () => {
+  let root;
+  const write = (relativePath, content) => {
+    const file = path.join(root, relativePath);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, Array.isArray(content) ? `${content.map(item => JSON.stringify(item)).join("\n")}\n` : typeof content === "string" ? content : JSON.stringify(content));
+  };
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "smoke-fallback-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  const fallbackReflect = {
+    endpoints: [
+      {
+        provider: "copilot",
+        routing_models: [
+          { model_id: "gpt-5.3-codex", supported_endpoints: ["/responses"], supported_reasoning_efforts: ["low", "medium", "high"] },
+          { model_id: "gpt-5.6-luna", supported_endpoints: ["/responses"], supported_reasoning_efforts: ["high"] },
+        ],
+      },
+    ],
+  };
+
+  it("requires selectionSource to be present and match when expectedSelectionSource is router", () => {
+    write("usage/aw_session.jsonl", [workflowInfo(), selection()]);
+    write(TOKEN_USAGE, [classifier(), luna()]);
+    write("sandbox/firewall/awf-reflect.json", reflect);
+
+    // Omitted expectedSelectionSource keeps pre-fallback AWF compatibility.
+    expect(checkModelRoutingEvidence({ rootDir: root, buildSession: false, allowedModels: ROUTED_ALLOWED }).failures).toEqual([]);
+
+    // Explicit expectedSelectionSource: "router" fails loudly when selectionSource is missing.
+    const missing = checkModelRoutingEvidence({ rootDir: root, buildSession: false, allowedModels: ROUTED_ALLOWED, expectedSelectionSource: "router" });
+    expect(missing.failures).toEqual([expect.stringMatching(/^FAIL R1 .*selectionSource is missing, expected router/)]);
+
+    // Passes when selectionSource is "router".
+    write("usage/aw_session.jsonl", [
+      workflowInfo(),
+      {
+        ...selection(),
+        data: { ...selection().data, selectionSource: "router", fallbackReason: null, fallbackTier: null },
+      },
+    ]);
+    const matched = checkModelRoutingEvidence({ rootDir: root, buildSession: false, allowedModels: ROUTED_ALLOWED, expectedSelectionSource: "router" });
+    expect(matched.failures).toEqual([]);
+    expect(matched.passes).toContainEqual(expect.stringMatching(/^PASS R1 .*selection_source=router/));
+  });
+
+  it("fails both explicit router expectation and omitted expectation when session records a fallback selection", () => {
+    write("usage/aw_session.jsonl", [
+      workflowInfo("selected", "gpt-5.3-codex"),
+      {
+        ...selection("gpt-5.3-codex", "/responses"),
+        data: { ...selection("gpt-5.3-codex", "/responses").data, selectionSource: "fallback", fallbackReason: "no_route", fallbackTier: "standard", router: null },
+      },
+    ]);
+    write(TOKEN_USAGE, [classifier("gpt-5.6-luna"), usage("gpt-5.3-codex", "/responses", 200)]);
+    write("sandbox/firewall/awf-reflect.json", fallbackReflect);
+
+    const omitted = checkModelRoutingEvidence({ rootDir: root, buildSession: false, allowedModels: ["gpt-5.3-codex"] });
+    expect(omitted.failures).toEqual([expect.stringMatching(/^FAIL R1 .*selectionSource is fallback, expected router/)]);
+
+    const explicitRouter = checkModelRoutingEvidence({ rootDir: root, buildSession: false, allowedModels: ["gpt-5.3-codex"], expectedSelectionSource: "router" });
+    expect(explicitRouter.failures).toEqual([expect.stringMatching(/^FAIL R1 .*selectionSource is fallback, expected router/)]);
+
+    // Explicitly null selectionSource is not equivalent to an absent pre-fallback field.
+    write("usage/aw_session.jsonl", [
+      workflowInfo("selected", "gpt-5.3-codex"),
+      {
+        ...selection("gpt-5.3-codex", "/responses"),
+        data: { ...selection("gpt-5.3-codex", "/responses").data, selectionSource: null },
+      },
+    ]);
+    const nullSource = checkModelRoutingEvidence({ rootDir: root, buildSession: false, allowedModels: ["gpt-5.3-codex"] });
+    expect(nullSource.failures).toEqual([expect.stringMatching(/^FAIL R1 .*selectionSource is null, expected router/)]);
+  });
+
+  it("checks requested mode and effort in P1 without rejecting degraded classification on expected fallback runs", () => {
+    write("usage/aw_session.jsonl", [
+      workflowInfo("selected", "gpt-5.3-codex"),
+      {
+        ...selection("gpt-5.3-codex", "/responses"),
+        data: {
+          ...selection("gpt-5.3-codex", "/responses").data,
+          objective: { goal: "cost", mode: "auto" },
+          mode: null,
+          selectedEffort: "medium",
+          degradedClassification: true,
+          degradedReason: "no_route",
+          selectionSource: "fallback",
+          fallbackReason: "no_route",
+          fallbackTier: "standard",
+          router: null,
+        },
+      },
+    ]);
+    write(TOKEN_USAGE, [usage("gpt-5.3-codex", "/responses", 200)]);
+    write("sandbox/firewall/awf-reflect.json", fallbackReflect);
+
+    const passed = checkModelRoutingEvidence({
+      rootDir: root,
+      buildSession: false,
+      allowedModels: ["gpt-5.3-codex"],
+      routingMode: "auto",
+      expectedSelectionSource: "fallback",
+      expectedFallbackReason: "no_route",
+      expectedFallbackTier: "standard",
+      expectedClassifierRequests: 0,
+    });
+    expect(passed.failures).toEqual([]);
+    expect(passed.passes).toContainEqual(expect.stringMatching(/^PASS P1 requested mode auto; recommended profile null and selected effort medium are valid/));
+
+    const wrongMode = checkModelRoutingEvidence({
+      rootDir: root,
+      buildSession: false,
+      allowedModels: ["gpt-5.3-codex"],
+      routingMode: "economy",
+      expectedSelectionSource: "fallback",
+      expectedFallbackReason: "no_route",
+      expectedFallbackTier: "standard",
+      expectedClassifierRequests: 0,
+    });
+    expect(wrongMode.failures).toEqual([expect.stringMatching(/^FAIL P1 requested mode \(objective\.mode\) is auto, expected economy/)]);
+  });
+
+  it("passes a shortlist-miss no_route fallback with expectedClassifierRequests=0 and fails if 0 is not requested explicitly", () => {
+    write("usage/aw_session.jsonl", [
+      workflowInfo("selected", "gpt-5.3-codex"),
+      {
+        ...selection("gpt-5.3-codex", "/responses"),
+        data: { ...selection("gpt-5.3-codex", "/responses").data, selectionSource: "fallback", fallbackReason: "no_route", fallbackTier: "standard", router: null },
+      },
+    ]);
+    write(TOKEN_USAGE, [usage("gpt-5.3-codex", "/responses", 200)]);
+    write("sandbox/firewall/awf-reflect.json", fallbackReflect);
+
+    // Never infers 0 classifier requests from fallback + no_route.
+    const defaultR2 = checkModelRoutingEvidence({
+      rootDir: root,
+      buildSession: false,
+      allowedModels: ["gpt-5.3-codex"],
+      expectedSelectionSource: "fallback",
+      expectedFallbackReason: "no_route",
+      expectedFallbackTier: "standard",
+    });
+    expect(defaultR2.failures).toEqual(["FAIL R2 expected exactly 1 routing_classification request, observed 0: none"]);
+
+    // Passes when expectedClassifierRequests: 0 is explicitly specified.
+    const explicitZero = checkModelRoutingEvidence({
+      rootDir: root,
+      buildSession: false,
+      allowedModels: ["gpt-5.3-codex"],
+      expectedSelectionSource: "fallback",
+      expectedFallbackReason: "no_route",
+      expectedFallbackTier: "standard",
+      expectedClassifierRequests: 0,
+    });
+    expect(explicitZero.failures).toEqual([]);
+    expect(explicitZero.passes).toContainEqual(expect.stringMatching(/^PASS R1 .*selection_source=fallback, fallback_reason=no_route, fallback_tier=standard/));
+    expect(explicitZero.passes).toContain("PASS R2 0 routing_classification requests as expected");
+  });
+
+  it("passes a no_route fallback after 1 classifier request with default R2", () => {
+    write("usage/aw_session.jsonl", [
+      workflowInfo("selected", "gpt-5.3-codex"),
+      {
+        ...selection("gpt-5.3-codex", "/responses"),
+        data: { ...selection("gpt-5.3-codex", "/responses").data, selectionSource: "fallback", fallbackReason: "no_route", fallbackTier: "standard", router: null },
+      },
+    ]);
+    write(TOKEN_USAGE, [classifier("gpt-5.6-luna"), usage("gpt-5.3-codex", "/responses", 200)]);
+    write("sandbox/firewall/awf-reflect.json", fallbackReflect);
+
+    const results = checkModelRoutingEvidence({
+      rootDir: root,
+      buildSession: false,
+      allowedModels: ["gpt-5.3-codex"],
+      expectedSelectionSource: "fallback",
+      expectedFallbackReason: "no_route",
+      expectedFallbackTier: "standard",
+    });
+    expect(results.failures).toEqual([]);
+    expect(results.passes).toContainEqual(expect.stringMatching(/^PASS R2 one routing_classification request:/));
+  });
+
+  it("reads selection provenance solely from usage/aw_session.jsonl even when model-routing.jsonl disagrees", () => {
+    write("usage/aw_session.jsonl", [
+      workflowInfo("selected", "gpt-5.3-codex"),
+      {
+        ...selection("gpt-5.3-codex", "/responses"),
+        data: { ...selection("gpt-5.3-codex", "/responses").data, selectionSource: "fallback", fallbackReason: "no_route", fallbackTier: "standard", router: null },
+      },
+    ]);
+    // Contradictory side log claiming router pick.
+    write("sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", [
+      { _schema: "model-routing/v0.29.21", stage: "selection", selected_model: "github-copilot/gpt-5.3-codex", wire_model: "gpt-5.3-codex", endpoint: "/responses", selection_source: "router", fallback_reason: null, fallback_tier: null },
+    ]);
+    write(TOKEN_USAGE, [usage("gpt-5.3-codex", "/responses", 200)]);
+    write("sandbox/firewall/awf-reflect.json", fallbackReflect);
+
+    const fallbackCheck = checkModelRoutingEvidence({
+      rootDir: root,
+      buildSession: false,
+      allowedModels: ["gpt-5.3-codex"],
+      expectedSelectionSource: "fallback",
+      expectedFallbackReason: "no_route",
+      expectedFallbackTier: "standard",
+      expectedClassifierRequests: 0,
+    });
+    expect(fallbackCheck.failures).toEqual([]);
+
+    const routerCheck = checkModelRoutingEvidence({
+      rootDir: root,
+      buildSession: false,
+      allowedModels: ["gpt-5.3-codex"],
+      expectedSelectionSource: "router",
+    });
+    expect(routerCheck.failures).toContainEqual(expect.stringMatching(/^FAIL R1 .*selectionSource is fallback, expected router/));
+  });
+
+  it("rejects expectedClassifierRequests=0 on router or legacy smokes", () => {
+    write("usage/aw_session.jsonl", [
+      workflowInfo(),
+      {
+        ...selection(),
+        data: { ...selection().data, selectionSource: "router", fallbackReason: null, fallbackTier: null },
+      },
+    ]);
+    write(TOKEN_USAGE, [luna()]);
+    write("sandbox/firewall/awf-reflect.json", reflect);
+
+    const explicitRouter = checkModelRoutingEvidence({
+      rootDir: root,
+      buildSession: false,
+      allowedModels: ROUTED_ALLOWED,
+      expectedSelectionSource: "router",
+      expectedClassifierRequests: 0,
+    });
+    expect(explicitRouter.failures).toEqual(['FAIL R2 expectedClassifierRequests=0 is only allowed when expectedSelectionSource="fallback"']);
+
+    const omittedSource = checkModelRoutingEvidence({
+      rootDir: root,
+      buildSession: false,
+      allowedModels: ROUTED_ALLOWED,
+      expectedClassifierRequests: 0,
+    });
+    expect(omittedSource.failures).toEqual(['FAIL R2 expectedClassifierRequests=0 is only allowed when expectedSelectionSource="fallback"']);
+  });
+
+  it("fails R1 when fallbackReason or fallbackTier is missing or mismatched", () => {
+    write("usage/aw_session.jsonl", [
+      workflowInfo("selected", "gpt-5.3-codex"),
+      {
+        ...selection("gpt-5.3-codex", "/responses"),
+        data: { ...selection("gpt-5.3-codex", "/responses").data, selectionSource: "fallback", fallbackReason: null, fallbackTier: null },
+      },
+    ]);
+    write(TOKEN_USAGE, [usage("gpt-5.3-codex", "/responses", 200)]);
+    write("sandbox/firewall/awf-reflect.json", fallbackReflect);
+
+    const missingFields = checkModelRoutingEvidence({
+      rootDir: root,
+      buildSession: false,
+      allowedModels: ["gpt-5.3-codex"],
+      expectedSelectionSource: "fallback",
+      expectedClassifierRequests: 0,
+    });
+    expect(missingFields.failures).toEqual([expect.stringMatching(/^FAIL R1 .*fallbackReason is missing.*fallbackTier is missing/)]);
+
+    const badConfig = checkModelRoutingEvidence({
+      rootDir: root,
+      buildSession: false,
+      allowedModels: ["gpt-5.3-codex"],
+      expectedSelectionSource: "router",
+      expectedFallbackReason: "no_route",
+    });
+    expect(badConfig.failures).toContainEqual(expect.stringMatching(/^FAIL R1 .*expectedFallbackReason\/expectedFallbackTier require expectedSelectionSource="fallback"/));
+  });
+});

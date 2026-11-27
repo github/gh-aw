@@ -734,15 +734,21 @@ Body.
 		"/tmp/gh-aw/agent_output.json",
 		"/tmp/gh-aw/safeoutputs.jsonl",
 		"/tmp/gh-aw/agent_execution.json",
+		"/tmp/gh-aw/agent-errors.jsonl",
 		"/tmp/gh-aw/agent_usage.jsonl",
 		"/tmp/gh-aw/agent_usage.json",
 		"/tmp/gh-aw/agent/harness_retry.json",
+		"/tmp/gh-aw/agent/routing-refusal.json",
+		"/tmp/gh-aw/agent/upstream-errors-fallback.jsonl",
 		"/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
 		"/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl",
+		"/tmp/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/adaptive-selection.jsonl",
 		"/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl",
 		"/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl",
+		"/tmp/gh-aw/sandbox/firewall/logs/api-proxy-logs/adaptive-selection.jsonl",
 		"/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl",
 		"/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl",
+		"/tmp/gh-aw/sandbox/firewall/audit/api-proxy-logs/adaptive-selection.jsonl",
 		constants.AWFResolvedConfigFilePath.String(),
 		"if-no-files-found: ignore",
 		"continue-on-error: true",
@@ -752,6 +758,7 @@ Body.
 		}
 	}
 	assert.NotContains(t, uploadSection, "/graders/")
+	assert.NotContains(t, uploadSection, "upstream-errors.jsonl", "fallback upload must never include raw upstream-errors.jsonl with headers or bodies")
 	assert.Contains(t, extractWorkflowStepByName(t, lockYAML, "Upload agent artifacts"), "/tmp/gh-aw/agent/harness_retry.json")
 
 	// The fallback artifact must be uploaded before the (large, failure-prone) agent artifact.
@@ -809,17 +816,26 @@ safe-outputs:
 
 	for _, expected := range []string{
 		"${{ runner.temp }}/gh-aw/agent_output.json",
+		"${{ runner.temp }}/gh-aw/agent-errors.jsonl",
 		"${{ runner.temp }}/gh-aw/agent_usage.jsonl",
 		"${{ runner.temp }}/gh-aw/agent/harness_retry.json",
+		"${{ runner.temp }}/gh-aw/agent/routing-refusal.json",
+		"${{ runner.temp }}/gh-aw/agent/upstream-errors-fallback.jsonl",
+		"${{ runner.temp }}/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
+		"${{ runner.temp }}/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl",
+		"${{ runner.temp }}/gh-aw/sandbox/firewall-audit-logs/api-proxy-logs/adaptive-selection.jsonl",
 		"${{ runner.temp }}/gh-aw/sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl",
 		"${{ runner.temp }}/gh-aw/sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl",
+		"${{ runner.temp }}/gh-aw/sandbox/firewall/logs/api-proxy-logs/adaptive-selection.jsonl",
 		"${{ runner.temp }}/gh-aw/sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl",
 		"${{ runner.temp }}/gh-aw/sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl",
+		"${{ runner.temp }}/gh-aw/sandbox/firewall/audit/api-proxy-logs/adaptive-selection.jsonl",
 		"${{ runner.temp }}/gh-aw/awf-resolved-config.json",
 	} {
 		assert.Contains(t, uploadSection, expected)
 	}
 	assert.NotContains(t, uploadSection, "/tmp/gh-aw/")
+	assert.NotContains(t, uploadSection, "upstream-errors.jsonl")
 	consolidation := extractWorkflowStepByName(t, string(lockContent), "Consolidate artifacts for ARC/DinD")
 	assert.Less(t, strings.Index(string(lockContent), "Consolidate artifacts for ARC/DinD"), strings.Index(string(lockContent), "id: validate_final_recovery_envelopes"))
 	assert.Less(t, strings.Index(string(lockContent), "id: validate_final_recovery_envelopes"), strings.Index(string(lockContent), "Upload agent output fallback artifact"))
@@ -955,4 +971,75 @@ Body.
 	if strings.Contains(lockYAML, "Upload agent output fallback artifact") {
 		t.Error("Expected no fallback artifact upload when safe-outputs is not declared")
 	}
+}
+
+func TestAgentOutputFallbackArtifact_AdaptiveRoutingWithoutExplicitSafeOutputs(t *testing.T) {
+	tmpDir := testutil.TempDir(t, "agent-output-fallback-adaptive-test")
+	testContent := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: copilot
+model: router
+model-routing:
+  learning: observe
+tools:
+  repo-memory: true
+strict: false
+---
+
+# Adaptive Routing Fallback
+
+Body.
+`
+	testFile := filepath.Join(tmpDir, "adaptive-fallback.md")
+	require.NoError(t, os.WriteFile(testFile, []byte(testContent), 0o600))
+
+	compiler := NewCompiler()
+	data, err := compiler.ParseWorkflowFile(testFile)
+	require.NoError(t, err)
+	require.Equal(t, "observe", data.RoutingLearningMode)
+	require.True(t, data.SafeOutputs == nil || data.SafeOutputs.AutoInjectedCreateIssue)
+
+	lockYAML, err := compiler.CompileToYAML(data, testFile)
+	require.NoError(t, err)
+
+	uploadSection := extractWorkflowStepByName(t, lockYAML, "Upload agent output fallback artifact")
+	assert.Contains(t, uploadSection, "if: always() && steps.redact_secrets.outcome == 'success' && steps.validate_recovery_envelopes.outcome == 'success' && steps.validate_final_recovery_envelopes.outcome == 'success'")
+	assert.Contains(t, uploadSection, "name: agent-output-fallback\n")
+	for _, rel := range []string{
+		"agent-errors.jsonl",
+		"agent/routing-refusal.json",
+		"agent/upstream-errors-fallback.jsonl",
+		"sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl",
+		"sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl",
+		"sandbox/firewall-audit-logs/api-proxy-logs/adaptive-selection.jsonl",
+		"sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl",
+		"sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl",
+		"sandbox/firewall/logs/api-proxy-logs/adaptive-selection.jsonl",
+		"sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl",
+		"sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl",
+		"sandbox/firewall/audit/api-proxy-logs/adaptive-selection.jsonl",
+	} {
+		assert.Contains(t, uploadSection, "/tmp/gh-aw/"+rel)
+	}
+	assert.NotContains(t, uploadSection, "upstream-errors.jsonl")
+	assert.Less(t, strings.Index(lockYAML, "- name: Upload agent output fallback artifact"), strings.Index(lockYAML, "- name: Upload agent artifacts"))
+	assert.Contains(t, lockYAML, `pattern: "{agent,agent-output-fallback}"`)
+
+	// Direct unit checks: adaptive opt-in emits fallback even when SafeOutputs is nil,
+	// including ARC/DinD path rewriting.
+	var nilSafeOutputs strings.Builder
+	NewCompiler().generateAgentOutputFallbackUpload(&nilSafeOutputs, &WorkflowData{RoutingLearningMode: "observe"}, "", false)
+	assert.Contains(t, nilSafeOutputs.String(), "name: agent-output-fallback\n")
+
+	var arcDindAdaptive strings.Builder
+	NewCompiler().generateAgentOutputFallbackUpload(&arcDindAdaptive, &WorkflowData{
+		RoutingLearningMode: "observe",
+		RunnerConfig:        &RunnerConfig{Topology: RunnerTopologyArcDind},
+	}, "", false)
+	assert.Contains(t, arcDindAdaptive.String(), "${{ runner.temp }}/gh-aw/agent/routing-refusal.json")
+	assert.Contains(t, arcDindAdaptive.String(), "${{ runner.temp }}/gh-aw/agent/upstream-errors-fallback.jsonl")
+	assert.Contains(t, arcDindAdaptive.String(), "${{ runner.temp }}/gh-aw/sandbox/firewall/logs/api-proxy-logs/adaptive-selection.jsonl")
+	assert.NotContains(t, arcDindAdaptive.String(), "/tmp/gh-aw/")
 }

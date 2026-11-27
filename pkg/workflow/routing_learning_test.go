@@ -87,13 +87,25 @@ func TestRoutingLearningObserveAddsOnlyTheWriterJob(t *testing.T) {
 	writer, added := onJobs[pushRoutingHistoryJobName]
 	require.True(t, added)
 	delete(onJobs, pushRoutingHistoryJobName)
+	// Opting in without explicit safe-outputs also emits the small fallback artifact upload
+	// on the agent job so routing observations survive an agent artifact upload timeout.
+	onAgentSteps := onJobs["agent"]["steps"].([]any)
+	fallbackStepIdx := -1
+	for i, raw := range onAgentSteps {
+		if step, ok := raw.(map[string]any); ok && step["name"] == "Upload agent output fallback artifact" {
+			fallbackStepIdx = i
+			break
+		}
+	}
+	require.GreaterOrEqual(t, fallbackStepIdx, 0, "observe must emit the fallback artifact upload when no explicit safe-outputs are declared")
+	onJobs["agent"]["steps"] = append(append([]any{}, onAgentSteps[:fallbackStepIdx]...), onAgentSteps[fallbackStepIdx+1:]...)
 	// Only conclusion's job inventory names the added job.
 	for _, jobs := range []map[string]map[string]any{offJobs, onJobs} {
 		env := jobs["conclusion"]["env"].(map[string]any)
 		delete(env, "GH_AW_JOB_DISPLAY_NAMES")
 		delete(env, "GH_AW_JOB_TIMING_ELIGIBLE")
 	}
-	assert.Equal(t, offJobs, onJobs, "observe must not change the agent job, its prompt, or any other job")
+	assert.Equal(t, offJobs, onJobs, "observe must not change the agent prompt, permissions, model selection, or any other job")
 
 	assert.Equal(t, []any{"activation", "agent", "conclusion"}, writer["needs"])
 	assert.Equal(t, "always() && needs.agent.result != 'skipped'", writer["if"])
@@ -336,4 +348,106 @@ func TestRoutingLearningDryRunOmitsWriterJob(t *testing.T) {
 		_, err = compiler.ParseWorkflowFile(invalidPath)
 	})
 	require.ErrorContains(t, err, "tools.repo-memory is required")
+}
+
+func TestPushRoutingHistoryOTLPConclusionWiring(t *testing.T) {
+	compileMode := func(t *testing.T, mode ActionMode) map[string]any {
+		t.Helper()
+		root := t.TempDir()
+		workflowPath := filepath.Join(root, ".github", "workflows", "triage.md")
+		require.NoError(t, os.MkdirAll(filepath.Dir(workflowPath), 0o755))
+		require.NoError(t, os.WriteFile(workflowPath, []byte(routingLearningSource(" workflow_dispatch", "model-routing:\n  learning: observe\n")), 0o600))
+		compiler := NewCompiler(WithNoEmit(true), WithVersion("1.0.0"))
+		compiler.gitRoot = root
+		compiler.SetActionMode(mode)
+		var (
+			data *WorkflowData
+			lock string
+			err  error
+		)
+		testutil.CaptureStderr(t, func() {
+			data, err = compiler.ParseWorkflowFile(workflowPath)
+			if err == nil {
+				lock, err = compiler.CompileToYAML(data, workflowPath)
+			}
+		})
+		require.NoError(t, err)
+		writer, ok := lockJobs(t, lock)[pushRoutingHistoryJobName]
+		require.True(t, ok, "push_routing_history job must be present")
+		return writer
+	}
+
+	findStep := func(t *testing.T, steps []any, name string) (int, map[string]any) {
+		t.Helper()
+		for i, raw := range steps {
+			step := raw.(map[string]any)
+			if step["name"] == name {
+				return i, step
+			}
+		}
+		return -1, nil
+	}
+
+	t.Run("script mode appends Clean Scripts with job status", func(t *testing.T) {
+		writer := compileMode(t, ActionModeScript)
+		steps := writer["steps"].([]any)
+
+		downloadIdx, download := findStep(t, steps, "Download usage artifact")
+		require.GreaterOrEqual(t, downloadIdx, 0)
+		assert.Nil(t, download["continue-on-error"], "a failed usage artifact download must fail the job")
+
+		pushIdx, push := findStep(t, steps, "Record the run in the routing history")
+		require.Greater(t, pushIdx, downloadIdx)
+		assert.Nil(t, push["if"], "push step must be skipped when artifact download fails")
+
+		cleanIdx, clean := findStep(t, steps, "Clean Scripts")
+		require.Equal(t, len(steps)-1, cleanIdx, "Clean Scripts must be the final step")
+		assert.Equal(t, "always()", clean["if"])
+		assert.Contains(t, clean["run"], "actions/setup/clean.sh")
+		cleanEnv := clean["env"].(map[string]any)
+		assert.Equal(t, "${{ github.job }}", cleanEnv["INPUT_JOB_NAME"])
+		assert.Equal(t, "${{ job.status }}", cleanEnv["GH_AW_JOB_RESULT"])
+		assert.Equal(t, "copilot", cleanEnv["GH_AW_INFO_ENGINE_ID"])
+
+		recordIdx, _ := findStep(t, steps, "Record job result for OTLP")
+		assert.Equal(t, -1, recordIdx, "script mode must not emit action-mode job-result export")
+	})
+
+	for _, mode := range []ActionMode{ActionModeDev, ActionModeRelease, ActionModeAction} {
+		t.Run("action mode "+mode.String()+" passes job status to post-hook without duplicate conclusion emitter", func(t *testing.T) {
+			writer := compileMode(t, mode)
+			steps := writer["steps"].([]any)
+
+			setupIdx, setup := findStep(t, steps, "Setup Scripts")
+			require.GreaterOrEqual(t, setupIdx, 0)
+			assert.NotEmpty(t, setup["uses"], "action mode must use the setup action so its post-hook runs")
+
+			downloadIdx, download := findStep(t, steps, "Download usage artifact")
+			require.Greater(t, downloadIdx, setupIdx)
+			assert.Nil(t, download["continue-on-error"], "a failed usage artifact download must fail the job")
+
+			pushIdx, push := findStep(t, steps, "Record the run in the routing history")
+			require.Greater(t, pushIdx, downloadIdx)
+			assert.Nil(t, push["if"], "push step must be skipped when artifact download fails")
+
+			recordIdx, record := findStep(t, steps, "Record job result for OTLP")
+			require.Equal(t, len(steps)-1, recordIdx, "Record job result for OTLP must be the final step")
+			assert.Equal(t, "always()", record["if"])
+			assert.Equal(t, true, record["continue-on-error"])
+			assert.Equal(t, "bash", record["shell"])
+			recordEnv := record["env"].(map[string]any)
+			assert.Equal(t, "${{ job.status }}", recordEnv["GH_AW_JOB_RESULT"])
+			assert.Contains(t, record["run"], `echo "GH_AW_JOB_RESULT=${GH_AW_JOB_RESULT}" >> "$GITHUB_ENV"`)
+			assert.NotContains(t, record["run"], "action_conclusion_otlp.cjs", "must rely on setup post-hook rather than emitting a duplicate conclusion span")
+
+			if mode == ActionModeDev {
+				restoreIdx, _ := findStep(t, steps, "Restore actions folder")
+				require.Greater(t, restoreIdx, pushIdx)
+				assert.Greater(t, recordIdx, restoreIdx, "job result export must run after Restore actions folder in dev mode")
+			}
+
+			cleanIdx, _ := findStep(t, steps, "Clean Scripts")
+			assert.Equal(t, -1, cleanIdx, "action mode must not emit script-mode Clean Scripts")
+		})
+	}
 }

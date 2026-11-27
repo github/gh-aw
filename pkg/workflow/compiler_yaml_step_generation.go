@@ -421,3 +421,10 @@ func (c *Compiler) generateScriptModeCleanupStep(data *WorkflowData) string {
 	}
 	return step.String()
 }
+
+// generateScriptModeCleanupStepWithJobResult appends GH_AW_JOB_RESULT to the
+// script-mode cleanup step so jobs that report their own failure status in OTLP
+// receive the final Actions job.status without changing other script-mode jobs.
+func (c *Compiler) generateScriptModeCleanupStepWithJobResult(data *WorkflowData) string {
+	return c.generateScriptModeCleanupStep(data) + "          GH_AW_JOB_RESULT: ${{ job.status }}\n"
+}

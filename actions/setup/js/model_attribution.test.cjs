@@ -449,3 +449,84 @@ describe("resolveModelRoutingSummary", () => {
     }
   });
 });
+
+describe("recordModelRouting fallback provenance allowlist", () => {
+  const { recordModelRouting, getModelRouting } = require("./model_attribution.cjs");
+
+  it("persists validated selection_source, fallback_reason, and fallback_tier and omits null or invalid values", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "model-attr-fallback-"));
+    const infoPath = path.join(root, "aw_info.json");
+    try {
+      const fallback = recordModelRouting(
+        {
+          status: "selected",
+          provider: "copilot",
+          model: "github-copilot/gpt-5.3-codex",
+          wire_model: "gpt-5.3-codex",
+          effort: "medium",
+          endpoint: "/responses",
+          selection_source: "fallback",
+          fallback_reason: "no_route",
+          fallback_tier: "standard",
+        },
+        {},
+        infoPath
+      );
+      expect(fallback).toMatchObject({
+        status: "selected",
+        selection_source: "fallback",
+        fallback_reason: "no_route",
+        fallback_tier: "standard",
+      });
+      expect(getModelRouting(infoPath)).toMatchObject({
+        selection_source: "fallback",
+        fallback_reason: "no_route",
+        fallback_tier: "standard",
+      });
+
+      const routerPick = recordModelRouting(
+        {
+          status: "selected",
+          wire_model: "gpt-5.6-luna",
+          selection_source: "router",
+          fallback_reason: null,
+          fallback_tier: null,
+        },
+        {},
+        infoPath
+      );
+      expect(routerPick.selection_source).toBe("router");
+      expect(routerPick.fallback_reason).toBeNull();
+      expect(routerPick.fallback_tier).toBeNull();
+
+      const olderAwf = recordModelRouting(
+        {
+          status: "selected",
+          wire_model: "gpt-5.6-luna",
+        },
+        {},
+        infoPath
+      );
+      expect(olderAwf).not.toHaveProperty("selection_source");
+      expect(olderAwf).not.toHaveProperty("fallback_reason");
+      expect(olderAwf).not.toHaveProperty("fallback_tier");
+
+      const invalid = recordModelRouting(
+        {
+          status: "selected",
+          wire_model: "gpt-5.6-luna",
+          selection_source: "bogus",
+          fallback_reason: "contains spaces",
+          fallback_tier: "mega",
+        },
+        {},
+        infoPath
+      );
+      expect(invalid).not.toHaveProperty("selection_source");
+      expect(invalid).not.toHaveProperty("fallback_reason");
+      expect(invalid).not.toHaveProperty("fallback_tier");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

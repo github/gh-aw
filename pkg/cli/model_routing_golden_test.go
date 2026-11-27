@@ -79,6 +79,10 @@ var modelRoutingGoldenCases = []modelRoutingGoldenCase{
 		unifiedClassifierAIC: new(0.6116),
 		legacyClassifierAIC:  new(0.6116),
 	},
+	{
+		name:             "copilot-routed-fallback-no-route",
+		legacyDifference: "selection provenance (selection_source, fallback_reason, fallback_tier) is read solely from usage/aw_session.jsonl, so the legacy variant without a unified session omits those fields",
+	},
 }
 
 type modelRoutingGoldenProjection struct {
@@ -89,6 +93,9 @@ type modelRoutingGoldenProjection struct {
 type modelRoutingGoldenRouting struct {
 	Status                          string                  `json:"status"`
 	Failure                         *ModelRoutingFailure    `json:"failure,omitempty"`
+	SelectionSource                 string                  `json:"selection_source,omitempty"`
+	FallbackReason                  string                  `json:"fallback_reason,omitempty"`
+	FallbackTier                    string                  `json:"fallback_tier,omitempty"`
 	SelectedModel                   string                  `json:"selected_model,omitempty"`
 	SelectedEffort                  string                  `json:"selected_effort,omitempty"`
 	Endpoint                        string                  `json:"endpoint,omitempty"`
@@ -279,7 +286,8 @@ func projectModelRoutingGoldenAudit(routing *ModelRoutingSummary, usage *TokenUs
 	projection := modelRoutingGoldenProjection{}
 	if routing != nil {
 		projected := &modelRoutingGoldenRouting{
-			Status:        routing.Status,
+			Status:          routing.Status,
+			SelectionSource: routing.SelectionSource, FallbackReason: routing.FallbackReason, FallbackTier: routing.FallbackTier,
 			SelectedModel: routing.SelectedModel, SelectedEffort: routing.SelectedEffort,
 			Endpoint: routing.Endpoint, EffectiveEndpoint: routing.EffectiveEndpoint, SelectedEndpoint: routing.SelectedEndpoint,
 			RoutedCounts: routing.RoutedCounts, OutcomeCounts: routing.OutcomeCounts,
@@ -548,6 +556,20 @@ func assertModelRoutingGoldenCase(t *testing.T, testCase modelRoutingGoldenCase,
 	case "copilot-routed-gpt-responses":
 		if !legacy && routing.SelectedModelCost.AIC == 0 {
 			t.Fatal("routed GPT selection should have non-zero selected-model cost")
+		}
+	case "copilot-routed-fallback-no-route":
+		if routing == nil || routing.Status != "selected" || routing.SelectedModel != "github-copilot/gpt-5.3-codex" ||
+			routing.SelectedEffort != "medium" || routing.RouterVersion != "" || routing.ClassifierCost.Requests != 0 {
+			t.Fatalf("unexpected fallback routing summary for legacy=%t: %+v", legacy, routing)
+		}
+		if legacy {
+			if routing.SelectionSource != "" || routing.FallbackReason != "" || routing.FallbackTier != "" {
+				t.Fatalf("legacy fallback variant should not read fallback provenance from side logs: %+v", routing)
+			}
+		} else {
+			if routing.SelectionSource != "fallback" || routing.FallbackReason != "no_route" || routing.FallbackTier != "standard" {
+				t.Fatalf("unified fallback provenance missing: %+v", routing)
+			}
 		}
 	case "claude-awf-selected-messages":
 		if legacy {

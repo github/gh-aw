@@ -8,13 +8,13 @@ const { ERR_API, ERR_CONFIG, ERR_SYSTEM, ERR_VALIDATION } = require("./error_cod
 const { redactStepSummaryContent, redactSecrets } = require("./redact_secrets.cjs");
 const { collectAddMaskedValues, applyAddMaskRedaction } = require("./add_mask_redaction.cjs");
 const { collectArtifactSecretValues } = require("./safe_output_manifest.cjs");
-const { projectSessionResult, isSessionEvent, isTokenCount, observedSessionModel, normalizeAgentSession } = require("./agent_session.cjs");
+const { projectSessionResult, isSessionEvent, isNestedSessionEvent, isTokenCount, observedSessionModel, normalizeAgentSession } = require("./agent_session.cjs");
 const { redactSessionForPublication } = require("./agent_session_render.cjs");
 const { writeSessionArtifact } = require("./session_artifact.cjs");
 const { collectCodexJSONRecords } = require("./codex_log_framing.cjs");
 const { collectAgentExecution, parseAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
 const { hasCopilotConversation, hasMalformedJsonl, deduplicateCopilotFallback } = require("./copilot_session.cjs");
-const { readProtectedCommandOutput, writeVerifiedExitCode, discardUntrustedSessionArtifacts } = require("./protected_command_output.cjs");
+const { readProtectedCommandOutput, writeVerifiedExitCode, discardUntrustedSessionArtifacts, removeProtectedFallbackFile, writeProtectedFallbackFile } = require("./protected_command_output.cjs");
 const { sessionTimestamp } = require("./unified_session_order.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
 const CLAUDE_RATE_LIMIT_PATTERN = /rate_limit_error|429 Too Many Requests|"api_error_status"\s*:\s*429|request rejected \(429\)|rate limit/i;
@@ -181,6 +181,26 @@ function withAgentProvenance(event, sourcePath, index) {
   };
 }
 
+const ROUTING_REFUSAL_RELATIVE_PATH = "agent/routing-refusal.json";
+
+/**
+ * Persist a minimal, content-free indicator of whether the main agent recorded a
+ * top-level `assistant.refusal`, so fallback-only recovery matches the full artifact.
+ * @param {string} rootDir
+ * @param {Array<any>} entries
+ * @returns {boolean}
+ */
+function persistRoutingRefusalIndicator(rootDir, entries) {
+  const fs = require("fs");
+  const refused = normalizeAgentSession(entries).some(event => event.type === "assistant.refusal" && !isNestedSessionEvent(event));
+  if (!refused) {
+    removeProtectedFallbackFile(rootDir, ROUTING_REFUSAL_RELATIVE_PATH, { fsImpl: fs });
+    return false;
+  }
+  writeProtectedFallbackFile(rootDir, ROUTING_REFUSAL_RELATIVE_PATH, '{"refused":true}\n', { fsImpl: fs });
+  return true;
+}
+
 /**
  * Bootstrap helper for log parser entry points.
  * Handles common logic for environment variable lookup, file existence checks,
@@ -272,6 +292,7 @@ async function runLogParser(options) {
 
   try {
     if (protectedCapture) discardUntrustedSessionArtifacts(rootDir);
+    else removeProtectedFallbackFile(rootDir, ROUTING_REFUSAL_RELATIVE_PATH, { fsImpl: fs });
     const logPath = process.env.GH_AW_AGENT_OUTPUT;
     if (!logPath) {
       if (protectedCapture) throw new Error(`${ERR_VALIDATION}: AWF protected command output directory is required`);
@@ -507,6 +528,7 @@ async function runLogParser(options) {
         });
         const canonicalEntries = [...conversationEntries.filter(event => event.type !== "agent.execution"), ...(execution ? [execution] : [])];
         writeSessionArtifact(path.join(rootDir, "agent-session.jsonl"), canonicalEntries, [...publicationMasks], { rejectStructuralRedaction: protectedCapture });
+        persistRoutingRefusalIndicator(rootDir, canonicalEntries);
         core.info(`[log-parser] Persisted ${canonicalEntries.length} canonical session events`);
       } catch (err) {
         if (protectedCapture) throw err;
@@ -683,5 +705,6 @@ if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     runLogParser,
     readCopilotSessions,
+    persistRoutingRefusalIndicator,
   };
 }
