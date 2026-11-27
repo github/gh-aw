@@ -58,7 +58,42 @@ type sessionModelRoutingPayload struct {
 	Mode              string `json:"mode"`
 	SelectedID        string `json:"selectedId"`
 	RouterVersion     string `json:"routerVersion"`
+	SelectionSource   string `json:"selectionSource"`
+	FallbackReason    string `json:"fallbackReason"`
+	FallbackTier      string `json:"fallbackTier"`
 	FailureCode       string `json:"failureCode"`
+}
+
+type sessionFirewallModelRoutingSelection struct {
+	Stage     string `json:"stage"`
+	Schema    string `json:"schema"`
+	Objective *struct {
+		Goal string `json:"goal"`
+		Mode string `json:"mode"`
+	} `json:"objective"`
+	Provider               string              `json:"provider"`
+	Labels                 *ModelRoutingLabels `json:"labels"`
+	Mode                   string              `json:"mode"`
+	ClassifierModel        string              `json:"classifierModel"`
+	ClassifierEffort       string              `json:"classifierEffort"`
+	ClassifierAttempts     int                 `json:"classifierAttempts"`
+	DegradedClassification bool                `json:"degradedClassification"`
+	DegradedReason         string              `json:"degradedReason"`
+	SelectedID             string              `json:"selectedId"`
+	SelectedProvider       string              `json:"selectedProvider"`
+	SelectedModel          string              `json:"selectedModel"`
+	SelectedEffort         string              `json:"selectedEffort"`
+	WireModel              string              `json:"wireModel"`
+	Endpoint               string              `json:"endpoint"`
+	SelectionSource        string              `json:"selectionSource"`
+	FallbackReason         string              `json:"fallbackReason"`
+	FallbackTier           string              `json:"fallbackTier"`
+	Router                 *struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	} `json:"router"`
+	RankedChoices []json.RawMessage `json:"rankedChoices"`
+	LatencyMs     int               `json:"latencyMs"`
 }
 
 type sessionModelRoutingOutcome struct {
@@ -87,6 +122,9 @@ type sessionModelRoutingEvent struct {
 type sessionModelRoutingAttribution struct {
 	WorkflowInfo              *sessionWorkflowInfo
 	ModelConfig               *AwInfoModelConfig
+	FirewallSelection         *sessionFirewallModelRoutingSelection
+	FirewallFailure           *ModelRoutingFailure
+	FirewallRequests          []modelRoutingRecord
 	Outcome                   *sessionModelRoutingOutcome
 	Mismatches                []ModelEndpointMismatch
 	UnavailableSubagentModels []sessionSubagentModelUnavailable
@@ -248,10 +286,90 @@ func decodeSessionModelRoutingEvent(line []byte, lineNumber int, attribution *se
 			unavailable.AgentName != "" && unavailable.DeclaredModel != "" && unavailable.Model != "" {
 			attribution.UnavailableSubagentModels = append(attribution.UnavailableSubagentModels, unavailable)
 		}
+	case event.Type == "firewall.model_routing" && event.Provenance.Component == "firewall" && event.Provenance.Phase == "agent":
+		var selection sessionFirewallModelRoutingSelection
+		if err := json.Unmarshal(event.Data, &selection); err != nil {
+			auditReportLog.Printf("Ignoring invalid firewall.model_routing on line %d: %v", lineNumber, err)
+			return nil
+		}
+		switch selection.Stage {
+		case "selection":
+			selection.SelectionSource = sanitizeModelRoutingSelectionSource(selection.SelectionSource)
+			selection.FallbackReason = sanitizeModelRoutingFallbackReason(selection.FallbackReason)
+			selection.FallbackTier = sanitizeModelRoutingFallbackTier(selection.FallbackTier)
+			attribution.FirewallSelection = &selection
+			attribution.FirewallFailure = nil
+		case "failure":
+			var failure struct {
+				Code   string `json:"code"`
+				Detail string `json:"detail"`
+			}
+			if json.Unmarshal(event.Data, &failure) == nil && (failure.Code != "" || failure.Detail != "") {
+				attribution.FirewallFailure = &ModelRoutingFailure{Code: failure.Code, Detail: failure.Detail}
+			}
+		case "request":
+			var req struct {
+				Schema          string   `json:"schema"`
+				LegacySchema    string   `json:"_schema"`
+				RequestID       string   `json:"requestId"`
+				LegacyRequestID string   `json:"request_id"`
+				Routed          string   `json:"routed"`
+				Deviations      []string `json:"deviations"`
+				RequestedModel  string   `json:"requestedModel"`
+				LegacyReqModel  string   `json:"requested_model"`
+				RequestedEffort string   `json:"requestedEffort"`
+				LegacyReqEffort string   `json:"requested_effort"`
+				Outcome         string   `json:"outcome"`
+			}
+			if json.Unmarshal(event.Data, &req) == nil {
+				attribution.FirewallRequests = append(attribution.FirewallRequests, modelRoutingRecord{
+					Schema:          firstNonEmpty(req.Schema, req.LegacySchema),
+					Stage:           "request",
+					RequestID:       firstNonEmpty(req.RequestID, req.LegacyRequestID),
+					Routed:          req.Routed,
+					Deviations:      req.Deviations,
+					RequestedModel:  firstNonEmpty(req.RequestedModel, req.LegacyReqModel),
+					RequestedEffort: firstNonEmpty(req.RequestedEffort, req.LegacyReqEffort),
+					Outcome:         req.Outcome,
+				})
+			}
+		}
 	case event.Type == "routing.observation" && event.Provenance.Component == "collector" && event.Provenance.Phase == "conclusion":
 		attribution.Observation = parseRoutingObservation(event.Data, lineNumber)
 	}
 	return nil
+}
+
+func sanitizeModelRoutingSelectionSource(value string) string {
+	switch value {
+	case "router", "fallback":
+		return value
+	default:
+		return ""
+	}
+}
+
+func sanitizeModelRoutingFallbackTier(value string) string {
+	switch value {
+	case "standard", "premium", "unclassified", "lightweight", "none":
+		return value
+	default:
+		return ""
+	}
+}
+
+func sanitizeModelRoutingFallbackReason(value string) string {
+	if value == "" || len(value) > 64 {
+		return ""
+	}
+	for i := range len(value) {
+		c := value[i]
+		isIdent := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == ':' || c == '-'
+		if !isIdent {
+			return ""
+		}
+	}
+	return value
 }
 
 // parseRoutingObservation returns the verdict when it uses T-UAS-094's
@@ -321,7 +439,10 @@ func (attribution *sessionModelRoutingAttribution) modelRouting() *AwInfoModelRo
 			AppliedEffort: data.AppliedEffort, Endpoint: data.EffectiveEndpoint,
 			SelectedEndpoint: data.SelectedEndpoint, Mode: data.Mode,
 			SelectedID: data.SelectedID, RouterVersion: data.RouterVersion,
-			FailureCode: data.FailureCode,
+			SelectionSource: sanitizeModelRoutingSelectionSource(data.SelectionSource),
+			FallbackReason:  sanitizeModelRoutingFallbackReason(data.FallbackReason),
+			FallbackTier:    sanitizeModelRoutingFallbackTier(data.FallbackTier),
+			FailureCode:     data.FailureCode,
 		}
 		found = true
 	}

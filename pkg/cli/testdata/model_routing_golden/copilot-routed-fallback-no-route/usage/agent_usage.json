@@ -1,0 +1,23 @@
+{
+  "input_tokens": 12000,
+  "output_tokens": 150,
+  "cache_read_tokens": 0,
+  "cache_write_tokens": 0,
+  "ambient_context": 12000,
+  "ai_credits": 0.25,
+  "primary_model": "gpt-5.3-codex",
+  "model_routing": {
+    "status": "selected",
+    "source": "awf-routing",
+    "provider": "copilot",
+    "wire_model": "gpt-5.3-codex",
+    "model": "github-copilot/gpt-5.3-codex",
+    "effort": "medium",
+    "endpoint": "/responses",
+    "selected_endpoint": "/responses",
+    "selected_id": "choice-fallback-0001",
+    "selection_source": "fallback",
+    "fallback_reason": "no_route",
+    "fallback_tier": "standard"
+  }
+}

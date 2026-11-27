@@ -24,9 +24,14 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  * - C1 configuration: declared sub-agent models are distinct and not in
  *   allowed-models
  * - E1 agent execution outcome; E2 evidence files present and parseable
- * - R1 routing selected; R2 one classifier call; R3 main-agent traffic on the
- *   selected model and a supported endpoint; R4 main-agent requests exist and
- *   use only allowed models
+ * - R1 routing selected (and selection provenance matches
+ *   `expectedSelectionSource`, `expectedFallbackReason`, and
+ *   `expectedFallbackTier` from `usage/aw_session.jsonl` when configured;
+ *   omitted `expectedSelectionSource` allows absent `selectionSource` on older
+ *   AWF releases while failing if present and not `"router"`); R2 classifier
+ *   call count matches `expectedClassifierRequests` (defaults to 1); R3
+ *   main-agent traffic on the selected model and a supported endpoint; R4
+ *   main-agent requests exist and use only allowed models
  * - M1 main-agent requests exist and use the expected endpoint (when configured)
  * - P1 the selection record's requested mode (`objective.mode`) equals the
  *   configured mode, its recommended profile (`mode`) is economy, balanced or
@@ -146,6 +151,8 @@ const AI_CREDITS_HARD_CAP = 10000;
 const AI_CREDITS_LIMIT_CODE = "ai_credits_limit_exceeded";
 const CREDIT_EPSILON = 1e-6;
 const ROUTING_PROFILES = ["economy", "balanced", "robust"];
+const SELECTION_SOURCES = ["router", "fallback"];
+const FALLBACK_TIERS = ["standard", "premium", "unclassified", "lightweight", "none"];
 const RESOLVED_STATUSES = ["exact", "resolved"];
 const NATIVE_PROVIDERS = ["anthropic", "openai"];
 // AWF native /reflect routing metadata names protocols, not paths.
@@ -176,6 +183,10 @@ const PROTOCOL_ENDPOINTS = {
  *   steering?: SteeringExpectation,
  *   expectSelectedEffort?: string,
  *   expectRequestedEffortMatchesSelection?: boolean,
+ *   expectedSelectionSource?: "router" | "fallback",
+ *   expectedFallbackReason?: string,
+ *   expectedFallbackTier?: "standard" | "premium" | "unclassified" | "lightweight" | "none",
+ *   expectedClassifierRequests?: number,
  * }} RoutingExpectations
  * @typedef {{ passes: string[], failures: string[], info?: string[] }} RoutingAssertionResults
  */
@@ -413,20 +424,73 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
   const selectedModel = servedModel(selection?.selectedModel);
   const harnessOutcomes = events.filter(event => event?.type === "model_routing.outcome");
   const r1Problems = [];
+  const expectedSelectionSource = expectations.expectedSelectionSource;
+  if (expectedSelectionSource !== undefined && !SELECTION_SOURCES.includes(expectedSelectionSource)) {
+    r1Problems.push(`expectedSelectionSource must be one of ${SELECTION_SOURCES.join(", ")}, got ${expectedSelectionSource}`);
+  }
+  if ((expectations.expectedFallbackReason !== undefined || expectations.expectedFallbackTier !== undefined) && expectedSelectionSource !== "fallback") {
+    r1Problems.push(`expectedFallbackReason/expectedFallbackTier require expectedSelectionSource="fallback"`);
+  }
+  if (expectations.expectedFallbackTier !== undefined && !FALLBACK_TIERS.includes(expectations.expectedFallbackTier)) {
+    r1Problems.push(`expectedFallbackTier must be one of ${FALLBACK_TIERS.join(", ")}, got ${expectations.expectedFallbackTier}`);
+  }
   if (runnerStatus !== "selected") r1Problems.push(`runner-written routing status is ${runnerStatus ?? "missing"}, expected selected`);
   if (!selection) r1Problems.push(`no firewall model_routing selection record with a selected model (observed ${selections.length} selection record(s))`);
-  else if (!allowed.has(selectedModel)) r1Problems.push(`selected model ${selectedModel} is outside allowed-models [${allowedList.join(", ")}]`);
+  else {
+    if (!allowed.has(selectedModel)) r1Problems.push(`selected model ${selectedModel} is outside allowed-models [${allowedList.join(", ")}]`);
+    const actualSource = selection.selectionSource;
+    if (expectedSelectionSource !== undefined) {
+      if (SELECTION_SOURCES.includes(expectedSelectionSource)) {
+        if (actualSource === undefined || actualSource === null || actualSource === "") {
+          r1Problems.push(`selectionSource is missing, expected ${expectedSelectionSource}`);
+        } else if (actualSource !== expectedSelectionSource) {
+          r1Problems.push(`selectionSource is ${actualSource}, expected ${expectedSelectionSource}`);
+        }
+        if (expectedSelectionSource === "fallback") {
+          const reason = typeof selection.fallbackReason === "string" ? selection.fallbackReason : "";
+          const tier = typeof selection.fallbackTier === "string" ? selection.fallbackTier : "";
+          if (!reason) r1Problems.push("fallbackReason is missing for fallback selection");
+          else if (expectations.expectedFallbackReason !== undefined && reason !== expectations.expectedFallbackReason) {
+            r1Problems.push(`fallbackReason is ${reason}, expected ${expectations.expectedFallbackReason}`);
+          }
+          if (!tier || !FALLBACK_TIERS.includes(tier)) r1Problems.push(`fallbackTier is ${selection.fallbackTier ?? "missing"}, expected one of ${FALLBACK_TIERS.join(", ")}`);
+          else if (expectations.expectedFallbackTier !== undefined && tier !== expectations.expectedFallbackTier) {
+            r1Problems.push(`fallbackTier is ${tier}, expected ${expectations.expectedFallbackTier}`);
+          }
+        }
+      }
+    } else if (actualSource !== undefined && actualSource !== "router") {
+      r1Problems.push(`selectionSource is ${actualSource === null ? "null" : actualSource}, expected router`);
+    }
+  }
   if (r1Problems.length) {
     const ignored = harnessOutcomes.length ? `; ignored agent-written model_routing.outcome (status=${harnessOutcomes.map(event => event.data?.status ?? "<none>").join(", ")})` : "";
     fail("R1", `routing not selected: ${r1Problems.join("; ")}${ignored}`);
   } else {
-    pass("R1", `routing selected ${selectedModel} (runner status=${runnerStatus}, endpoint=${normalizeEndpoint(selection?.endpoint) || "<none>"})`);
+    const provenanceDetails =
+      selection?.selectionSource === "fallback"
+        ? `, selection_source=fallback${selection.fallbackReason ? `, fallback_reason=${selection.fallbackReason}` : ""}${selection.fallbackTier ? `, fallback_tier=${selection.fallbackTier}` : ""}`
+        : selection?.selectionSource
+          ? `, selection_source=${selection.selectionSource}`
+          : "";
+    pass("R1", `routing selected ${selectedModel} (runner status=${runnerStatus}, endpoint=${normalizeEndpoint(selection?.endpoint) || "<none>"}${provenanceDetails})`);
   }
 
-  // R2: exactly one classifier request.
+  // R2: expected classifier request count (defaults to 1; non-1 overrides are
+  // allowed only on explicit fallback smokes so router-picked smokes always require 1).
   const classifierRequests = requests.filter(isClassifierRequest);
-  if (classifierRequests.length === 1) pass("R2", `one routing_classification request: ${describeRequest(classifierRequests[0])}`);
-  else fail("R2", `expected exactly 1 routing_classification request, observed ${classifierRequests.length}: ${describeRequests(classifierRequests)}`);
+  const expectedClassifierRequests = expectations.expectedClassifierRequests === undefined ? 1 : expectations.expectedClassifierRequests;
+  if (typeof expectedClassifierRequests !== "number" || !Number.isInteger(expectedClassifierRequests) || expectedClassifierRequests < 0) {
+    fail("R2", `expectedClassifierRequests must be a non-negative integer, got ${expectedClassifierRequests}`);
+  } else if (expectedClassifierRequests !== 1 && expectedSelectionSource !== "fallback") {
+    fail("R2", `expectedClassifierRequests=${expectedClassifierRequests} is only allowed when expectedSelectionSource="fallback"`);
+  } else if (classifierRequests.length === expectedClassifierRequests) {
+    if (expectedClassifierRequests === 1) pass("R2", `one routing_classification request: ${describeRequest(classifierRequests[0])}`);
+    else if (expectedClassifierRequests === 0) pass("R2", "0 routing_classification requests as expected");
+    else pass("R2", `${expectedClassifierRequests} routing_classification requests: ${describeRequests(classifierRequests)}`);
+  } else {
+    fail("R2", `expected exactly ${expectedClassifierRequests} routing_classification request${expectedClassifierRequests === 1 ? "" : "s"}, observed ${classifierRequests.length}: ${describeRequests(classifierRequests)}`);
+  }
 
   // Every non-classifier request is agent traffic; AWF does not record which
   // agent made it.
@@ -492,10 +556,11 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
   if (selection) results.info?.push(`INFO routing recommended profile=${selection.mode ?? "<none>"} requested mode=${selection.objective?.mode ?? "<none>"} selected effort=${selectedEffort ?? "<none>"}`);
   if (expectations.routingMode) {
     const p1Problems = [];
+    const expectingFallback = expectedSelectionSource === "fallback";
     if (!selection) {
       p1Problems.push("no firewall model_routing selection record with a selected model");
     } else {
-      if (selection.degradedClassification === true) {
+      if (!expectingFallback && selection.degradedClassification === true) {
         const classification = events.filter(event => event?.type === "firewall.model_routing" && event.data?.stage === "classification").at(-1)?.data;
         const classifierRequest = requests.filter(isClassifierRequest).at(-1);
         const degradedReason = selection.degradedReason ?? "missing";
@@ -504,14 +569,20 @@ function evaluateModelRoutingEvidence({ events, requests, reflect = null, expect
       }
       const requested = selection.objective?.mode;
       if (requested !== expectations.routingMode) p1Problems.push(`requested mode (objective.mode) is ${requested ?? "missing"}, expected ${expectations.routingMode}`);
-      if (!ROUTING_PROFILES.includes(selection.mode)) p1Problems.push(`recommended profile (mode) is ${selection.mode ?? "missing"}, expected one of ${ROUTING_PROFILES.join(", ")}`);
+      if (expectingFallback) {
+        if (selection.mode != null && !ROUTING_PROFILES.includes(selection.mode)) {
+          p1Problems.push(`recommended profile (mode) is ${selection.mode}, expected null or one of ${ROUTING_PROFILES.join(", ")}`);
+        }
+      } else if (!ROUTING_PROFILES.includes(selection.mode)) {
+        p1Problems.push(`recommended profile (mode) is ${selection.mode ?? "missing"}, expected one of ${ROUTING_PROFILES.join(", ")}`);
+      }
       const efforts = supportedEfforts(selectedModel, reflect, metadataProvider);
       if (!efforts) p1Problems.push(`no /reflect supported_reasoning_efforts for ${selectedModel} to check selected effort ${selectedEffort ?? "null"} against`);
       else if (!efforts.size && selectedEffort !== null) p1Problems.push(`selected effort is ${selectedEffort}, expected null because /reflect lists no supported efforts for ${selectedModel}`);
       else if (efforts.size && !efforts.has(String(selectedEffort))) p1Problems.push(`selected effort ${selectedEffort ?? "null"} is not among ${selectedModel}'s /reflect supported efforts [${[...efforts].join(", ")}]`);
     }
     if (p1Problems.length) fail("P1", p1Problems.join("; "));
-    else pass("P1", `requested mode ${expectations.routingMode}; recommended profile ${selection?.mode} and selected effort ${selectedEffort ?? "null"} are valid for ${selectedModel}`);
+    else pass("P1", `requested mode ${expectations.routingMode}; recommended profile ${selection?.mode ?? "null"} and selected effort ${selectedEffort ?? "null"} are valid for ${selectedModel}`);
   }
 
   if (metadataProvider) {

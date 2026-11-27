@@ -953,6 +953,45 @@ describe("parse_token_usage", () => {
         });
         expect(mockCore.setOutput).toHaveBeenCalledWith("model_routing_status", "failed");
       });
+
+      test("propagates fallback selection provenance and handles null router and ranked_choices", async () => {
+        const fallbackSelection = {
+          _schema: "model-routing/v0.29.21",
+          stage: "selection",
+          provider: "copilot",
+          selected_provider: "copilot",
+          selected_model: "github-copilot/gpt-5.3-codex",
+          wire_model: "gpt-5.3-codex",
+          selected_effort: "medium",
+          endpoint: "/responses",
+          selection_source: "fallback",
+          fallback_reason: "no_route",
+          fallback_tier: "standard",
+          router: null,
+          ranked_choices: null,
+          selected_id: "choice-fallback-0001",
+        };
+        setupRoutingRun({ records: [fallbackSelection] });
+
+        await main();
+
+        const recorded = readRecordedRouting();
+        expect(recorded).toMatchObject({
+          status: "selected",
+          source: "awf-routing",
+          provider: "copilot",
+          wire_model: "gpt-5.3-codex",
+          model: "github-copilot/gpt-5.3-codex",
+          effort: "medium",
+          endpoint: "/responses",
+          selected_id: "choice-fallback-0001",
+          selection_source: "fallback",
+          fallback_reason: "no_route",
+          fallback_tier: "standard",
+        });
+        expect(recorded).not.toHaveProperty("router_version");
+        expect(mockCore.setOutput).toHaveBeenCalledWith("model_routing_status", "selected");
+      });
     });
 
     test("skips summary when token usage file does not exist", async () => {

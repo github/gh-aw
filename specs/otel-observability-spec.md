@@ -1,17 +1,17 @@
 ---
 title: gh-aw OpenTelemetry Observability Specification
 description: Formal W3C-style specification for observability contract for GitHub Agentic Workflows using OpenTelemetry traces, metrics, logs, and OTLP export.
-version: 0.8.0
+version: 0.9.0
 status: Working Draft
 date: 2026-06-18
-last_updated: 2026-11-23
+last_updated: 2026-11-27
 editors:
   - GitHub gh-aw Team
 ---
 
 # gh-aw OpenTelemetry Observability Specification
 
-**Version**: 0.8.0
+**Version**: 0.9.0
 **Status**: Working Draft  
 **Publication Date**: June 18, 2026
 **Latest Version**: https://github.com/github/gh-aw/blob/main/specs/otel-observability-spec.md  
@@ -28,13 +28,13 @@ This specification defines the compatibility-first OpenTelemetry observability c
 
 This document is a **Working Draft** maintained by the GitHub `gh-aw` Team. It may be changed, replaced, or made obsolete by subsequent versions.
 
-Version 0.8.0 adds an explicit `observability.otlp: false` opt-out while preserving authored environment configuration and local telemetry mirrors. Version 0.7.0 added OTLP metrics emission (enabled by default when configured) and the `logMetric()` API.
+Version 0.9.0 adds additive model-routing observation attributes to conclusion spans while preserving existing span, mirror, metrics, privacy, and compatibility contracts. Version 0.8.0 added the explicit `observability.otlp: false` opt-out and GenAI semantic-convention alignment.
 
 Sections explicitly marked **Informative** are non-normative. All other sections are normative unless stated otherwise.
 
 Implementation mapping, validation requirements, and compatibility test expectations are defined in this specification so version 0.7.0 has one authoritative contract.
 
-Implementations claiming conformance MUST identify the version and conformance classes they implement. A conformance claim for version 0.7.0 is a compatibility claim: it MUST preserve externally observable behavior documented by this specification unless a later specification explicitly defines a migration period and compatibility alias.
+Implementations claiming conformance MUST identify the version and conformance classes they implement. A conformance claim for version 0.9.0 is a compatibility claim: it MUST preserve externally observable behavior documented by this specification unless a later specification explicitly defines a migration period and compatibility alias.
 
 ## Table of Contents
 
@@ -738,6 +738,34 @@ When no agent or triggering workflow conclusion is available, a failure inferred
 code or output errors MUST also set `error.type = "agent_failed"` on the agent spans and agent-duration metric.
 A triggering workflow's failure alone MUST NOT classify the agent invocation as failed.
 
+#### 10.3.1 Model-Routing Observation Attributes
+
+When `usage/aw_session.jsonl` contains a valid `routing.observation` event as defined by
+[T-UAS-094], the conclusion runtime MUST project that event onto the
+`gh-aw.conclusion.conclusion` span:
+
+| Attribute | Type | Requirement |
+|---|---|---|
+| `gh-aw.model_routing.observation.outcome` | string | REQUIRED when the valid observation is present. The value MUST be `success`, `failure`, or `skip`. |
+| `gh-aw.model_routing.observation.skip_reason` | string | REQUIRED only when `gh-aw.model_routing.observation.outcome` is `skip`. The value MUST be `cancelled`, `infrastructure`, `rate_limited`, `pair_mismatch`, or `unknown_evidence`. It MUST be absent for `success` and `failure`. |
+
+The projected event MUST have collector provenance and conclusion phase as required by
+[T-UAS-094]. When multiple collector/conclusion `routing.observation` events appear,
+the implementation MUST evaluate the last collector/conclusion event and fail closed
+(omitting both attributes) if that final event is invalid, matching the Go and JS
+session readers.
+
+If the session file is missing, unreadable, malformed, untrusted, or contains no valid
+collector/conclusion `routing.observation` event, the implementation MUST omit both
+attributes. It MUST NOT synthesize `skip` or any `skip_reason` from missing or invalid
+evidence.
+
+These attributes MUST be emitted only on `gh-aw.conclusion.conclusion`. They MUST NOT
+be emitted on setup, agent, model, tool, gateway, or other non-conclusion spans.
+
+This projection MUST NOT add metric instruments or metric dimensions. The provenance,
+verdict vocabulary, and evidence semantics remain governed by [T-UAS-094].
+
 ### 10.4 Tool and MCP Attributes
 
 | Attribute | Type | Requirement |
@@ -1256,6 +1284,7 @@ attribute-level checks mapped directly to Section 10 requirements:
 | **T-OT-018** | §6.7, §9.5, §10.5, §11.2 conformance | Built-in telemetry exported over OTLP to Weaver live-check with semantic-conventions-genai at the §18.1 commit has no undeclared violations with the opt-in; without it, every finding is declared with a reason | `actions/setup/js/fixtures/genai/`, `scripts/genai_registry.test.py` (CI) |
 | **T-OT-019** | §11.2 wire format | Opt-in GenAI spans and metrics (kind, scope `schemaUrl`, monotonic sums, 20-bound histogram) encode byte-for-byte like the reference SDK protocol types | `scripts/test_otlp_protobuf.mjs` |
 | **T-OT-020** | §6.7 backward compatibility | Without `gen_ai_v1` (unset or another value), a success and a failure agent job export every fact of a golden export captured before §6.7; with it, every `gh-aw.*` and `github.*` attribute is kept | `send_otlp_span_legacy_contract.test.cjs` |
+| **T-OT-021** | §10.3.1 model-routing observation attributes | For a valid collector/conclusion `routing.observation`, `gh-aw.conclusion.conclusion` contains `gh-aw.model_routing.observation.outcome` with value `success`, `failure`, or `skip`; `skip` also contains the permitted `gh-aw.model_routing.observation.skip_reason`, while `success` and `failure` do not. Missing, unreadable, malformed, untrusted, invalid, or non-conclusion evidence omits both attributes; no skip is synthesized and no metrics are added. Multiple collector/conclusion candidate records evaluate the last collector/conclusion event and fail closed if it is invalid. | Runtime OTLP contract tests covering provenance, malformed records, invalid verdicts, non-conclusion spans, absent files, and last-collector-event fail-closed behavior |
 
 
 ### 17.2 Optional Extension Tests
@@ -1297,6 +1326,7 @@ context is added to outcome spans or links.
 - **[OpenTelemetry Specification]** OpenTelemetry Authors. https://opentelemetry.io/docs/specs/otel/
 - **[OTLP]** OpenTelemetry Authors. *OpenTelemetry Protocol Specification*. https://opentelemetry.io/docs/specs/otlp/
 - **[OpenTelemetry Semantic Conventions]** OpenTelemetry Authors. https://opentelemetry.io/docs/specs/semconv/
+- **[Unified Agent Session Specification]** GitHub `gh-aw`. *Unified Agent Session Specification*, version 2.15.1, requirement T-UAS-094. https://github.com/github/gh-aw/blob/main/docs/src/content/docs/specs/unified-agent-session-specification.md
 - **[CI/CD Spans]** OpenTelemetry Authors. *Semantic conventions for CI/CD spans*. https://opentelemetry.io/docs/specs/semconv/cicd/cicd-spans/
 - **[CI/CD Metrics]** OpenTelemetry Authors. *Semantic conventions for CI/CD metrics*. https://opentelemetry.io/docs/specs/semconv/cicd/cicd-metrics/
 - **[CI/CD Resources]** OpenTelemetry Authors. *CI/CD resource semantic conventions*. https://opentelemetry.io/docs/specs/semconv/resource/cicd/
@@ -1328,6 +1358,7 @@ which has no release tag, and semantic-conventions v1.45.0.
 
 ### Unreleased
 
+- **Added**: Additive model-routing observation attributes on `gh-aw.conclusion.conclusion` (§10.3.1), projected only from valid collector/conclusion `routing.observation` evidence defined by T-UAS-094; invalid or unavailable evidence fails closed without synthesizing `skip` or adding metrics.
 - **Added**: Backend service correlation through W3C `traceparent`, header-safe job baggage using `cicd.pipeline.task.name`, and JSON `job_id` (§7.7.1), with endpoint coverage and trust-boundary requirements.
 - **Added**: Additive, data-minimized `server.address` attribution for Copilot BYOK setup and conclusion spans (§10.3), with compiler propagation through `GH_AW_INFO_GENAI_ENDPOINT` and runtime normalization that excludes credentials, ports, paths, queries, fragments, invalid values, and unresolved expressions.
 - **Clarified**: Outbound `traceparent` and `tracestate` forwarding to Copilot BYOK endpoints remains out of scope pending `github/gh-aw-firewall` support.

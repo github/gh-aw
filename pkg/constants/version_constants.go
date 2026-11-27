@@ -297,7 +297,7 @@ const CopilotNoAskUserMinVersion Version = "1.0.19"
 //
 // The first recompile regenerates all lock files using the new version; the second recompile
 // refreshes the container SHA pins that were resolved during the first pass.
-const DefaultMCPGatewayVersion Version = "v0.5.14"
+const DefaultMCPGatewayVersion Version = "v0.5.15"
 
 // MCPGAzureOIDCMinVersion is the first MCPG release supporting Azure federation.
 const MCPGAzureOIDCMinVersion Version = "v0.5.12"
