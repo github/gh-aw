@@ -1,4 +1,13 @@
-# Agent Performance Analyzer - Latest Run (2026-11-24)
+# Agent Performance Analyzer - Latest Run (2026-11-27)
+
+## 2026-11-27 run (noop)
+- Data basis: `daily/2026-11-27.json` is partial (logs stop at 2026-11-26T21:15Z; safe-output and engagement null), but run counts are complete for the 24h API window: 1095 executed, 950 successful (86.8%), 371 workflows. Not scored as a trend; 11-17 remains the last complete scored snapshot.
+- Bottom (n>=3 executed, 24h): smoke-work-queue-dispatcher 2/4 (#81440 OPEN); auto-triage-issues 4/8 (down from 14/18 on 11-26; #81455 CLOSED not_planned 2026-11-27T10:40Z, created 11-26T21:26Z, i.e. ~13h, shorter than the 24h `expires: 1d` pattern on record; the closure mechanism is unverified); daily-go-test-parallelizer 8/12 (unchanged); auditor 17/24 (#81203 OPEN); visual-regression-checker 3/4; contribution-check 5/6; smoke-work-queue-worker 10/12.
+- Ai-moderator 87/100 executed, avg 860s vs `timeout-minutes: 5` in source. Earlier note cited 10,603s avg; the metric moved. Timeout cause still unverified; route to Workflow Health.
+- Top: issue-monster 92/92, code-scanning-dispatcher 6/6 (WH confirms recovery), aw-failure-investigator 48/48, code-scanning-fixer-worker 18/18.
+- Redesign verdicts unchanged: Matt Pocock 41/45 (91.1%), no self-check or rubric. Design Decision Gate 44/45 KEEP. Impeccable insufficient data.
+- Tracker states verified with `github issue_read` (state fields only): #81455 CLOSED not_planned; #81440, #81203, #80251, #81495 OPEN.
+- Decision: noop. Weekly discussion filed 2026-11-22, next due 2026-11-29. The auto-triage and smoke-dispatcher failures are already tracked by WH. The expiry-closure recommendation (2026-09-21, 2026-11-14) still covers the premature closures, so no new issue.
 
 ## 2026-11-26 run (noop)
 - Data basis: `daily/2026-11-26.json` is partial for logs (7 batches, 21:13Z to 02:52Z) but complete for the 24h API window (34 pages, 928 executed, 774 succeeded, 83.4%). The 11-17 snapshot remains the last complete scored one, so these counts are not compared as a trend.
