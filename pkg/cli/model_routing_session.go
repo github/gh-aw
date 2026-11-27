@@ -364,7 +364,8 @@ func sanitizeModelRoutingFallbackReason(value string) string {
 	}
 	for i := range len(value) {
 		c := value[i]
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == ':' || c == '-') {
+		isIdent := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == ':' || c == '-'
+		if !isIdent {
 			return ""
 		}
 	}

@@ -3,12 +3,12 @@
 const { iterateJsonl, readJsonlFile } = require("./jsonl_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
-const { isErrorIdentifier } = require("./routing_analytics.cjs");
 
 const ROUTING_STATUSES = new Set(["selected", "pending", "failed", "rejected", "unavailable"]);
 const ROUTING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max", "off"]);
 const ROUTING_SELECTION_SOURCES = new Set(["router", "fallback"]);
 const ROUTING_FALLBACK_TIERS = new Set(["standard", "premium", "unclassified", "lightweight", "none"]);
+const ROUTING_ERROR_IDENTIFIER = /^[A-Za-z0-9_.:-]{1,64}$/;
 const ROUTING_TASK_TYPES = new Set(["explain", "plan", "fix", "refactor", "chore", "implement", "unknown"]);
 const ROUTING_SCOPES = new Set(["local", "multi_file", "subsystem", "cross_system", "unknown"]);
 const ROUTING_COMPLEXITIES = new Set(["trivial", "easy", "medium", "hard", "expert", "unknown"]);
@@ -100,7 +100,7 @@ function recordModelRouting(routing, env = process.env, infoPath = `${env.GH_AW_
   const info = fs.existsSync(infoPath) ? readFallbackMetadata(infoPath) : {};
   const requestedModel = requestedModelIdentifier(info.requested_model || info.model || env.GH_AW_INFO_MODEL || env.GH_AW_ENGINE_MODEL);
   const selectionSource = typeof routing.selection_source === "string" && ROUTING_SELECTION_SOURCES.has(routing.selection_source) ? routing.selection_source : "";
-  const fallbackReason = routing.fallback_reason === null ? null : typeof routing.fallback_reason === "string" && isErrorIdentifier(routing.fallback_reason) ? routing.fallback_reason : undefined;
+  const fallbackReason = routing.fallback_reason === null ? null : typeof routing.fallback_reason === "string" && ROUTING_ERROR_IDENTIFIER.test(routing.fallback_reason) ? routing.fallback_reason : undefined;
   const fallbackTier = routing.fallback_tier === null ? null : typeof routing.fallback_tier === "string" && ROUTING_FALLBACK_TIERS.has(routing.fallback_tier) ? routing.fallback_tier : undefined;
   const modelRouting = {
     status: routing.status,
