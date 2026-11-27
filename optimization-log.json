@@ -1,15 +1,5 @@
 [
   {
-    "date": "2026-10-14",
-    "workflow_name": "Matt Pocock Skills Reviewer",
-    "workflow_file": "mattpocock-skills-reviewer",
-    "total_aic_analyzed": 216.39,
-    "runs_audited": 2,
-    "recommendations_count": 5,
-    "subagent_candidates": 0,
-    "estimated_aic_savings_per_run": 40
-  },
-  {
     "date": "2026-10-15",
     "workflow_name": "Avenger",
     "workflow_file": "avenger",
@@ -298,5 +288,15 @@
     "recommendations_count": 5,
     "subagent_candidates": 1,
     "estimated_aic_savings_per_run": 12
+  },
+  {
+    "date": "2026-11-27",
+    "workflow_name": "Auditor",
+    "workflow_file": "auditor",
+    "total_aic_analyzed": 45.18,
+    "runs_audited": 1,
+    "recommendations_count": 5,
+    "subagent_candidates": 0,
+    "estimated_aic_savings_per_run": 5
   }
 ]
