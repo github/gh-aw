@@ -7,6 +7,7 @@ package workflow
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -69,6 +70,10 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	// ── Network section ──────────────────────────────────────────────────────
 	if config.AllowedDomains != "" {
 		allowList := splitDomainList(config.AllowedDomains)
+		// AWF's domain validator rejects the IPv6 loopback literal.
+		allowList = slices.DeleteFunc(allowList, func(domain string) bool {
+			return domain == "::1"
+		})
 		awfConfig.Network = &AWFNetworkConfig{
 			AllowDomains: allowList,
 		}
