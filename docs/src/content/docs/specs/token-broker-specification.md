@@ -553,7 +553,7 @@ Before implementation can claim deployment conformance, operators must resolve:
 | Job binding | Available signed claims or trusted GitHub metadata sufficient to authorize the consuming job without treating local cache keys as proof. |
 | Lifecycle and abuse policy | Credential lifetime limits, replay behavior within one capability/context, tenant rate limits, key-refresh bounds, server timeouts, audit retention, and revocation propagation. |
 | Inference integration | Native renewable AWF provider and downstream renewal tests. This remains unresolved in the current repository implementation. |
-| OTLP integration | The current compiler rejects the opt-in without an AWF agent sandbox and otherwise rejects it as unavailable. Approved collector/destination policy and client egress enforcement, job-wide handoff with AWF filtering when used, and enforceable exporter deadlines remain unimplemented; runtime activation remains disabled. |
+| OTLP integration | The OTLP opt-in and runtime are not implemented. Approved collector/destination policy and client egress enforcement, job-wide handoff with AWF filtering when used, and enforceable exporter deadlines remain unimplemented. |
 
 These choices do not permit extra wire fields, weakened identity verification, or claims that an unimplemented inference or OTLP path works.
 

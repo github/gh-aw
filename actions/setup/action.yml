@@ -26,10 +26,6 @@ inputs:
     description: 'Optional pre-minted OIDC bearer token used for OTLP Authorization headers.'
     required: false
     default: ''
-  token-broker-otlp:
-    description: 'Acquire a job-scoped OTLP endpoint and token from the configured token broker.'
-    required: false
-    default: 'false'
 
 outputs:
   files_copied:

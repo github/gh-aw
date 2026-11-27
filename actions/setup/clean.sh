@@ -20,7 +20,6 @@ set -e
 
 DESTINATION="${INPUT_DESTINATION:-${RUNNER_TEMP}/gh-aw/actions}"
 LEASE_VALIDATED=true
-OTLP_CLEANUP_FAILED=false
 GH_AW_NODE="${GH_AW_NODE:-${GH_AW_NODE_BIN:-$(command -v node 2>/dev/null || true)}}"
 
 if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
@@ -36,13 +35,7 @@ fi
 # to keep dev/release and script mode behavior in sync.
 if [[ "$LEASE_VALIDATED" == "true" && -n "$GH_AW_NODE" && -f "${DESTINATION}/action_conclusion_otlp.cjs" ]]; then
   echo "Sending OTLP conclusion span..."
-  if [[ "${INPUT_TOKEN_BROKER_OTLP:-false}" == "true" ]]; then
-    if ! "$GH_AW_NODE" "${DESTINATION}/action_conclusion_otlp.cjs"; then
-      OTLP_CLEANUP_FAILED=true
-    fi
-  else
-    "$GH_AW_NODE" "${DESTINATION}/action_conclusion_otlp.cjs" || true
-  fi
+  "$GH_AW_NODE" "${DESTINATION}/action_conclusion_otlp.cjs" || true
   echo "OTLP conclusion span step complete"
 fi
 
@@ -66,8 +59,4 @@ if [[ "${RUNNER_ENVIRONMENT:-}" == "self-hosted" ]]; then
     exit 1
   fi
   "$GH_AW_NODE" "${DESTINATION}/docker_lease.cjs" release
-fi
-
-if [[ "$OTLP_CLEANUP_FAILED" == "true" ]]; then
-  exit 1
 fi

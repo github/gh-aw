@@ -16,7 +16,6 @@ const inputTraceId = getActionInput("TRACE_ID");
 const inputParentSpanId = getActionInput("PARENT_SPAN_ID");
 const inputJobName = getActionInput("JOB_NAME");
 const inputOTLPOIDCToken = getActionInput("OTLP_OIDC_TOKEN");
-const inputTokenBrokerOTLP = getActionInput("TOKEN_BROKER_OTLP") || "false";
 
 const result = spawnSync("bash", [path.join(__dirname, "setup.sh")], {
   stdio: "inherit",
@@ -26,7 +25,6 @@ const result = spawnSync("bash", [path.join(__dirname, "setup.sh")], {
     INPUT_PARENT_SPAN_ID: inputParentSpanId,
     INPUT_JOB_NAME: inputJobName,
     INPUT_OTLP_OIDC_TOKEN: inputOTLPOIDCToken,
-    INPUT_TOKEN_BROKER_OTLP: inputTokenBrokerOTLP,
     GH_AW_NODE: process.execPath,
     // Tell setup.sh to skip the OTLP span: in action mode index.js sends it
     // after setup.sh returns so that the startMs captured here is used.
@@ -60,9 +58,6 @@ if (result.status !== 0) {
     const { run } = require(path.join(__dirname, "js", "action_setup_otlp.cjs"));
     await run();
   } catch {
-    if (inputTokenBrokerOTLP === "true") {
-      console.error("Token broker OTLP setup failed.");
-      process.exitCode = 1;
-    }
+    // Non-fatal: silently ignore any OTLP export or output-write errors.
   }
 })();

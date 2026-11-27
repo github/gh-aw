@@ -44,7 +44,6 @@ require("./shim.cjs");
 
 const sendOtlpSpan = require("./send_otlp_span.cjs");
 const { getActionInput } = require("./action_input_utils.cjs");
-const { writeEnvLine } = require("./action_setup_otlp.cjs");
 const fs = require("fs");
 const path = require("path");
 
@@ -76,76 +75,39 @@ function parseJobStartMs(raw) {
  * @returns {Promise<void>}
  */
 async function run() {
-  const brokeredOTLP = getActionInput("TOKEN_BROKER_OTLP") === "true";
   const endpoints = process.env.GH_AW_OTLP_ENDPOINTS;
   const jobName = getActionInput("JOB_NAME");
   const preUpload = process.env.GH_AW_OTEL_CONCLUSION_PREUPLOAD === "true";
-  try {
-    if (!preUpload && fs.existsSync(PREUPLOAD_CONCLUSION_MARKER)) return;
-    const spanName = buildSpanName(jobName);
-    // Use the job-start timestamp set by action_setup_otlp so the conclusion span
-    // duration covers the actual job execution window, not just this step's overhead.
-    const startMs = parseJobStartMs(process.env.GITHUB_AW_OTEL_JOB_START_MS);
+  if (!preUpload && fs.existsSync(PREUPLOAD_CONCLUSION_MARKER)) return;
+  const spanName = buildSpanName(jobName);
+  // Use the job-start timestamp set by action_setup_otlp so the conclusion span
+  // duration covers the actual job execution window, not just this step's overhead.
+  const startMs = parseJobStartMs(process.env.GITHUB_AW_OTEL_JOB_START_MS);
 
-    if (endpoints) {
-      core.info(`[otlp] sending conclusion span "${spanName}" to configured endpoints`);
-    } else {
-      core.info("[otlp] GH_AW_OTLP_ENDPOINTS not set, skipping OTLP export (will attempt JSONL mirror)");
-    }
+  if (endpoints) {
+    core.info(`[otlp] sending conclusion span "${spanName}" to configured endpoints`);
+  } else {
+    core.info("[otlp] GH_AW_OTLP_ENDPOINTS not set, skipping OTLP export (will attempt JSONL mirror)");
+  }
 
-    /** @type {{ startMs: number | undefined, jobResult?: string }} */
-    const conclusionOptions = { startMs };
-    if (process.env.GH_AW_JOB_RESULT) conclusionOptions.jobResult = process.env.GH_AW_JOB_RESULT;
-    await sendOtlpSpan.sendJobConclusionSpan(spanName, conclusionOptions);
-    if (preUpload) {
-      try {
-        fs.writeFileSync(PREUPLOAD_CONCLUSION_MARKER, "emitted", { mode: 0o600 });
-      } catch {
-        // Duplicate prevention is best-effort; telemetry remains non-fatal.
-      }
+  /** @type {{ startMs: number | undefined, jobResult?: string }} */
+  const conclusionOptions = { startMs };
+  if (process.env.GH_AW_JOB_RESULT) conclusionOptions.jobResult = process.env.GH_AW_JOB_RESULT;
+  await sendOtlpSpan.sendJobConclusionSpan(spanName, conclusionOptions);
+  if (preUpload) {
+    try {
+      fs.writeFileSync(PREUPLOAD_CONCLUSION_MARKER, "emitted", { mode: 0o600 });
+    } catch {
+      // Duplicate prevention is best-effort; telemetry remains non-fatal.
     }
+  }
 
-    if (jobName === "conclusion") {
-      await require("./send_otlp_session_logs.cjs").sendSessionLogs();
-    }
+  if (jobName === "conclusion") {
+    await require("./send_otlp_session_logs.cjs").sendSessionLogs();
+  }
 
-    if (endpoints) {
-      core.info("[otlp] conclusion span export attempted");
-    }
-  } finally {
-    if (brokeredOTLP && !preUpload) {
-      try {
-        await require("./otlp_metrics.cjs").flushCustomMetrics();
-      } finally {
-        try {
-          await require("./token_broker.cjs").invalidateBrokerTokens();
-        } finally {
-          for (const key of [
-            "GH_AW_OTLP_ENDPOINTS",
-            "GH_AW_OTLP_ALL_HEADERS",
-            "GH_AW_OTLP_EXPORT_DEADLINE_MS",
-            "OTEL_EXPORTER_OTLP_ENDPOINT",
-            "OTEL_EXPORTER_OTLP_HEADERS",
-            "OTEL_EXPORTER_OTLP_PROTOCOL",
-            "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
-            "OTEL_EXPORTER_OTLP_TRACES_HEADERS",
-            "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL",
-            "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
-            "OTEL_EXPORTER_OTLP_METRICS_HEADERS",
-            "OTEL_EXPORTER_OTLP_METRICS_PROTOCOL",
-            "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
-            "OTEL_EXPORTER_OTLP_LOGS_HEADERS",
-            "OTEL_EXPORTER_OTLP_LOGS_PROTOCOL",
-          ]) {
-            process.env[key] = "";
-            if (process.env.GITHUB_ENV && !writeEnvLine(process.env.GITHUB_ENV, key, "", key, "GITHUB_ENV")) {
-              console.error("[otlp] unable to clear brokered OTLP environment values");
-              process.exitCode = 1;
-            }
-          }
-        }
-      }
-    }
+  if (endpoints) {
+    core.info("[otlp] conclusion span export attempted");
   }
 }
 
@@ -154,10 +116,5 @@ module.exports = { run, buildSpanName, parseJobStartMs };
 // When invoked directly (node action_conclusion_otlp.cjs) from clean.sh,
 // run immediately.  Non-fatal: errors are silently swallowed.
 if (require.main === module) {
-  run().catch(() => {
-    if (getActionInput("TOKEN_BROKER_OTLP") === "true") {
-      console.error("Token broker OTLP cleanup failed.");
-      process.exitCode = 1;
-    }
-  });
+  run().catch(() => {});
 }

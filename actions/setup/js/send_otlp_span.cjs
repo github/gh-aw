@@ -1050,17 +1050,18 @@ function hasProxyConfigured(endpoint) {
  * @param {string | Buffer} body
  * @returns {{ ok: boolean, status: number, statusText: string, responseBody: Buffer, contentType: string, diagnosticsUnavailable: boolean }}
  */
-function sendOTLPViaCurl(url, headers, body, timeoutMs = 10_000, followRedirects = true) {
+function sendOTLPViaCurl(url, headers, body) {
   /** @type {string[]} */
   const args = [
     "--silent",
     "--show-error",
+    "--location",
     "--suppress-connect-headers",
     "--dump-header",
     "-",
     // Let curl finish and emit its status before the subprocess deadline.
     "--max-time",
-    String(Math.max(1, timeoutMs) / 1000),
+    "10",
     "--max-filesize",
     String(MAX_OTLP_RESPONSE_BYTES),
     "--write-out",
@@ -1071,8 +1072,6 @@ function sendOTLPViaCurl(url, headers, body, timeoutMs = 10_000, followRedirects
     "@-",
   ];
 
-  if (followRedirects) args.splice(2, 0, "--location");
-
   for (const [key, value] of Object.entries(headers)) {
     args.push("--header", `${key}: ${value}`);
   }
@@ -1082,7 +1081,7 @@ function sendOTLPViaCurl(url, headers, body, timeoutMs = 10_000, followRedirects
     input: body,
     stdio: ["pipe", "pipe", "pipe"],
     maxBuffer: MAX_OTLP_RESPONSE_BYTES + 4096,
-    timeout: followRedirects ? Math.max(15_000, timeoutMs) : Math.max(1, timeoutMs),
+    timeout: 15_000,
   });
 
   const interrupted = result.error && "code" in result.error && (result.error.code === "ENOBUFS" || result.error.code === "ETIMEDOUT");
@@ -1164,23 +1163,6 @@ const MAX_ATTR_VALUE_LENGTH = 1024;
 const REDACTED = "[REDACTED]";
 
 const FETCH_TIMEOUT_MS = 120_000;
-let brokeredOTLPDeadlineFailureReported = false;
-
-function getBrokeredOTLPExportRemainingMs() {
-  const raw = process.env.GH_AW_OTLP_EXPORT_DEADLINE_MS;
-  if (!raw) return undefined;
-  const deadline = /^\d+$/.test(raw) ? Number(raw) : NaN;
-  const remaining = deadline - Date.now();
-  if (!Number.isSafeInteger(deadline) || remaining <= 0) {
-    process.exitCode = 1;
-    if (!brokeredOTLPDeadlineFailureReported) {
-      brokeredOTLPDeadlineFailureReported = true;
-      console.error("[otlp] brokered OTLP export deadline reached; failing the step");
-    }
-    return 0;
-  }
-  return remaining;
-}
 
 /**
  * Sanitize an array of OTLP key-value attributes in-place (shallowly cloned).
@@ -1474,24 +1456,17 @@ async function sendOTLPSpan(endpoint, payload, { maxRetries = 2, baseDelayMs = 1
   }
   const headers = { "Content-Type": protocol === "http/protobuf" ? "application/x-protobuf" : "application/json", ...extraHeaders };
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    let remaining = getBrokeredOTLPExportRemainingMs();
-    if (remaining === 0) return false;
     if (attempt > 0) {
-      const delay = baseDelayMs * 2 ** (attempt - 1);
-      if (remaining !== undefined && delay >= remaining) return false;
-      await new Promise(resolve => setTimeout(resolve, delay));
-      remaining = getBrokeredOTLPExportRemainingMs();
-      if (remaining === 0) return false;
+      await new Promise(resolve => setTimeout(resolve, baseDelayMs * 2 ** (attempt - 1)));
     }
     try {
       const response = hasProxyConfigured(endpoint)
-        ? sendOTLPViaCurl(url, headers, sanitizedBody, remaining === undefined ? 10_000 : Math.min(10_000, remaining), remaining === undefined)
+        ? sendOTLPViaCurl(url, headers, sanitizedBody)
         : await fetch(url, {
             method: "POST",
             headers,
             body: sanitizedBody,
-            ...(remaining !== undefined ? { redirect: "manual" } : {}),
-            signal: AbortSignal.timeout(remaining === undefined ? FETCH_TIMEOUT_MS : Math.min(FETCH_TIMEOUT_MS, remaining)),
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
           });
       if (response.ok) {
         let diagnostic;

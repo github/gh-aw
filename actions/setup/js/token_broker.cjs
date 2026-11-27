@@ -79,32 +79,6 @@ function expiration(value) {
   return result;
 }
 
-/** @param {string} text @param {string[]} expectedKeys */
-function parseStringObject(text, expectedKeys) {
-  const string = '"(?:[^"\\\\\\u0000-\\u001f]|\\\\(?:["\\\\/bfnrt]|u[0-9a-fA-F]{4}))*"';
-  const pair = `${string}\\s*:\\s*${string}`;
-  const pairs = new Array(expectedKeys.length).fill(pair).join("\\s*,\\s*");
-  // eslint-disable-next-line gh-aw-custom/require-escaped-regexp-interpolation -- All fragments are fixed JSON grammar, never response data.
-  if (!new RegExp(`^\\s*\\{\\s*${pairs}\\s*\\}\\s*$`).test(text)) throw failure("MALFORMED_RESPONSE");
-  let result;
-  try {
-    result = JSON.parse(text);
-  } catch {
-    throw failure("MALFORMED_RESPONSE");
-  }
-  if (
-    !result ||
-    typeof result !== "object" ||
-    Array.isArray(result) ||
-    Object.keys(result).length !== expectedKeys.length ||
-    expectedKeys.some(key => !Object.hasOwn(result, key)) ||
-    Object.values(result).some(value => typeof value !== "string")
-  ) {
-    throw failure("MALFORMED_RESPONSE");
-  }
-  return result;
-}
-
 /** @typedef {{env?: NodeJS.ProcessEnv, fetchImpl?: typeof fetch, now?: () => number, mask?: (token: string) => void | Promise<void>}} BrokerOptions */
 
 /**
@@ -171,7 +145,9 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
         const text = await readBoundedBody(response, 65536);
         const result = JSON.parse(text);
         if (typeof result?.token === "string") await mask(result.token);
-        parseStringObject(text, ["token", "expires_at"]);
+        const string = '"(?:[^"\\\\\\u0000-\\u001f]|\\\\(?:["\\\\/bfnrt]|u[0-9a-fA-F]{4}))*"';
+        // eslint-disable-next-line gh-aw-custom/require-escaped-regexp-interpolation -- All fragments are fixed JSON grammar, never response data.
+        if (!new RegExp(`^\\s*\\{\\s*${string}\\s*:\\s*${string}\\s*,\\s*${string}\\s*:\\s*${string}\\s*\\}\\s*$`).test(text)) throw failure("MALFORMED_RESPONSE");
         if (!result || typeof result !== "object" || Array.isArray(result) || Object.keys(result).length !== 2 || !Object.hasOwn(result, "token") || !Object.hasOwn(result, "expires_at") || !isCredential(result.token))
           throw failure("MALFORMED_RESPONSE");
         const expiresAt = expiration(result.expires_at);
@@ -189,66 +165,6 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
     });
     pending.set(key, request);
     return request;
-  }
-
-  async function getOTLPCredentials() {
-    if (!Object.hasOwn(env, "GH_AW_TOKEN_BROKER_URL")) throw failure("CONFIGURATION");
-    const snapshot = { ...env };
-    const endpoint = snapshot.GH_AW_TOKEN_BROKER_URL || "";
-    httpsUrl(endpoint, "CONFIGURATION");
-    const rawJobDeadline = snapshot.GH_AW_OTLP_JOB_DEADLINE_MS || "";
-    const jobDeadline = /^\d+$/.test(rawJobDeadline) ? Number(rawJobDeadline) : NaN;
-    if (!Number.isSafeInteger(jobDeadline) || jobDeadline <= now()) throw failure("CONFIGURATION");
-
-    const controller = new AbortController();
-    /** @type {ReturnType<typeof setTimeout> | undefined} */
-    let timer;
-    /** @type {Promise<never>} */
-    const timeout = new Promise((_, reject) => {
-      timer = setTimeout(() => {
-        reject(failure("UNAVAILABLE"));
-        controller.abort();
-      }, TIMEOUT_MS);
-    });
-    const exchange = async () => {
-      const oidcToken = await acquireOIDCToken(snapshot, endpoint, fetchImpl, now, mask, controller.signal);
-      if (controller.signal.aborted) throw failure("UNAVAILABLE");
-      let response;
-      try {
-        response = await fetchImpl(endpoint, {
-          method: "POST",
-          headers: { ...buildServiceRequestHeaders(snapshot), "content-type": "application/json", accept: "application/json", "cache-control": "no-store" },
-          body: JSON.stringify({ token_type: "otlp", oidc_token: oidcToken, ...(snapshot.GITHUB_JOB ? { job_id: snapshot.GITHUB_JOB } : {}) }),
-          redirect: "manual",
-          signal: controller.signal,
-        });
-      } catch {
-        throw failure("UNAVAILABLE");
-      }
-      if (response.status !== 200 || response.redirected) {
-        discard(response);
-        if (response.status === 401 || response.status === 403) throw failure("UNAUTHORIZED");
-        if ([400, 404, 422, 501].includes(response.status)) throw failure("UNSUPPORTED");
-        throw failure("UNAVAILABLE");
-      }
-      try {
-        const text = await readBoundedBody(response, 65536);
-        const parsed = JSON.parse(text);
-        if (typeof parsed?.endpoint === "string") await mask(parsed.endpoint);
-        if (typeof parsed?.token === "string") await mask(parsed.token);
-        const result = parseStringObject(text, ["endpoint", "token", "expires_at"]);
-        const collector = httpsUrl(result.endpoint, "MALFORMED_RESPONSE");
-        if (/\/v1\/(?:traces|metrics|logs)\/?$/i.test(collector.pathname)) throw failure("MALFORMED_RESPONSE");
-        if (!isCredential(result.token) || !/^[A-Za-z0-9._~+/-]+={0,}$/.test(result.token)) throw failure("MALFORMED_RESPONSE");
-        const expiresAt = expiration(result.expires_at);
-        if (expiresAt <= Math.max(now() + SKEW_MS, jobDeadline + SKEW_MS)) throw failure("MALFORMED_RESPONSE");
-        if (controller.signal.aborted) throw failure("UNAVAILABLE");
-        return { endpoint: collector.href, token: result.token, expiresAt };
-      } catch {
-        throw failure("MALFORMED_RESPONSE");
-      }
-    };
-    return Promise.race([exchange(), timeout]).finally(() => clearTimeout(timer));
   }
 
   async function invalidateTokens() {
@@ -295,7 +211,7 @@ function createTokenBrokerClient({ env = process.env, fetchImpl = fetch, now = D
     return Promise.race([invalidate(), timeout]).finally(() => clearTimeout(timer));
   }
 
-  return { getToken, getOTLPCredentials, invalidateTokens };
+  return { getToken, invalidateTokens };
 }
 
 /**
@@ -335,33 +251,32 @@ let defaultClient;
 /** @type {WeakMap<BrokerOptions, ReturnType<typeof createTokenBrokerClient>>} */
 const optionClients = new WeakMap();
 
-/** @param {BrokerOptions} [options] */
-function clientForOptions(options) {
+/** @param {string} tokenType @param {BrokerOptions} [options] @param {string} [provider] @returns {Promise<string>} */
+function getBrokerToken(tokenType, options, provider = "github") {
   if (!options) {
     defaultClient ||= createTokenBrokerClient();
-    return defaultClient;
+    return defaultClient.getToken(tokenType, provider);
   }
   let client = optionClients.get(options);
   if (!client) {
     client = createTokenBrokerClient(options);
     optionClients.set(options, client);
   }
-  return client;
-}
-
-/** @param {string} tokenType @param {BrokerOptions} [options] @param {string} [provider] @returns {Promise<string>} */
-function getBrokerToken(tokenType, options, provider = "github") {
-  return clientForOptions(options).getToken(tokenType, provider);
+  return client.getToken(tokenType, provider);
 }
 
 /** @param {BrokerOptions} [options] @returns {Promise<void>} */
 function invalidateBrokerTokens(options) {
-  return clientForOptions(options).invalidateTokens();
+  if (!options) {
+    defaultClient ||= createTokenBrokerClient();
+    return defaultClient.invalidateTokens();
+  }
+  let client = optionClients.get(options);
+  if (!client) {
+    client = createTokenBrokerClient(options);
+    optionClients.set(options, client);
+  }
+  return client.invalidateTokens();
 }
 
-/** @param {BrokerOptions} [options] */
-function getBrokerOTLPCredentials(options) {
-  return clientForOptions(options).getOTLPCredentials();
-}
-
-module.exports = { createTokenBrokerClient, getBrokerToken, getBrokerOTLPCredentials, invalidateBrokerTokens, isTokenBrokerEnabled };
+module.exports = { createTokenBrokerClient, getBrokerToken, invalidateBrokerTokens, isTokenBrokerEnabled };

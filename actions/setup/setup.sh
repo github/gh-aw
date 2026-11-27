@@ -723,11 +723,7 @@ echo "Successfully copied ${SAFE_OUTPUTS_COUNT} safe-outputs files to ${SAFE_OUT
 # Skipped when GH_AW_SKIP_SETUP_OTLP=1 because index.js will send the span itself.
 if [ -z "${GH_AW_SKIP_SETUP_OTLP}" ] && command -v node &>/dev/null && [ -f "${DESTINATION}/action_setup_otlp.cjs" ]; then
   debug_log "Sending OTLP setup span..."
-  if [ "${INPUT_TOKEN_BROKER_OTLP:-false}" = "true" ]; then
-    SETUP_START_MS="${SETUP_START_MS}" INPUT_TRACE_ID="${INPUT_TRACE_ID:-}" INPUT_PARENT_SPAN_ID="${INPUT_PARENT_SPAN_ID:-}" INPUT_JOB_NAME="${INPUT_JOB_NAME:-}" INPUT_TOKEN_BROKER_OTLP=true node "${DESTINATION}/action_setup_otlp.cjs"
-  else
-    SETUP_START_MS="${SETUP_START_MS}" INPUT_TRACE_ID="${INPUT_TRACE_ID:-}" INPUT_PARENT_SPAN_ID="${INPUT_PARENT_SPAN_ID:-}" INPUT_JOB_NAME="${INPUT_JOB_NAME:-}" node "${DESTINATION}/action_setup_otlp.cjs" || true
-  fi
+  SETUP_START_MS="${SETUP_START_MS}" INPUT_TRACE_ID="${INPUT_TRACE_ID:-}" INPUT_PARENT_SPAN_ID="${INPUT_PARENT_SPAN_ID:-}" INPUT_JOB_NAME="${INPUT_JOB_NAME:-}" node "${DESTINATION}/action_setup_otlp.cjs" || true
   debug_log "OTLP setup span step complete"
 fi
 

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"maps"
 
-	"github.com/github/gh-aw/pkg/jsonutil"
 	"github.com/github/gh-aw/pkg/setutil"
 )
 
@@ -88,14 +87,13 @@ func mergeObservabilityConfigs(configs []string) string {
 	mergedAttrs := make(map[string]string)
 	mergedResourceAttrs := make(map[string]string)
 	var mergedGitHubApp map[string]any
-	var tokenBroker *bool
 
 	for i, cfgJSON := range configs {
 		if cfgJSON == "" {
 			continue
 		}
 		var obs map[string]any
-		if err := jsonutil.UnmarshalString(cfgJSON, &obs); err != nil {
+		if err := json.Unmarshal([]byte(cfgJSON), &obs); err != nil {
 			parserLog.Printf("Failed to unmarshal observability config from import %d during merge: %v", i, err)
 			continue
 		}
@@ -110,10 +108,9 @@ func mergeObservabilityConfigs(configs []string) string {
 		if mergedGitHubApp == nil {
 			mergedGitHubApp = extractOTLPGitHubAppFromObsMap(obs)
 		}
-		tokenBroker = firstOTLPTokenBroker(tokenBroker, obs)
 	}
 
-	if len(allEndpoints) == 0 && len(mergedAttrs) == 0 && len(mergedResourceAttrs) == 0 && mergedGitHubApp == nil && tokenBroker == nil {
+	if len(allEndpoints) == 0 && len(mergedAttrs) == 0 && len(mergedResourceAttrs) == 0 && mergedGitHubApp == nil {
 		return ""
 	}
 
@@ -133,9 +130,6 @@ func mergeObservabilityConfigs(configs []string) string {
 	if mergedGitHubApp != nil {
 		otlpMap["github-app"] = mergedGitHubApp
 	}
-	if tokenBroker != nil {
-		otlpMap["token-broker"] = *tokenBroker
-	}
 	merged := map[string]any{"otlp": otlpMap}
 	b, err := json.Marshal(merged)
 	if err != nil {
@@ -143,15 +137,6 @@ func mergeObservabilityConfigs(configs []string) string {
 		return ""
 	}
 	return string(b)
-}
-
-func firstOTLPTokenBroker(current *bool, obs map[string]any) *bool {
-	if otlp, ok := obs["otlp"].(map[string]any); ok && current == nil {
-		if enabled, ok := otlp["token-broker"].(bool); ok {
-			return &enabled
-		}
-	}
-	return current
 }
 
 func mergeOTLPStringMapFirstWins(destination, source map[string]string) {
