@@ -207,28 +207,20 @@ To migrate:
 
 ## Pod security and rootless install
 
-ARC DinD installs the Copilot CLI in rootless mode by default. If your `copilot-setup-steps` install the CLI manually, pass `--rootless` to avoid `sudo` in clusters that enforce `allowPrivilegeEscalation: false` (via PodSecurity Admission or OPA policies).
+For a runner container with `allowPrivilegeEscalation: false`, configure `runner.topology: arc-dind` as shown above and recompile the workflow. The generated Copilot CLI installer already passes `--rootless`; no setup file or manual CLI installation is required. It installs to `$RUNNER_TEMP/gh-aw/bin` without `sudo` and adds that directory to `$GITHUB_PATH`. AWF mounts it read-only. Ensure `RUNNER_TEMP` is writable and shared with the DinD daemon as described in [Tool cache redirection](#tool-cache-redirection). The DinD sidecar still requires `privileged: true`.
 
-The `--rootless` flag installs to `$RUNNER_TEMP/gh-aw/bin` without any `sudo` calls. AWF mounts this job-scoped directory read-only; the script adds it to `$GITHUB_PATH` so subsequent steps find the binary:
+If you independently run `install_copilot_cli.sh` in a custom setup step, pass `--rootless` and ensure the script is available to that step; do not rely on an imported checkout to supply it.
 
-```yaml
-copilot-setup-steps:
-  runs-on: arc-runner-set
-  steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      with:
-        repository: github/gh-aw
-        path: gh-aw
-    - name: Install Copilot CLI (rootless)
-      run: bash "${GITHUB_WORKSPACE}/gh-aw/actions/setup/sh/install_copilot_cli.sh" --rootless
-      env:
-        GH_HOST: github.com
+An optional `copilot-setup-steps.yml` is not a top-level gh-aw frontmatter key. To reuse such a file alongside an agentic workflow in `.github/workflows/`, explicitly import it in the workflow frontmatter:
+
+```aw
+---
+imports:
+  - copilot-setup-steps.yml
+---
 ```
 
-In rootless mode:
-- The binary is installed to `$RUNNER_TEMP/gh-aw/bin/copilot` (no `sudo` required).
-- `$RUNNER_TEMP/gh-aw/bin` is appended to `$GITHUB_PATH` so `copilot` is on `PATH` for all later steps.
-- Ownership and cleanup operations that previously used `sudo` run as the current user (which owns the relevant files in rootless deployments).
+The file must contain `jobs.copilot-setup-steps.steps`. gh-aw imports only those steps, ignores the job's `runs-on` and other job settings, and removes all `actions/checkout` steps. Select the runner with the agentic workflow's `runs-on` instead. The similarly named [Copilot coding-agent setup file](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/customize-cloud-agent/customize-the-agent-environment) configures the separate coding-agent service; it is not automatically applied to gh-aw workflows, though a workflow can explicitly import its steps.
 
 ## Known limitations
 
@@ -251,7 +243,7 @@ The threat-detection job can't find the Copilot binary. This was fixed in gh-aw 
 
 ### `sudo: The "no new privileges" flag is set`
 
-The runner pod's security context has `allowPrivilegeEscalation: false`. Pass `--rootless` to the Copilot CLI install script so it installs without `sudo` — see [Pod security and rootless install](#pod-security-and-rootless-install) above.
+If the runner container has `allowPrivilegeEscalation: false`, check that the workflow uses `runner.topology: arc-dind` and has been recompiled. Check any custom install steps for `sudo` as well. See [Pod security and rootless install](#pod-security-and-rootless-install) for the rootless default and manual-install guidance.
 
 ### `awf-cli-proxy could not connect to the external DIFC proxy`
 
