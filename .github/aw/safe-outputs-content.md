@@ -4,6 +4,19 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
 
 # Safe Outputs: GitHub Content
 
+Configure issue, discussion, comment, and pull request safe outputs. Keep the
+agent read-only; use the [shared rules](safe-outputs.md#shared-rules) and
+[runtime controls](safe-outputs-runtime.md). Before selecting an operation,
+read its complete entry below for parameters, limits, authorization, temporary
+IDs, and failure behavior. For native initial issue statuses, read the
+`create-issue` entry, including **Initial native status**. Use
+[`set-issue-status`](safe-outputs-automation.md#native-issue-statuses) for
+existing issues, not `update-issue.status` or a Projects field. Apply the
+configured target/repository constraints and never claim staged or failed
+outputs were applied.
+
+<!-- instruction-prefix-end -->
+
 - **[Experimental]** Jira uses a normal local or pinned remote
   `.github/workflows/connectors/jira.md` import and shared connector runtime. Bind the
   reviewed site, project, and issue grants through `with`, then select
@@ -67,6 +80,14 @@ description: Safe-output reference for issue, discussion, comment, and pull requ
   `create_issue` output validation requires:
   - `body` minimum length: **20** characters
   - `body` maximum length: **65000** characters
+
+  **Initial native status**: `planning-status` sets a default name or numeric
+  status ID; `allowed-statuses` restricts both that default and the agent's
+  `planning_status` parameter. Only open categories (`backlog`, `planned`,
+  `started`) are accepted at creation. Resolve in the destination repository
+  before creation and fail if preview support or the selected status is
+  unavailable. Never substitute `update-issue.status` (open/closed) or a Projects
+  field. Omission preserves GitHub's existing default behavior.
 
   **Issue artifacts**: `create_issue` accepts optional `artifacts: [{name, body | path, type?}]` (`type`: `generic`, `plan`, `link`, `embedded_html`). `path` must be a literal absolute path under the workspace or `/tmp/gh-aw/agent`; the unprivileged MCP backend reads it so content never enters the agent context. Oversized or over-limit requests are rejected before creation (no truncation). See [docs: Issue Artifacts](https://github.github.com/gh-aw/reference/safe-outputs/#issue-artifacts).
 

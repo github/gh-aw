@@ -62,7 +62,7 @@ func (e *ClaudeEngine) ResolveLLMProvider(workflowData *WorkflowData) LLMProvide
 }
 
 func (e *ClaudeEngine) UsesWebFetchFallback(data *WorkflowData) bool {
-	return e.ResolveLLMProvider(data) == LLMProviderGitHub
+	return e.ResolveLLMProvider(data) == LLMProviderGitHub || isFirewallEnabled(data)
 }
 
 func (e *ClaudeEngine) GetHostedWebCapabilities(_ *WorkflowData) HostedWebCapabilities {
@@ -267,13 +267,17 @@ func (e *ClaudeEngine) buildClaudeCliArgs(workflowData *WorkflowData, toolsWithM
 	// fine-grained control: Bash(git:*), MCP tool prefixes, path-specific tools, etc.
 	allowedTools = e.computeAllowedClaudeToolsStringWithDynamicWorkflows(toolsWithMountedCLIs, workflowData.SafeOutputs, workflowData.CacheMemoryConfig, workflowData.DriveMemoryConfig, workflowData.MCPScripts, workflowData.SandboxConfig, dynamicWorkflowsEnabled(e, workflowData.EngineConfig))
 	if usesWebFetchMCPForEngine(e, workflowData) {
-		tools := strings.Split(allowedTools, ",")
-		for i, tool := range tools {
-			if tool == "WebFetch" {
-				tools[i] = "mcp__web-fetch__web_fetch"
+		if e.ResolveLLMProvider(workflowData) == LLMProviderGitHub {
+			tools := strings.Split(allowedTools, ",")
+			for i, tool := range tools {
+				if tool == "WebFetch" {
+					tools[i] = "mcp__web-fetch__web_fetch"
+				}
 			}
+			allowedTools = strings.Join(tools, ",")
+		} else {
+			allowedTools += ",mcp__web-fetch__web_fetch"
 		}
-		allowedTools = strings.Join(tools, ",")
 	}
 	if allowedTools != "" {
 		claudeArgs = append(claudeArgs, "--allowed-tools", allowedTools)
@@ -492,11 +496,9 @@ func (e *ClaudeEngine) buildClaudeCommandEnv(workflowData *WorkflowData) map[str
 		// Limit Claude CLI internal retries so terminal errors such as
 		// 403 ai_credits_limit_exceeded are surfaced quickly to the harness.
 		// The outer harness already owns the full retry/backoff loop for 429/529.
-		// The external threat-detection path (threat-detect --engine claude) has no
-		// harness retry wrapper, so we leave CLI retries at their default there.
+		// Detection retains the CLI's default retry behavior.
 		env["CLAUDE_CODE_MAX_RETRIES"] = "0"
 	} else if settings := claudeDetectionSettings(workflowData); settings != "" {
-		// The external threat-detect binary builds its own Claude Code arguments, so
 		// claude_harness.cjs adds --settings from this variable when none is present.
 		env[claudeSettingsEnvVar] = settings
 	}

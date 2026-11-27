@@ -34,6 +34,8 @@ safe-outputs:
     expires: 2d
     title-prefix: "[plan] "
     labels: [plan, ai-generated, cookie]
+    planning-status: Todo
+    allowed-statuses: [Todo]
     max: 5  # Maximum 5 sub-issues per group
     group: true
   close-discussion:

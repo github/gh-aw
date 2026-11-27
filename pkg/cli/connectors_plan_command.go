@@ -18,7 +18,7 @@ var connectorPlanLog = logger.New("cli:connectors_plan")
 func newConnectorPlanCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plan <binding>",
-		Short: "Validate a connector binding and print its frozen content digest",
+		Short: "Validate a connector binding and print its frozen plan digest",
 		Long: "Validate a local ConnectorBinding with its repository-confined definition and connection. " +
 			"Print the frozen plan digest as JSON without resolving secrets or activating capabilities. " +
 			"Definition and connection paths are relative to --root, not the binding file.",

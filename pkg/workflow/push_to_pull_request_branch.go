@@ -16,6 +16,7 @@ type PushToPullRequestBranchConfig struct {
 	Target                         string           `yaml:"target,omitempty"`                              // Target for push-to-pull-request-branch: like add-comment but for pull requests
 	TitlePrefix                    string           `yaml:"title-prefix,omitempty"`                        // Required title prefix for pull request validation
 	RequiredLabels                 []string         `yaml:"required-labels,omitempty"`                     // Required labels for pull request validation
+	RequiredAuthor                 string           `yaml:"required-author,omitempty"`                     // Required pull request author login
 	Labels                         []string         `yaml:"labels,omitempty"`                              // Deprecated alias for required-labels
 	IfNoChanges                    string           `yaml:"if-no-changes,omitempty"`                       // Behavior when no changes to push: "warn", "error", or "ignore" (default: "warn")
 	IgnoreMissingBranchFailure     bool             `yaml:"ignore-missing-branch-failure,omitempty"`       // When true, missing/deleted target branches are treated as skipped instead of hard failures.
@@ -137,6 +138,7 @@ func (c *Compiler) parsePushToPullRequestBranchConstraints(configMap map[string]
 	if config.TitlePrefix == "" {
 		config.TitlePrefix = extractStringFromMap(configMap, "title-prefix", pushToPullRequestBranchLog)
 	}
+	config.RequiredAuthor = extractStringFromMap(configMap, "required-author", pushToPullRequestBranchLog)
 	config.RequiredLabels = ParseStringArrayOrExprFromConfig(configMap, "required-labels", pushToPullRequestBranchLog)
 	if len(config.RequiredLabels) == 0 {
 		config.RequiredLabels = ParseStringArrayOrExprFromConfig(configMap, "labels", pushToPullRequestBranchLog)

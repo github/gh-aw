@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/cli/go-gh/v2/pkg/auth"
 	"github.com/github/gh-aw/pkg/errorutil"
+	"github.com/github/gh-aw/pkg/fileutil"
 )
 
 // SourceCommandContext constructs Git commands for disposable source downloads.
@@ -28,28 +30,32 @@ func SourceCommandContext(ctx context.Context, remoteURL string, args ...string)
 // retries without credentials if the remote rejects the configured token.
 func SourceCommandOutputContext(ctx context.Context, remoteURL string, args ...string) ([]byte, error) {
 	cmd, hasCredentials := sourceCommandContext(ctx, remoteURL, true, args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
 	output, err := cmd.Output()
-	if err == nil || !hasCredentials || !isSourceAuthenticationError(stderr.String()) {
-		return output, err
+	if err != nil {
+		var exitErr *exec.ExitError
+		if hasCredentials && errors.As(err, &exitErr) && isSourceAuthenticationError(string(exitErr.Stderr)) {
+			anonymousCmd, _ := sourceCommandContext(ctx, remoteURL, false, args...)
+			return anonymousCmd.Output()
+		}
 	}
-
-	anonymousCmd, _ := sourceCommandContext(ctx, remoteURL, false, args...)
-	return anonymousCmd.Output()
+	return output, err
 }
 
 // SourceCommandCombinedOutputContext runs an isolated source-download Git
 // command and retries without credentials if the remote rejects the token.
 func SourceCommandCombinedOutputContext(ctx context.Context, remoteURL string, args ...string) ([]byte, error) {
 	cmd, hasCredentials := sourceCommandContext(ctx, remoteURL, true, args...)
-	output, err := cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput() //nolint:execcommandoutputerrdiscard // Preserve failed authenticated output if the anonymous retry also fails.
 	if err == nil || !hasCredentials || !isSourceAuthenticationError(string(output)) {
 		return output, err
 	}
 
 	anonymousCmd, _ := sourceCommandContext(ctx, remoteURL, false, args...)
-	return anonymousCmd.CombinedOutput()
+	anonymousOutput, anonymousErr := anonymousCmd.CombinedOutput()
+	if anonymousErr != nil {
+		return append(output, anonymousOutput...), anonymousErr
+	}
+	return anonymousOutput, nil
 }
 
 func sourceCommandContext(ctx context.Context, remoteURL string, includeCredentials bool, args ...string) (*exec.Cmd, bool) {
@@ -67,7 +73,22 @@ func sourceCommandContext(ctx context.Context, remoteURL string, includeCredenti
 		"-c", "submodule.recurse=false",
 	}
 	cmdDir := sourceCommandWorkingDirectory()
-	gitPath := trustedGitPath()
+	gitPath, err := exec.LookPath("git")
+	if err == nil && !filepath.IsAbs(gitPath) {
+		gitPath, err = filepath.Abs(gitPath)
+	}
+	if err == nil {
+		var validatedGitPath string
+		validatedGitPath, err = fileutil.ValidateExecutablePath(gitPath)
+		if err == nil {
+			_, err = fileutil.ValidateAbsolutePath(validatedGitPath)
+		}
+	}
+	if err != nil {
+		cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
+		cmd.Err = fmt.Errorf("resolve git executable: %w", err)
+		return cmd, false
+	}
 	cmd := exec.CommandContext(ctx, gitPath, append(base, args...)...)
 	cmd.Dir = cmdDir
 	cmd.Env = sourceCommandEnvironment(cmdDir)
@@ -127,28 +148,16 @@ func sourceCommandWorkingDirectory() string {
 	return safeDir
 }
 
-func trustedGitPath() string {
-	gitPath, err := exec.LookPath("git")
-	if err != nil {
-		return "git"
-	}
-	if !filepath.IsAbs(gitPath) {
-		if absolutePath, absErr := filepath.Abs(gitPath); absErr == nil {
-			return absolutePath
-		}
-	}
-	return gitPath
-}
-
 func trustedGitExecPath(gitPath, cmdDir string, env []string) string {
+	// gitPath is the validated absolute PATH entry for the fixed name "git".
 	cmd := exec.Command(gitPath, "--exec-path")
 	cmd.Dir = cmdDir
 	cmd.Env = env
-	output, err := cmd.Output()
+	output, err := cmd.Output() //nolint:execcommandoutputerrdiscard // A failed optional probe simply omits the override.
 	if err != nil {
 		return ""
 	}
-	execPath := strings.TrimSpace(string(output))
+	execPath := string(bytes.TrimSpace(output))
 	if execPath == "" {
 		return ""
 	}

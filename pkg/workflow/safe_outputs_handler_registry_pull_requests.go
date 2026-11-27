@@ -20,6 +20,7 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 			AddTemplatableInt("max", c.Max).
 			AddIfNotEmpty("target", c.Target).
 			AddIfNotEmpty("title_prefix", c.TitlePrefix).
+			AddTemplatableString("required_author", c.RequiredAuthor).
 			AddTemplatableStringSlice("required_labels", c.RequiredLabels).
 			AddIfNotEmpty("if_no_changes", c.IfNoChanges).
 			AddIfTrue("ignore_missing_branch_failure", c.IgnoreMissingBranchFailure).
@@ -69,7 +70,7 @@ var pullRequestHandlerRegistry = map[string]handlerBuilder{
 			AddBoolPtrOrDefault("update_branch_stacks", c.UpdateBranchStacks, true).
 			AddStringPtr("default_operation", c.Operation).
 			AddTemplatableBool("footer", getEffectiveFooterForTemplatable(c.Footer, cfg.Footer)).AddStringSlice("required_labels", c.RequiredLabels).
-			AddIfNotEmpty("required_title_prefix", c.RequiredTitlePrefix).AddIfNotEmpty("target-repo", c.TargetRepoSlug).
+			AddIfNotEmpty("required_title_prefix", c.RequiredTitlePrefix).AddTemplatableString("required_author", c.RequiredAuthor).AddIfNotEmpty("target-repo", c.TargetRepoSlug).
 			AddStringSlice("allowed_repos", c.AllowedRepos).
 			AddIfNotEmpty("github-token", resolveHandlerGitHubToken(c.GitHubApp, "update-pull-request", c.GitHubToken)).
 			AddTemplatableBool("staged", templatableBoolPtrToStringPtr(c.Staged)).

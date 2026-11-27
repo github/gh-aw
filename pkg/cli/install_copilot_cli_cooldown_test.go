@@ -190,7 +190,7 @@ esac
 				"COPILOT_INSTALL_DIR="+installDir, "GITHUB_PATH="+filepath.Join(dir, "github-path"),
 				"PATH="+binDir+":"+os.Getenv("PATH"), "CURL_LOG="+logPath,
 				"MOCK_RELEASE="+metadataPath, "MOCK_MANIFEST="+manifestPath, "MOCK_ARCHIVE="+archivePath,
-				"GITHUB_TOKEN=test-token",
+				"GITHUB_SERVER_URL=https://github.com", "GITHUB_TOKEN=test-token",
 			)
 			output, err := cmd.CombinedOutput()
 			if test.wantError != "" {

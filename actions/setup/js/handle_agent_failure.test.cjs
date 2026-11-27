@@ -3828,6 +3828,7 @@ describe("handle_agent_failure", () => {
         expect(rendered).toContain("The workflow recorded a `report_incomplete` signal");
         expect(rendered).toContain("completion could not be confirmed");
         expect(rendered).toContain("A successful agent job only confirms a clean process exit");
+        expect(rendered).toContain("A successful memory save confirms persistence only, not task completion or data completeness");
         expect(rendered).not.toContain("due to an infrastructure or tool failure");
       }
       expect(reportIncompleteContext).toContain("infrastructure_error");

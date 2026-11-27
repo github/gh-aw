@@ -1376,7 +1376,43 @@
               "description": "Issues event trigger that runs when repository issues are created, updated, or managed",
               "type": "object",
               "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "anyOf": [{ "required": ["status-ids"] }, { "required": ["status-categories"] }]
+                  },
+                  "then": {
+                    "required": ["types"],
+                    "properties": {
+                      "types": {
+                        "contains": { "const": "status_changed" }
+                      }
+                    }
+                  }
+                }
+              ],
               "properties": {
+                "status-ids": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "description": "Match captured event.status.id on status_changed before activation. Requires explicit types including status_changed. Values are ORed; combined with status-categories using AND. Other activity types are unaffected."
+                },
+                "status-categories": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string",
+                    "enum": ["backlog", "planned", "started", "completed", "not_planned", "duplicate"]
+                  },
+                  "description": "Match captured event.status.category on status_changed before activation, not issue.status. Requires explicit types including status_changed. Values are ORed; combined with status-ids using AND. Other activity types are unaffected."
+                },
                 "types": {
                   "type": "array",
                   "description": "Types of issue events",
@@ -3242,7 +3278,7 @@
         },
         "installation": {
           "type": "string",
-          "description": "Installation privilege for Copilot CLI and threat-detect in the agent and detection jobs. Rootless installs to ~/.local/bin without sudo. Defaults to rootless for arc-dind and privileged (/usr/local/bin via sudo) otherwise. Privileged is not supported with arc-dind. Does not change AWF runtime privileges or enable split-filesystem handling.",
+          "description": "Installation privilege for Copilot CLI in the agent and detection jobs. Rootless installs to the job-scoped $RUNNER_TEMP/gh-aw/bin without sudo. Defaults to rootless for arc-dind or when sudo is unavailable to a non-root runner. Privileged is not supported with arc-dind. Does not change AWF runtime privileges or enable split-filesystem handling.",
           "enum": ["rootless", "privileged"]
         }
       }
@@ -6585,7 +6621,7 @@
     },
     "safe-outputs": {
       "type": "object",
-      "$comment": "Required if workflow creates or modifies GitHub resources. Operations requiring safe-outputs: approve-workflow-run, autofix-code-scanning-alert, add-comment, add-labels, add-reviewer, assign-milestone, assign-to-agent, assign-to-user, close-discussion, close-issue, close-pull-request, create-agent-session, create-agent-task (deprecated, use create-agent-session), create-check-run, create-code-scanning-alert, create-discussion, create-issue, create-project, create-project-status-update, create-pull-request, create-pull-request-review-comment, dispatch-workflow, hide-comment, link-sub-issue, mark-pull-request-as-ready-for-review, merge-pull-request, report-missing-data, report-missing-tool, noop, push-to-pull-request-branch, remove-labels, reply-to-pull-request-review-comment, resolve-pull-request-review-thread, set-issue-field, set-issue-type, submit-pull-request-review, threat-detection, unassign-from-user, update-discussion, update-issue, update-project, update-pull-request, update-release, upload-artifact, upload-asset, upload-code-coverage. See documentation for complete details.",
+      "$comment": "Required if workflow creates or modifies GitHub resources. Operations requiring safe-outputs: approve-workflow-run, autofix-code-scanning-alert, add-comment, add-labels, add-reviewer, assign-milestone, assign-to-agent, assign-to-user, close-discussion, close-issue, close-pull-request, create-agent-session, create-agent-task (deprecated, use create-agent-session), create-check-run, create-code-scanning-alert, create-discussion, create-issue, create-project, create-project-status-update, create-pull-request, create-pull-request-review-comment, dispatch-workflow, hide-comment, link-sub-issue, mark-pull-request-as-ready-for-review, merge-pull-request, report-missing-data, report-missing-tool, noop, push-to-pull-request-branch, remove-labels, reply-to-pull-request-review-comment, resolve-pull-request-review-thread, set-issue-field, set-issue-status, set-issue-type, submit-pull-request-review, threat-detection, unassign-from-user, update-discussion, update-issue, update-project, update-pull-request, update-release, upload-artifact, upload-asset, upload-code-coverage. See documentation for complete details.",
       "description": "Safe output processing configuration that automatically creates GitHub issues, comments, and pull requests from AI workflow output without requiring write permissions in the main job",
       "examples": [
         {
@@ -6689,6 +6725,17 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                "planning-status": {
+                  "$ref": "#/$defs/issuePlanningStatus",
+                  "description": "Default native planning status for newly created issues. Only open-category statuses (backlog, planned, started) are accepted."
+                },
+                "allowed-statuses": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/issuePlanningStatus" },
+                  "minItems": 1,
+                  "maxItems": 50,
+                  "description": "Allowed native planning status names or integer IDs for created issues, including the configured default."
                 },
                 "max-issue-artifacts": {
                   "type": "integer",
@@ -10720,6 +10767,11 @@
                   "type": "string",
                   "description": "Target for updates: 'triggering' (default), '*' (any PR), or explicit PR number"
                 },
+                "required-author": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Only update pull requests opened by this GitHub login, or app/<slug> for a GitHub App bot"
+                },
                 "title": {
                   "type": "boolean",
                   "description": "Allow updating pull request title - defaults to true, set to false to disable"
@@ -11026,6 +11078,11 @@
                 "required-title-prefix": {
                   "type": "string",
                   "description": "Required prefix for pull request title. Only pull requests with this prefix will be accepted."
+                },
+                "required-author": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Only push to pull requests opened by this GitHub login, or app/<slug> for a GitHub App bot"
                 },
                 "title-prefix": {
                   "type": "string",
@@ -11353,6 +11410,61 @@
             }
           ],
           "description": "Enable AI agents to minimize (hide) comments on issues or pull requests based on relevance, spam detection, or moderation rules."
+        },
+        "set-issue-status": {
+          "description": "Change native issue planning status, separately from legacy update-issue.status open/closed state.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "authorization": { "$ref": "#/$defs/safeOutputAuthorization" },
+                "allowed": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/issuePlanningStatus" },
+                  "minItems": 1,
+                  "maxItems": 50,
+                  "description": "Allowed native planning status names or integer IDs. Omit to allow any status, subject to allow-close and allow-reopen."
+                },
+                "allow-close": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Allow transitions from open to closed status categories."
+                },
+                "allow-reopen": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Allow transitions from closed to open status categories."
+                },
+                "max": {
+                  "description": "Maximum operations (default: 5).",
+                  "oneOf": [
+                    { "type": "integer", "minimum": 1 },
+                    { "type": "string", "pattern": "^\\$\\{\\{.*\\}\\}$" }
+                  ]
+                },
+                "target": {
+                  "type": "string",
+                  "description": "Target issue: 'triggering' (default), '*' (any issue), or an explicit issue number."
+                },
+                "target-repo": { "type": "string", "description": "Target repository in owner/repo format." },
+                "allowed-repos": { "type": "array", "items": { "type": "string" } },
+                "required-labels": { "type": "array", "items": { "type": "string" } },
+                "required-title-prefix": { "type": "string" },
+                "github-token": { "$ref": "#/$defs/github_token_same_job" },
+                "head-github-token": { "$ref": "#/$defs/github_token_same_job" },
+                "github-app": { "$ref": "#/$defs/github_app" },
+                "staged": { "$ref": "#/$defs/templatable_boolean" },
+                "samples": {
+                  "oneOf": [
+                    { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+                    { "type": "object", "additionalProperties": true }
+                  ]
+                }
+              }
+            }
+          ]
         },
         "set-issue-type": {
           "oneOf": [
@@ -12678,13 +12790,6 @@
                   ],
                   "description": "Absolute host path to an additional CA certificate for the detection job's API proxy upstream TLS verification. Defaults to sandbox.agent.ca-cert when unset or empty and the detection engine matches the agent engine; set to false to disable inheritance. The file must exist on the detection runner before engine execution; use threat-detection.steps to create it. Requires AWF v0.28.10 or later.",
                   "examples": ["/tmp/detection-ca.pem", false]
-                },
-                "artifact-base-url": {
-                  "type": "string",
-                  "format": "uri",
-                  "pattern": "^https://\\S+$",
-                  "description": "Optional HTTPS base URL for a mirror of pinned threat-detect release assets. The compiler appends the pinned release tag and asset name; compiler-supplied SHA-256 digests remain authoritative.",
-                  "examples": ["https://artifacts.example.com/gh-aw-threat-detection/releases/download"]
                 },
                 "continue-on-error": {
                   "$ref": "#/$defs/templatable_boolean",
@@ -14779,6 +14884,13 @@
     }
   ],
   "$defs": {
+    "issuePlanningStatus": {
+      "description": "Native issue planning status name or positive integer ID.",
+      "oneOf": [
+        { "type": "string", "minLength": 1, "maxLength": 256, "pattern": ".*\\S.*" },
+        { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+      ]
+    },
     "safeOutputAuthorization": {
       "type": "object",
       "additionalProperties": false,

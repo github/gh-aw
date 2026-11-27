@@ -206,6 +206,23 @@ checkout:
 			expectWarning: false,
 		},
 		{
+			name: "target=* with required-author does not emit constraint warning",
+			content: `---
+on: push
+safe-outputs:
+  push-to-pull-request-branch:
+    target: "*"
+    required-author: workflow-bot
+checkout:
+  fetch: ["*"]
+  fetch-depth: 0
+---
+
+# Test Workflow
+`,
+			expectWarning: false,
+		},
+		{
 			name: "target=* with required-labels does not emit constraint warning",
 			content: `---
 on: push
@@ -255,7 +272,7 @@ safe-outputs:
 		},
 	}
 
-	const constraintWarningText = "push-to-pull-request-branch: target: \"*\" allows pushing to any PR branch with no additional constraints"
+	const constraintWarningText = "push-to-pull-request-branch: target: \"*\" allows pushing to any PR branch with no author, title, or label constraints"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -829,6 +829,80 @@ describe("update_pull_request.cjs - update_branch behavior", () => {
     expect(result.data._update_branch_stacks).toBe(false);
   });
 
+  it("should disable stacked PR stack-sync fallback when required_author is configured", () => {
+    const result = updatePRModule.buildPRUpdateData({ update_branch: true }, { required_author: "workflow-bot" });
+
+    expect(result.success).toBe(true);
+    expect(result.data._update_branch_stacks).toBe(false);
+  });
+
+  it.each(["", "   ", 42])("should reject invalid required_author values before fetching the PR: %p", async required_author => {
+    const handler = await updatePRModule.main({ required_author });
+
+    const result = await handler({ pull_request_number: 100, title: "Changed title" });
+
+    expect(result).toMatchObject({ success: false, error: "required_author must be a non-empty string when configured" });
+    expect(mockGithub.rest.issues.get).not.toHaveBeenCalled();
+    expect(mockGithub.rest.pulls.update).not.toHaveBeenCalled();
+  });
+
+  it("should skip updates when the PR author does not match required_author", async () => {
+    mockGithub.rest.issues.get.mockResolvedValue({
+      data: {
+        number: 100,
+        title: "Test PR",
+        labels: [],
+        user: { login: "other-user" },
+      },
+    });
+    const handler = await updatePRModule.main({ required_author: "workflow-bot" });
+
+    const result = await handler({ pull_request_number: 100, title: "Changed title" });
+
+    expect(result).toMatchObject({ success: false, skipped: true, error: "Item author does not match required-author filter" });
+    expect(mockGithub.rest.pulls.update).not.toHaveBeenCalled();
+    expect(mockGithub.rest.pulls.updateBranch).not.toHaveBeenCalled();
+  });
+
+  it("should match required_author case-insensitively", async () => {
+    mockGithub.rest.issues.get.mockResolvedValue({
+      data: {
+        number: 100,
+        title: "Test PR",
+        labels: [],
+        user: { login: "Workflow-Bot" },
+      },
+    });
+    const handler = await updatePRModule.main({ required_author: "workflow-bot" });
+
+    const result = await handler({ pull_request_number: 100, title: "Changed title" });
+
+    expect(result.success).toBe(true);
+    expect(mockGithub.rest.pulls.update).toHaveBeenCalledWith({
+      owner: "testowner",
+      repo: "testrepo",
+      pull_number: 100,
+      title: "Changed title",
+    });
+  });
+
+  it("should match required_author app identifiers to GitHub App bot authors", async () => {
+    mockGithub.rest.issues.get.mockResolvedValue({
+      data: {
+        number: 100,
+        title: "Test PR",
+        labels: [],
+        user: { login: "Workflow-Bot[bot]", type: "Bot" },
+      },
+    });
+    const handler = await updatePRModule.main({ required_author: "app/workflow-bot" });
+
+    const result = await handler({ pull_request_number: 100, title: "Changed title" });
+
+    expect(result.success).toBe(true);
+    expect(mockGithub.rest.pulls.update).toHaveBeenCalled();
+  });
+
   it("should call updateBranch when update_branch is enabled and no other fields are updated", async () => {
     const handler = await updatePRModule.main({ update_branch: true });
 

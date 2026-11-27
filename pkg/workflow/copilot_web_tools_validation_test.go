@@ -12,18 +12,64 @@ import (
 )
 
 func TestWebFetchMCPRequiresAWF(t *testing.T) {
-	_, err := NewCompiler().ParseWorkflowString(`---
+	for _, engine := range []string{"copilot", "pi", "agy", "\n  id: claude\n  model-provider: github"} {
+		t.Run(engine, func(t *testing.T) {
+			_, err := NewCompiler().ParseWorkflowString(fmt.Sprintf(`---
 on: workflow_dispatch
 strict: false
-engine: copilot
+engine: %s
 sandbox:
   agent: false
 tools:
   web-fetch:
 ---
 Fetch a page.
-`, "web-fetch-no-awf.md")
-	require.ErrorContains(t, err, "requires the AWF agent sandbox")
+`, engine), "web-fetch-no-awf.md")
+			require.ErrorContains(t, err, "requires the AWF agent sandbox")
+		})
+	}
+}
+
+func TestNativeWebFetchWithoutAWF(t *testing.T) {
+	for _, engine := range []string{"claude", "codex", "gemini"} {
+		t.Run(engine, func(t *testing.T) {
+			data, err := NewCompiler().ParseWorkflowString(fmt.Sprintf(`---
+on: workflow_dispatch
+strict: false
+engine: %s
+sandbox:
+  agent: false
+tools:
+  web-fetch:
+---
+Fetch a page.
+`, engine), "native-web-fetch.md")
+			require.NoError(t, err)
+			require.False(t, usesWebFetchMCP(data))
+		})
+	}
+}
+
+func TestWebFetchMCPDisabled(t *testing.T) {
+	for _, engine := range []CapabilityProvider{NewCopilotEngine(), NewClaudeEngine(), NewCodexEngine(), NewGeminiEngine(), NewPiEngine(), NewAgyEngine()} {
+		for _, tools := range []map[string]any{nil, {"web-fetch": false}} {
+			require.False(t, usesWebFetchMCPForEngine(engine, &WorkflowData{Tools: tools}))
+		}
+	}
+}
+
+func TestGeminiWebFetchProxyEnvironment(t *testing.T) {
+	data := &WorkflowData{
+		Tools:         map[string]any{"web-fetch": nil},
+		SandboxConfig: &SandboxConfig{Agent: &AgentSandboxConfig{ID: "awf"}},
+		ExcludedEnv:   []string{"http_proxy"},
+	}
+	allowed := NewGeminiEngine().geminiShellEnvironment(data)
+	require.NotContains(t, allowed, "HTTP_PROXY")
+	require.Contains(t, allowed, "HTTPS_PROXY")
+	require.Contains(t, allowed, "SSL_CERT_FILE")
+	data.Tools = nil
+	require.Empty(t, NewGeminiEngine().geminiShellEnvironment(data))
 }
 
 func TestWebFetchMCPCompilation(t *testing.T) {
@@ -38,10 +84,10 @@ func TestWebFetchMCPCompilation(t *testing.T) {
 		{name: "copilot-sdk", engine: "\n  id: copilot\n  copilot-sdk: true", fallback: true},
 		{name: "pi", engine: "pi", fallback: true},
 		{name: "claude-copilot", engine: "\n  id: claude\n  model-provider: github", fallback: true},
-		{name: "claude-anthropic", engine: "claude"},
-		{name: "codex", engine: "codex"},
-		{name: "gemini", engine: "gemini"},
-		{name: "agy", engine: "agy"},
+		{name: "claude-anthropic", engine: "claude", fallback: true},
+		{name: "codex", engine: "codex", fallback: true},
+		{name: "gemini", engine: "gemini", fallback: true},
+		{name: "agy", engine: "agy", fallback: true},
 		{name: "goose", engine: "\n  id: goose", importFile: "goose.md", model: "copilot/auto", fallback: true},
 		{name: "opencode", engine: "\n  id: opencode", importFile: "opencode.md", model: "copilot/auto", fallback: true},
 	} {
@@ -71,6 +117,14 @@ Fetch a page.
 			assert.Equal(t, tc.fallback, strings.Contains(string(lock), "export GH_AW_WEB_FETCH_MCP=1"))
 			assert.Equal(t, tc.fallback, strings.Contains(string(lock), `"name":"web-fetch","tools":["web_fetch"]`))
 			assert.NotContains(t, string(lock), "web_fetch_mcp_server.cjs", "the host gateway must not start the server")
+			if tc.name == "claude-anthropic" {
+				assert.Contains(t, string(lock), "mcp__web-fetch__web_fetch")
+				assert.Contains(t, string(lock), "WebFetch")
+			}
+			if tc.name == "gemini" {
+				assert.Contains(t, string(lock), `HTTP_PROXY`)
+				assert.Contains(t, string(lock), `HTTPS_PROXY`)
+			}
 		})
 	}
 }
@@ -246,7 +300,7 @@ Test Claude web tool availability.
 						} else {
 							require.NoError(t, err)
 							require.NotNil(t, data)
-							require.Equal(t, config.wantErr && tool == "web-fetch", usesWebFetchMCP(data))
+							require.Equal(t, tool == "web-fetch", usesWebFetchMCP(data))
 						}
 					})
 				}
@@ -281,7 +335,7 @@ func TestClaudeCopilotWebToolsImportedEngineConfig(t *testing.T) {
 					} else {
 						require.NoError(t, err)
 						require.NotNil(t, data)
-						require.Equal(t, provider == "github" && tool == "web-fetch", usesWebFetchMCP(data))
+						require.Equal(t, tool == "web-fetch", usesWebFetchMCP(data))
 					}
 				}
 			})

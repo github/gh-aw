@@ -38,7 +38,7 @@ v1 endpoint.
 the provider exposes from `GET /openai/v1/models`. For versioned GPT-5 models,
 that is often a fully qualified name such as `gpt-5.4-2026-03-05`.
 
-If the Azure deployment name is different, set `COPILOT_PROVIDER_MODEL_ID` to
+If the Azure deployment name is different, set `COPILOT_PROVIDER_WIRE_MODEL` to
 the deployment name that Azure expects on the request body:
 
 ```aw wrap
@@ -47,11 +47,13 @@ engine:
   model: gpt-5.4-2026-03-05
   env:
     COPILOT_PROVIDER_BASE_URL: https://RESOURCE.openai.azure.com/openai/v1
-    COPILOT_PROVIDER_MODEL_ID: gpt-5.4
+    COPILOT_PROVIDER_WIRE_MODEL: gpt-5.4
 ```
 
 This keeps the AWF proxy and Copilot CLI aligned on the selected model while
-still sending the Azure deployment name upstream.
+still sending the Azure deployment name upstream. Leave
+`COPILOT_PROVIDER_MODEL_ID` unset so Copilot uses `COPILOT_MODEL` for agent
+configuration and token limits.
 
 ## Configure API-key authentication
 
@@ -62,7 +64,7 @@ engine:
   env:
     COPILOT_PROVIDER_BASE_URL: https://RESOURCE.openai.azure.com/openai/v1
     COPILOT_PROVIDER_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-    COPILOT_PROVIDER_MODEL_ID: gpt-5.4
+    COPILOT_PROVIDER_WIRE_MODEL: gpt-5.4
     COPILOT_PROVIDER_WIRE_API: responses
 
 network:
@@ -98,7 +100,7 @@ engine:
     azure-client-id: <client-id>
   env:
     COPILOT_PROVIDER_BASE_URL: https://RESOURCE.openai.azure.com/openai/v1
-    COPILOT_PROVIDER_MODEL_ID: gpt-5.4
+    COPILOT_PROVIDER_WIRE_MODEL: gpt-5.4
     COPILOT_PROVIDER_WIRE_API: responses
 
 network:
@@ -136,7 +138,7 @@ If Azure works with direct `curl` requests but the AWF proxy returns
 - Verify that `engine.model` matches a model returned by
   `GET /openai/v1/models`.
 - If Azure requires a different deployment name on the wire, set
-  `COPILOT_PROVIDER_MODEL_ID` to that deployment name.
+  `COPILOT_PROVIDER_WIRE_MODEL` to that deployment name.
 - Keep `COPILOT_PROVIDER_BASE_URL` on the `/openai/v1` endpoint.
 - Set `COPILOT_PROVIDER_WIRE_API: responses` for GPT-5 and o-series models.
 

@@ -27,6 +27,8 @@ safe-outputs:
   create-issue:
     title-prefix: "[squad-plan] "
     labels: [cookie]
+    planning-status: Todo
+    allowed-statuses: [Todo]
     max: 8
 ---
 

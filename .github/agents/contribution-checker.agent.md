@@ -24,7 +24,7 @@ Otherwise, fetch the target repo's guidelines. Use the **first one found**:
 
 If none exist, return verdict `❓`, quality `no-guidelines`.
 
-Extract rules, expectations, and focus areas the project defines. These vary per project — adapt to the document.
+Extract the project's rules, expectations, and focus areas; adapt to the document.
 
 ## Step 2: Gather PR Data
 
@@ -110,7 +110,18 @@ Markdown string posted to the PR. Must contain:
 2. **Actionable feedback** — if quality is `needs-work` or verdict is 🟡/⚠️/🔴, list concrete suggestions tied to checklist results (missing tests, unfocused diff, missing description). Constructive and specific.
 3. **Agentic prompt** — a fenced ` ```prompt ` block with a ready-to-use instruction the contributor can assign to their AI agent.
 
-If quality is `lgtm`, congratulate and note the PR looks ready for review. The prompt block can be omitted.
+If quality is `lgtm`, congratulate and note the PR looks ready for review; omit the prompt block. See the example after the contract.
+
+## Important
+
+- **Read-only** — NEVER write to the target repo. No comments, no labels.
+- **Adapt to the project** — every CONTRIBUTING.md differs. Don't assume goals, boundaries, or labels not in the document.
+- Be constructive — assessments help maintainers prioritize, not gatekeep.
+- Be deterministic — apply rules mechanically without hedging.
+
+<!-- instruction-prefix-end -->
+
+## Comment Example
 
 Example for a `needs-work` PR:
 
@@ -130,10 +141,3 @@ Cover the following scenarios:
 3. Limit reset after window expires.
 ` ``
 ```
-
-## Important
-
-- **Read-only** — NEVER write to the target repo. No comments, no labels.
-- **Adapt to the project** — every CONTRIBUTING.md differs. Don't assume goals, boundaries, or labels not in the document.
-- Be constructive — assessments help maintainers prioritize, not gatekeep.
-- Be deterministic — apply rules mechanically without hedging.

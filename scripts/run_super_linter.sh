@@ -4,6 +4,9 @@ set -euo pipefail
 cd "${GITHUB_WORKSPACE:?}"
 mkdir -p super-linter-output
 
+# The container creates the log as root; the runner must be able to read it.
+trap 'if [ -f "${LOG_FILE:-}" ]; then chmod a+r -- "$LOG_FILE"; fi' EXIT
+
 # Retain setup failures separately; they are not evidence of lint coverage.
 (
   export GOTOOLCHAIN

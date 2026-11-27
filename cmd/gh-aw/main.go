@@ -963,9 +963,9 @@ func configureOtherCommandFlags() {
 	runCmd.Flags().StringArrayP("raw-field", "F", []string{}, "Pass a workflow dispatch input in key=value format (can be specified multiple times)")
 	_ = runCmd.Flags().MarkShorthandDeprecated("raw-field", "use the long form --raw-field instead")
 	runCmd.Flags().Bool("push", false, "Commit and push workflow files (including transitive imports) before running. Refuses to proceed when unrelated files are already staged.")
-	runCmd.Flags().Bool("dry-run", false, "Preview workflow execution without triggering runs on GitHub Actions")
+	runCmd.Flags().Bool("dry-run", false, "Preview dispatch without triggering runs; preparation can still compile, enable, or push workflows")
 	runCmd.Flags().BoolP("json", "j", false, "Output results in JSON format")
-	runCmd.Flags().Bool("approve", false, "Approve all safe update changes. When strict mode is active (the default), the compiler emits warnings for new restricted secrets or unapproved action additions/removals not present in the existing gh-aw-manifest. Use this flag to approve and skip safe update enforcement")
+	runCmd.Flags().Bool("approve", false, "Approve safe update changes during compilation with --push; has no effect without --push")
 	runCmd.ValidArgsFunction = cli.CompleteWorkflowNames
 	cli.RegisterEngineFlagCompletion(runCmd)
 }

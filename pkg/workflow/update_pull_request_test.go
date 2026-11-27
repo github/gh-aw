@@ -11,7 +11,7 @@ import (
 )
 
 func TestUpdatePullRequestRequiredFilters(t *testing.T) {
-	// Test that required-labels and required-title-prefix are parsed correctly
+	// Test that required-author, required-labels, and required-title-prefix are parsed correctly
 	tmpDir := testutil.TempDir(t, "output-update-pr-required-filters-test")
 
 	testContent := `---
@@ -28,6 +28,7 @@ safe-outputs:
   update-pull-request:
     required-title-prefix: "[ci] "
     required-labels: [automation, bot]
+    required-author: app/workflow-bot
     body: true
     sync-stack: false
 ---
@@ -62,6 +63,13 @@ This workflow tests the update-pull-request required-labels and required-title-p
 
 	if len(workflowData.SafeOutputs.UpdatePullRequests.RequiredLabels) != 2 {
 		t.Fatalf("Expected 2 required-labels, got %d", len(workflowData.SafeOutputs.UpdatePullRequests.RequiredLabels))
+	}
+	if workflowData.SafeOutputs.UpdatePullRequests.RequiredAuthor != "app/workflow-bot" {
+		t.Fatalf("Expected required-author to be 'app/workflow-bot', got '%s'", workflowData.SafeOutputs.UpdatePullRequests.RequiredAuthor)
+	}
+	handlerConfig := handlerRegistry["update_pull_request"](workflowData.SafeOutputs)
+	if handlerConfig["required_author"] != "app/workflow-bot" {
+		t.Fatalf("Expected runtime required_author to be 'app/workflow-bot', got '%v'", handlerConfig["required_author"])
 	}
 
 	if workflowData.SafeOutputs.UpdatePullRequests.RequiredLabels[0] != "automation" {

@@ -342,8 +342,12 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 					allowedPermissions = map[string]string{"contents": "write"}
 				}
 				if entry.id == "agy-conformance-reusable" && name == "safe_outputs" {
+					allowedPermissions["issues"] = "read"
 					allowedPermissions["pull-requests"] = "read"
-					assert.Equal(t, map[string]string{"pull-requests": "read"}, config.Permissions)
+					assert.Equal(t, map[string]string{"issues": "read", "pull-requests": "read"}, config.Permissions)
+				}
+				if entry.id == "smoke-agy" && name == "safe_outputs" {
+					allowedPermissions["issues"] = "read"
 				}
 				if entry.id == "smoke-agy" && (name == "pre_activation" || name == "activation") {
 					allowedPermissions = map[string]string{
@@ -376,6 +380,9 @@ func TestAgyProductionConformancePermissionsAreBoundedAndScoped(t *testing.T) {
 				if name == "conclusion" {
 					if entry.id != "engine-conformance-agy" {
 						allowedPermissions = map[string]string{"actions": "read", "id-token": "write"}
+						if entry.id == "agy-conformance-reusable" || entry.id == "smoke-agy" {
+							allowedPermissions["issues"] = "read"
+						}
 					}
 					for _, step := range config.Steps {
 						if step["id"] == "mint-otlp-oidc-token" {

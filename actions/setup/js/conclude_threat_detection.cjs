@@ -169,17 +169,11 @@ function conclude(resultFile, env) {
   };
   if (run !== "true") {
     info("Detection skipped — no threats to evaluate.");
-    return finish("skipped", "", [], !(run === "false" && env.THREAT_DETECT_INSTALL_OUTCOME === "skipped"));
+    return finish("skipped", "", [], run !== "false");
   }
 
-  // Keep the host wrapper's install outcome precedence and outputs: AWF
-  // failure can cause the detector install step to be skipped.
-  for (const [tool, outcome] of [
-    ["AWF", env.AWF_INSTALL_OUTCOME],
-    ["threat-detect", env.THREAT_DETECT_INSTALL_OUTCOME],
-  ]) {
-    if (!outcome || outcome === "success") continue;
-    if (tool === "AWF" && env.GH_AW_GITHUB_API_QUOTA_BLOCKED) {
+  if (env.AWF_INSTALL_OUTCOME && env.AWF_INSTALL_OUTCOME !== "success") {
+    if (env.GH_AW_GITHUB_API_QUOTA_BLOCKED) {
       const quota = env.GH_AW_GITHUB_API_QUOTA_BLOCKED.replace(/[^A-Za-z0-9_=;:.+ -]/g, "").slice(0, 512);
       const message = `Threat detection is deferred: AWF attestation verification could not complete within the wait budget (${quota}).`;
       if (env.GITHUB_STEP_SUMMARY) {
@@ -191,7 +185,14 @@ function conclude(resultFile, env) {
       }
       return fail("github_api_quota_exhausted", `GitHub API quota exhausted. ${message}`, [], false);
     }
-    return fail("agent_failure", `ERR_SYSTEM: ${tool} installation did not complete verification (install outcome: ${outcome})`, [], false);
+    return fail("agent_failure", `ERR_SYSTEM: AWF installation did not complete verification (install outcome: ${env.AWF_INSTALL_OUTCOME})`, [], false);
+  }
+  if (
+    (env.DETECTION_RESET_OUTCOME && env.DETECTION_RESET_OUTCOME !== "success") ||
+    (env.DETECTION_COLLECTION_OUTCOME && env.DETECTION_COLLECTION_OUTCOME !== "success") ||
+    ["skipped", "cancelled"].includes(env.DETECTION_AGENTIC_EXECUTION_OUTCOME)
+  ) {
+    return fail("agent_failure", "ERR_SYSTEM: Detection execution or result staging did not complete.", [], false);
   }
 
   const commandFiles = [env.GITHUB_OUTPUT, env.GITHUB_ENV].filter(Boolean);

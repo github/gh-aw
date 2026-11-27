@@ -12,7 +12,7 @@ func TestHandlerRegistryDomainComposition(t *testing.T) {
 		registry map[string]handlerBuilder
 		wantKeys []string
 	}{
-		{name: "issueHandlerRegistry", registry: issueHandlerRegistry, wantKeys: []string{"create_issue", "close_issue", "update_issue", "link_sub_issue", "set_issue_type", "set_issue_field", "add_labels", "remove_labels", "replace_label", "assign_milestone"}},
+		{name: "issueHandlerRegistry", registry: issueHandlerRegistry, wantKeys: []string{"create_issue", "close_issue", "update_issue", "link_sub_issue", "set_issue_type", "set_issue_status", "set_issue_field", "add_labels", "remove_labels", "replace_label", "assign_milestone"}},
 		{name: "discussionHandlerRegistry", registry: discussionHandlerRegistry, wantKeys: []string{"create_discussion", "close_discussion", "update_discussion"}},
 		{name: "pullRequestHandlerRegistry", registry: pullRequestHandlerRegistry, wantKeys: []string{"create_pull_request", "push_to_pull_request_branch", "update_pull_request", "merge_pull_request", "close_pull_request", "mark_pull_request_as_ready_for_review", "add_reviewer", "dismiss_pull_request_review", "submit_pull_request_review", "resolve_pull_request_review_thread", "create_pull_request_review_comment", "reply_to_pull_request_review_comment"}},
 		{name: "workflowHandlerRegistry", registry: workflowHandlerRegistry, wantKeys: []string{"create_security_advisory", "approve_workflow_run", "create_code_scanning_alert", "create_check_run", "dispatch_workflow", "dispatch_repository", "call_workflow", "autofix_code_scanning_alert", "upload_code_coverage", "upload_asset", "upload_artifact"}},
@@ -51,6 +51,27 @@ func TestHandlerRegistryDomainComposition(t *testing.T) {
 	}
 }
 
+func TestPullRequestRequiredAuthorExpressionsUseJSONTemplating(t *testing.T) {
+	const expression = "${{ inputs.required_author }}"
+	config := &SafeOutputsConfig{
+		PushToPullRequestBranch: &PushToPullRequestBranchConfig{RequiredAuthor: expression},
+		UpdatePullRequests:      &UpdatePullRequestsConfig{RequiredAuthor: expression},
+	}
+
+	for _, key := range []string{"push_to_pull_request_branch", "update_pull_request"} {
+		t.Run(key, func(t *testing.T) {
+			handlerConfig := pullRequestHandlerRegistry[key](config)
+			value, ok := handlerConfig["required_author"].(templatableJSONExpression)
+			if !ok {
+				t.Fatalf("required_author has type %T, want templatableJSONExpression", handlerConfig["required_author"])
+			}
+			if value.expr != "${{ toJSON(inputs.required_author) }}" {
+				t.Errorf("required_author expression = %q, want JSON-safe expression", value.expr)
+			}
+		})
+	}
+}
+
 func TestHandlerRegistryBuilders(t *testing.T) {
 	tests := []struct {
 		name string
@@ -61,6 +82,7 @@ func TestHandlerRegistryBuilders(t *testing.T) {
 		{name: "update_issue", cfg: &SafeOutputsConfig{UpdateIssues: &UpdateIssuesConfig{}}},
 		{name: "link_sub_issue", cfg: &SafeOutputsConfig{LinkSubIssue: &LinkSubIssueConfig{}}},
 		{name: "set_issue_type", cfg: &SafeOutputsConfig{SetIssueType: &SetIssueTypeConfig{}}},
+		{name: "set_issue_status", cfg: &SafeOutputsConfig{SetIssueStatus: &SetIssueStatusConfig{}}},
 		{name: "set_issue_field", cfg: &SafeOutputsConfig{SetIssueField: &SetIssueFieldConfig{}}},
 		{name: "add_labels", cfg: &SafeOutputsConfig{AddLabels: &AddLabelsConfig{}}},
 		{name: "remove_labels", cfg: &SafeOutputsConfig{RemoveLabels: &RemoveLabelsConfig{}}},

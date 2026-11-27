@@ -3,8 +3,8 @@ set +o histexpand
 
 set -euo pipefail
 
-if command -v node >/dev/null 2>&1; then
-  exec node "${BASH_SOURCE[0]%/*}/conclude_threat_detection.cjs" "$@"
+if command -v "${GH_AW_NODE:-node}" >/dev/null 2>&1; then
+  exec "${GH_AW_NODE:-node}" "${BASH_SOURCE[0]%/*}/conclude_threat_detection.cjs" "$@"
 fi
 
 result_file="${1:-/tmp/gh-aw/threat-detection/detection_result.json}"
@@ -14,7 +14,7 @@ export_env=true
 if [[ "${RUN_DETECTION:-}" != "true" ]]; then
   conclusion=skipped
   reason=
-  if [[ "${RUN_DETECTION:-}" == "false" && "${THREAT_DETECT_INSTALL_OUTCOME:-}" == "skipped" ]]; then
+  if [[ "${RUN_DETECTION:-}" == "false" ]]; then
     export_env=false
   fi
 elif [[ -n "${AWF_INSTALL_OUTCOME:-}" && "${AWF_INSTALL_OUTCOME}" != "success" && -n "${GH_AW_GITHUB_API_QUOTA_BLOCKED:-}" ]]; then
@@ -25,7 +25,7 @@ elif [[ -n "${AWF_INSTALL_OUTCOME:-}" && "${AWF_INSTALL_OUTCOME}" != "success" &
       echo "Could not write the quota step summary."
     fi
   fi
-elif [[ ( -n "${AWF_INSTALL_OUTCOME:-}" && "${AWF_INSTALL_OUTCOME}" != "success" ) || ( -n "${THREAT_DETECT_INSTALL_OUTCOME:-}" && "${THREAT_DETECT_INSTALL_OUTCOME}" != "success" ) ]]; then
+elif [[ "${AWF_INSTALL_OUTCOME:-success}" != "success" || "${DETECTION_RESET_OUTCOME:-success}" != "success" || "${DETECTION_COLLECTION_OUTCOME:-success}" != "success" || "${DETECTION_AGENTIC_EXECUTION_OUTCOME:-}" =~ ^(skipped|cancelled)$ ]]; then
   export_env=false
 elif [[ -e "$result_file" || -L "$result_file" ]]; then
   # A verdict that cannot be read must not be downgraded to a tooling warning.

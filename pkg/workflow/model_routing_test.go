@@ -287,7 +287,7 @@ func TestCompiledRoutedWorkflowsKeepThreatDetectionJob(t *testing.T) {
 				require.NotNil(t, executionStep, "expected %s execution step using fixed model %q", tt.detectionEngine, tt.detectionModel)
 				require.Equal(t, tt.detectionModelValue, findCompiledEnvValue(t, executionStep, tt.detectionModelEnv), "engine execution step: %v", executionStep)
 				if external {
-					require.Contains(t, fmt.Sprint(executionStep["run"]), "--engine "+tt.detectionEngine)
+					require.Contains(t, fmt.Sprint(executionStep["run"]), `stage_threat_detection_runtime.cjs" `+tt.detectionEngine)
 				} else {
 					require.Contains(t, fmt.Sprint(executionStep["name"]), "Copilot CLI")
 				}
