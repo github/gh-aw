@@ -335,46 +335,33 @@ let defaultClient;
 /** @type {WeakMap<BrokerOptions, ReturnType<typeof createTokenBrokerClient>>} */
 const optionClients = new WeakMap();
 
-/** @param {string} tokenType @param {BrokerOptions} [options] @param {string} [provider] @returns {Promise<string>} */
-function getBrokerToken(tokenType, options, provider = "github") {
+/** @param {BrokerOptions} [options] */
+function clientForOptions(options) {
   if (!options) {
     defaultClient ||= createTokenBrokerClient();
-    return defaultClient.getToken(tokenType, provider);
+    return defaultClient;
   }
   let client = optionClients.get(options);
   if (!client) {
     client = createTokenBrokerClient(options);
     optionClients.set(options, client);
   }
-  return client.getToken(tokenType, provider);
+  return client;
+}
+
+/** @param {string} tokenType @param {BrokerOptions} [options] @param {string} [provider] @returns {Promise<string>} */
+function getBrokerToken(tokenType, options, provider = "github") {
+  return clientForOptions(options).getToken(tokenType, provider);
 }
 
 /** @param {BrokerOptions} [options] @returns {Promise<void>} */
 function invalidateBrokerTokens(options) {
-  if (!options) {
-    defaultClient ||= createTokenBrokerClient();
-    return defaultClient.invalidateTokens();
-  }
-  let client = optionClients.get(options);
-  if (!client) {
-    client = createTokenBrokerClient(options);
-    optionClients.set(options, client);
-  }
-  return client.invalidateTokens();
+  return clientForOptions(options).invalidateTokens();
 }
 
 /** @param {BrokerOptions} [options] */
-async function getBrokerOTLPCredentials(options) {
-  if (!options) {
-    defaultClient ||= createTokenBrokerClient();
-    return defaultClient.getOTLPCredentials();
-  }
-  let client = optionClients.get(options);
-  if (!client) {
-    client = createTokenBrokerClient(options);
-    optionClients.set(options, client);
-  }
-  return client.getOTLPCredentials();
+function getBrokerOTLPCredentials(options) {
+  return clientForOptions(options).getOTLPCredentials();
 }
 
 module.exports = { createTokenBrokerClient, getBrokerToken, getBrokerOTLPCredentials, invalidateBrokerTokens, isTokenBrokerEnabled };

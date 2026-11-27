@@ -13956,6 +13956,10 @@
           "type": "object",
           "description": "OTLP (OpenTelemetry Protocol) trace export configuration.",
           "properties": {
+            "token-broker": {
+              "type": "boolean",
+              "description": "Request brokered OTLP credentials. Requires the agent sandbox; runtime support is not yet available."
+            },
             "endpoint": {
               "description": "OTLP endpoint configuration. Accepts a plain URL string (backward-compat), a single {url, headers} object, or an array of {url, headers} objects for multi-endpoint concurrent fan-out. Encoded as GH_AW_OTLP_ENDPOINTS (JSON array).",
               "oneOf": [

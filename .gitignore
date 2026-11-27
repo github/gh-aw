@@ -115,6 +115,7 @@ gh-aw-test/
 # Action build artifacts - keep bundled index.js, exclude temp files
 actions/**/node_modules/
 actions/**/*.tmp
+actions/setup/js/.gh-aw-failure-prompts-*/
 actions/**/.build/
 
 # pkg/workflow/js should only contain generated .cjs files and safe_outputs_tools.json

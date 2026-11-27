@@ -91,6 +91,34 @@ observability:
 	}
 }
 
+func TestCompileBrokeredOTLPSandbox(t *testing.T) {
+	const source = "---\non: workflow_dispatch\nengine: copilot\nstrict: false\npermissions: { contents: read }\nnetwork: { allowed: [defaults] }\n"
+	for _, tc := range []struct {
+		name, config, imported, wantError string
+	}{
+		{name: "disabled sandbox", config: "observability: {otlp: {token-broker: true}}\nfeatures: {dangerously-disable-sandbox-agent: true}\nsandbox: {agent: false}\n", wantError: "requires the AWF agent sandbox"},
+		{name: "default sandbox", config: "observability: {otlp: {token-broker: true}}\n", wantError: "not yet available"},
+		{name: "explicit sandbox", config: "observability: {otlp: {token-broker: true}}\nsandbox: {agent: awf}\n", wantError: "not yet available"},
+		{name: "disabled selector", config: "observability: {otlp: {token-broker: false}}\nfeatures: {dangerously-disable-sandbox-agent: true}\nsandbox: {agent: false}\n"},
+		{name: "imported selector", config: "imports: [shared.md]\nfeatures: {dangerously-disable-sandbox-agent: true}\nsandbox: {agent: false}\n", imported: "observability: {otlp: {token-broker: true}}\n", wantError: "requires the AWF agent sandbox"},
+		{name: "main override", config: "imports: [shared.md]\nobservability: {otlp: {token-broker: false}}\n", imported: "observability: {otlp: {token-broker: true}}\n"},
+		{name: "main opt out", config: "imports: [shared.md]\nobservability: {otlp: false}\n", imported: "observability: {otlp: {token-broker: true}}\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "shared.md"), []byte("---\n"+tc.imported+"---\n"), 0600))
+			path := filepath.Join(dir, "telemetry.md")
+			require.NoError(t, os.WriteFile(path, []byte(source+tc.config+"---\nSay hello.\n"), 0600))
+			err := NewCompiler().CompileWorkflow(path)
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestNormalizeFrontmatterConfigOTLPDisabled(t *testing.T) {
 	frontmatter := map[string]any{
 		"observability": map[string]any{

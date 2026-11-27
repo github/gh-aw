@@ -222,16 +222,13 @@ async function run() {
     process.env.INPUT_PARENT_SPAN_ID = inputParentSpanId;
   }
 
-  const brokeredOTLP = getActionInput("TOKEN_BROKER_OTLP") === "true";
-  if (brokeredOTLP) {
+  if (getActionInput("TOKEN_BROKER_OTLP") === "true") {
     // Fail closed until sandbox filtering, collector policy, and exporter deadlines are enforced.
     throw new Error("Brokered OTLP is not available until its security controls are enforced.");
   }
 
   const inputOTLPOIDCToken = getActionInput("OTLP_OIDC_TOKEN");
-  if (brokeredOTLP) {
-    // The brokered profile replaces, rather than merges with, inherited OTLP credentials.
-  } else if (/[\r\n]/.test(inputOTLPOIDCToken)) {
+  if (/[\r\n]/.test(inputOTLPOIDCToken)) {
     core.warning("[otlp] ignoring OTLP OIDC token containing line breaks");
   } else if (inputOTLPOIDCToken) {
     maskSecret(inputOTLPOIDCToken);

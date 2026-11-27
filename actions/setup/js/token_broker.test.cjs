@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-const { createTokenBrokerClient, getBrokerOTLPCredentials, getBrokerToken, isTokenBrokerEnabled } = require("./token_broker.cjs");
+const { createTokenBrokerClient, getBrokerOTLPCredentials, getBrokerToken, invalidateBrokerTokens, isTokenBrokerEnabled } = require("./token_broker.cjs");
 
 const START = Date.parse("2026-10-30T12:00:00Z");
 const jwt = exp => [JSON.stringify({ alg: "synthetic" }), JSON.stringify({ exp }), "synthetic-signature"].map(value => Buffer.from(value).toString("base64url")).join(".");
@@ -42,6 +42,18 @@ afterEach(() => {
 });
 
 describe("token broker", () => {
+  it("shares the options-scoped client between token requests and invalidation", async () => {
+    const fixture = setup({
+      fetchImpl: vi.fn(async (_url, init) => (init.method === "POST" ? (JSON.parse(init.body).operation === "invalidate" ? new Response(null, { status: 204 }) : success()) : json({ value: OIDC }))),
+    });
+    await getBrokerToken("copilot-task", fixture.options);
+    await getBrokerToken("copilot-task", fixture.options);
+    expect(fixture.fetchImpl).toHaveBeenCalledTimes(2);
+    await invalidateBrokerTokens(fixture.options);
+    await getBrokerToken("copilot-task", fixture.options);
+    expect(fixture.fetchImpl).toHaveBeenCalledTimes(6);
+  });
+
   it("correlates exchanges and invalidation with the current trace and encoded job, but not OIDC issuance", async () => {
     const fixture = setup({
       env: { ...makeEnv(), GITHUB_AW_OTEL_TRACE_ID: "a".repeat(32), GITHUB_AW_OTEL_PARENT_SPAN_ID: "b".repeat(16), GITHUB_JOB: "safe outputs/review" },

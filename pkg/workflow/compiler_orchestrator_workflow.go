@@ -391,6 +391,9 @@ func (c *Compiler) mergeImportedWorkflowConfiguration(ctx *workflowBuildContext)
 	if ctx.workflowData.ConcurrencyJobDiscriminator == "" {
 		ctx.workflowData.ConcurrencyJobDiscriminator = ctx.engineSetup.importsResult.MergedJobDiscriminator
 	}
+	if err := validateBrokeredOTLP(ctx.workflowData, ctx.engineSetup.importsResult.MergedObservability); err != nil {
+		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
+	}
 	c.mergeImportedObservability(ctx.workflowData, ctx.engineSetup.importsResult.MergedObservability)
 	if err := resolveOTLPMetadataReferences(ctx.workflowData); err != nil {
 		return formatCompilerError(ctx.cleanPath, "error", err.Error(), err)
@@ -408,6 +411,27 @@ func (c *Compiler) mergeImportedWorkflowConfiguration(ctx *workflowBuildContext)
 	}
 	ctx.workflowData.Features = mergedFeatures
 	return nil
+}
+
+func validateBrokeredOTLP(workflowData *WorkflowData, importedObservability string) error {
+	if isOTLPDisabled(workflowData.RawFrontmatter) {
+		return nil
+	}
+	otlp := ExtractMapField(extractRawObservabilityMap(workflowData.RawFrontmatter), "otlp")
+	enabled, present := otlp["token-broker"].(bool)
+	if !present && importedObservability != "" {
+		var imported map[string]any
+		if jsonutil.UnmarshalString(importedObservability, &imported) == nil {
+			enabled, present = ExtractMapField(imported, "otlp")["token-broker"].(bool)
+		}
+	}
+	if !present || !enabled {
+		return nil
+	}
+	if !isFirewallEnabled(workflowData) {
+		return errors.New("observability.otlp.token-broker requires the AWF agent sandbox; enable sandbox.agent")
+	}
+	return errors.New("observability.otlp.token-broker is not yet available: sandbox filtering, collector policy, and exporter deadline enforcement are required")
 }
 
 // mergeImportedObservability merges imported OTLP config into raw frontmatter with main precedence.
