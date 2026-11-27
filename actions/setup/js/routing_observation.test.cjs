@@ -257,4 +257,191 @@ describe("routing.observation in the unified session", () => {
     fs.writeFileSync(path.join(root, "agent-session.jsonl"), JSON.stringify({ type: "routing.observation", data: { outcome: "success" } }) + "\n");
     expect(verdicts(collect(root))).toEqual([]);
   });
+
+  describe("agent-output-fallback parity with the full agent artifact", () => {
+    const { persistUpstreamErrorFallback } = req("./parse_token_usage.cjs");
+    const { persistRoutingRefusalIndicator } = req("./log_parser_bootstrap.cjs");
+    const LAYOUTS = ["sandbox/firewall/logs/api-proxy-logs", "sandbox/firewall/audit/api-proxy-logs", "sandbox/firewall-audit-logs/api-proxy-logs"];
+
+    /**
+     * Build a full-artifact run directory and a fallback-only recovery directory containing only
+     * the files uploaded by `agent-output-fallback` (no `agent-session.jsonl`, no `agent-stdio.log`,
+     * no native session logs, and no raw `upstream-errors.jsonl`).
+     * @param {{layout?: string, agentOutput?: unknown, upstreamError?: Record<string, unknown>, sessionEvents?: unknown[]}} options
+     */
+    function buildFullAndFallback({ layout = PROXY_LOGS, agentOutput = { items: [], errors: [] }, upstreamError, sessionEvents = [], agentExecution }) {
+      const full = fs.mkdtempSync(path.join(os.tmpdir(), "routing-full-"));
+      const fallback = fs.mkdtempSync(path.join(os.tmpdir(), "routing-fallback-"));
+      roots.push(full, fallback);
+      const source = fixtures.runDir(routed.id);
+      const awInfo = JSON.stringify(fixtures.awInfo(routed.id));
+      // Write activation metadata (from the info artifact) and proxy files into the selected layout.
+      fs.writeFileSync(path.join(full, "aw_info.json"), awInfo);
+      fs.writeFileSync(path.join(fallback, "aw_info.json"), awInfo);
+      fs.writeFileSync(path.join(full, "agent_output.json"), JSON.stringify(agentOutput));
+      fs.writeFileSync(path.join(fallback, "agent_output.json"), JSON.stringify(agentOutput));
+      const fullProxyDir = path.join(full, layout);
+      const fallbackProxyDir = path.join(fallback, layout);
+      fs.mkdirSync(fullProxyDir, { recursive: true });
+      fs.mkdirSync(fallbackProxyDir, { recursive: true });
+      for (const name of ["token-usage.jsonl", "model-routing.jsonl"]) {
+        fs.copyFileSync(path.join(source, PROXY_LOGS, name), path.join(fullProxyDir, name));
+        fs.copyFileSync(path.join(source, PROXY_LOGS, name), path.join(fallbackProxyDir, name));
+      }
+      if (upstreamError) {
+        fs.writeFileSync(path.join(fullProxyDir, "upstream-errors.jsonl"), JSON.stringify(upstreamError) + "\n");
+      }
+      if (sessionEvents.length > 0) {
+        fs.writeFileSync(path.join(full, "agent-session.jsonl"), sessionEvents.map(e => JSON.stringify(e)).join("\n") + "\n");
+      }
+      if (agentExecution) {
+        fs.writeFileSync(path.join(full, "agent-errors.jsonl"), JSON.stringify({ type: "agent.execution", data: agentExecution }) + "\n");
+      }
+      // Run the agent-job producers on the full directory, then copy ONLY fallback-manifest files.
+      persistUpstreamErrorFallback(full);
+      persistRoutingRefusalIndicator(full, sessionEvents);
+      for (const rel of ["agent-errors.jsonl", "agent/upstream-errors-fallback.jsonl", "agent/routing-refusal.json"]) {
+        const src = path.join(full, rel);
+        if (fs.existsSync(src)) {
+          fs.mkdirSync(path.join(fallback, path.dirname(rel)), { recursive: true });
+          fs.copyFileSync(src, path.join(fallback, rel));
+        }
+      }
+      return { full, fallback };
+    }
+
+    const mainRequest = proxyRecords(fixtures.runDir(routed.id), "token-usage.jsonl").find(record => !record.purpose && record.model === "gpt-5.6-luna").request_id;
+
+    it.each(LAYOUTS)("matches full-artifact verdicts in fallback-only recovery across layout %s", layout => {
+      const scenarios = [
+        {
+          name: "report_incomplete with AWF-only HTTP 429",
+          agent: "failure",
+          agentOutput: { items: [{ type: "report_incomplete" }], errors: [] },
+          upstreamError: { event: "UPSTREAM_ERROR_RESPONSE", request_id: mainRequest, status: 429, response_headers: { "x-debug": "secret-header" }, response_body: "rate limited" },
+          expected: skip("rate_limited"),
+        },
+        {
+          name: "failed agent with no terminal output and AWF-only HTTP 503",
+          agent: "failure",
+          agentOutput: { items: [], errors: [] },
+          upstreamError: { event: "UPSTREAM_ERROR_RESPONSE", request_id: mainRequest, status: 503, response_body: "upstream outage" },
+          expected: skip("infrastructure"),
+        },
+        {
+          name: "failed agent with no terminal output and main-agent assistant.refusal",
+          agent: "failure",
+          agentOutput: { items: [], errors: [] },
+          sessionEvents: [{ type: "assistant.refusal", data: { reason: "content_filter", content: "Private refusal content" } }],
+          expected: { outcome: "failure" },
+        },
+        {
+          name: "failed agent with no terminal output and nested subagent refusal only",
+          agent: "failure",
+          agentOutput: { items: [], errors: [] },
+          sessionEvents: [{ type: "assistant.refusal", data: { reason: "refusal", agentId: "subagent-1", content: "Subagent refusal" } }],
+          expected: skip("unknown_evidence"),
+        },
+        {
+          name: "failed agent with agentic_engine_timeout in agent-errors.jsonl",
+          agent: "failure",
+          agentOutput: { items: [], errors: [] },
+          agentExecution: { categories: ["agentic_engine_timeout"], errorCodes: [], errorTypes: [], exitCode: 124 },
+          expected: skip("infrastructure"),
+        },
+        {
+          name: "failed agent with effective_tokens_limit_exceeded in agent-errors.jsonl",
+          agent: "failure",
+          agentOutput: { items: [], errors: [] },
+          agentExecution: { categories: ["effective_tokens_limit_exceeded"], errorCodes: [], errorTypes: [], exitCode: 1 },
+          expected: { outcome: "failure" },
+        },
+        {
+          name: "report_incomplete with HTTP 429 and space-containing errorType in agent-errors.jsonl",
+          agent: "failure",
+          agentOutput: { items: [{ type: "report_incomplete" }], errors: [] },
+          agentExecution: { categories: [], errorCodes: [429], errorTypes: ["Too Many Requests"], exitCode: 1 },
+          expected: skip("rate_limited"),
+        },
+      ];
+
+      const { main: validateRecovery } = req("./validate_recovery_envelopes.cjs");
+      for (const scenario of scenarios) {
+        const { full, fallback } = buildFullAndFallback({
+          layout,
+          agentOutput: scenario.agentOutput,
+          upstreamError: scenario.upstreamError,
+          sessionEvents: scenario.sessionEvents,
+          agentExecution: scenario.agentExecution,
+        });
+        // Run the pre-upload recovery validator on the fallback root before collection.
+        validateRecovery({ roots: [fallback] });
+        const fullOut = path.join(full, "usage/aw_session.jsonl");
+        const fallbackOut = path.join(fallback, "usage/aw_session.jsonl");
+        writeUnifiedSession({ rootDir: full, outputPath: fullOut, warn: () => {}, dailyAIC: {}, admission: {}, jobDurations: {}, jobResults: jobResults(scenario.agent), routingObservation: true });
+        writeUnifiedSession({ rootDir: fallback, outputPath: fallbackOut, warn: () => {}, dailyAIC: {}, admission: {}, jobDurations: {}, jobResults: jobResults(scenario.agent), routingObservation: true });
+
+        const fullContent = fs.readFileSync(fullOut, "utf8");
+        const fallbackContent = fs.readFileSync(fallbackOut, "utf8");
+        const fullEvents = [...readJsonlFile(fullOut, { strict: true })];
+        const fallbackEvents = [...readJsonlFile(fallbackOut, { strict: true })];
+        expect(validateSession(fullContent)).toBe(fullEvents.length);
+        expect(validateSession(fallbackContent)).toBe(fallbackEvents.length);
+        expect(verdicts(fullEvents).map(e => e.data)).toEqual([scenario.expected]);
+        expect(verdicts(fallbackEvents).map(e => e.data)).toEqual([scenario.expected]);
+        // Fallback recovery must never copy response headers, bodies, or refusal prose.
+        expect(fallbackContent).not.toContain("secret-header");
+        expect(fallbackContent).not.toContain("Private refusal content");
+      }
+    });
+
+    it("does not duplicate upstream errors or override full session evidence when both artifacts merge", () => {
+      const { full } = buildFullAndFallback({
+        agentOutput: { items: [], errors: [] },
+        upstreamError: { event: "UPSTREAM_ERROR_RESPONSE", request_id: mainRequest, status: 503, provider: "copilot", model: "gpt-5.6-luna", error_code: "server_error" },
+        sessionEvents: [{ type: "assistant.message", data: { content: "no refusal here" } }],
+      });
+      // Simulate a stale/conflicting refusal indicator beside a merged full agent-session.jsonl.
+      fs.mkdirSync(path.join(full, "agent"), { recursive: true });
+      fs.writeFileSync(path.join(full, "agent/routing-refusal.json"), '{"refused":true}\n');
+
+      const events = collect(full, { agent: "failure" });
+      const upstreamEvents = events.filter(event => event.type === "firewall.upstream_error");
+      expect(upstreamEvents).toHaveLength(1);
+      expect(upstreamEvents[0].data).toMatchObject({ requestId: mainRequest, httpStatus: 503, provider: "copilot", model: "gpt-5.6-luna", errorCode: "server_error" });
+      expect(upstreamEvents[0].provenance.path).toContain("upstream-errors.jsonl");
+      expect(verdicts(events).map(e => e.data)).toEqual([skip("infrastructure")]);
+
+      // Remove upstream errors to confirm full agent-session.jsonl takes precedence over routing-refusal.json.
+      fs.rmSync(path.join(full, PROXY_LOGS, "upstream-errors.jsonl"));
+      fs.rmSync(path.join(full, "agent/upstream-errors-fallback.jsonl"));
+      expect(verdicts(collect(full, { agent: "failure" })).map(e => e.data)).toEqual([skip("unknown_evidence")]);
+    });
+
+    it("rejects over-64-char fallback request_ids and ignores fallback upstream errors in protected session capture", () => {
+      const { fallback } = buildFullAndFallback({
+        agentOutput: { items: [], errors: [] },
+      });
+      const overBoundaryId = "r".repeat(65);
+      fs.mkdirSync(path.join(fallback, "agent"), { recursive: true });
+      fs.writeFileSync(path.join(fallback, "agent/upstream-errors-fallback.jsonl"), JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: overBoundaryId, status: 503 }) + "\n");
+      const overBoundaryEvents = collect(fallback, { agent: "failure" });
+      expect(overBoundaryEvents.filter(event => event.type === "firewall.upstream_error")).toEqual([]);
+      expect(overBoundaryEvents.some(event => event.type === "session.collection_warning" && event.data.code === "invalid_upstream_error_fallback")).toBe(true);
+
+      // In protected session capture, sandbox-side fallback upstream-error files are ignored.
+      fs.writeFileSync(path.join(fallback, "agent-session.jsonl"), JSON.stringify({ type: "assistant.message", data: { content: "verified" } }) + "\n");
+      fs.writeFileSync(path.join(fallback, "agent/upstream-errors-fallback.jsonl"), JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: mainRequest, status: 503 }) + "\n");
+      const protectedEvents = collectUnifiedSession({
+        rootDir: fallback,
+        protectedSessionCapture: true,
+        warn: () => {},
+        dailyAIC: {},
+        admission: {},
+        jobResults: jobResults("failure"),
+        routingObservation: true,
+      }).events;
+      expect(protectedEvents.filter(event => event.type === "firewall.upstream_error")).toEqual([]);
+    });
+  });
 });

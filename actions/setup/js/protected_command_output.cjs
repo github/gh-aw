@@ -144,12 +144,165 @@ function writeVerifiedExitCode(rootDir, exitCode) {
   }
 }
 
+/**
+ * Safely remove a fallback/session artifact path without following symlinked
+ * intermediate directories. Real directories planted at the target path are removed
+ * recursively; symlinks at the target path are unlinked without touching their target.
+ * @param {string} rootDir
+ * @param {string} relativePath
+ * @param {{fsImpl?: typeof fs}} [options]
+ */
+function discardArtifactPath(rootDir, relativePath, { fsImpl = fs } = {}) {
+  const parts = relativePath.split("/");
+  let current = rootDir;
+  for (let i = 0; i < parts.length - 1; i++) {
+    current = path.join(current, parts[i]);
+    if (typeof fsImpl.lstatSync !== "function") {
+      if (!fsImpl.existsSync(current)) return;
+      throw new Error(`${ERR_VALIDATION}: lstatSync is required to inspect ${parts.slice(0, i + 1).join("/")}`);
+    }
+    let stat;
+    try {
+      stat = fsImpl.lstatSync(current);
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
+      throw error;
+    }
+    if (stat.isSymbolicLink()) {
+      throw new Error(`${ERR_VALIDATION}: Refusing to traverse symlinked session artifact directory ${parts.slice(0, i + 1).join("/")}`);
+    }
+    if (!stat.isDirectory()) return;
+  }
+  const target = path.join(current, parts[parts.length - 1]);
+  if (typeof fsImpl.lstatSync !== "function") {
+    if (!fsImpl.existsSync(target)) return;
+    throw new Error(`${ERR_VALIDATION}: lstatSync is required to remove ${relativePath}`);
+  }
+  let stat;
+  try {
+    stat = fsImpl.lstatSync(target);
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
+    throw error;
+  }
+  try {
+    if (!stat.isSymbolicLink() && stat.isDirectory()) {
+      fsImpl.rmSync(target, { recursive: true, force: true });
+    } else {
+      fsImpl.rmSync(target, { force: true });
+    }
+  } catch (error) {
+    throw new Error(`${ERR_VALIDATION}: Failed to remove untrusted session artifact ${relativePath}`, { cause: error });
+  }
+}
+
+/**
+ * Remove a fallback sidecar file if present, ignoring symlinked or non-directory parents.
+ * @param {string} rootDir
+ * @param {string} relativePath
+ * @param {{fsImpl?: typeof fs}} [options]
+ */
+function removeProtectedFallbackFile(rootDir, relativePath, { fsImpl = fs } = {}) {
+  const parts = relativePath.split("/");
+  let current = rootDir;
+  for (let i = 0; i < parts.length - 1; i++) {
+    current = path.join(current, parts[i]);
+    if (typeof fsImpl.lstatSync !== "function") {
+      if (!fsImpl.existsSync(current)) return;
+      return;
+    }
+    let dirStat;
+    try {
+      dirStat = fsImpl.lstatSync(current);
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
+      throw error;
+    }
+    if (dirStat.isSymbolicLink() || !dirStat.isDirectory()) return;
+  }
+  discardArtifactPath(rootDir, relativePath, { fsImpl });
+}
+
+/**
+ * Atomically write a bounded fallback sidecar file under rootDir without following
+ * symlinked parent directories, removing any directory planted at the target path first.
+ * @param {string} rootDir
+ * @param {string} relativePath
+ * @param {string} content
+ * @param {{fsImpl?: typeof fs}} [options]
+ */
+function writeProtectedFallbackFile(rootDir, relativePath, content, { fsImpl = fs } = {}) {
+  const parts = relativePath.split("/");
+  let current = rootDir;
+  for (let i = 0; i < parts.length - 1; i++) {
+    current = path.join(current, parts[i]);
+    try {
+      const dirStat = fsImpl.lstatSync(current);
+      if (dirStat.isSymbolicLink()) {
+        throw new Error(`${ERR_VALIDATION}: Refusing a symlinked metadata directory ${parts.slice(0, i + 1).join("/")}`);
+      }
+      if (!dirStat.isDirectory()) {
+        throw new Error(`${ERR_VALIDATION}: Metadata path is not a directory: ${parts.slice(0, i + 1).join("/")}`);
+      }
+    } catch (error) {
+      if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) throw error;
+      try {
+        fsImpl.mkdirSync(current, { recursive: true });
+      } catch (mkdirError) {
+        throw new Error(`${ERR_VALIDATION}: Failed to create metadata directory ${current}`, { cause: mkdirError });
+      }
+    }
+  }
+  const target = path.join(current, parts[parts.length - 1]);
+  try {
+    const targetStat = fsImpl.lstatSync(target);
+    if (!targetStat.isSymbolicLink() && targetStat.isDirectory()) {
+      fsImpl.rmSync(target, { recursive: true, force: true });
+    }
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) throw error;
+  }
+  const temporary = `${target}.${crypto.randomBytes(16).toString("hex")}.tmp`;
+  let descriptor;
+  try {
+    descriptor = fsImpl.openSync(temporary, fsImpl.constants.O_WRONLY | fsImpl.constants.O_CREAT | fsImpl.constants.O_EXCL | (fsImpl.constants.O_NOFOLLOW ?? 0), 0o600);
+    fsImpl.writeFileSync(descriptor, content, "utf8");
+    fsImpl.closeSync(descriptor);
+    descriptor = undefined;
+    fsImpl.renameSync(temporary, target);
+  } catch (error) {
+    if (descriptor !== undefined) {
+      try {
+        fsImpl.closeSync(descriptor);
+      } catch {
+        // Ignore cleanup failure after write error.
+      }
+    }
+    try {
+      fsImpl.rmSync(temporary, { force: true });
+    } catch {
+      // Ignore cleanup failure after write error.
+    }
+    throw error;
+  }
+}
+
 /** @param {string} rootDir */
 function discardUntrustedSessionArtifacts(rootDir) {
   const errors = [];
-  for (const name of ["agent-stdio.log", "agent-session.jsonl", "agent-session.jsonl.tmp", "agent-errors.jsonl", "agent-errors.jsonl.tmp"]) {
+  for (const name of [
+    "agent-stdio.log",
+    "agent-session.jsonl",
+    "agent-session.jsonl.tmp",
+    "agent-errors.jsonl",
+    "agent-errors.jsonl.tmp",
+    "agent/routing-refusal.json",
+    "agent/routing-refusal.json.tmp",
+    "agent/upstream-errors-fallback.jsonl",
+    "agent/upstream-errors-fallback.jsonl.tmp",
+  ]) {
     try {
-      fs.rmSync(path.join(rootDir, name), { force: true });
+      discardArtifactPath(rootDir, name);
     } catch (error) {
       errors.push(error);
     }
@@ -157,4 +310,4 @@ function discardUntrustedSessionArtifacts(rootDir) {
   if (errors.length) throw new AggregateError(errors, `${ERR_VALIDATION}: Failed to discard sandbox-written session artifacts`);
 }
 
-module.exports = { readProtectedCommandOutput, writeVerifiedExitCode, discardUntrustedSessionArtifacts };
+module.exports = { readProtectedCommandOutput, writeVerifiedExitCode, discardUntrustedSessionArtifacts, removeProtectedFallbackFile, writeProtectedFallbackFile };
