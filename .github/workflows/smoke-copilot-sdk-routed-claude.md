@@ -22,9 +22,9 @@ engine:
   bare: true
 model: router/economy
 model-routing:
-  # claude-haiku-4.5 lists no reasoning efforts, so this also covers a Claude
-  # model selected without an effort. The sub-agent's model stays out of the pool.
-  allowed-models: [claude-haiku-4.5]
+  # claude-haiku-5.5 is in AWF's bundled router tables on Copilot (/chat/completions).
+  # The sub-agent's model stays out of the pool.
+  allowed-models: [claude-haiku-5.5]
 imports:
   - shared/reporting.md
 max-tool-denials: 3
@@ -55,8 +55,9 @@ post-steps:
           core,
           engine: "copilot",
           executionOutcome: process.env.SMOKE_EXECUTION,
-          allowedModels: ["claude-haiku-4.5"],
+          allowedModels: ["claude-haiku-5.5"],
           mainEndpoint: "/chat/completions",
+          expectedSelectionSource: "router",
           subAgents: [{ name: "mini-whoami", model: "gpt-5.6-luna", endpoint: "/responses" }],
           requireDeclaredAgentNames: true,
           expectModelInventory: true,
