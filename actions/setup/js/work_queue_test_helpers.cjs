@@ -4,6 +4,8 @@ const { appendCommit, buildCommit, cloneState, newRequest, replayTransactions } 
 const { gateKey, nodeId } = require("./work_queue_graph.cjs");
 const { planDispatch } = require("./work_queue_scheduler.cjs");
 const { createHash } = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
 const { canonical } = require("./work_queue_codec.cjs");
 const { registerQueueLedgerClient } = require("./work_queue_git_transport.cjs");
 const { readWorkQueuePolicyEnv } = require("./work_queue_policy.cjs");
@@ -236,9 +238,9 @@ function fakeQueueGitHub(initialContents = undefined, { branch = "work-queue", r
  */
 function compiledDispatcherPolicy(name, repository) {
   // Loaded here, not at import: the repository-level adapter provisions a Go tool.
-  const repositoryRoot = require("node:path").join(__dirname, "../../..");
-  const { readDocumentMetadata } = require(require("node:path").join(repositoryRoot, "scripts/markdown_metadata_test_adapter.cjs"));
-  const source = require("node:fs").readFileSync(require("node:path").join(repositoryRoot, `.github/workflows/${name}.lock.yml`), "utf8");
+  const repositoryRoot = path.join(__dirname, "../../..");
+  const { readDocumentMetadata } = require(path.join(repositoryRoot, "scripts/markdown_metadata_test_adapter.cjs"));
+  const source = fs.readFileSync(path.join(repositoryRoot, `.github/workflows/${name}.lock.yml`), "utf8");
   const steps = readDocumentMetadata(source).value?.jobs?.safe_outputs?.steps ?? [];
   const controls = steps.find(step => step?.id === "work_queue_controls");
   if (!controls?.env) throw new Error(`${name}.lock.yml has no work_queue_controls step`);
