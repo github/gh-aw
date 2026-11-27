@@ -227,9 +227,9 @@ func safeOutputsArtifactStagingConfig(data *WorkflowData) (string, map[string]st
 	runtimePolicyValues := make(map[string]string)
 	nextRuntimePolicyValue := 0
 	encodePatterns := func(patterns []string) []string {
-		encoded := make([]string, len(patterns))
-		for i, pattern := range patterns {
-			encoded[i] = encodeArtifactStagingRuntimePolicy(pattern, runtimePolicyValues, &nextRuntimePolicyValue)
+		encoded := make([]string, 0, len(patterns))
+		for _, pattern := range patterns {
+			encoded = append(encoded, encodeArtifactStagingRuntimePolicy(pattern, runtimePolicyValues, &nextRuntimePolicyValue))
 		}
 		return encoded
 	}
