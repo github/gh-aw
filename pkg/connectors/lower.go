@@ -62,6 +62,7 @@ type Selection struct {
 // LoadService validates a repository-local definition and connection without
 // requiring, activating, or resolving credentials for any capability.
 func LoadService(root, definition, connectionPath string) (*Service, error) {
+	log.Printf("Loading connector service: definition=%s connection=%s", definition, connectionPath)
 	dir, err := os.OpenRoot(root)
 	if err != nil {
 		return nil, fmt.Errorf("open connector repository root: %w", err)
@@ -89,6 +90,8 @@ func LoadService(root, definition, connectionPath string) (*Service, error) {
 }
 
 func (s *Service) Select(selection Selection) (*Plan, error) {
+	log.Printf("Selecting connector capabilities: triggers=%d mcp=%d httpMcp=%d safeOutputs=%d context=%d",
+		len(selection.Triggers), len(selection.MCP), len(selection.HTTPMCP), len(selection.SafeOutputs), len(selection.Context))
 	binding := Binding{
 		APIVersion: APIVersion, Kind: "ConnectorBinding",
 		Definition: s.definition, Connection: s.path,
