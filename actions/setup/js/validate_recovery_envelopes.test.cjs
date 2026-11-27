@@ -3,7 +3,7 @@ import childProcess from "child_process";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { main, validateEnvelope } from "./validate_recovery_envelopes.cjs";
+import { main, readBoundedRegularFile, validateEnvelope } from "./validate_recovery_envelopes.cjs";
 import { main as redactSecrets, processFile } from "./redact_secrets.cjs";
 
 const MAGIC = Buffer.from("GH-AW-OBJECT-PACK 1\n");
@@ -433,20 +433,12 @@ describe("final recovery envelope upload boundary", () => {
 
   it("fails closed on POSIX when O_NOFOLLOW is unavailable, and uses open-and-verify on win32", () => {
     const agentErrors = path.join(root, "agent-errors.jsonl");
-    fs.writeFileSync(agentErrors, '{"type":"agent.execution","data":{"categories":["agentic_engine_timeout"],"errorCodes":[],"errorTypes":[],"exitCode":124}}\n');
-    const origConstants = fs.constants;
-    const origPlatform = Object.getOwnPropertyDescriptor(process, "platform");
-    try {
-      Object.defineProperty(fs, "constants", { value: { ...origConstants, O_NOFOLLOW: undefined }, configurable: true });
-      Object.defineProperty(process, "platform", { value: "linux", configurable: true });
-      expect(() => main({ roots: [root] })).toThrow("O_NOFOLLOW is required for recovery artifact validation");
-
-      Object.defineProperty(process, "platform", { value: "win32", configurable: true });
-      expect(main({ roots: [root] })).toEqual({ removed: 0 });
-      expect(fs.existsSync(agentErrors)).toBe(true);
-    } finally {
-      Object.defineProperty(fs, "constants", { value: origConstants, configurable: true });
-      if (origPlatform) Object.defineProperty(process, "platform", origPlatform);
-    }
+    const content = '{"type":"agent.execution","data":{"categories":["agentic_engine_timeout"],"errorCodes":[],"errorTypes":[],"exitCode":124}}\n';
+    fs.writeFileSync(agentErrors, content);
+    expect(() => readBoundedRegularFile(agentErrors, 64 * 1024, { platform: "linux", noFollowFlag: undefined })).toThrow("O_NOFOLLOW is required for recovery artifact validation");
+    expect(readBoundedRegularFile(agentErrors, 64 * 1024, { platform: "win32", noFollowFlag: undefined })).toBe(content);
+    const link = path.join(root, "agent-errors-link.jsonl");
+    fs.symlinkSync(agentErrors, link);
+    expect(readBoundedRegularFile(link, 64 * 1024, { platform: "win32", noFollowFlag: undefined })).toBeNull();
   });
 });

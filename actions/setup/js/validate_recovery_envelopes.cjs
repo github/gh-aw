@@ -19,11 +19,14 @@ const IDENTIFIER_PATTERN = /^[A-Za-z0-9_.:-]{1,64}$/;
  * identity check on Windows where POSIX O_NOFOLLOW does not exist.
  * @param {string} filename
  * @param {number} maxBytes
+ * @param {{platform?: string, noFollowFlag?: number | undefined}} [options]
  * @returns {string | null}
  */
-function readBoundedRegularFile(filename, maxBytes) {
-  const hasNoFollow = typeof fs.constants.O_NOFOLLOW === "number" && fs.constants.O_NOFOLLOW !== 0;
-  if (!hasNoFollow && process.platform !== "win32") {
+function readBoundedRegularFile(filename, maxBytes, options = {}) {
+  const platform = Object.hasOwn(options, "platform") ? options.platform : process.platform;
+  const noFollowFlag = Object.hasOwn(options, "noFollowFlag") ? options.noFollowFlag : fs.constants.O_NOFOLLOW;
+  const hasNoFollow = typeof noFollowFlag === "number" && noFollowFlag !== 0;
+  if (!hasNoFollow && platform !== "win32") {
     throw new Error("O_NOFOLLOW is required for recovery artifact validation");
   }
   let before;
@@ -37,7 +40,7 @@ function readBoundedRegularFile(filename, maxBytes) {
   }
   let fd;
   try {
-    fd = fs.openSync(filename, hasNoFollow ? READ_FLAGS : fs.constants.O_RDONLY);
+    fd = fs.openSync(filename, hasNoFollow ? fs.constants.O_RDONLY | noFollowFlag | (fs.constants.O_NONBLOCK ?? 0) : fs.constants.O_RDONLY);
     const stat = fs.fstatSync(fd);
     if (!stat.isFile() || stat.size > maxBytes) return null;
     if (before && (before.dev !== stat.dev || before.ino !== stat.ino)) return null;
@@ -354,4 +357,4 @@ function main({ roots = ["/tmp/gh-aw", path.join(process.env.RUNNER_TEMP || "/tm
   return { removed };
 }
 
-module.exports = { main, validateEnvelope };
+module.exports = { main, validateEnvelope, readBoundedRegularFile };
