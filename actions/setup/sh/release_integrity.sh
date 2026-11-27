@@ -149,6 +149,7 @@ github/gh-aw-firewall v0.29.16 checksums.txt 6891cd50542511cbae92fc89adbec0bbe05
 github/gh-aw-firewall v0.29.17 checksums.txt f56a82090eb65c9afba912c43fb2aa08de2ca54f8776f27a3fb851bbac21fa92
 github/gh-aw-firewall v0.29.18 checksums.txt bd7b3b0ed6d7a29d5711e1b7ce066e229c2a38577be0c363da899ef17b036b86
 github/gh-aw-firewall v0.29.20 checksums.txt 344d3c3dda4c1ee5cbd2ce9090ad2e5fc3482770494efd07f32565f8bb218cfd
+github/gh-aw-firewall v0.29.21 checksums.txt 322c4b494c42174384f2879ab536c62e1291500396b0f16e3400105e4b4c770d
 PINS
     ) || {
       local config_field="engine"
