@@ -14,7 +14,7 @@ const { writeSessionArtifact } = require("./session_artifact.cjs");
 const { collectCodexJSONRecords } = require("./codex_log_framing.cjs");
 const { collectAgentExecution, parseAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
 const { hasCopilotConversation, hasMalformedJsonl, deduplicateCopilotFallback } = require("./copilot_session.cjs");
-const { readProtectedCommandOutput, writeVerifiedExitCode, discardUntrustedSessionArtifacts } = require("./protected_command_output.cjs");
+const { readProtectedCommandOutput, writeVerifiedExitCode, discardUntrustedSessionArtifacts, removeProtectedFallbackFile, writeProtectedFallbackFile } = require("./protected_command_output.cjs");
 const { sessionTimestamp } = require("./unified_session_order.cjs");
 const INFERENCE_ACCESS_ERROR_PATTERN = /Access denied by policy settings|invalid access to inference/i;
 const CLAUDE_RATE_LIMIT_PATTERN = /rate_limit_error|429 Too Many Requests|"api_error_status"\s*:\s*429|request rejected \(429\)|rate limit/i;
@@ -184,42 +184,6 @@ function withAgentProvenance(event, sourcePath, index) {
 const ROUTING_REFUSAL_RELATIVE_PATH = "agent/routing-refusal.json";
 
 /**
- * Remove any pre-existing refusal indicator (including a sandbox-planted directory
- * at that path) without following a symlinked parent directory.
- * @param {string} rootDir
- */
-function removeRoutingRefusalIndicator(rootDir) {
-  const fs = require("fs");
-  const path = require("path");
-  const agentDir = path.join(rootDir, "agent");
-  let dirStat;
-  try {
-    dirStat = fs.lstatSync(agentDir);
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
-    throw error;
-  }
-  if (dirStat.isSymbolicLink() || !dirStat.isDirectory()) return;
-  const target = path.join(agentDir, "routing-refusal.json");
-  let targetStat;
-  try {
-    targetStat = fs.lstatSync(target);
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
-    throw error;
-  }
-  try {
-    if (!targetStat.isSymbolicLink() && targetStat.isDirectory()) {
-      fs.rmSync(target, { recursive: true, force: true });
-    } else {
-      fs.rmSync(target, { force: true });
-    }
-  } catch (error) {
-    throw new Error(`${ERR_SYSTEM}: Failed to remove routing refusal indicator ${target}: ${getErrorMessage(error)}`, { cause: error });
-  }
-}
-
-/**
  * Persist a minimal, content-free indicator of whether the main agent recorded a
  * top-level `assistant.refusal`, so fallback-only recovery matches the full artifact.
  * @param {string} rootDir
@@ -228,62 +192,12 @@ function removeRoutingRefusalIndicator(rootDir) {
  */
 function persistRoutingRefusalIndicator(rootDir, entries) {
   const fs = require("fs");
-  const path = require("path");
-  const crypto = require("crypto");
   const refused = normalizeAgentSession(entries).some(event => event.type === "assistant.refusal" && !isNestedSessionEvent(event));
   if (!refused) {
-    removeRoutingRefusalIndicator(rootDir);
+    removeProtectedFallbackFile(rootDir, ROUTING_REFUSAL_RELATIVE_PATH, { fsImpl: fs });
     return false;
   }
-  const agentDir = path.join(rootDir, "agent");
-  try {
-    const dirStat = fs.lstatSync(agentDir);
-    if (dirStat.isSymbolicLink()) {
-      throw new Error(`${ERR_VALIDATION}: Refusing a symlinked agent metadata directory`);
-    }
-    if (!dirStat.isDirectory()) {
-      throw new Error(`${ERR_VALIDATION}: Agent metadata path is not a directory`);
-    }
-  } catch (error) {
-    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) throw error;
-    try {
-      fs.mkdirSync(agentDir, { recursive: true });
-    } catch (mkdirError) {
-      throw new Error(`${ERR_SYSTEM}: Failed to create agent metadata directory ${agentDir}: ${getErrorMessage(mkdirError)}`, { cause: mkdirError });
-    }
-  }
-  const target = path.join(agentDir, "routing-refusal.json");
-  try {
-    const targetStat = fs.lstatSync(target);
-    if (!targetStat.isSymbolicLink() && targetStat.isDirectory()) {
-      fs.rmSync(target, { recursive: true, force: true });
-    }
-  } catch (error) {
-    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) throw error;
-  }
-  const temporary = `${target}.${crypto.randomBytes(16).toString("hex")}.tmp`;
-  let descriptor;
-  try {
-    descriptor = fs.openSync(temporary, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0), 0o600);
-    fs.writeFileSync(descriptor, '{"refused":true}\n', "utf8");
-    fs.closeSync(descriptor);
-    descriptor = undefined;
-    fs.renameSync(temporary, target);
-  } catch (error) {
-    if (descriptor !== undefined) {
-      try {
-        fs.closeSync(descriptor);
-      } catch {
-        // Ignore cleanup failure after write error.
-      }
-    }
-    try {
-      fs.rmSync(temporary, { force: true });
-    } catch {
-      // Ignore cleanup failure after write error.
-    }
-    throw error;
-  }
+  writeProtectedFallbackFile(rootDir, ROUTING_REFUSAL_RELATIVE_PATH, '{"refused":true}\n', { fsImpl: fs });
   return true;
 }
 
@@ -378,7 +292,7 @@ async function runLogParser(options) {
 
   try {
     if (protectedCapture) discardUntrustedSessionArtifacts(rootDir);
-    else removeRoutingRefusalIndicator(rootDir);
+    else removeProtectedFallbackFile(rootDir, ROUTING_REFUSAL_RELATIVE_PATH, { fsImpl: fs });
     const logPath = process.env.GH_AW_AGENT_OUTPUT;
     if (!logPath) {
       if (protectedCapture) throw new Error(`${ERR_VALIDATION}: AWF protected command output directory is required`);
@@ -792,6 +706,5 @@ if (typeof module !== "undefined" && module.exports) {
     runLogParser,
     readCopilotSessions,
     persistRoutingRefusalIndicator,
-    ROUTING_REFUSAL_RELATIVE_PATH,
   };
 }

@@ -398,6 +398,7 @@ describe("final recovery envelope upload boundary", () => {
       '{"event":"UPSTREAM_ERROR_RESPONSE","request_id":"req-1","status":429,"response_body":"leaked"}\n',
       '{"event":"UPSTREAM_ERROR_RESPONSE","request_id":"leaked","request_id":"req-1","status":429}\n',
       '{"event":"UPSTREAM_ERROR_RESPONSE","request_id":"free form secret text","status":429}\n',
+      `{"event":"UPSTREAM_ERROR_RESPONSE","request_id":"${"a".repeat(65)}","status":429}\n`,
       '{"status":429,"event":"UPSTREAM_ERROR_RESPONSE","request_id":"req-1"}\n',
     ]) {
       fs.writeFileSync(errorsDir, badUpstream);

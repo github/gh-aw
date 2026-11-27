@@ -24,7 +24,7 @@ const { buildWorkflowCallId } = require("./aw_context.cjs");
 const SESSION_FILE_FORMAT_VERSION = 1;
 // The conclusion's sanitized detection result; only it carries a trusted conclusion reason.
 const DETECTION_RESULT_PATH = "usage/detection/detection_result.json";
-const UPSTREAM_ERROR_REQUEST_ID_PATTERN = /^[A-Za-z0-9_.:-]{1,128}$/;
+const UPSTREAM_ERROR_REQUEST_ID_PATTERN = /^[A-Za-z0-9_.:-]{1,64}$/;
 
 /** @param {any} data @returns {boolean} */
 function isModelEndpointMismatchData(data) {
@@ -749,7 +749,7 @@ function collectUnifiedSession({
         add(file, "firewall", phase, undefined, unit);
       }
     }
-    if (prefix === "" && !seen.has(path.join("api-proxy-logs", "upstream-errors.jsonl"))) {
+    if (prefix === "" && !protectedSessionCapture && !seen.has(path.join("api-proxy-logs", "upstream-errors.jsonl"))) {
       const fallbackErrors = path.join(rootDir, "agent/upstream-errors-fallback.jsonl");
       if (exists(fallbackErrors)) {
         /** @type {SessionEvent[]} */

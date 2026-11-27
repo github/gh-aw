@@ -158,12 +158,18 @@ describe("native protected command output", () => {
     }
   });
 
-  it("removes directories planted at nested refusal artifact paths", () => {
-    const plantedDir = path.join(directory, "agent", "routing-refusal.json");
-    fs.mkdirSync(plantedDir, { recursive: true });
-    fs.writeFileSync(path.join(plantedDir, "extra.txt"), "untrusted");
+  it("removes directories planted at nested fallback artifact paths", () => {
+    const plantedRefusalDir = path.join(directory, "agent", "routing-refusal.json");
+    const plantedUpstreamFile = path.join(directory, "agent", "upstream-errors-fallback.jsonl");
+    const plantedUpstreamTmp = path.join(directory, "agent", "upstream-errors-fallback.jsonl.tmp");
+    fs.mkdirSync(plantedRefusalDir, { recursive: true });
+    fs.writeFileSync(path.join(plantedRefusalDir, "extra.txt"), "untrusted");
+    fs.writeFileSync(plantedUpstreamFile, '{"event":"UPSTREAM_ERROR_RESPONSE","request_id":"req-1","status":503}\n');
+    fs.writeFileSync(plantedUpstreamTmp, "tmp");
     discardUntrustedSessionArtifacts(directory);
-    expect(fs.existsSync(plantedDir)).toBe(false);
+    expect(fs.existsSync(plantedRefusalDir)).toBe(false);
+    expect(fs.existsSync(plantedUpstreamFile)).toBe(false);
+    expect(fs.existsSync(plantedUpstreamTmp)).toBe(false);
   });
 
   it("atomically replaces a sidecar symlink with the verified exit code", () => {

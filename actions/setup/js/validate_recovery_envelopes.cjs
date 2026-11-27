@@ -7,19 +7,24 @@ const { getObjectPackLimits } = require("./object_pack_limits.cjs");
 const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 
 const MAGIC = Buffer.from("GH-AW-OBJECT-PACK 1\n");
-const READ_FLAGS = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_NONBLOCK ?? 0);
+const READ_FLAGS = fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK;
 const MAX_ROUTING_REFUSAL_BYTES = 1024;
 const MAX_UPSTREAM_ERROR_FALLBACK_BYTES = 1024 * 1024;
 const MAX_AGENT_ERRORS_BYTES = 64 * 1024;
-const IDENTIFIER_PATTERN = /^[A-Za-z0-9_.:-]{1,128}$/;
+const IDENTIFIER_PATTERN = /^[A-Za-z0-9_.:-]{1,64}$/;
 
 /**
- * Read a bounded regular file without following symlinks.
+ * Read a bounded regular file without following symlinks. Fails closed when the
+ * runtime does not expose O_NOFOLLOW so symlinks can never be followed across the
+ * upload boundary.
  * @param {string} filename
  * @param {number} maxBytes
  * @returns {string | null}
  */
 function readBoundedRegularFile(filename, maxBytes) {
+  if (typeof fs.constants.O_NOFOLLOW !== "number" || fs.constants.O_NOFOLLOW === 0) {
+    throw new Error("O_NOFOLLOW is required for recovery artifact validation");
+  }
   let fd;
   try {
     fd = fs.openSync(filename, READ_FLAGS);

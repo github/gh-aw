@@ -4,7 +4,6 @@
 const { iterateJsonl, iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 const fs = require("fs");
 const path = require("path");
-const crypto = require("crypto");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_PARSE } = require("./error_codes.cjs");
 const { parseTokenUsageJsonl, generateTokenUsageSummary, formatAICForOutput } = require("./parse_mcp_gateway_log.cjs");
@@ -14,6 +13,7 @@ const { recordModelRouting, resolveEffectiveModel, validateModelIdentifier } = r
 const { persistCopilotModelSelection } = require("./copilot_model_selection.cjs");
 const { getApiProxyEventName } = require("./steering_helpers.cjs");
 const { persistModelConfigBaseline } = require("./routing_analytics.cjs");
+const { removeProtectedFallbackFile, writeProtectedFallbackFile } = require("./protected_command_output.cjs");
 
 const DEFAULT_GH_AW_DIR = "/tmp/gh-aw";
 /**
@@ -257,7 +257,7 @@ function recordModelRoutingFromArtifacts(env = process.env, ghAwDir = env.GH_AW_
 }
 
 const UPSTREAM_ERROR_FALLBACK_RELATIVE_PATH = "agent/upstream-errors-fallback.jsonl";
-const UPSTREAM_ERROR_REQUEST_ID_PATTERN = /^[A-Za-z0-9_.:-]{1,128}$/;
+const UPSTREAM_ERROR_REQUEST_ID_PATTERN = /^[A-Za-z0-9_.:-]{1,64}$/;
 const UPSTREAM_ERROR_LAYOUT_PATHS = ["sandbox/firewall/logs/api-proxy-logs/upstream-errors.jsonl", "sandbox/firewall/audit/api-proxy-logs/upstream-errors.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/upstream-errors.jsonl"];
 
 /**
@@ -284,40 +284,6 @@ function resolveRegularFileInside(rootDir, relativePath) {
 }
 
 /**
- * Remove any stale upstream-error fallback file (including a sandbox-planted directory
- * at that path) without following a symlinked agent directory.
- * @param {string} ghAwDir
- */
-function removeUpstreamErrorFallback(ghAwDir) {
-  const agentDir = path.join(ghAwDir, "agent");
-  let dirStat;
-  try {
-    dirStat = fs.lstatSync(agentDir);
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
-    throw error;
-  }
-  if (dirStat.isSymbolicLink() || !dirStat.isDirectory()) return;
-  const target = path.join(agentDir, "upstream-errors-fallback.jsonl");
-  let targetStat;
-  try {
-    targetStat = fs.lstatSync(target);
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return;
-    throw error;
-  }
-  try {
-    if (!targetStat.isSymbolicLink() && targetStat.isDirectory()) {
-      fs.rmSync(target, { recursive: true, force: true });
-    } else {
-      fs.rmSync(target, { force: true });
-    }
-  } catch (error) {
-    throw new Error(`${ERR_PARSE}: Failed to remove upstream error fallback ${target}: ${getErrorMessage(error)}`, { cause: error });
-  }
-}
-
-/**
  * Persist an allowlisted recovery file containing only the event discriminator,
  * `request_id`, and HTTP `status` from AWF's `upstream-errors.jsonl` (using the
  * same logs > audit > legacy layout precedence as the unified session collector).
@@ -329,7 +295,7 @@ function removeUpstreamErrorFallback(ghAwDir) {
 function persistUpstreamErrorFallback(ghAwDir = getGhAwPath("")) {
   const sourceFile = UPSTREAM_ERROR_LAYOUT_PATHS.map(rel => resolveRegularFileInside(ghAwDir, rel)).find(Boolean);
   if (!sourceFile) {
-    removeUpstreamErrorFallback(ghAwDir);
+    removeProtectedFallbackFile(ghAwDir, UPSTREAM_ERROR_FALLBACK_RELATIVE_PATH, { fsImpl: fs });
     return 0;
   }
   let content;
@@ -354,58 +320,10 @@ function persistUpstreamErrorFallback(ghAwDir = getGhAwPath("")) {
     records.push({ event: "UPSTREAM_ERROR_RESPONSE", request_id: requestId, status });
   }
   if (records.length === 0) {
-    removeUpstreamErrorFallback(ghAwDir);
+    removeProtectedFallbackFile(ghAwDir, UPSTREAM_ERROR_FALLBACK_RELATIVE_PATH, { fsImpl: fs });
     return 0;
   }
-  const agentDir = path.join(ghAwDir, "agent");
-  try {
-    const dirStat = fs.lstatSync(agentDir);
-    if (dirStat.isSymbolicLink()) {
-      throw new Error(`${ERR_PARSE}: Refusing a symlinked agent metadata directory`);
-    }
-    if (!dirStat.isDirectory()) {
-      throw new Error(`${ERR_PARSE}: Agent metadata path is not a directory`);
-    }
-  } catch (error) {
-    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) throw error;
-    try {
-      fs.mkdirSync(agentDir, { recursive: true });
-    } catch (mkdirError) {
-      throw new Error(`${ERR_PARSE}: Failed to create agent metadata directory ${agentDir}: ${getErrorMessage(mkdirError)}`, { cause: mkdirError });
-    }
-  }
-  const target = path.join(agentDir, "upstream-errors-fallback.jsonl");
-  try {
-    const targetStat = fs.lstatSync(target);
-    if (!targetStat.isSymbolicLink() && targetStat.isDirectory()) {
-      fs.rmSync(target, { recursive: true, force: true });
-    }
-  } catch (error) {
-    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) throw error;
-  }
-  const temporary = `${target}.${crypto.randomBytes(16).toString("hex")}.tmp`;
-  let outFd;
-  try {
-    outFd = fs.openSync(temporary, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0), 0o600);
-    fs.writeFileSync(outFd, records.map(record => JSON.stringify(record)).join("\n") + "\n", "utf8");
-    fs.closeSync(outFd);
-    outFd = undefined;
-    fs.renameSync(temporary, target);
-  } catch (error) {
-    if (outFd !== undefined) {
-      try {
-        fs.closeSync(outFd);
-      } catch {
-        // Ignore cleanup failure after write error.
-      }
-    }
-    try {
-      fs.rmSync(temporary, { force: true });
-    } catch {
-      // Ignore cleanup failure after write error.
-    }
-    throw error;
-  }
+  writeProtectedFallbackFile(ghAwDir, UPSTREAM_ERROR_FALLBACK_RELATIVE_PATH, records.map(record => JSON.stringify(record)).join("\n") + "\n", { fsImpl: fs });
   return records.length;
 }
 

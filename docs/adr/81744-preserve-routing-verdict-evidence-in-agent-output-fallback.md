@@ -1,70 +1,57 @@
 # ADR-81744: Preserve routing verdict evidence and adaptive receipts in agent-output-fallback
 
-**Status:** Draft
+**Status:** Accepted
 **Date:** 2026-11-27
+**Deciders:** rabeckett (PR author)
 **PR:** [#81744](https://github.com/github/gh-aw/pull/81744)
 **Linked issue:** #81725 (related: #79102)
 
 ## Context
 
-When a routed workflow's large `agent` artifact upload times out or fails, the `conclusion` job recovers from the small `agent-output-fallback` artifact. Before this PR, that fallback carried safe-output and accounting files (`token-usage.jsonl`, `model-routing.jsonl`) but not the evidence needed to classify a routed run's `routing.observation` verdict. Three gaps followed:
+When a routed workflow's large `agent` artifact upload times out or fails, the `conclusion` job recovers from the small `agent-output-fallback` artifact. Before this change, that fallback carried safe-output and accounting files (`token-usage.jsonl`, `model-routing.jsonl`) but omitted key evidence that `conclusion` uses to classify a routed run's `routing.observation` verdict:
 
-- Workflows that opt into `model-routing.learning` without explicit `safe-outputs:` (or with only auto-injected issue creation) did not emit `agent-output-fallback`, so no recovery path existed.
-- The fallback omitted the firewall's upstream HTTP error status (for example 429 and 503) and the main-agent `assistant.refusal` signal. Without them, the conclusion collector cannot tell provider rate limits, 5xx outages, and refusals apart.
-- Live adaptive routing writes selection receipts to `adaptive-selection.jsonl`. Omitting that file turns a recovered live run into `receipt_missing` instead of counting it under its bound receipt.
+- Workflows that opt into `model-routing.learning` without explicit `safe-outputs:` (or with only auto-injected issue creation) did not emit `agent-output-fallback`, leaving no recovery path when the full `agent` artifact failed to upload.
+- The fallback omitted AWF's upstream HTTP error status evidence (for example HTTP 429 and 503), the main-agent `assistant.refusal` signal, and classified execution error categories (`agent-errors.jsonl`). Without them, fallback-only recovery could misclassify rate limits, provider outages, timeouts, and content refusals.
+- Live adaptive routing writes selection receipts to `adaptive-selection.jsonl`. Omitting that file from the fallback manifest turns a recovered live run into `receipt_missing` instead of counting it under its bound receipt.
 
-The PR body's scenario table shows the effect on fallback-only recovery:
-
-| Scenario | Full `agent` artifact | Fallback-only, before |
+| Scenario | Full `agent` artifact | Fallback-only recovery before |
 | --- | --- | --- |
-| `report_incomplete` with an AWF-only HTTP 429 | `skip` (`rate_limited`) | `failure` (charged to the model) |
+| `report_incomplete` with an AWF-only HTTP 429 | `skip` (`rate_limited`) | `failure` (counted against the model) |
+| Failed agent, no terminal output, AWF-only HTTP 503 | `skip` (`infrastructure`) | `skip` (`unknown_evidence`) |
 | Failed agent, no terminal output, main-agent `assistant.refusal` | `failure` | `skip` (`unknown_evidence`) |
-| Live adaptive run with a bound receipt | Counted under the bound receipt | `receipt_missing` |
-
-The linked issue #81725 describes the problem and the proposed behavior. It does not contain alternatives or consequences, so this ADR draws those from PR evidence.
-
-The gate trigger is the diff itself: 125 added lines under `pkg/` (five files in `pkg/workflow/`), above the 100-line default threshold. The PR does not carry the `implementation` label.
+| Failed agent with `agentic_engine_timeout` in `agent-errors.jsonl` | `skip` (`infrastructure`) | `skip` (`unknown_evidence`) |
+| Live adaptive run with a bound receipt | Receipt preserved for reducer | `receipt_missing` |
 
 ## Decision
 
-Use `agent-output-fallback` as the recovery channel for routing verdict evidence. Emit it whenever routing learning is enabled, not only when safe outputs exist, and include the minimal evidence the conclusion collector needs.
+Use `agent-output-fallback` as the recovery channel for routing verdict evidence and adaptive receipts, emitting it whenever `model-routing.learning` is enabled in addition to explicit safe-output workflows.
 
-Concretely:
-
-1. **Emission gate.** `generateAgentOutputFallbackUpload` in `pkg/workflow/compiler_yaml_artifacts.go` emits the upload when `data.RoutingLearningMode` is set, in addition to the existing safe-output condition.
-2. **Added recovery files, in all three firewall log layouts (including ARC/DinD path rewriting):**
-   - `adaptive-selection.jsonl`, beside `model-routing.jsonl` and `token-usage.jsonl`, when present.
-   - `agent/upstream-errors-fallback.jsonl`: allowlisted lines carrying only `event`, `request_id`, and `status`. It is a separate file so a merged download cannot overwrite the full `upstream-errors.jsonl`.
-   - `agent/routing-refusal.json`: content-free `{"refused":true}`, written only for top-level `assistant.refusal` events.
-   - `agent-errors.jsonl`: classified `agent.execution` categories and codes, produced before secret redaction.
-3. **Validation.** `actions/setup/js/validate_recovery_envelopes.cjs` checks canonical allowlisted bytes and rejects directories, symlinks, or tampered payloads at fallback paths before upload. Secret redaction and recovery-envelope validation remain required gates.
-
-Why: the conclusion job should reach the same `routing.observation` verdict and `runs.jsonl` row whether it recovers from the full artifact or the fallback. The allowlist supplies the verdict inputs without headers, response bodies, or conversation content.
-
-Evidence:
-
-- `pkg/workflow/compiler_yaml_artifacts.go`: the early return changes from `SafeOutputs == nil || AutoInjectedCreateIssue` to also require `RoutingLearningMode == ""`. The fallback path list gains `agent-errors.jsonl`, `agent/routing-refusal.json`, `agent/upstream-errors-fallback.jsonl`, and `adaptive-selection.jsonl` entries for each layout.
-- Test files changed: `pkg/workflow/compiler_artifacts_test.go` (+87), `pkg/workflow/routing_learning_test.go` (+13), `actions/setup/js/routing_observation.test.cjs` (+161), `actions/setup/js/push_routing_history.test.cjs` (+242), and `actions/setup/js/validate_recovery_envelopes.test.cjs` (+77).
-- `actions/setup/js/validate_recovery_envelopes.cjs` (+182 / -1) carries the envelope validation logic.
+1. **Emission gate.** `generateAgentOutputFallbackUpload` in `pkg/workflow/compiler_yaml_artifacts.go` emits `agent-output-fallback` when `data.RoutingLearningMode` is set, keeping existing secret redaction and recovery-envelope validation gates.
+2. **Allowlisted recovery files across all three firewall log layouts (including ARC/DinD path rewriting):**
+   - `adaptive-selection.jsonl` beside `model-routing.jsonl` and `token-usage.jsonl` in each layout when present.
+   - `agent/upstream-errors-fallback.jsonl`: allowlisted lines carrying only `event` (`UPSTREAM_ERROR_RESPONSE`), a T-UAS-082-bounded `request_id` (`^[A-Za-z0-9_.:-]{1,64}$`), and HTTP `status` (100-599). Kept distinct from `upstream-errors.jsonl` so merged downloads never overwrite or duplicate the full diagnostic, and ignored whenever `upstream-errors.jsonl` is present or protected session capture is active.
+   - `agent/routing-refusal.json`: content-free `{"refused":true}`, written only for top-level `assistant.refusal` events (never nested subagent refusals) and read only when no agent conversation source is present.
+   - `agent-errors.jsonl`: classified `agent.execution` categories and codes already written before secret redaction.
+3. **Fail-closed pre-upload validation and cleanup.** `actions/setup/js/protected_command_output.cjs` shares the symlink-safe sidecar write/remove helpers and discards untrusted fallback files before protected capture. `actions/setup/js/validate_recovery_envelopes.cjs` validates canonical allowlisted bytes (requiring `O_NOFOLLOW`) and removes directories, symlinks, or tampered payloads at those fallback paths before upload.
 
 ## Alternatives Considered
 
-The first two alternatives are rejected in the PR body or its scenario table. The third is inferred from the diff; the author did not record it.
-
-1. **Keep fallback-only recovery as it was (status quo).** Rejected: the scenario table shows wrong verdicts for HTTP 429, main-agent refusal, and live receipts.
-2. **Copy the full `upstream-errors.jsonl` and conversation-level refusal evidence into the fallback.** Rejected: the PR body requires that the fallback exclude headers and response bodies. The allowlisted record supplies the status and refusal signal without the diagnostic content.
-3. **Add a separate routing-evidence artifact instead of extending `agent-output-fallback`.** Inferred, not recorded by the author. A new artifact would need its own upload, download, and validation path in `conclusion`. Extending the existing fallback reuses the redaction and envelope gates already applied to it.
+1. **Keep fallback-only recovery unchanged (status quo).** Rejected because fallback-only recovery flips routed verdicts for HTTP 429, HTTP 503, execution timeouts, and main-agent refusals, and drops live adaptive receipts.
+2. **Upload raw `upstream-errors.jsonl` and full conversation logs in `agent-output-fallback`.** Rejected because `agent-output-fallback` must stay small and exclude sanitized upstream headers, response bodies, and conversation content, and must not overwrite full diagnostics in merged downloads.
+3. **Create a separate routing-evidence artifact instead of extending `agent-output-fallback`.** Rejected because a new artifact would duplicate upload, download, ARC/DinD consolidation, redaction, and recovery-envelope gating already wired into `agent-output-fallback` and `conclusion`.
 
 ## Consequences
 
 **Positive**
 
-- Fallback-only recovery yields the same `routing.observation` verdicts as full-artifact recovery for the HTTP 429, HTTP 503, main-agent refusal, and bound live receipt cases in the PR table.
-- Opted-in adaptive workflows without explicit `safe-outputs:` gain a recovery path when the `agent` upload fails.
-- The fallback contains no raw upstream headers, response bodies, or conversation content. The distinct file name prevents overwrites in merged downloads.
+- Fallback-only recovery matches full-artifact `routing.observation` verdicts and observe-mode `runs.jsonl` rows across all three firewall log layouts, and preserves `adaptive-selection.jsonl` for live-mode reducer parity.
+- Opted-in adaptive workflows without explicit `safe-outputs:` gain a reliable recovery path when the full `agent` artifact upload fails.
+- No raw upstream headers, response bodies, or conversation prose enter `agent-output-fallback`, and merged downloads preserve the full `agent` artifact's primary sources without duplication.
 
 **Negative**
 
-- More workflows upload `agent-output-fallback`: every workflow with `model-routing.learning`, not only those with safe outputs.
-- The recovery allowlist is larger and spans three firewall log layouts, including ARC/DinD path rewriting. If the compiler path lists and `validate_recovery_envelopes.cjs` drift apart, evidence is dropped silently, so they must stay in sync.
-- 329 files under `.github/workflows/` change in the diff, mostly from recompilation. Reviewers should confirm that the lock changes reflect only the new gating, as the PR body states.
+- Workflows that opt into `model-routing.learning` without explicit `safe-outputs:` now emit the small `agent-output-fallback` upload step.
+- The compiler's fallback path list, producers, collector, and `validate_recovery_envelopes.cjs` must remain aligned on the fallback file paths and canonical schemas.
+
+---
+*Reviewed by the PR author.*

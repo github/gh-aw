@@ -2007,6 +2007,7 @@ describe("parse_token_usage", () => {
               response_body: "sanitized error body text",
             }),
             JSON.stringify({ event: "OTHER_EVENT", request_id: "req-other", status: 500 }),
+            JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: "a".repeat(65), status: 429 }),
             JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: "req-bad-status", status: 99 }),
             JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", status: 503 }),
             "{not json",

@@ -417,5 +417,31 @@ describe("routing.observation in the unified session", () => {
       fs.rmSync(path.join(full, "agent/upstream-errors-fallback.jsonl"));
       expect(verdicts(collect(full, { agent: "failure" })).map(e => e.data)).toEqual([skip("unknown_evidence")]);
     });
+
+    it("rejects over-64-char fallback request_ids and ignores fallback upstream errors in protected session capture", () => {
+      const { fallback } = buildFullAndFallback({
+        agentOutput: { items: [], errors: [] },
+      });
+      const overBoundaryId = "r".repeat(65);
+      fs.mkdirSync(path.join(fallback, "agent"), { recursive: true });
+      fs.writeFileSync(path.join(fallback, "agent/upstream-errors-fallback.jsonl"), JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: overBoundaryId, status: 503 }) + "\n");
+      const overBoundaryEvents = collect(fallback, { agent: "failure" });
+      expect(overBoundaryEvents.filter(event => event.type === "firewall.upstream_error")).toEqual([]);
+      expect(overBoundaryEvents.some(event => event.type === "session.collection_warning" && event.data.code === "invalid_upstream_error_fallback")).toBe(true);
+
+      // In protected session capture, sandbox-side fallback upstream-error files are ignored.
+      fs.writeFileSync(path.join(fallback, "agent-session.jsonl"), JSON.stringify({ type: "assistant.message", data: { content: "verified" } }) + "\n");
+      fs.writeFileSync(path.join(fallback, "agent/upstream-errors-fallback.jsonl"), JSON.stringify({ event: "UPSTREAM_ERROR_RESPONSE", request_id: mainRequest, status: 503 }) + "\n");
+      const protectedEvents = collectUnifiedSession({
+        rootDir: fallback,
+        protectedSessionCapture: true,
+        warn: () => {},
+        dailyAIC: {},
+        admission: {},
+        jobResults: jobResults("failure"),
+        routingObservation: true,
+      }).events;
+      expect(protectedEvents.filter(event => event.type === "firewall.upstream_error")).toEqual([]);
+    });
   });
 });
