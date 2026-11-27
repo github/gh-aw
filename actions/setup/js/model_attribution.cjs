@@ -1,6 +1,6 @@
 "use strict";
 
-const { iterateJsonl, readJsonlFile } = require("./jsonl_helpers.cjs");
+const { iterateJsonl, readJsonlFile, readJsonlFileEvents } = require("./jsonl_helpers.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
 const { ERR_SYSTEM } = require("./error_codes.cjs");
 
@@ -9,6 +9,7 @@ const ROUTING_EFFORTS = new Set(["none", "minimal", "low", "medium", "high", "xh
 const ROUTING_TASK_TYPES = new Set(["explain", "plan", "fix", "refactor", "chore", "implement", "unknown"]);
 const ROUTING_SCOPES = new Set(["local", "multi_file", "subsystem", "cross_system", "unknown"]);
 const ROUTING_COMPLEXITIES = new Set(["trivial", "easy", "medium", "hard", "expert", "unknown"]);
+const ROUTING_OBSERVATION_SKIP_REASONS = new Set(["cancelled", "infrastructure", "rate_limited", "pair_mismatch", "unknown_evidence"]);
 // Same candidates as ai_credits_context.cjs; these files ship in the agent artifact.
 const TOKEN_USAGE_LOG_PATHS = ["sandbox/firewall/logs/api-proxy-logs/token-usage.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/token-usage.jsonl", "sandbox/firewall/audit/api-proxy-logs/token-usage.jsonl"];
 const MODEL_ROUTING_LOG_PATHS = ["sandbox/firewall/logs/api-proxy-logs/model-routing.jsonl", "sandbox/firewall/audit/api-proxy-logs/model-routing.jsonl", "sandbox/firewall-audit-logs/api-proxy-logs/model-routing.jsonl"];
@@ -300,6 +301,49 @@ function resolveModelRoutingSummary({
   return result;
 }
 
+/**
+ * Read the collector-emitted `routing.observation` verdict from `usage/aw_session.jsonl` (T-UAS-094).
+ * Only events with `provenance.component === "collector"` and `provenance.phase === "conclusion"` are trusted.
+ * Returns null when absent, unreadable, or invalid; never synthesizes `"skip"`.
+ *
+ * @param {{ sessionPath?: string }} [options]
+ * @returns {{ outcome: "success" | "failure" } | { outcome: "skip", skip_reason: string } | null}
+ */
+function resolveRoutingObservation({ sessionPath = require("path").join((process.env.GH_AW_TMP_DIR || "").trim() || "/tmp/gh-aw", "usage/aw_session.jsonl") } = {}) {
+  /** @param {unknown} value @returns {value is Record<string, any>} */
+  const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
+  /** @type {any} */
+  let lastTrusted = null;
+  try {
+    for (const record of readJsonlFileEvents(sessionPath, { fatalUTF8: true, jsonWhitespaceOnly: true })) {
+      if (record.type === "invalid") {
+        if (record.reason === "blank" && /^[ \t\r\n]*$/.test(record.rawLine)) continue;
+        return null;
+      }
+      const event = record.value;
+      if (!isObject(event) || typeof event.type !== "string" || !event.type || !isObject(event.data)) {
+        return null;
+      }
+      if (event.type === "routing.observation" && isObject(event.provenance) && event.provenance.component === "collector" && event.provenance.phase === "conclusion") {
+        lastTrusted = event;
+      }
+    }
+  } catch {
+    return null;
+  }
+  const data = lastTrusted?.data;
+  if (!isObject(data)) return null;
+  if (data.outcome === "success" || data.outcome === "failure") {
+    if (data.reason !== undefined) return null;
+    return { outcome: data.outcome };
+  }
+  if (data.outcome === "skip") {
+    if (typeof data.reason !== "string" || !ROUTING_OBSERVATION_SKIP_REASONS.has(data.reason)) return null;
+    return { outcome: "skip", skip_reason: data.reason };
+  }
+  return null;
+}
+
 function resolveEffectiveModel(infoPath = `${process.env.GH_AW_TMP_DIR || "/tmp/gh-aw"}/aw_info.json`, phase = process.env.GH_AW_PHASE || "agent", env = process.env) {
   let routing = getModelRouting(infoPath, phase);
   if (!routing && typeof env.GH_AW_MODEL_ROUTING_STATUS === "string" && ROUTING_STATUSES.has(env.GH_AW_MODEL_ROUTING_STATUS)) {
@@ -409,6 +453,7 @@ module.exports = {
   recordModelRouting,
   getModelRouting,
   resolveModelRoutingSummary,
+  resolveRoutingObservation,
   resolveEffectiveModel,
   getEffectiveModelLabel,
   validateRoutingEffort,

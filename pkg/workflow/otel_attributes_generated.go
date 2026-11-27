@@ -156,6 +156,8 @@ const (
 	OTelAttrGhAwModelRoutingFailureCode             = "gh-aw.model_routing.failure_code"
 	OTelAttrGhAwModelRoutingMode                    = "gh-aw.model_routing.mode"
 	OTelAttrGhAwModelRoutingObjective               = "gh-aw.model_routing.objective"
+	OTelAttrGhAwModelRoutingObservationOutcome      = "gh-aw.model_routing.observation.outcome"
+	OTelAttrGhAwModelRoutingObservationSkipReason   = "gh-aw.model_routing.observation.skip_reason"
 	OTelAttrGhAwModelRoutingRouterVersion           = "gh-aw.model_routing.router_version"
 	OTelAttrGhAwModelRoutingScope                   = "gh-aw.model_routing.scope"
 	OTelAttrGhAwModelRoutingStatus                  = "gh-aw.model_routing.status"
@@ -363,6 +365,8 @@ var otelAttributeNamesByValue = map[string]string{
 	"gh-aw.model_routing.failure_code":             "gh-aw.model_routing.failure_code",
 	"gh-aw.model_routing.mode":                     "gh-aw.model_routing.mode",
 	"gh-aw.model_routing.objective":                "gh-aw.model_routing.objective",
+	"gh-aw.model_routing.observation.outcome":      "gh-aw.model_routing.observation.outcome",
+	"gh-aw.model_routing.observation.skip_reason":  "gh-aw.model_routing.observation.skip_reason",
 	"gh-aw.model_routing.router_version":           "gh-aw.model_routing.router_version",
 	"gh-aw.model_routing.scope":                    "gh-aw.model_routing.scope",
 	"gh-aw.model_routing.status":                   "gh-aw.model_routing.status",
