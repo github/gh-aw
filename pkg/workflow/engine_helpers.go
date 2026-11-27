@@ -422,6 +422,9 @@ func appendEnvVarLine(lines []string, key, value string) []string {
 	value = strings.TrimSuffix(value, "\n")
 
 	if !strings.Contains(value, "\n") {
+		if key == "COPILOT_PROVIDER_WIRE_MODEL" {
+			return append(lines, fmt.Sprintf("          %s: %s", key, strconv.Quote(value)))
+		}
 		// Single-line: emit inline with YAML-safe quoting
 		return append(lines, fmt.Sprintf("          %s: %s", key, yamlStringValue(value)))
 	}

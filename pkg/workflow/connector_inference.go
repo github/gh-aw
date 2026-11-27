@@ -110,9 +110,9 @@ func resolveConnectorInference(alias string, registration ConnectorRegistration)
 	}
 	// Selecting the profile approves egress to its endpoint; importing alone does not.
 	result := &ResolvedConnectorInference{Selection: *selection, AllowedDomains: []string{endpoint.Hostname()}, Env: map[string]string{
-		"COPILOT_PROVIDER_BASE_URL": strings.TrimSuffix(endpoint.String(), "/") + profile.Path,
-		"COPILOT_PROVIDER_TYPE":     "openai",
-		"COPILOT_PROVIDER_MODEL_ID": selection.Model,
+		"COPILOT_PROVIDER_BASE_URL":   strings.TrimSuffix(endpoint.String(), "/") + profile.Path,
+		"COPILOT_PROVIDER_TYPE":       "openai",
+		"COPILOT_PROVIDER_WIRE_MODEL": selection.Model,
 	}, ModelCatalogDisabled: profile.ModelCatalog != nil && !*profile.ModelCatalog}
 	switch profile.Protocol {
 	case "openai-responses":
