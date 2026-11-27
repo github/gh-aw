@@ -3906,6 +3906,126 @@ describe("sendJobConclusionSpan", () => {
     expect(Object.keys(attrs).some(key => key.startsWith("gh-aw.model_routing."))).toBe(false);
   });
 
+  async function emitConclusionWithSession(sessionLines, { spanName = "gh-aw.conclusion.conclusion", jobName = "conclusion" } = {}) {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
+    vi.stubGlobal("fetch", mockFetch);
+    process.env.GH_AW_OTLP_ENDPOINTS = JSON.stringify([{ url: "https://traces.example.com" }]);
+    process.env.INPUT_JOB_NAME = jobName;
+    const tmpDir = nodeFs.mkdtempSync(path.join(os.tmpdir(), "gh-aw-routing-observation-"));
+    process.env.GH_AW_TMP_DIR = tmpDir;
+    try {
+      if (sessionLines !== null) {
+        const sessionPath = path.join(tmpDir, "usage/aw_session.jsonl");
+        originalMkdirSync(path.dirname(sessionPath), { recursive: true });
+        nodeFs.writeFileSync(sessionPath, sessionLines.map(line => (typeof line === "string" ? line : JSON.stringify(line))).join("\n") + (sessionLines.length ? "\n" : ""));
+      }
+      await sendJobConclusionSpan(spanName, { startMs: 1_700_000_000_000 });
+    } finally {
+      nodeFs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const span = body.resourceSpans[0].scopeSpans[0].spans[0];
+    return Object.fromEntries(span.attributes.map(a => [a.key, a.value.stringValue ?? a.value.intValue ?? a.value.doubleValue ?? a.value.boolValue]));
+  }
+
+  it.each(["success", "failure"])("emits routing observation outcome %s without skip_reason on gh-aw.conclusion.conclusion", async outcome => {
+    const attrs = await emitConclusionWithSession([
+      { type: "session.format", data: { version: 1 }, provenance: { component: "collector", phase: "conclusion" } },
+      { type: "routing.observation", data: { outcome }, provenance: { component: "collector", phase: "conclusion" } },
+    ]);
+    expect(attrs["gh-aw.model_routing.observation.outcome"]).toBe(outcome);
+    expect(attrs).not.toHaveProperty("gh-aw.model_routing.observation.skip_reason");
+  });
+
+  it.each(["cancelled", "infrastructure", "rate_limited", "pair_mismatch", "unknown_evidence"])("emits routing observation skip with skip_reason %s on gh-aw.conclusion.conclusion", async reason => {
+    const attrs = await emitConclusionWithSession([{ type: "routing.observation", data: { outcome: "skip", reason }, provenance: { component: "collector", phase: "conclusion" } }]);
+    expect(attrs["gh-aw.model_routing.observation.outcome"]).toBe("skip");
+    expect(attrs["gh-aw.model_routing.observation.skip_reason"]).toBe(reason);
+  });
+
+  it("ignores routing.observation events with untrusted provenance", async () => {
+    const untrustedCases = [
+      { type: "routing.observation", data: { outcome: "success" }, provenance: { component: "agent", phase: "agent" } },
+      { type: "routing.observation", data: { outcome: "failure" }, provenance: { component: "engine", phase: "agent" } },
+      { type: "routing.observation", data: { outcome: "skip", reason: "pair_mismatch" }, provenance: { component: "collector", phase: "agent" } },
+      { type: "routing.observation", data: { outcome: "success" }, provenance: { component: "workflow", phase: "conclusion" } },
+      { type: "routing.observation", data: { outcome: "success" } },
+    ];
+    const attrs = await emitConclusionWithSession(untrustedCases);
+    expect(attrs).not.toHaveProperty("gh-aw.model_routing.observation.outcome");
+    expect(attrs).not.toHaveProperty("gh-aw.model_routing.observation.skip_reason");
+
+    const preserved = await emitConclusionWithSession([
+      { type: "routing.observation", data: { outcome: "failure" }, provenance: { component: "collector", phase: "conclusion" } },
+      { type: "routing.observation", data: { outcome: "success" }, provenance: { component: "agent", phase: "agent" } },
+    ]);
+    expect(preserved["gh-aw.model_routing.observation.outcome"]).toBe("failure");
+    expect(preserved).not.toHaveProperty("gh-aw.model_routing.observation.skip_reason");
+  });
+
+  it("omits routing observation attributes and never synthesizes skip when session file or verdict is absent", async () => {
+    const missingFileAttrs = await emitConclusionWithSession(null);
+    expect(missingFileAttrs).not.toHaveProperty("gh-aw.model_routing.observation.outcome");
+    expect(missingFileAttrs).not.toHaveProperty("gh-aw.model_routing.observation.skip_reason");
+
+    const emptyFileAttrs = await emitConclusionWithSession([]);
+    expect(emptyFileAttrs).not.toHaveProperty("gh-aw.model_routing.observation.outcome");
+    expect(emptyFileAttrs).not.toHaveProperty("gh-aw.model_routing.observation.skip_reason");
+
+    const nonRoutedAttrs = await emitConclusionWithSession([{ type: "session.format", data: { version: 1 }, provenance: { component: "collector", phase: "conclusion" } }]);
+    expect(nonRoutedAttrs).not.toHaveProperty("gh-aw.model_routing.observation.outcome");
+    expect(nonRoutedAttrs).not.toHaveProperty("gh-aw.model_routing.observation.skip_reason");
+  });
+
+  it("omits routing observation attributes for malformed verdicts or malformed session files", async () => {
+    const invalidPayloads = [{ outcome: "unknown" }, { outcome: "skip" }, { outcome: "skip", reason: "not_in_vocabulary" }, { outcome: "success", reason: "infrastructure" }, { outcome: "failure", reason: "" }];
+    for (const data of invalidPayloads) {
+      const attrs = await emitConclusionWithSession([{ type: "routing.observation", data, provenance: { component: "collector", phase: "conclusion" } }]);
+      expect(attrs).not.toHaveProperty("gh-aw.model_routing.observation.outcome");
+      expect(attrs).not.toHaveProperty("gh-aw.model_routing.observation.skip_reason");
+    }
+
+    const corruptBefore = await emitConclusionWithSession(["{corrupt json line", { type: "routing.observation", data: { outcome: "skip", reason: "rate_limited" }, provenance: { component: "collector", phase: "conclusion" } }]);
+    expect(corruptBefore).not.toHaveProperty("gh-aw.model_routing.observation.outcome");
+    expect(corruptBefore).not.toHaveProperty("gh-aw.model_routing.observation.skip_reason");
+
+    const truncatedAfter = await emitConclusionWithSession([{ type: "routing.observation", data: { outcome: "skip", reason: "rate_limited" }, provenance: { component: "collector", phase: "conclusion" } }, '{"type":"session.collection"']);
+    expect(truncatedAfter).not.toHaveProperty("gh-aw.model_routing.observation.outcome");
+    expect(truncatedAfter).not.toHaveProperty("gh-aw.model_routing.observation.skip_reason");
+
+    for (const badLine of ["\u00a0" + JSON.stringify({ type: "session.format", data: { version: 1 }, provenance: { component: "collector", phase: "conclusion" } }), "\u00a0", "42", "{}"]) {
+      const attrs = await emitConclusionWithSession([{ type: "routing.observation", data: { outcome: "skip", reason: "rate_limited" }, provenance: { component: "collector", phase: "conclusion" } }, badLine]);
+      expect(attrs).not.toHaveProperty("gh-aw.model_routing.observation.outcome");
+      expect(attrs).not.toHaveProperty("gh-aw.model_routing.observation.skip_reason");
+    }
+
+    const superseded = await emitConclusionWithSession([
+      { type: "routing.observation", data: { outcome: "success" }, provenance: { component: "collector", phase: "conclusion" } },
+      { type: "routing.observation", data: { outcome: "skip", reason: "infrastructure" }, provenance: { component: "collector", phase: "conclusion" } },
+    ]);
+    expect(superseded["gh-aw.model_routing.observation.outcome"]).toBe("skip");
+    expect(superseded["gh-aw.model_routing.observation.skip_reason"]).toBe("infrastructure");
+
+    const invalidated = await emitConclusionWithSession([
+      { type: "routing.observation", data: { outcome: "success" }, provenance: { component: "collector", phase: "conclusion" } },
+      { type: "routing.observation", data: { outcome: "invalid" }, provenance: { component: "collector", phase: "conclusion" } },
+    ]);
+    expect(invalidated).not.toHaveProperty("gh-aw.model_routing.observation.outcome");
+    expect(invalidated).not.toHaveProperty("gh-aw.model_routing.observation.skip_reason");
+  });
+
+  it("does not emit routing observation attributes on non-conclusion job spans", async () => {
+    const sessionLines = [{ type: "routing.observation", data: { outcome: "skip", reason: "pair_mismatch" }, provenance: { component: "collector", phase: "conclusion" } }];
+    for (const [spanName, jobName] of [
+      ["gh-aw.agent.conclusion", "agent"],
+      ["gh-aw.safe_outputs.conclusion", "safe_outputs"],
+    ]) {
+      const attrs = await emitConclusionWithSession(sessionLines, { spanName, jobName });
+      expect(attrs).not.toHaveProperty("gh-aw.model_routing.observation.outcome");
+      expect(attrs).not.toHaveProperty("gh-aw.model_routing.observation.skip_reason");
+    }
+  });
+
   it("does not duplicate gen_ai.request.model on the agent span", async () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: "OK" });
     vi.stubGlobal("fetch", mockFetch);

@@ -15,7 +15,7 @@ const { resolveAICreditsFailureState } = require("./ai_credits_context.cjs");
 const { collectCodexMixedRecords } = require("./parse_codex_log.cjs");
 const { normalizeCodexSession } = require("./codex_session.cjs");
 const { projectSessionResult, observedSessionModel } = require("./agent_session.cjs");
-const { resolveEffectiveModel, resolveModelRoutingSummary } = require("./model_attribution.cjs");
+const { resolveEffectiveModel, resolveModelRoutingSummary, resolveRoutingObservation } = require("./model_attribution.cjs");
 const { normalizeHarnessRetryRecord } = require("./harness_retry_record.cjs");
 const { isDurableSessionRecord } = require("./durable_session_record.cjs");
 const { readEvalsNotEvaluatedStatus } = require("./evals_status.cjs");
@@ -2584,6 +2584,13 @@ async function sendJobConclusionSpan(spanName, options = {}) {
             attributes.push(buildAttr(attributeName, value));
           }
         }
+      }
+    }
+    const routingObservation = resolveRoutingObservation(getGhAwPath("usage/aw_session.jsonl"));
+    if (routingObservation) {
+      attributes.push(buildAttr("gh-aw.model_routing.observation.outcome", routingObservation.outcome));
+      if (routingObservation.outcome === "skip") {
+        attributes.push(buildAttr("gh-aw.model_routing.observation.skip_reason", routingObservation.skip_reason));
       }
     }
   }

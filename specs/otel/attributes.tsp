@@ -163,6 +163,8 @@ model AttributeNames {
   ghAwModelRoutingFailureCode: "gh-aw.model_routing.failure_code";
   ghAwModelRoutingMode: "gh-aw.model_routing.mode";
   ghAwModelRoutingObjective: "gh-aw.model_routing.objective";
+  ghAwModelRoutingObservationOutcome: "gh-aw.model_routing.observation.outcome";
+  ghAwModelRoutingObservationSkipReason: "gh-aw.model_routing.observation.skip_reason";
   ghAwModelRoutingRouterVersion: "gh-aw.model_routing.router_version";
   ghAwModelRoutingScope: "gh-aw.model_routing.scope";
   ghAwModelRoutingStatus: "gh-aw.model_routing.status";
