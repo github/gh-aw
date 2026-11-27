@@ -54,7 +54,8 @@ imports:
     with:
       branch-name: "memory/session-insights"
       description: "Historical session analysis data"
-  - ../skills/jqschema/SKILL.md  # Must come before copilot-session-data-fetch.md (dependency)
+  # Must come before copilot-session-data-fetch.md (dependency)
+  - ../skills/jqschema/SKILL.md
   - shared/copilot-session-data-fetch.md
   - shared/session-analysis-charts.md
   - shared/session-analysis-strategies.md
