@@ -120,7 +120,7 @@ The YAML frontmatter supports these fields:
 - **`runs-on-slim:`** - Runner type for all framework/generated jobs (activation, safe-outputs, unlock, etc.). Defaults to `ubuntu-slim`. `safe-outputs.runs-on` takes precedence for safe-output jobs specifically.
 - **`runner:`** - Runner configuration (object).
   - `topology: arc-dind` (only enum value) targets GitHub ARC runners with rootless Docker-in-Docker: gh-aw emits the topology in the AWF config, redirects the tool cache to a shared volume, and validates that no generated step requires root. AWF then activates split-filesystem handling, network isolation, sysroot staging, and DinD pre-staging automatically.
-  - `installation: rootless | privileged` sets install privilege for the Copilot CLI and threat-detect binaries in agent and detection jobs. `rootless` installs to the job-scoped `$RUNNER_TEMP/gh-aw/bin` (AWF mounts it read-only) without `sudo`; `privileged` uses `sudo` into `/usr/local/bin` and is rejected with `arc-dind`. When omitted, installers choose rootless for `arc-dind` or when the runner is neither root nor able to `sudo -n true`. It does not change AWF runtime privileges; leave `topology` unset on native runners.
+  - `installation: rootless | privileged` sets install privilege for the Copilot CLI in agent and detection jobs. `rootless` installs to the job-scoped `$RUNNER_TEMP/gh-aw/bin` (AWF mounts it read-only) without `sudo`; `privileged` uses `sudo` into `/usr/local/bin` and is rejected with `arc-dind`. When omitted, the installer chooses rootless for `arc-dind` or when the runner is neither root nor able to `sudo -n true`. It does not change AWF runtime privileges; leave `topology` unset on native runners.
 
   ```yaml
   runner:

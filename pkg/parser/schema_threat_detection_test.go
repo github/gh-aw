@@ -34,39 +34,23 @@ func TestMainWorkflowSchemaThreatDetectionCACert(t *testing.T) {
 	}
 }
 
-func TestMainWorkflowSchemaThreatDetectionArtifactBaseURL(t *testing.T) {
+func TestMainWorkflowSchemaThreatDetectionEngineVersion(t *testing.T) {
 	t.Parallel()
 
-	frontmatter := func(baseURL string) map[string]any {
-		return map[string]any{
-			"on":     "push",
-			"engine": "copilot",
-			"safe-outputs": map[string]any{
-				"create-issue": nil,
-				"threat-detection": map[string]any{
-					"artifact-base-url": baseURL,
-				},
-			},
-		}
+	detection := map[string]any{"engine": map[string]any{"id": "copilot", "version": "1.2.3"}}
+	frontmatter := map[string]any{
+		"on":     "push",
+		"engine": "copilot",
+		"safe-outputs": map[string]any{
+			"create-issue": nil, "threat-detection": detection,
+		},
 	}
-
-	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(
-		frontmatter("https://artifacts.example.com/threat-detect/releases/download"),
-		"/tmp/gh-aw/threat-detection-artifact-mirror-valid.md",
-	); err != nil {
-		t.Fatalf("expected HTTPS artifact mirror to validate: %v", err)
+	const path = "threat-detection.md"
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, path); err != nil {
+		t.Fatalf("detection engine version should validate: %v", err)
 	}
-
-	for _, invalid := range []string{
-		"http://artifacts.example.com/threat-detect",
-		"file:///tmp/threat-detect",
-		"artifacts.example.com/threat-detect",
-	} {
-		if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(
-			frontmatter(invalid),
-			"/tmp/gh-aw/threat-detection-artifact-mirror-invalid.md",
-		); err == nil {
-			t.Errorf("expected unsafe artifact mirror %q to fail schema validation", invalid)
-		}
+	detection["artifact-base-url"] = "https://artifacts.example.com/detector"
+	if err := ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, path); err == nil {
+		t.Fatal("obsolete detector release mirror should not validate")
 	}
 }

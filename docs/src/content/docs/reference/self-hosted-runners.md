@@ -40,7 +40,7 @@ Self-hosted runners may require `sudo` depending on the selected engine and conf
 
 - **AWF (Agentic Workflow Firewall)**: Runs rootless in the default network-isolation mode. Egress is enforced via Docker network topology — an internal Docker network (`awf-net`) with no internet route and a dual-homed Squid proxy as the sole egress path. No `sudo` and no `NET_ADMIN` are required on the runner for AWF in this mode. Container-level `iptables`, Squid proxy ACLs, and capability drops provide defense in depth, all managed inside the Docker daemon's domain.
 
-- **Copilot CLI and threat-detect installation**: Root and passwordless-sudo runners install these binaries to `/usr/local/bin`. Rootless installation uses the job-scoped `$RUNNER_TEMP/gh-aw/bin` directory without `sudo`.
+- **Copilot CLI installation**: Root and passwordless-sudo runners install the CLI to `/usr/local/bin`. Rootless installation uses the job-scoped `$RUNNER_TEMP/gh-aw/bin` directory without `sudo`.
 
 ### Unprivileged CLI installation
 
@@ -56,7 +56,7 @@ runner:
 Triage this issue.
 ```
 
-This setting applies to the generated Copilot CLI and threat-detect installers in the agent and detection jobs, including when `safe-outputs.threat-detection.runs-on` selects a different runner. Rootless installs use `$RUNNER_TEMP/gh-aw/bin`, a job-scoped directory that AWF mounts read-only, and publish it through `GITHUB_PATH`. This protects host-executed binaries from sandbox changes. The directory must be writable during setup. External threat detection stages the verified detector there so the sandbox can resolve it independently of its home directory. Release pins, checksum verification, HTTPS requirements, platform checks, and Copilot's trusted toolcache policy remain unchanged.
+This setting applies to Copilot CLI installation in the agent and detection jobs, including when `safe-outputs.threat-detection.runs-on` selects a different runner. Rootless installs use `$RUNNER_TEMP/gh-aw/bin`, a job-scoped directory that AWF mounts read-only, and publish it through `GITHUB_PATH`. The directory must be writable during setup. The detector itself ships with the setup action and needs no separate installation.
 
 Omitting `runner.installation` preserves the existing defaults. Explicit `privileged` selects the native sudo-based installation and is rejected with `runner.topology: arc-dind`.
 
@@ -64,7 +64,7 @@ Installation privilege does not change AWF runtime privileges or enable split-fi
 
 When `runner.installation` is omitted, native installers automatically choose rootless mode if the runner is neither root nor able to run `sudo -n true`; root and passwordless-sudo runners retain privileged installation. ARC/DinD explicitly selects rootless mode even when sudo is available.
 
-`engine.command` skips standard Copilot installation only for the primary agent. External Copilot threat detection still installs and uses the standard `copilot` executable; it does not run the primary agent's custom command. A preinstalled executable on `PATH` does not skip either installer or its privilege checks.
+`engine.command` skips standard Copilot installation only for the primary agent. Bundled Copilot threat detection still installs and uses the standard `copilot` executable; it does not run the primary agent's custom command. A preinstalled executable on `PATH` does not skip the installer or its privilege checks.
 
 Rootless installation cannot repair root-owned state from previous privileged AWF runs. If preparing `~/.copilot` fails, installation stops with an ownership-repair diagnostic. Before retrying, a runner administrator must restore ownership of that directory and its contents to the runner's UID and GID and make it writable. Installers clean only their own staging directories, not shared `/tmp/awf-*-chroot-home` or `/tmp/awf-chroot-*` directories that may belong to active jobs. A runner administrator must remove confirmed stale directories before the runner is reused.
 

@@ -226,12 +226,10 @@ async function main() {
   // Note: creation of /tmp/gh-aw/threat-detection and detection.log is handled by a separate shell step
 
   // Write rendered prompt to step summary using HTML details/summary.
-  // On the external detector path this prompt is never used (threat-detect renders its own
-  // template and writes it to the step summary), so the write is suppressed to avoid showing
-  // two different prompts for a single detection run.
+  // The bundled detector renders its own prompt; don't display the unused inline prompt.
   const skipPromptSummary = (process.env.GH_AW_DETECTION_SKIP_PROMPT_SUMMARY || "").toLowerCase() === "true";
   if (skipPromptSummary) {
-    core.info("Skipping threat detection prompt step summary (external detector renders its own prompt)");
+    core.info("Skipping inline prompt summary: the bundled detector renders its own prompt");
   } else {
     await core.summary.addRaw("<details>\n<summary>Threat Detection Prompt</summary>\n\n" + "``````markdown\n" + promptContent + "\n" + "``````\n\n</details>\n").write();
   }

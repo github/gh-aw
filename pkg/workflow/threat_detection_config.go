@@ -24,7 +24,6 @@ type ThreatDetectionConfig struct {
 	Environment         string        `yaml:"environment,omitempty"`       // GitHub Actions environment override for the detection job (defaults to top-level environment when OIDC is used)
 	ContinueOnError     *bool         `yaml:"continue-on-error,omitempty"` // When true (default), detection failures produce warnings instead of blocking safe outputs
 	ReportAsIssue       *bool         `yaml:"report-as-issue,omitempty"`   // When true (default), detection warnings/failures create/update the "[aw] Detection Runs" tracking issue
-	ArtifactBaseURL     string        `yaml:"artifact-base-url,omitempty"` // HTTPS base URL for a mirror of pinned threat-detect release assets
 	EnabledExpr         *string       `yaml:"-"`                           // Expression form of the enabled flag, e.g. "${{ inputs.enable-threat-detection }}"
 	ContinueOnErrorExpr *string       `yaml:"-"`                           // Expression form of continue-on-error, e.g. "${{ inputs.coe }}"
 }
@@ -199,10 +198,6 @@ func parseThreatDetectionScalarFields(configMap map[string]any, threatConfig *Th
 }
 
 func parseThreatDetectionNetworkFields(configMap map[string]any, threatConfig *ThreatDetectionConfig) {
-	if artifactBaseURL, ok := configMap["artifact-base-url"].(string); ok {
-		threatConfig.ArtifactBaseURL = artifactBaseURL
-	}
-
 	if caCert, ok := configMap["ca-cert"].(string); ok {
 		threatConfig.CACert = strings.TrimSpace(caCert)
 	} else if caCert, ok := configMap["ca-cert"].(bool); ok {
