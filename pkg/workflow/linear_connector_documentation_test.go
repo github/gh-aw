@@ -14,7 +14,7 @@ import (
 	"github.com/github/gh-aw/pkg/connectors"
 	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 type linearDocumentation struct {
