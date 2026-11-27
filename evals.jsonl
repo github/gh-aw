@@ -130,3 +130,5 @@
 {"id":"report_created","question":"Was a daily report created tracking code generation, tests, and token usage trends?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-25T15:20:47.706Z","runid":"45642880182"}
 {"id":"merged_prs_analyzed","question":"Did the agent analyze Copilot pull requests merged in the last 24 hours?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-26T15:20:18.966Z","runid":"45846953540"}
 {"id":"report_created","question":"Was a daily report created tracking code generation, tests, and token usage trends?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-26T15:20:18.966Z","runid":"45846953540"}
+{"id":"merged_prs_analyzed","question":"Did the agent analyze Copilot pull requests merged in the last 24 hours?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-27T15:19:08.571Z","runid":"46022907200"}
+{"id":"report_created","question":"Was a daily report created tracking code generation, tests, and token usage trends?","answer":"UNKNOWN","model":"gpt-6-luna","timestamp":"2026-11-27T15:19:08.571Z","runid":"46022907200"}
