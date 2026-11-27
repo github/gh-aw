@@ -31,23 +31,21 @@ func SourceCommandContext(ctx context.Context, remoteURL string, args ...string)
 func SourceCommandOutputContext(ctx context.Context, remoteURL string, args ...string) ([]byte, error) {
 	cmd, hasCredentials := sourceCommandContext(ctx, remoteURL, true, args...)
 	output, err := cmd.Output()
-	if err == nil || !hasCredentials {
-		return output, err
+	if err != nil {
+		var exitErr *exec.ExitError
+		if hasCredentials && errors.As(err, &exitErr) && isSourceAuthenticationError(string(exitErr.Stderr)) {
+			anonymousCmd, _ := sourceCommandContext(ctx, remoteURL, false, args...)
+			return anonymousCmd.Output()
+		}
 	}
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) || !isSourceAuthenticationError(string(exitErr.Stderr)) {
-		return output, err
-	}
-
-	anonymousCmd, _ := sourceCommandContext(ctx, remoteURL, false, args...)
-	return anonymousCmd.Output()
+	return output, err
 }
 
 // SourceCommandCombinedOutputContext runs an isolated source-download Git
 // command and retries without credentials if the remote rejects the token.
 func SourceCommandCombinedOutputContext(ctx context.Context, remoteURL string, args ...string) ([]byte, error) {
 	cmd, hasCredentials := sourceCommandContext(ctx, remoteURL, true, args...)
-	output, err := cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput() //nolint:execcommandoutputerrdiscard // Preserve failed authenticated output if the anonymous retry also fails.
 	if err == nil || !hasCredentials || !isSourceAuthenticationError(string(output)) {
 		return output, err
 	}
