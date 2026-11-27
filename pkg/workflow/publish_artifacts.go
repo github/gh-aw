@@ -182,6 +182,40 @@ func generateSafeOutputsArtifactStagingUpload(builder *strings.Builder, data *Wo
 	publishArtifactsLog.Print("Generating safe-outputs artifact staging upload step")
 
 	prefix := artifactPrefixExprForDownstreamJob(data)
+	configJSON, err := safeOutputsArtifactStagingConfig(data)
+	if err != nil {
+		return err
+	}
+
+	builder.WriteString("      - name: Prepare safe-outputs artifact staging\n")
+	builder.WriteString("        id: prepare_safe_outputs_artifact_staging\n")
+	builder.WriteString("        if: always() && " + secretRedactionSuccessCondition(data) + "\n")
+	fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/github-script")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	builder.WriteString("        env:\n")
+	builder.WriteString("          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}\n")
+	fmt.Fprintf(builder, "          GH_AW_UPLOAD_ARTIFACT_CONFIG: %q\n", configJSON)                           //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	fmt.Fprintf(builder, "          GH_AW_UPLOAD_ARTIFACT_STAGING_DIR: %s\n", artifactStagingDirExpr)          //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	fmt.Fprintf(builder, "          GH_AW_UPLOAD_ARTIFACT_TRANSFER_DIR: %s\n", artifactStagingTransferDirExpr) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	builder.WriteString("        with:\n")
+	builder.WriteString("          script: |\n")
+	builder.WriteString("            const { setupGlobals } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/setup_globals.cjs`);\n")
+	builder.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
+	builder.WriteString("            const { prepare } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/prepare_upload_artifact_staging.cjs`);\n")
+	builder.WriteString("            const result = await prepare({ core });\n")
+	builder.WriteString("            core.info(`Prepared ${result.count} safe-output staging file(s)`);\n")
+	builder.WriteString("      # Upload safe-outputs upload-artifact staging for the upload_artifact job\n")
+	builder.WriteString("      - name: Upload upload-artifact staging\n")
+	builder.WriteString("        if: always() && " + secretRedactionSuccessCondition(data) + " && steps.prepare_safe_outputs_artifact_staging.outcome == 'success'\n")
+	fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	builder.WriteString("        with:\n")
+	fmt.Fprintf(builder, "          name: %s%s\n", prefix, SafeOutputsUploadArtifactStagingArtifactName) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	fmt.Fprintf(builder, "          path: %s\n", artifactStagingTransferDirExpr)                         //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	builder.WriteString("          retention-days: 1\n")
+	builder.WriteString("          if-no-files-found: ignore\n")
+	return nil
+}
+
+func safeOutputsArtifactStagingConfig(data *WorkflowData) (string, error) {
 	config := make(map[string]any)
 	if artifactConfig := data.SafeOutputs.UploadArtifact; artifactConfig != nil {
 		handlerConfig := make(map[string]any)
@@ -207,35 +241,9 @@ func generateSafeOutputsArtifactStagingUpload(builder *strings.Builder, data *Wo
 	}
 	configJSON, err := json.Marshal(config)
 	if err != nil {
-		return fmt.Errorf("cannot serialize safe-output staging configuration: %w", err)
+		return "", fmt.Errorf("cannot serialize safe-output staging configuration: %w", err)
 	}
-
-	builder.WriteString("      - name: Prepare safe-outputs artifact staging\n")
-	builder.WriteString("        id: prepare_safe_outputs_artifact_staging\n")
-	builder.WriteString("        if: always() && " + secretRedactionSuccessCondition(data) + "\n")
-	fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/github-script")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-	builder.WriteString("        env:\n")
-	builder.WriteString("          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}\n")
-	fmt.Fprintf(builder, "          GH_AW_UPLOAD_ARTIFACT_CONFIG: %q\n", string(configJSON))
-	fmt.Fprintf(builder, "          GH_AW_UPLOAD_ARTIFACT_STAGING_DIR: %s\n", artifactStagingDirExpr)
-	fmt.Fprintf(builder, "          GH_AW_UPLOAD_ARTIFACT_TRANSFER_DIR: %s\n", artifactStagingTransferDirExpr)
-	builder.WriteString("        with:\n")
-	builder.WriteString("          script: |\n")
-	builder.WriteString("            const { setupGlobals } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/setup_globals.cjs`);\n")
-	builder.WriteString("            setupGlobals(core, github, context, exec, io, getOctokit);\n")
-	builder.WriteString("            const { prepare } = require(`${process.env.RUNNER_TEMP}/gh-aw/actions/prepare_upload_artifact_staging.cjs`);\n")
-	builder.WriteString("            const result = await prepare({ core });\n")
-	builder.WriteString("            core.info(`Prepared ${result.count} safe-output staging file(s)`);\n")
-	builder.WriteString("      # Upload safe-outputs upload-artifact staging for the upload_artifact job\n")
-	builder.WriteString("      - name: Upload upload-artifact staging\n")
-	builder.WriteString("        if: always() && " + secretRedactionSuccessCondition(data) + " && steps.prepare_safe_outputs_artifact_staging.outcome == 'success'\n")
-	fmt.Fprintf(builder, "        uses: %s\n", pinAction("actions/upload-artifact")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-	builder.WriteString("        with:\n")
-	fmt.Fprintf(builder, "          name: %s%s\n", prefix, SafeOutputsUploadArtifactStagingArtifactName) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-	fmt.Fprintf(builder, "          path: %s\n", artifactStagingTransferDirExpr)                         //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-	builder.WriteString("          retention-days: 1\n")
-	builder.WriteString("          if-no-files-found: ignore\n")
-	return nil
+	return string(configJSON), nil
 }
 
 func usesSafeOutputsArtifactStaging(config *SafeOutputsConfig) bool {
