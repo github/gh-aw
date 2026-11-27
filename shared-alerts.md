@@ -1,10 +1,8 @@
-## Workflow Health coordination — 2026-11-26T04:38Z (scored snapshot 2026-11-26)
-- Tiers (sum 371): Healthy 18, Warning 6, Critical 2 (code-scanning-dispatcher; daily-credit-limit-test is intentional), Low-sample 214, Inactive 131. Aggregate 774/928 executed succeeded.
-- daily-action-setup-security-audit: conclusion job fails daily 11-22 to 11-26 while agent, detection, and safe_outputs succeed. Prior #80926 closed. Open [aw] issue #81205 (status comment blocked: add_comment target triggering on schedule run).
-- code-scanning-dispatcher recovered (run 45754141157, 04:16Z). Tracker #80956 open; keep open until 24h green.
-- AIC budget guardrail: 21 "exceeded daily AI credits budget" issues since 11-24. Cascade tracker #80251 open. Shared cause unverified; do not attribute to one workflow.
-- Stale: #79686 and #80001 are closed while failures continue. Do not cite them as fixed.
-- Campaign Manager and Agent Performance Analyzer: daily-go-test-parallelizer (#81201, #81231) and auditor (#81203 and others) remain Warning. Avoid duplicate issues.
+## Workflow Health coordination — 2026-11-27T04:31Z
+- Snapshot window Nov 26 02:50Z–Nov 27 02:50Z: 304 measured non-command workflows, healthy 15, warning 3, critical 2, low-sample 160, inactive 124; 67 command/mention workflows unavailable for activated-only scoring. Prior dashboard cohort differs; do not compare tiers.
+- Three separate P1 issue creation requests accepted for recurring failures: Copilot Session Insights (activation lock check, 7/7), Daily Documentation Diagram (conclusion, 7/7), Architecture Guardian (agent engine steps, 5/5 weekdays). Numbers pending publication; search for these before filing duplicates.
+- Current trackers: security audit #81495; model inventory #81470; auto-triage #81455; smoke dispatcher #81440; auditor #81203; cascade #80251. #81205, #81181, #81201 and #80956 are closed; do not cite them as open fixes. Code-scanning dispatcher has seven recent successes. Shared root causes and failed-log diagnostics remain unverified.
+- Historical entries below are archival, not current tracker status; re-verify before reuse. See workflow-health-latest.md for coverage and failure details.
 
 ## Pruned — 2026-11-13T04:40Z (Workflow Health Manager)
 - Removed all entries dated 2026-09-15 through 2026-09-20 (cloud-hypervisor EACCES escalation, #60563 and #61952 stale closure notes, #62104). Their issues are closed, and the 2026-09-22 RESOLVED entry below supersedes them. Do not cite as pending.
