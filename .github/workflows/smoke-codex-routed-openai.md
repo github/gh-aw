@@ -24,8 +24,8 @@ engine: codex
 model: router/economy
 model-routing:
   # Native OpenAI routing keeps CODEX_API_KEY / OPENAI_API_KEY inference.
-  # gpt-5.4 has maintained AWF routing metadata (Responses, none..xhigh effort).
-  allowed-models: [gpt-5.4]
+  # gpt-5.6-luna has maintained AWF routing metadata (Responses, none..max effort).
+  allowed-models: [gpt-5.6-luna]
 imports:
   - shared/smoke-test-brevity.md
   - shared/reporting.md
@@ -59,10 +59,11 @@ post-steps:
           core,
           engine: "codex",
           executionOutcome: process.env.SMOKE_EXECUTION,
-          allowedModels: ["gpt-5.4"],
+          allowedModels: ["gpt-5.6-luna"],
           mainEndpoint: "/responses",
           routingMode: "economy",
           nativeProvider: "openai",
+          expectedSelectionSource: "router",
           expectRequestedEffortMatchesSelection: true,
           expectModelInventory: true,
           resolutionRoles: [],
