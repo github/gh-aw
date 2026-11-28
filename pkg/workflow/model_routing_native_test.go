@@ -365,3 +365,89 @@ func TestNativeRoutingSmokeEvidence(t *testing.T) {
 		})
 	}
 }
+
+func TestCompiledModelRoutingEndpoints(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		frontmatter string
+		wantPresent bool
+	}{
+		{
+			name: "implicit default routing on default v0.29.21",
+			frontmatter: `---
+on: workflow_dispatch
+permissions:
+  contents: read
+  copilot-requests: write
+engine: copilot
+---
+Inspect the repository.`,
+			wantPresent: true,
+		},
+		{
+			name: "implicit default routing on older v0.29.20",
+			frontmatter: `---
+on: workflow_dispatch
+permissions:
+  contents: read
+  copilot-requests: write
+engine: copilot
+sandbox:
+  agent:
+    version: v0.29.20
+---
+Inspect the repository.`,
+			wantPresent: false,
+		},
+		{
+			name: "dynamic expression routing on default v0.29.21",
+			frontmatter: `---
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        type: string
+        default: router/balanced
+permissions:
+  contents: read
+  copilot-requests: write
+engine: copilot
+model: ${{ inputs.level }}
+---
+Inspect the repository.`,
+			wantPresent: true,
+		},
+		{
+			name: "dynamic expression routing on older v0.29.20",
+			frontmatter: `---
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        type: string
+        default: router/balanced
+permissions:
+  contents: read
+  copilot-requests: write
+engine: copilot
+model: ${{ inputs.level }}
+sandbox:
+  agent:
+    version: v0.29.20
+---
+Inspect the repository.`,
+			wantPresent: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			compiled := compileRoutedWorkflowSource(t, tc.frontmatter)
+			require.NoError(t, compiled.err)
+			routing := compiled.routing(t)
+			if tc.wantPresent {
+				require.Equal(t, []any{"/responses", "/chat/completions"}, routing["endpoints"])
+			} else {
+				require.NotContains(t, routing, "endpoints")
+			}
+		})
+	}
+}

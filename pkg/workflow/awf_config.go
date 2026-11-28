@@ -234,6 +234,7 @@ type AWFModelRoutingConfig struct {
 	Objective       AWFModelRoutingObjective `json:"objective"`
 	Task            AWFModelRoutingTask      `json:"task"`
 	CandidateModels []string                 `json:"candidateModels,omitempty"`
+	Endpoints       []string                 `json:"endpoints,omitempty"`
 }
 
 type AWFModelRoutingObjective struct {
