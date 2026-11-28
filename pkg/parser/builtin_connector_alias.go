@@ -24,10 +24,16 @@ func resolveBuiltinConnectorAlias(filePath string) (string, bool, error) {
 }
 
 func validBuiltinConnectorID(id string) bool {
-	if len(id) == 0 || len(id) > 63 || id[0] < 'a' || id[0] > 'z' {
+	if id == "" || len(id) > 63 {
 		return false
 	}
-	for _, char := range id[1:] {
+	for index, char := range id {
+		if index == 0 {
+			if char < 'a' || char > 'z' {
+				return false
+			}
+			continue
+		}
 		if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
 			return false
 		}
