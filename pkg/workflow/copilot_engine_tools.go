@@ -24,7 +24,7 @@ package workflow
 import (
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -52,6 +52,20 @@ func sanitizeCopilotShellCommand(cmdStr string) (string, bool) {
 	// Trim trailing whitespace from the prefix.
 	// shell(jq) prefix-matches any jq invocation, preserving full tool access.
 	return strings.TrimRight(prefix, " "), true
+}
+
+func normalizeCopilotBashCommand(cmdStr string) string {
+	cmdStr, _ = normalizeBashCommand(cmdStr)
+	if !strings.HasSuffix(cmdStr, "*") || cmdStr == "*" ||
+		strings.ContainsAny(cmdStr, " \t\r\n:") {
+		return cmdStr
+	}
+
+	command := strings.TrimSuffix(cmdStr, "*")
+	if command == "" || strings.ContainsAny(command, "*?[]") {
+		return cmdStr
+	}
+	return command + ":*"
 }
 
 // computeCopilotToolArguments computes the --allow-tool arguments for Copilot CLI based on tool configurations.
@@ -101,10 +115,10 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 				// Add specific shell commands
 				for _, cmd := range bashCommands {
 					if cmdStr, ok := cmd.(string); ok {
-						// Normalize trailing " *" wildcard (e.g. "jq *" → "jq") so that
-						// all engines emit the canonical prefix form (shell(jq)) regardless
-						// of whether the command was written with or without the wildcard.
-						cmdStr, _ = normalizeBashCommand(cmdStr)
+						// Normalize the documented command wildcard (e.g. "curl*") to
+						// Copilot's command/argument form (shell(curl:*)). Also strip the
+						// trailing " *" form (e.g. "jq *") to its canonical prefix form.
+						cmdStr = normalizeCopilotBashCommand(cmdStr)
 						// For stem commands (like dotnet, npm, cargo), Copilot CLI uses
 						// subcommand matching. When the user specifies just the base command
 						// (e.g., "dotnet"), append :* so "dotnet build", "dotnet test", etc.
@@ -281,7 +295,7 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 			}
 			expectValue = !expectValue
 		}
-		sort.Strings(values)
+		slices.Sort(values)
 
 		// Rebuild args with sorted, deduplicated values
 		newArgs := make([]string, 0, len(args))
@@ -320,7 +334,7 @@ func (e *CopilotEngine) generateCopilotToolArgumentsComment(tools map[string]any
 			expectValue = true
 			continue
 		}
-		fmt.Fprintf(&comment, "%s# %s %s\n", indent, flag, arg)
+		fmt.Fprintf(&comment, "%s# %s %s\n", indent, flag, arg) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		expectValue = false
 	}
 

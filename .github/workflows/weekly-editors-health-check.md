@@ -33,8 +33,8 @@ tools:
   cli-proxy: true
   playwright:
   bash:
-    - "curl*"
-    - "cat*"
+    - "curl:*"
+    - "cat:*"
   edit:
 
 safe-outputs:
@@ -89,7 +89,7 @@ Proceed with the full list of editors discovered in this step.
 
 For each editor discovered in Step 0, verify that its URL is reachable:
 
-1. Use `curl -sS -o /dev/null -w "%{http_code}" <url>` to perform an HTTP GET request.
+1. For each URL, make a separate shell tool call containing only `curl -sS -o /dev/null -w "%{http_code}" --max-time 30 '<url>'` to perform an HTTP GET request. Do not combine checks in a shell loop, pipeline, command substitution, or other compound command.
 2. Record the HTTP status code for each URL.
 3. A status code of **200** means the editor is available.
 4. Any other status code (or a connection error) means the editor is unavailable.
@@ -155,6 +155,7 @@ Example body (rows reflect whatever editors were discovered in Step 0):
 ## Error Handling
 
 - If a URL is unreachable (non-200 status or connection error), skip the screenshot step for that editor but still include the editor in the PR body with its error status.
+- If a standalone URL check is denied by workflow tool permissions, mark that editor's reachability as unknown (permission denied). Do not retry command variants or treat the denial as an unreachable URL; continue checking the remaining editors. After all editor checks, call `report_incomplete` once with each denied operation.
 - If a screenshot cannot be taken (Playwright error), log the error and continue with the remaining editors.
 - If no screenshots were successfully taken or no documentation changes are needed (e.g., all screenshots and links are unchanged and already up to date), do **not** open a pull request. Instead, call the `noop` safe output tool explaining what was checked and why no PR was needed.
 - Always attempt all editors before deciding whether to create a PR or call `noop`.

@@ -63,8 +63,14 @@ func validatePathComponents(owner, repo, path, sha string) error {
 type ImportCache struct {
 	baseDir            string // Base directory for cache (typically repo root)
 	readOnly           bool
+	requireStablePaths bool
 	localOnlyRoot      string
 	resolvedLocalFiles map[string]struct{}
+}
+
+// SetRequireStablePaths rejects remote imports that cannot be stored at a stable cache path.
+func (c *ImportCache) SetRequireStablePaths(required bool) {
+	c.requireStablePaths = required
 }
 
 // SetReadOnly prevents downloads from changing the on-disk import cache.

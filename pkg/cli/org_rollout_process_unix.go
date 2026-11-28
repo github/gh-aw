@@ -17,6 +17,17 @@ func configureOrgRolloutProcess(cmd *exec.Cmd) {
 		if errors.Is(err, syscall.ESRCH) {
 			return os.ErrProcessDone
 		}
+
 		return err
 	}
+}
+
+func configureMaintenanceCheckoutProcess(cmd *exec.Cmd, rolloutWorker bool) {
+	if rolloutWorker {
+		return
+	}
+	configureOrgRolloutProcess(cmd)
+	// A separate session has no controlling terminal, so tools cannot block
+	// waiting for terminal credentials when stdin is disconnected.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 }
