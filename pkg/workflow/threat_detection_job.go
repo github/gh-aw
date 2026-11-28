@@ -2,6 +2,7 @@
 package workflow
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
@@ -30,6 +31,35 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 	if !IsDetectionJobEnabled(data.SafeOutputs) {
 		threatLog.Print("Threat detection engine disabled with no custom steps, skipping detection job")
 		return nil, nil
+	}
+	detectionEngineID := c.getThreatDetectionEngineID(data)
+	if engine, err := c.getAgenticEngine(detectionEngineID); err == nil {
+		if imported, ok := engine.(*BehaviorDefinedEngine); ok && !isThreatDetectionCapableEngineID(detectionEngineID) {
+			if _, exists := data.enginePrerequisites[detectionEngineID]; !exists {
+				return nil, fmt.Errorf("self-detecting imported engine %q has no captured runtime/setup prerequisites; import its definition instead of declaring it inline", detectionEngineID)
+			}
+			model := data.SafeOutputs.ThreatDetection.Model
+			if model == "" {
+				model = inheritedDetectionModel(data, detectionEngineID)
+			}
+			if model == "" {
+				model = imported.GetDefaultDetectionModel()
+			}
+			providerPrefix := ""
+			if behavior := imported.behavior(); behavior != nil && behavior.Execution != nil {
+				providerPrefix = behavior.Execution.ModelEnvProviderPrefix
+			}
+			if !strings.Contains(model, "/") && !isExpression(model) && providerPrefix == "" {
+				return nil, fmt.Errorf("imported detection engine %q requires a provider-qualified model in safe-outputs.threat-detection.model or behaviors.models.default", detectionEngineID)
+			}
+			if isFeatureEnabled(constants.GHAWDetectionFeatureFlag, data) {
+				detectionData := buildExternalDetectorWorkflowData(data, detectionEngineID)
+				detectionData.Model = model
+				if _, ok := findBehaviorDefinedExecutionStep(imported.GetExecutionSteps(detectionData, constants.ThreatDetectionLogPath)); !ok {
+					return nil, fmt.Errorf("imported detection engine %q did not generate the required agentic_execution step", detectionEngineID)
+				}
+			}
+		}
 	}
 
 	var steps []string
@@ -94,9 +124,14 @@ func (c *Compiler) buildDetectionJob(data *WorkflowData) (*Job, error) { //nolin
 	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.EngineConfig != nil {
 		detectionSpecificEnv = data.SafeOutputs.ThreatDetection.EngineConfig.Env
 	}
-	detectionEngineID := c.getThreatDetectionEngineID(data)
 	effectiveDetectionEnv := mergeThreatDetectionEngineEnv(data, detectionEngineID, detectionSpecificEnv)
 	var engineConfigBuilder strings.Builder
+	if prereqs, ok := data.enginePrerequisites[detectionEngineID]; ok {
+		engineConfigBuilder.WriteString(prereqs.PreAgentSteps)
+		if runtimeConfig, err := json.Marshal(prereqs.Runtimes); err == nil {
+			engineConfigBuilder.Write(runtimeConfig)
+		}
+	}
 	for _, envValue := range effectiveDetectionEnv {
 		engineConfigBuilder.WriteByte('\n')
 		engineConfigBuilder.WriteString(envValue)

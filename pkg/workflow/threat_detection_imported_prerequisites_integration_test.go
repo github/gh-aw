@@ -29,10 +29,14 @@ engine:
   id: python-agent
   detection-engine: python-agent
   display-name: Python Agent
+  models:
+    default: copilot/gpt-5.2
   version: "2.9.2"
   behaviors:
+    secret-strategy: universal-llm-consumer
     execution:
       command-name: python3
+      model-env-var: MODEL
     harness-script: |
       console.log("source harness");
     installation:
@@ -66,7 +70,7 @@ pre-agent-steps:
 ---
 `)
 	for _, tt := range []struct{ name, primary, detection string }{
-		{"inherited", "", ""},
+		{"inherited", "engine:\n  model: copilot/gpt-5.2", ""},
 		{"explicit", "engine: copilot", "  threat-detection:\n    engine: python-agent"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -100,9 +104,14 @@ Inspect the repository.
 			require.Regexp(t, `uses: actions/github-script@[0-9a-f]{40}`, detection)
 			require.Contains(t, detection, "python-version: '3.12'")
 			require.Contains(t, detection, "pydantic==2.9.2 --hash=sha256:")
+			require.Contains(t, detection, "MODEL:")
+			require.Contains(t, detection, "copilot/gpt-5.2")
+			require.Contains(t, detection, "GH_AW_ENGINE_VERSION: 2.9.2")
+			require.Contains(t, detection, "HOME: /tmp/gh-aw/agent/python-agent-python-home")
+			require.Contains(t, detection, "if: always() && steps.detection_guard.outputs.run_detection == 'true'")
 			require.Equal(t, 1, strings.Count(detection, "- name: Setup Node.js"))
 			last := -1
-			for _, marker := range []string{"- name: Setup Python", "- name: Install locked Pydantic", "- name: Prepare Python engine", `> "${RUNNER_TEMP}/gh-aw/actions/python-agent_harness.cjs"`, "stage_threat_detection_runtime.cjs"} {
+			for _, marker := range []string{"- name: Setup Python", "- name: Install locked Pydantic", "name: Prepare Python engine", `> "${RUNNER_TEMP}/gh-aw/actions/python-agent_harness.cjs"`, "stage_threat_detection_runtime.cjs"} {
 				index := strings.Index(detection, marker)
 				require.Greater(t, index, last, "missing or out-of-order %q", marker)
 				last = index

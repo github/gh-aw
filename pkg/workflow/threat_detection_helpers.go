@@ -3,6 +3,7 @@ package workflow
 
 import (
 	"maps"
+	"path"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -12,6 +13,8 @@ import (
 )
 
 var threatLog = logger.New("workflow:threat_detection")
+
+const defaultThreatDetectionMaxTurns = 50
 
 // detectionStepCondition is the if condition applied to inline detection steps.
 // Detection steps only run when the detection guard determines there's output to analyze.
@@ -191,6 +194,17 @@ func buildExternalDetectorWorkflowData(data *WorkflowData, engineID string) *Wor
 		d.EngineConfig.LLMProvider = LLMProviderOpenAI
 	}
 	d.EngineConfig.Env = mergeThreatDetectionEngineEnv(data, engineID, d.EngineConfig.Env)
+	if d.EngineConfig.Env == nil {
+		d.EngineConfig.Env = make(map[string]string)
+	}
+	if !isThreatDetectionCapableEngineID(engineID) {
+		d.EngineConfig.Env["HOME"] = path.Join(constants.TmpGhAwAgentDir, engineID+"-python-home")
+	}
+	if data.SafeOutputs != nil && data.SafeOutputs.ThreatDetection != nil && data.SafeOutputs.ThreatDetection.MaxTurns != nil {
+		d.EngineConfig.MaxRuns = *data.SafeOutputs.ThreatDetection.MaxTurns
+	} else if d.EngineConfig.MaxRuns <= 0 {
+		d.EngineConfig.MaxRuns = defaultThreatDetectionMaxTurns
+	}
 	if d.EngineConfig.Auth == nil && isOpenAIWIFWithAWF(d) {
 		d.EngineConfig.Auth = resolveOpenAIWIFAuth(d.EngineConfig)
 	}
@@ -362,7 +376,8 @@ func inheritedDetectionModel(data *WorkflowData, detectionEngineID string) strin
 	if engineID != detectionEngineID && len(data.ModelMappings[data.Model]) > 0 {
 		return ""
 	}
-	if engineID == detectionEngineID || engineID == "" || engineID == "pi" || isThreatDetectionCapableEngineID(engineID) {
+	if engineID == detectionEngineID || engineID == "" || engineID == "pi" ||
+		(isThreatDetectionCapableEngineID(engineID) && isThreatDetectionCapableEngineID(detectionEngineID)) {
 		return data.Model
 	}
 	return ""

@@ -7,6 +7,7 @@ const engine = process.argv[2];
 const bundled = ["copilot", "claude", "codex"].includes(engine);
 if (!/^[a-zA-Z0-9_-]+$/.test(engine) || (!bundled && !process.argv[3])) throw new Error("Unsupported detection engine");
 const argv = bundled ? [engine] : JSON.parse(Buffer.from(process.argv[3], "base64").toString("utf8"));
+const configFiles = !bundled && process.argv[4] ? JSON.parse(Buffer.from(process.argv[4], "base64").toString("utf8")) : [];
 if (!Array.isArray(argv) || !argv[0] || !argv.every(arg => typeof arg === "string")) throw new Error("Invalid detection harness argv");
 if (!process.env.RUNNER_TEMP) throw new Error("RUNNER_TEMP must be set");
 const root = path.join(process.env.RUNNER_TEMP, "gh-aw");
@@ -21,6 +22,7 @@ const launch = {
   command,
   args: [path.join(root, "actions", `${engine}_harness.cjs`), ...argv],
   convention: bundled ? engine : "imported",
-  model: process.env[`GH_AW_MODEL_DETECTION_${engine.toUpperCase()}`]?.trim() || nativeModel[engine],
+  configFiles,
+  model: process.env[`GH_AW_MODEL_DETECTION_${engine.toUpperCase().replace(/-/g, "_")}`]?.trim() || nativeModel[engine],
 };
 fs.writeFileSync(path.join(runtime, "launch.json"), JSON.stringify(launch), { flag: "wx" });

@@ -102,6 +102,13 @@ func (e *BehaviorDefinedEngine) GetLogFileForParsing() string {
 	return e.BaseEngine.GetLogFileForParsing()
 }
 
+func (e *BehaviorDefinedEngine) GetDefaultDetectionModel() string {
+	if e != nil && e.definition != nil {
+		return e.definition.Models.Default
+	}
+	return ""
+}
+
 func (e *BehaviorDefinedEngine) usesUniversalLLMConsumer() bool {
 	behavior := e.behavior()
 	return behavior != nil && behavior.SecretStrategy == behaviorSecretStrategyUniversalLLMConsumer

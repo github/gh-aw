@@ -154,6 +154,10 @@ async function detect(opts, signal) {
             ? `\n\nYour previous verdict was rejected as structurally ineligible: ${err.message}\nRe-analyze the artifacts and run threat_detection_result again, keeping any category you can still support.`
             : "\n\nYour previous response did not record a verdict. Run threat_detection_result with all three boolean flags. For findings, write reasons to $THREAT_DETECTION_REASONS_FILE and use --reasons-file.";
       }
+      if (result && opts.launch.convention === "imported" && (run.error || run.timedOut || run.cancelled || run.exitCode !== 0)) {
+        result = undefined;
+        correction = "\n\nYour previous process did not complete successfully after recording its report. Re-analyze the artifacts, record a corrected report, and exit successfully.";
+      }
       if (result) return publish(opts, result, warnings);
       if (signal.aborted) return { reason: "cancelled", code: 2 };
       if (run.timedOut) return { reason: "engine_timeout", code: 2 };

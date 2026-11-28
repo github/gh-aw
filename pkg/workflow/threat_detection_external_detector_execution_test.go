@@ -85,6 +85,20 @@ func TestExternalDetectorExecutionStepIncludesThreatDetectionContext(t *testing.
 	})
 }
 
+func TestExternalDetectorMaxTurnsSetsAWFInvocationLimit(t *testing.T) {
+	compiler := NewCompiler()
+	maxTurns := 3
+	data := &WorkflowData{
+		AI: "claude",
+		SafeOutputs: &SafeOutputsConfig{
+			ThreatDetection: &ThreatDetectionConfig{MaxTurns: &maxTurns},
+		},
+	}
+	detection := buildExternalDetectorWorkflowData(data, "claude")
+	assert.Equal(t, 3, detection.EngineConfig.MaxRuns)
+	assert.Contains(t, strings.Join(compiler.buildExternalDetectorExecutionStep(data), ""), `\"maxRuns\":3`)
+}
+
 func containsExternalDetectorCopilotPathPrefix(steps string) bool {
 	return strings.Contains(steps, `export PATH="${RUNNER_TEMP}/gh-aw/bin:$PATH"`) ||
 		strings.Contains(steps, `export PATH=\"${RUNNER_TEMP}/gh-aw/bin:$PATH\"`)

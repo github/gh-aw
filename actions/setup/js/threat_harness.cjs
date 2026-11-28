@@ -16,19 +16,30 @@ function provisionTool(dir, sink, eligibility, env) {
   fs.rmSync(reasons, { force: true });
   const script = [
     "#!/bin/sh",
-    `export THREAT_DETECTION_BOUND_RESULT_FILE=${quote(sink)}`,
-    `export THREAT_DETECTION_RESULT_FILE=${quote(sink)}`,
-    `exec ${quote(process.execPath)} ${quote(path.join(__dirname, "threat_report.cjs"))} "$@"`,
+    `THREAT_DETECTION_BOUND_RESULT_FILE=${quote(sink)} THREAT_DETECTION_RESULT_FILE=${quote(sink)} THREAT_DETECTION_REASONS_FILE=${quote(reasons)} exec ${quote(process.execPath)} ${quote(path.join(__dirname, "threat_report.cjs"))} "$@"`,
     "",
   ].join("\n");
   fs.writeFileSync(path.join(dir, "threat_detection_result"), script, { mode: 0o700, flag: "wx" });
   env.PATH = dir + path.delimiter + (env.PATH || "");
-  env.THREAT_DETECTION_RESULT_FILE = sink;
   env.THREAT_DETECTION_REASONS_FILE = reasons;
   for (const category of CATEGORIES) {
     const key = `THREAT_DETECTION_ELIGIBLE_${category.toUpperCase()}`;
     if (typeof eligibility?.[category] === "boolean") env[key] = String(eligibility[category]);
     else delete env[key];
+  }
+}
+
+function stageConfigFiles(configFiles, cwd) {
+  if (configFiles === undefined) return;
+  if (!Array.isArray(configFiles)) throw new Error("Expected launch.configFiles to be an array");
+  for (const file of configFiles) {
+    if (!file || typeof file.path !== "string" || typeof file.content !== "string" || path.isAbsolute(file.path)) {
+      throw new Error("Invalid imported detector config file");
+    }
+    const target = path.resolve(cwd, file.path);
+    if (!target.startsWith(cwd + path.sep)) throw new Error("Imported detector config path escapes its private workspace");
+    fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
+    fs.writeFileSync(target, file.content, { mode: 0o600, flag: "wx" });
   }
 }
 
@@ -120,6 +131,14 @@ async function runHarness({ launch, prompt, artifactsDir, sink, eligibility, max
     if (launch.mode !== undefined && !["harness", "direct"].includes(launch.mode)) throw new Error("Expected launch.mode to be harness or direct");
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "threat-harness-"));
     const env = { ...process.env, ...launch.env };
+    const workspace = path.join(dir, "workspace");
+    fs.mkdirSync(workspace, { mode: 0o700 });
+    if (launch.convention === "imported") {
+      stageConfigFiles(launch.configFiles, workspace);
+      launch = { ...launch, cwd: workspace };
+      env.GITHUB_WORKSPACE = workspace;
+      env.GH_AW_ENGINE_CWD = workspace;
+    }
     if (launch.convention === "claude" && launch.mode !== "direct") {
       const settings = (env.GH_AW_CLAUDE_SETTINGS || "").trim();
       if (settings && !settings.startsWith("{")) env.GH_AW_CLAUDE_SETTINGS = path.resolve(launch.cwd || process.cwd(), settings);
@@ -138,7 +157,7 @@ async function runHarness({ launch, prompt, artifactsDir, sink, eligibility, max
     if (sink) {
       provisionTool(dir, sink, eligibility, env);
       prompt = `Host-provided reasons file (literal path, JSON-encoded): ${JSON.stringify(env.THREAT_DETECTION_REASONS_FILE)}\n\n${prompt}`;
-      if (["claude", "codex", "imported"].includes(launch.convention)) {
+      if (["claude", "codex"].includes(launch.convention)) {
         launch = { ...launch, cwd: path.dirname(sink) };
         env.GITHUB_WORKSPACE = path.dirname(sink);
         env.GH_AW_ENGINE_CWD = path.dirname(sink);

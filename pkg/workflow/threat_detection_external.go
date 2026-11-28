@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
+	yamlparser "github.com/goccy/go-yaml"
 )
 
 func (c *Compiler) buildPrepareDetectionEngineConfigForExternalDetectorStep(data *WorkflowData) []string {
@@ -514,21 +515,27 @@ func (c *Compiler) buildInstallDetectionEngineForExternalDetectorStep(data *Work
 }
 
 func (c *Compiler) buildImportedDetectorInstallation(data, detectionData *WorkflowData, engine *BehaviorDefinedEngine) []string {
-	prereqs := data.enginePrerequisites[engine.GetID()]
+	prereqs, ok := data.enginePrerequisites[engine.GetID()]
+	if !ok {
+		return nil
+	}
 	// Only the definition contributes runtimes, not the primary job's steps, MCP
 	// servers, or runtime overrides. Use the original workflow's pin context.
 	runtimes := map[string]any{"node": map[string]any{}} // the harness always needs Node
 	maps.Copy(runtimes, prereqs.Runtimes)
 	requirements := DetectRuntimeRequirements(&WorkflowData{Runtimes: runtimes})
-	steps := GenerateRuntimeSetupSteps(requirements, data)
 	if detectionData.EngineConfig.Version == "" {
 		detectionData.EngineConfig.Version = engine.definition.Version
 	}
+	steps := GenerateRuntimeSetupSteps(requirements, data)
 	for _, step := range engine.GetInstallationSteps(detectionData) {
 		// Node was provisioned above, and AWF is installed separately.
 		if !isAWFBinaryInstallStep(step) && extractStepName(strings.Join(step, "\n")) != "Setup Node.js" {
 			steps = append(steps, step)
 		}
+	}
+	for i := range steps {
+		steps[i] = withDetectionStepCondition(steps[i])
 	}
 	var yaml strings.Builder
 	arcDind := isArcDindTopology(detectionData)
@@ -536,11 +543,67 @@ func (c *Compiler) buildImportedDetectorInstallation(data, detectionData *Workfl
 		c.generateArcDindToolCacheRedirectStep(&yaml)
 	}
 	c.emitRuntimeSetupSteps(&yaml, steps, arcDind)
-	writeStepsSection(&yaml, prereqs.PreAgentSteps)
+	if prereqs.PreAgentSteps != "" {
+		var section map[string]any
+		if err := yamlparser.Unmarshal([]byte(prereqs.PreAgentSteps), &section); err == nil {
+			steps, _ := section["pre-agent-steps"].([]any)
+			for _, value := range steps {
+				step, ok := value.(map[string]any)
+				if !ok {
+					continue
+				}
+				step["if"] = combineDetectionStepCondition(step["if"])
+				env, _ := step["env"].(map[string]any)
+				if env == nil {
+					env = make(map[string]any)
+				}
+				env["GH_AW_ENGINE_VERSION"] = detectionData.EngineConfig.Version
+				pythonHome := detectionData.EngineConfig.Env["HOME"]
+				if arcDind {
+					pythonHome = "${{ runner.temp }}/gh-aw/agent/" + engine.GetID() + "-python-home"
+				}
+				env["HOME"] = pythonHome
+				step["env"] = env
+			}
+			section["pre-agent-steps"] = steps
+			if encoded, err := yamlparser.Marshal(section); err == nil {
+				writeStepsSection(&yaml, string(encoded))
+			}
+		}
+	}
 	if harness := engine.buildHarnessWriteStep(); len(harness) > 0 {
-		yaml.WriteString(strings.Join(harness, "\n") + "\n")
+		yaml.WriteString(strings.Join(withDetectionStepCondition(harness), "\n") + "\n")
 	}
 	return []string{yaml.String()}
+}
+
+func combineDetectionStepCondition(existing any) string {
+	condition := detectionStepCondition
+	if text, ok := existing.(string); ok && strings.TrimSpace(text) != "" {
+		expression := strings.TrimSpace(text)
+		if strings.HasPrefix(expression, "${{") && strings.HasSuffix(expression, "}}") {
+			expression = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(expression, "${{"), "}}"))
+		}
+		condition += " && (" + expression + ")"
+	}
+	return condition
+}
+
+func withDetectionStepCondition(step GitHubActionStep) GitHubActionStep {
+	result := slices.Clone(step)
+	for i, line := range result {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "if:") {
+			prefix := line[:len(line)-len(strings.TrimLeft(line, " "))]
+			result[i] = prefix + "if: " + combineDetectionStepCondition(strings.TrimSpace(strings.TrimPrefix(trimmed, "if:")))
+			return result
+		}
+	}
+	if len(result) > 0 {
+		indent := result[0][:len(result[0])-len(strings.TrimLeft(result[0], " "))]
+		result = append(result[:1], append(GitHubActionStep{indent + "if: " + detectionStepCondition}, result[1:]...)...)
+	}
+	return result
 }
 
 func isAWFBinaryInstallStep(step GitHubActionStep) bool {
@@ -585,6 +648,13 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// The rw mount for ThreatDetectionDir allows the threat-detect binary to write
 	// detection_result.json from inside the AWF container to the host filesystem.
 	threatDetectionData := buildExternalDetectorWorkflowData(data, engineID)
+	imported, importedHarness := engine.(*BehaviorDefinedEngine)
+	importedHarness = importedHarness && !isThreatDetectionCapableEngineID(engineID)
+	if importedHarness {
+		threatDetectionData.Tools = map[string]any{
+			"bash": []any{"threat_detection_result"},
+		}
+	}
 
 	// Resolve the detection model, mirroring buildDetectionEngineExecutionStep on the
 	// inline path. Without this, the engine env block falls back to
@@ -630,8 +700,6 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	// Compute which env vars to exclude from the AWF container. The API proxy
 	// handles authentication, so the raw credentials must not reach the container.
 	coreSecretVarNames := engineCoreSecretVarNames(engineID)
-	imported, importedHarness := engine.(*BehaviorDefinedEngine)
-	importedHarness = importedHarness && !isThreatDetectionCapableEngineID(engineID)
 	if importedHarness {
 		coreSecretVarNames = append(coreSecretVarNames, imported.GetRequiredSecretNames(threatDetectionData)...)
 		for _, binding := range imported.definition.Auth {
@@ -655,9 +723,20 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 		// defaults do not account for. Avoid OpenAI access for GitHub-hosted detection.
 		allowedDomains = mergeDomainsWithNetworkToolsAndRuntimes(NewCodexEngine().defaultDomains(threatDetectionData), threatDetectionData.NetworkPermissions, data.Tools, data.Runtimes)
 	} else if importedHarness {
-		// Opting in to detection does not grant the primary agent's browsing
-		// domains, tool hosts, or install-time package registry access.
-		allowedDomains = mergeDomainsWithNetworkToolsAndRuntimes(nil, threatDetectionData.NetworkPermissions, nil, nil)
+		// Keep the imported engine's inference hosts, but not package registries,
+		// primary workflow tool hosts, or primary runtimes.
+		var defaults []string
+		if network := imported.behavior().Network; network != nil {
+			declared, err := resolveEngineNetworkDomains(network, threatDetectionData.Model)
+			if err == nil {
+				for _, domain := range declared {
+					if GetDomainEcosystem(domain) == "" {
+						defaults = append(defaults, domain)
+					}
+				}
+			}
+		}
+		allowedDomains = mergeDomainsWithNetworkToolsAndRuntimes(defaults, threatDetectionData.NetworkPermissions, nil, nil)
 	} else {
 		allowedDomains = GetAllowedDomainsForEngine(constants.EngineName(engineID), threatDetectionData.NetworkPermissions, data.Tools, data.Runtimes)
 	}
@@ -702,6 +781,13 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 			panic(fmt.Sprintf("BUG: cannot encode detection argv (string slice): %v", err))
 		}
 		stageArgs += " " + base64.StdEncoding.EncodeToString(argv)
+		if config := imported.behavior().ConfigFile; config != nil && config.Path != "" {
+			configFiles, err := json.Marshal([]map[string]string{{"path": config.Path, "content": config.Content}})
+			if err != nil {
+				panic(fmt.Sprintf("BUG: cannot encode imported detection config file: %v", err))
+			}
+			stageArgs += " " + base64.StdEncoding.EncodeToString(configFiles)
+		}
 	}
 	awfConfig := AWFCommandConfig{
 		EngineName:         engineID,
@@ -722,12 +808,12 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	if len(executionSteps) > 0 {
 		step := executionSteps[0]
 		if importedHarness {
-			// A behavior-defined engine emits setup steps before its execution step.
-			for _, candidate := range executionSteps {
-				if slices.Contains(candidate, "        id: agentic_execution") {
-					step = candidate
-					break
-				}
+			// Do not silently fall back to a setup step if the engine's execution
+			// step contract changes.
+			if executionStep, ok := findBehaviorDefinedExecutionStep(executionSteps); ok {
+				step = executionStep
+			} else {
+				step = nil
 			}
 		}
 		envLines = extractStepEnvLines(step)
@@ -791,6 +877,18 @@ func (c *Compiler) buildExternalDetectorExecutionStep(data *WorkflowData) []stri
 	}
 
 	return append(c.buildTokenBrokerRequestStep(threatDetectionData, executionCondition), steps...)
+}
+
+func findBehaviorDefinedExecutionStep(steps []GitHubActionStep) (GitHubActionStep, bool) {
+	for _, step := range steps {
+		for _, line := range step {
+			trimmed := strings.TrimSpace(line)
+			if id, ok := strings.CutPrefix(trimmed, "id:"); ok && strings.TrimSpace(id) == "agentic_execution" {
+				return step, true
+			}
+		}
+	}
+	return nil, false
 }
 
 func codexOIDCReflectionGuard(provider string) string {

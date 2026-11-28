@@ -2,6 +2,8 @@ package parser
 
 import (
 	"encoding/json"
+	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -92,6 +94,12 @@ func (acc *importAccumulator) extractDetectionPrerequisites(fm map[string]any) e
 	}
 	if acc.enginePrerequisites == nil {
 		acc.enginePrerequisites = make(map[string]EnginePrerequisites)
+	}
+	if existing, exists := acc.enginePrerequisites[id]; exists {
+		if !reflect.DeepEqual(existing, prereqs) {
+			return fmt.Errorf("conflicting detection prerequisites for imported engine %q", id)
+		}
+		return nil
 	}
 	acc.enginePrerequisites[id] = prereqs
 	return nil
