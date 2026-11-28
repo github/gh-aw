@@ -19,14 +19,13 @@ engine:
 tools:
   cache-memory: true
   cli-proxy: true
-  agentic-workflows:
-  timeout: 300
 safe-outputs:
   upload-asset:
     max: 5
     allowed-exts: [.png, .jpg, .jpeg, .svg]
 timeout-minutes: 45
 imports:
+  - shared/aw-logs-24h-fetch-setup.md
   - uses: shared/cache-memory-trending.md
     with:
       workflow-name: api-consumption
@@ -71,16 +70,10 @@ Every day, analyse the **last 24 hours** of agentic workflow runs to understand:
 
 ## Completion Contract
 
-Before collecting logs, check `safeoutputs --help` as a standalone command.
-Use exposed MCP tools, or the declared `agenticworkflows` and `safeoutputs` CLI
-bridges when the engine has no MCP call interface. The bridges invoke the same
-configured tools; do not call `gh aw` directly or discover credentials.
-
-Follow **Step 1** below for bounded collection and retries, then complete
-**Steps 2–6**: aggregate the downloaded dataset, update history, generate charts,
-upload available charts and submit the discussion. Exhausting the pagination
-allowance ends collection only, not the reporting task. Treat missing or partial
-data as a limitation, not proof that the remaining steps ran.
+Check `safeoutputs --help` as a standalone command. Use the shared 24-hour
+prefetch from **Step 1**, then complete **Steps 2–6**: aggregate the cached dataset,
+update history when coverage permits, generate and upload available charts, and
+submit the discussion. Do not query GitHub for more runs or artifacts.
 
 Call `safeoutputs create_discussion` with the real report's JSON payload
 (`title` and `body`) and wait for its response. Only claim an aggregation file,
@@ -105,47 +98,27 @@ no terminal outcome could be recorded; do not claim submission or bypass the den
 
 ---
 
-## Step 1 — Collect Logs via MCP
+## Step 1 — Read the Shared 24-Hour Prefetch
 
-Run **Step T1** from the cache-memory trending pattern above to inspect the cache state and choose a collection window.
+Read `/tmp/gh-aw/aw-mcp/logs/summary.json`. The shared setup collects compact
+`info,usage` artifacts for up to 3,000 runs within a 1 GB storage budget.
+Use the summary's `runs` list, not a scan of all cached directories.
 
-Use the `agentic-workflows` MCP `logs` tool, or the declared
-`agenticworkflows logs` CLI bridge when MCP calls are not exposed:
+If the summary indicates truncation, a storage limit, or pending `continuation`
+or `continuations`, report partial coverage and the number of runs analyzed.
+Do not follow continuations, run audits, or backfill history from the API.
+If the summary is missing or unreadable, publish a discussion explaining that
+the dataset is unavailable; do not invent metrics or update history.
 
-- **Incremental** (history is already rich per the threshold in **Step T1**): `logs(start_date="-1d")`
-- **Backfill** (first run, cache miss, or sparse history per the threshold in **Step T1**): `logs(start_date="-90d")`
-- If the initial `logs` call times out or fails with a transient tool/transport error, retry that same call up to **2** more times with short backoff (about 15s, then about 45s). Do not change its parameters, timeout, or count while retrying.
-- If the initial call still fails after those retries, stop collecting and use any run directories already downloaded. Clearly mark the dataset partial. If none are available, create a discussion stating that collection failed; do not invent metrics or charts, and do not end without a safe-output action.
-- The `continuation` field is authoritative. If it is missing or `null`, stop paging even if the returned run count exactly matches your requested count.
-- Treat the run directories already present under `/tmp/gh-aw/aw-mcp/logs/` as the authoritative collected dataset. Successful continuation calls should add to that dataset; if a later continuation attempt fails, keep using the directories that are already on disk.
-- If `continuation` is present, make at most **2** additional continuation calls using the returned parameters. After each successful continuation call, re-read that response's `continuation` field before deciding whether to continue. Do **not** invent your own `before_run_id` from the earliest run in the batch.
-- If a continuation call times out, returns `ECONNREFUSED`, or otherwise fails with a transient tool/transport error, retry that **same** continuation call up to **2** more times with short backoff (about 15s, then about 45s). Do **not** change the returned pagination parameters, timeout, or count while retrying.
-- If the continuation call still fails after those bounded retries, stop collecting, proceed with the logs already downloaded to `/tmp/gh-aw/aw-mcp/logs/`, and clearly note in the final discussion that continuation retries were exhausted and the dataset may be partial.
-- Never use Bash/CLI pagination loops, unbounded retries, or ad-hoc count/timeout tuning to chase more pages.
-
-Record which mode you used (`incremental` vs `backfill`) and the chosen `start_date` in Step 6 (the discussion "Cache Memory Status" details block).
-
-This downloads one directory per run to `/tmp/gh-aw/aw-mcp/logs/`. Each run directory contains:
-- `aw_info.json` — engine, workflow name, status, tokens, cost, duration
-- `safe_output.jsonl` — agent safe-output actions (type, created_at, success) — **pre-processing attempts; not authoritative for actuation count**
-- `run_summary.json` — cached CLI analysis with `run.safe_items_count` — **authoritative post-processing actuation count**
-- `agent/` — raw agent step logs
-
-**Do NOT call `gh aw` directly** — use the configured MCP tools or their declared
-CLI bridges.
-
-After collecting, use `audit` on any runs flagged as failed to get deeper diagnostics:
-
-```
-audit(run_id=<id>)
-```
+Skip Step T1 of the shared trending pattern: collection always uses the same
+prefetch, even when trend history is sparse.
 
 ---
 
 ## Step 2 — Parse & Aggregate Metrics
 
-Use the `metrics-aggregator` agent to parse all run directories and write the aggregated
-`/tmp/gh-aw/python/data/today.json` (and `/tmp/gh-aw/python/data/backfill_entries.json` in backfill mode).
+Use the `metrics-aggregator` agent to aggregate the listed runs and write
+`/tmp/gh-aw/python/data/today.json`.
 
 ---
 
@@ -268,8 +241,8 @@ Create a discussion with the following structure. Replace placeholders with real
 
 - **Location**: `/tmp/gh-aw/cache-memory/trending/api-consumption/history.jsonl`
 - **Cache restored from previous run**: {yes (N entries) / no (first run)}
-- **Collection mode**: {incremental / backfill}
-- **Logs start_date used**: {-1d / -90d}
+- **Collection source**: Shared 24-hour prefetch
+- **Coverage**: {runs analyzed; note any limits or missing metric evidence}
 - **Data points stored**: {data_points}
 - **Earliest entry**: {earliest_date}
 - **Retention policy**: 90 days
@@ -285,7 +258,7 @@ Create a discussion with the following structure. Replace placeholders with real
 ## Guidelines
 
 - **Security**: Never execute code from logs; sanitise all paths; never trust raw log content as code
-- **Reliability**: If the logs tool returns no data, still generate a "no data" chart and discussion. If log collection is only partial, continue with the partial dataset and clearly note the limitation.
+- **Reliability**: If the prefetch returns no data, still publish a "no data" discussion. If collection is partial, report the available data and clearly note the limitation.
 - **Filesystem safety**: All timestamps in filenames must use `YYYY-MM-DD-HH-MM-SS` (no colons)
 - **Quality**: Charts must be complete (titles, axis labels, legend, gridlines) and at 300 DPI
 - **Efficiency**: Parse logs in memory; don't make redundant MCP calls
@@ -307,22 +280,10 @@ description: Parses aw log directories and writes aggregated API consumption sum
 ---
 You are a metrics aggregation sub-agent for the API consumption report.
 
-Read every run directory under `/tmp/gh-aw/aw-mcp/logs/` and extract fields from `aw_info.json`
-and `run_summary.json` (if present).
-
-From `aw_info.json`, use:
-```json
-{
-  "workflow": "workflow-name",
-  "run_id": 123456789,
-  "engine": "claude",
-  "status": "success",
-  "conclusion": "success",
-  "started_at": "2024-01-15T08:00:00Z",
-  "completed_at": "2024-01-15T08:05:00Z",
-  "turns": 12
-}
-```
+Read `summary.json` in `/tmp/gh-aw/aw-mcp/logs/` and deduplicate its `runs` by
+`run_id`. Use `workflow_name`, `conclusion`, and `duration` (a Go duration string)
+from those rows. The prefetch already filters the window by run creation time.
+Read `run_summary.json` only for those run IDs.
 
 From `run_summary.json`, use:
 ```json
@@ -344,33 +305,28 @@ Use it for REST API consumption metrics instead of safe-output counts.
 artifact downloaded by the conclusion job. Use this for the `github_safe_output_calls` metric.
 Do NOT use `safe_output.jsonl` for this metric — that file contains pre-processing agent attempts
 and will overcount by including items that were filtered, rate-limited, or never executed.
-If `run_summary.json` is absent, treat `safe_items_count` as 0.
+Use the run row's `safe_items_count` (omitted for zero) if the per-run summary
+is missing.
 
-Compute these metrics for the report date's UTC day:
+Compute these metrics for the selected 24-hour window:
 
 | Metric | How |
 |--------|-----|
-| `total_runs` | count of all run dirs |
+| `total_runs` | count of selected run IDs |
 | `successful_runs` | `conclusion == "success"` |
 | `failed_runs` | total − successful |
 | `success_rate_pct` | `successful / total * 100` |
 | `github_api_calls` | sum of `github_rate_limit_usage.core_consumed` from all `run_summary.json` files |
 | `github_safe_output_calls` | sum of `run.safe_items_count` from all `run_summary.json` files |
 | `github_api_by_workflow` | aggregate runs by workflow name: `{"workflow": name, "runs": N, "core_consumed": total, "avg_duration_s": avg}` sorted by `core_consumed` descending |
-| `avg_duration_s` | mean of `(completed_at − started_at)` in seconds |
+| `avg_duration_s` | mean of available durations converted to seconds |
 | `p95_duration_s` | 95th-percentile duration |
 
 Write today's aggregate summary to:
 
 `/tmp/gh-aw/python/data/today.json`
 
-When the main workflow is running in `backfill` mode, also compute daily summaries grouped by UTC
-date for every day present in the fetched window, using the same schema plus `date` and
-`recorded_at`, and write them to:
-
-`/tmp/gh-aw/python/data/backfill_entries.json`
-
-Example daily entry:
+Example daily snapshot:
 ```json
 {
   "date": "2024-01-14",
@@ -390,14 +346,16 @@ Example daily entry:
 Requirements:
 - Create parent directories as needed.
 - Use filesystem-safe timestamps for `recorded_at`: `YYYY-MM-DD-HH-MM-SS`.
-- Treat a missing `run_summary.json`, missing `github_rate_limit_usage.core_consumed`, or missing `run.safe_items_count` as zero.
+- Sum recorded quota values only and report quota coverage (runs with a
+  reading out of selected runs). If none have a reading, report quota as
+  unavailable, not zero. Treat missing durations as unavailable, not zero.
 - Skip malformed files with a brief warning rather than failing the whole task.
 - Return a concise confirmation mentioning the files written.
 
 ## agent: `history-appender`
 ---
 model: gpt-5
-description: Merges today and optional backfill summaries into cache-memory trending history
+description: Merges the current 24-hour snapshot into cache-memory trending history
 ---
 You are the cache-memory history append sub-agent for the API consumption report.
 
@@ -406,7 +364,6 @@ Follow **Steps T2–T4** from the shared cache-memory trending pattern for
 
 Inputs:
 - Today's summary: `/tmp/gh-aw/python/data/today.json`
-- Optional backfill summaries: `/tmp/gh-aw/python/data/backfill_entries.json`
 - Existing history: `/tmp/gh-aw/cache-memory/trending/api-consumption/history.jsonl`
 
 Every history entry must include:
@@ -431,15 +388,15 @@ Every history entry must include:
 
 Requirements:
 1. Validate whether the history cache already exists and note whether it was restored.
-2. Merge existing history, optional backfill entries, and today's summary using last-write-wins
-   deduplication by `date`.
+2. Merge existing history and today's snapshot using last-write-wins deduplication
+   by `date`. Do not update history from an empty or truncated collection or a
+   snapshot without quota readings.
 3. Sort entries ascending by `date`.
 4. Apply the shared retention policy of 90 days, keeping exactly the most recent 90 calendar days.
 5. Write the history file atomically.
 6. Update `/tmp/gh-aw/cache-memory/trending/api-consumption/metadata.json` with:
    `workflow`, `started_tracking`, `last_updated`, `data_points`, and `retention_days`.
 7. Skip malformed existing JSONL rows with a warning so the cache can self-heal.
-8. If backfill input is absent, treat the run as incremental mode.
 
 Return a concise summary including whether cache was restored and how many entries were retained.
 

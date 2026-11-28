@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"bb9e4f0f3136a50f66cce9a39f673129142144631872d616bf96ce0bf6f04bca","body_hash":"de047226670f24b2be72e612e62005070502a521d219f2941b0e7ba6fe579341","strict":true,"agent_id":"codex","agent_model":"copilot/auto","engine_versions":{"codex":"0.171.0"}}
-# gh-aw-manifest: {"version":1,"secrets":["GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-go","sha":"d8cbb8045d7f43706b9177cceb36c1f91a6644d5","version":"v7.1.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/setup-python","sha":"6d4fd22b20465ccc0f7354476588e8df7c9ca0e0","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"},{"repo":"astral-sh/setup-uv","sha":"68559e99cc807c1eb7e9238fd43a15bba460eec2","version":"v10.3.3"},{"repo":"docker/build-push-action","sha":"c3c9e263c25d99ce0380d002d59b67737d91b0dc","version":"v7.4.0"},{"repo":"docker/setup-buildx-action","sha":"f87e5991a6d7451dcb8d9637bfbc97413f497069","version":"v4.4.1"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.21","digest":"sha256:fef2443688fc8991d995b935963ef82cec704a867d5e53146f13e86819484059","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.21@sha256:fef2443688fc8991d995b935963ef82cec704a867d5e53146f13e86819484059"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.21","digest":"sha256:3293e5813a4e51bf1c5a1b22a762a25033d3ccc5f3582acb2572ad68045ce0e7","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.21@sha256:3293e5813a4e51bf1c5a1b22a762a25033d3ccc5f3582acb2572ad68045ce0e7"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.21","digest":"sha256:ccc189ace632f3f42fa2ee1e77feb67d438e0975c591520da3f473c132e6216d","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.21@sha256:ccc189ace632f3f42fa2ee1e77feb67d438e0975c591520da3f473c132e6216d"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.15","digest":"sha256:3f6567e6db31d820e43031fa17a745e5a056fd074604192a884ac12a443ff5c1","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.15@sha256:3f6567e6db31d820e43031fa17a745e5a056fd074604192a884ac12a443ff5c1"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"}],"mcp_servers":[{"name":"agenticworkflows","tools":["*"]},{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["create_discussion","noop","report_incomplete","report_missing_data","report_missing_tool","upload_asset"]}],"threat_detection":{"mode":"enabled"},"admission":true,"agent_metadata":{"02c7144080d46a53ddbf":{"model":"gpt-5"},"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad"},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"a6890e205ae27dae8383":{"model":"gpt-5"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"},"e4eeaaca991b9dc46103":{"model":"gpt-5"}},"metadata_refs":{"artifact:4943cffeebb6706aa8bc":{"/tools":"/manifest/mcp_servers/0/tools"}}}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"76d4e9cb2292c79406c7d3ca27d03feff2965c9fb2a6e16bd3a74621453326f2","body_hash":"36c1bf7928f0097f2840f2d683ee270ae6c8cb74673e4e816c878ddedac6a8dc","strict":true,"agent_id":"codex","agent_model":"copilot/auto","engine_versions":{"codex":"0.171.0"}}
+# gh-aw-manifest: {"version":1,"secrets":["GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GH_AW_OTEL_GRAFANA_AUTHORIZATION","GH_AW_OTEL_GRAFANA_ENDPOINT","GH_AW_OTEL_SENTRY_AUTHORIZATION","GH_AW_OTEL_SENTRY_ENDPOINT","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"9000827ccba6bdab643e8b6fd33ac0654aef8333","version":"v8.0.2"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-go","sha":"d8cbb8045d7f43706b9177cceb36c1f91a6644d5","version":"v7.1.0"},{"repo":"actions/setup-node","sha":"949feb2413d6458794dcd2491c4babbbce0c15c1","version":"v7.1.0"},{"repo":"actions/setup-python","sha":"6d4fd22b20465ccc0f7354476588e8df7c9ca0e0","version":"v7.1.0"},{"repo":"actions/upload-artifact","sha":"cf430e030ddbb5b0abf93d22962f4752f3646cd9","version":"v7.0.2"},{"repo":"astral-sh/setup-uv","sha":"68559e99cc807c1eb7e9238fd43a15bba460eec2","version":"v10.3.3"},{"repo":"docker/build-push-action","sha":"c3c9e263c25d99ce0380d002d59b67737d91b0dc","version":"v7.4.0"},{"repo":"docker/setup-buildx-action","sha":"f87e5991a6d7451dcb8d9637bfbc97413f497069","version":"v4.4.1"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.29.21","digest":"sha256:fef2443688fc8991d995b935963ef82cec704a867d5e53146f13e86819484059","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.29.21@sha256:fef2443688fc8991d995b935963ef82cec704a867d5e53146f13e86819484059"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.21","digest":"sha256:3293e5813a4e51bf1c5a1b22a762a25033d3ccc5f3582acb2572ad68045ce0e7","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.29.21@sha256:3293e5813a4e51bf1c5a1b22a762a25033d3ccc5f3582acb2572ad68045ce0e7"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.29.21","digest":"sha256:ccc189ace632f3f42fa2ee1e77feb67d438e0975c591520da3f473c132e6216d","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.29.21@sha256:ccc189ace632f3f42fa2ee1e77feb67d438e0975c591520da3f473c132e6216d"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.5.15","digest":"sha256:3f6567e6db31d820e43031fa17a745e5a056fd074604192a884ac12a443ff5c1","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.5.15@sha256:3f6567e6db31d820e43031fa17a745e5a056fd074604192a884ac12a443ff5c1"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc","pinned_image":"ghcr.io/github/gh-aw-node@sha256:8735428c2d4e602f90781ba0c571c400e8ff93c7ee1508a75d71f87e34e415cc"},{"image":"ghcr.io/github/github-mcp-server:v2.2.0","digest":"sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174","pinned_image":"ghcr.io/github/github-mcp-server:v2.2.0@sha256:040c4e99810076035eb1d9beb4b4a96fcf589c43cefed6ff51a46a553eb4e174"}],"mcp_servers":[{"name":"agenticworkflows","tools":["*"]},{"name":"github","tools":["get_commit","get_file_contents","get_latest_release","get_me","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["create_discussion","noop","report_incomplete","report_missing_data","report_missing_tool","upload_asset"]}],"threat_detection":{"mode":"enabled"},"admission":true,"agent_metadata":{"019a61c90603b6fb0b0c":{"model":"gpt-5"},"02c7144080d46a53ddbf":{"model":"gpt-5"},"03cbf8931deff21d5116":{"name":"Agentic Workflows"},"4943cffeebb6706aa8bc":{"name":"Squad"},"9ea639558df913e650e4":{"name":"technical-doc-writer"},"a17c6c62ffcd7401f40f":{"name":"adr-writer"},"ad6ff0fe9219fbfa5ccc":{"name":"grumpy-reviewer","tools":["read","search"]},"e0c35a96dedfb29cb9b1":{"name":"w3c-specification-writer"},"e4eeaaca991b9dc46103":{"model":"gpt-5"}},"metadata_refs":{"artifact:4943cffeebb6706aa8bc":{"/tools":"/manifest/mcp_servers/0/tools"}}}
 # This file was automatically generated by gh-aw. DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -27,6 +27,7 @@
 #
 # Resolved workflow manifest:
 #   Imports:
+#     - shared/aw-logs-24h-fetch-setup.md
 #     - shared/cache-memory-trending.md
 #     - shared/trending-charts-simple.md
 #     - shared/daily-audit-discussion.md
@@ -170,7 +171,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "bb9e4f0f3136a50f66cce9a39f673129142144631872d616bf96ce0bf6f04bca:de047226670f24b2be72e612e62005070502a521d219f2941b0e7ba6fe579341"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "76d4e9cb2292c79406c7d3ca27d03feff2965c9fb2a6e16bd3a74621453326f2:36c1bf7928f0097f2840f2d683ee270ae6c8cb74673e4e816c878ddedac6a8dc"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -182,7 +183,7 @@ jobs:
       - name: Generate agentic run info
         id: generate_aw_info
         env:
-          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"02c7144080d46a53ddbf30c5e6431db562db415693d518643a325e217251c6a8","kind":"artifact","value":{"model":"gpt-5"}},{"sha256":"a6890e205ae27dae8383403f712ad32f3e5d1cd569e8d8a9e186119fd5fa31e7","kind":"artifact","value":{"model":"gpt-5"}},{"sha256":"e4eeaaca991b9dc46103b4f8f71618a30fcf4990933321de33bcdbdc58f28961","kind":"artifact","value":{"model":"gpt-5"}}]}'
+          GH_AW_INFO_MARKDOWN_METADATA: '{"version":2,"records":[{"sha256":"019a61c90603b6fb0b0c115b8f163dbe0467d47e81e464a310f12e01e660888a","kind":"artifact","value":{"model":"gpt-5"}},{"sha256":"02c7144080d46a53ddbf30c5e6431db562db415693d518643a325e217251c6a8","kind":"artifact","value":{"model":"gpt-5"}},{"sha256":"e4eeaaca991b9dc46103b4f8f71618a30fcf4990933321de33bcdbdc58f28961","kind":"artifact","value":{"model":"gpt-5"}}]}'
           GH_AW_INFO_ENGINE_ID: "codex"
           GH_AW_INFO_ENGINE_NAME: "Codex"
           GH_AW_INFO_MODEL: "copilot/auto"
@@ -327,7 +328,7 @@ jobs:
           GH_AW_OTLP_LOGS_ENABLED: ""
           GH_AW_OTLP_LOGS_MAX_BYTES: ""
           GH_AW_PROMPT: ${{ runner.temp }}/gh-aw/aw-prompts/prompt.txt
-          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"file\":\"github_mcp_cli_tools_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0012\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0013\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0014\"},{\"author_file\":\".github/workflows/api-consumption-report.md\"}],\"system_item_count\":14,\"author_expressions\":{\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\",\"github.server_url\":\"GH_AW_GITHUB_SERVER_URL\"}}"
+          GH_AW_PROMPT_CONFIG: "{\"items\":[{\"content_env\":\"GH_AW_PROMPT_CONTENT_0000\"},{\"file\":\"xpia.md\"},{\"file\":\"temp_folder_prompt.md\"},{\"file\":\"markdown.md\"},{\"file\":\"cache_memory_prompt.md\"},{\"file\":\"safe_outputs_cli_only_transport_prompt.md\"},{\"file\":\"safe_outputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0001\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0002\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0003\"},{\"file\":\"mcp_cli_tools_with_safeoutputs_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0004\"},{\"file\":\"github_mcp_cli_tools_prompt.md\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0005\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0006\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0007\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0008\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0009\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0010\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0011\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0012\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0013\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0014\"},{\"content_env\":\"GH_AW_PROMPT_CONTENT_0015\"},{\"author_file\":\".github/workflows/api-consumption-report.md\"}],\"system_item_count\":14,\"author_expressions\":{\"github.repository\":\"GH_AW_GITHUB_REPOSITORY\",\"github.run_id\":\"GH_AW_GITHUB_RUN_ID\",\"github.server_url\":\"GH_AW_GITHUB_SERVER_URL\"}}"
           GH_AW_PROMPT_CONTENT_0000: |
             <system>
           GH_AW_PROMPT_CONTENT_0001: |
@@ -343,6 +344,8 @@ jobs:
           GH_AW_PROMPT_CONTENT_0005: |
             </system>
           GH_AW_PROMPT_CONTENT_0006: |
+            {{#runtime-import .github/workflows/shared/aw-logs-24h-fetch-setup.md}}
+          GH_AW_PROMPT_CONTENT_0007: |
             ## Cache-Memory Trending — Standard Pattern
 
             Use this section to manage the rolling JSONL history and calculate trends.
@@ -580,23 +583,23 @@ jobs:
 
             </details>
             ```
-          GH_AW_PROMPT_CONTENT_0007: |
-            {{#runtime-import .github/skills/jqschema/SKILL.md}}
           GH_AW_PROMPT_CONTENT_0008: |
-            {{#runtime-import .github/workflows/shared/reporting.md}}
+            {{#runtime-import .github/skills/jqschema/SKILL.md}}
           GH_AW_PROMPT_CONTENT_0009: |
-            {{#runtime-import .github/workflows/shared/otlp.md}}
+            {{#runtime-import .github/workflows/shared/reporting.md}}
           GH_AW_PROMPT_CONTENT_0010: |
-            {{#runtime-import .github/workflows/shared/graders.md}}
+            {{#runtime-import .github/workflows/shared/otlp.md}}
           GH_AW_PROMPT_CONTENT_0011: |
-            {{#runtime-import .github/workflows/shared/trending-charts-simple.md}}
+            {{#runtime-import .github/workflows/shared/graders.md}}
           GH_AW_PROMPT_CONTENT_0012: |
-            {{#runtime-import .github/workflows/shared/graders/state-revisit-probability-rep.md}}
+            {{#runtime-import .github/workflows/shared/trending-charts-simple.md}}
           GH_AW_PROMPT_CONTENT_0013: |
-            {{#runtime-import .github/workflows/shared/graders/recurrence-determinism.md}}
+            {{#runtime-import .github/workflows/shared/graders/state-revisit-probability-rep.md}}
           GH_AW_PROMPT_CONTENT_0014: |
+            {{#runtime-import .github/workflows/shared/graders/recurrence-determinism.md}}
+          GH_AW_PROMPT_CONTENT_0015: |
             {{#runtime-import .github/workflows/shared/graders/recurrence-laminarity.md}}
-          GH_AW_PROMPT_ENV: "[\"GH_AW_ACTIONS_DIR\",\"GH_AW_EXPR_0FB38B2A\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_SERVER_URL\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_PROMPT\",\"GH_AW_PROMPT_CONFIG\",\"GH_AW_PROMPT_CONTENT_0000\",\"GH_AW_PROMPT_CONTENT_0001\",\"GH_AW_PROMPT_CONTENT_0002\",\"GH_AW_PROMPT_CONTENT_0003\",\"GH_AW_PROMPT_CONTENT_0004\",\"GH_AW_PROMPT_CONTENT_0005\",\"GH_AW_PROMPT_CONTENT_0006\",\"GH_AW_PROMPT_CONTENT_0007\",\"GH_AW_PROMPT_CONTENT_0008\",\"GH_AW_PROMPT_CONTENT_0009\",\"GH_AW_PROMPT_CONTENT_0010\",\"GH_AW_PROMPT_CONTENT_0011\",\"GH_AW_PROMPT_CONTENT_0012\",\"GH_AW_PROMPT_CONTENT_0013\",\"GH_AW_PROMPT_CONTENT_0014\",\"GH_AW_SAFE_OUTPUTS\"]"
+          GH_AW_PROMPT_ENV: "[\"GH_AW_ACTIONS_DIR\",\"GH_AW_EXPR_0FB38B2A\",\"GH_AW_EXPR_76DF9333\",\"GH_AW_EXPR_77C1A4D2\",\"GH_AW_EXPR_7C248226\",\"GH_AW_EXPR_C19C384F\",\"GH_AW_GITHUB_ACTOR\",\"GH_AW_GITHUB_REPOSITORY\",\"GH_AW_GITHUB_RUN_ID\",\"GH_AW_GITHUB_SERVER_URL\",\"GH_AW_GITHUB_WORKSPACE\",\"GH_AW_PROMPT\",\"GH_AW_PROMPT_CONFIG\",\"GH_AW_PROMPT_CONTENT_0000\",\"GH_AW_PROMPT_CONTENT_0001\",\"GH_AW_PROMPT_CONTENT_0002\",\"GH_AW_PROMPT_CONTENT_0003\",\"GH_AW_PROMPT_CONTENT_0004\",\"GH_AW_PROMPT_CONTENT_0005\",\"GH_AW_PROMPT_CONTENT_0006\",\"GH_AW_PROMPT_CONTENT_0007\",\"GH_AW_PROMPT_CONTENT_0008\",\"GH_AW_PROMPT_CONTENT_0009\",\"GH_AW_PROMPT_CONTENT_0010\",\"GH_AW_PROMPT_CONTENT_0011\",\"GH_AW_PROMPT_CONTENT_0012\",\"GH_AW_PROMPT_CONTENT_0013\",\"GH_AW_PROMPT_CONTENT_0014\",\"GH_AW_PROMPT_CONTENT_0015\",\"GH_AW_SAFE_OUTPUTS\"]"
           GH_AW_SAFE_OUTPUTS: ${{ runner.temp }}/gh-aw/safeoutputs/outputs.jsonl
           OTEL_EXPORTER_OTLP_ENDPOINT: ""
           OTEL_EXPORTER_OTLP_HEADERS: ""
@@ -969,6 +972,10 @@ jobs:
           GH_AW_CACHE_DIR: /tmp/gh-aw/cache-memory
           GH_AW_MIN_INTEGRITY: none
         run: bash "${RUNNER_TEMP}/gh-aw/actions/setup_cache_memory_git.sh"
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: Download logs from last 24 hours
+        run: ./gh-aw logs --start-date -1d --count 3000 --artifacts info,usage --max-storage 1024 -o /tmp/gh-aw/aw-mcp/logs
       - env:
           UV_PYTHON_INSTALL_DIR: /tmp/gh-aw/python/uv-python
         name: Setup Python environment
@@ -2262,7 +2269,7 @@ jobs:
           GH_AW_DEFAULT_ADMISSION_URL: ${{ vars.GH_AW_DEFAULT_ADMISSION_URL }}
           GH_AW_DEFAULT_ADMISSION_AUDIENCE: ${{ vars.GH_AW_DEFAULT_ADMISSION_AUDIENCE }}
           GH_AW_DEFAULT_ADMISSION_ON_OUTAGE: ${{ vars.GH_AW_DEFAULT_ADMISSION_ON_OUTAGE }}
-          GH_AW_ADMISSION_WORKFLOW_HASH: "bb9e4f0f3136a50f66cce9a39f673129142144631872d616bf96ce0bf6f04bca:de047226670f24b2be72e612e62005070502a521d219f2941b0e7ba6fe579341"
+          GH_AW_ADMISSION_WORKFLOW_HASH: "76d4e9cb2292c79406c7d3ca27d03feff2965c9fb2a6e16bd3a74621453326f2:36c1bf7928f0097f2840f2d683ee270ae6c8cb74673e4e816c878ddedac6a8dc"
           GH_AW_INFO_WORKFLOW_ID: ${{ job.workflow_ref }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
