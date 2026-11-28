@@ -134,6 +134,7 @@ describe("checkout_pr_branch.cjs", () => {
     process.env.GITHUB_SERVER_URL = "https://github.com";
     delete process.env.GH_AW_ALLOWED_BOTS;
     delete process.env.GH_AW_PULL_REQUEST_FLOATING_HEAD;
+    vi.unstubAllEnvs();
   });
 
   afterEach(() => {
@@ -1659,6 +1660,7 @@ If the pull request is still open, verify that:
 
   describe("workflow_dispatch events with aw_context", () => {
     beforeEach(() => {
+      vi.stubEnv("GH_AW_DIRECT_PR_TARGET", "123");
       mockContext.eventName = "workflow_dispatch";
       mockContext.payload = {
         repository: { fork: false },
@@ -1685,6 +1687,96 @@ If the pull request is still open, verify that:
       expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
       expect(mockCore.setOutput).toHaveBeenCalledWith("checked_out", "true");
       expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should prepare the incremental baseline for a direct PR-number dispatch", async () => {
+      mockContext.payload.inputs = { pull_request_number: "123" };
+
+      await runScript();
+
+      expect(mockGithub.rest.pulls.get).toHaveBeenCalledWith(expect.objectContaining({ pull_number: 123 }));
+      expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "-B", "feature-branch", "refs/remotes/origin/pr-head"]);
+      expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_SHA", "1111111111111111111111111111111111111111");
+      expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_PR_NUMBER", "123");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checked_out", "true");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("accepts a hash-prefixed configured target for a direct dispatch", async () => {
+      vi.stubEnv("GH_AW_DIRECT_PR_TARGET", "#123");
+      mockContext.payload.inputs = { pull_request_number: "123" };
+      await runScript();
+      expect(mockGithub.rest.pulls.get).toHaveBeenCalledWith(expect.objectContaining({ pull_number: 123 }));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["different target", "GH_AW_DIRECT_PR_TARGET", "456"],
+      ["missing target", "GH_AW_DIRECT_PR_TARGET", ""],
+      ["side repository", "GH_AW_DIRECT_PR_TARGET_REPO", "other/repo"],
+      ["side checkout", "GH_AW_DIRECT_PR_CHECKOUT_REPO", "other/repo"],
+      ["environment target", "GH_AW_TARGET_REPO_SLUG", "other/repo"],
+      ["multiple allowed repositories", "GH_AW_DIRECT_PR_MULTIPLE_REPOS", "true"],
+    ])("should skip direct dispatch for %s", async (_name, variable, value) => {
+      mockContext.payload.inputs = { pull_request_number: "123" };
+      vi.stubEnv(variable, value);
+      await runScript();
+      expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
+      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Skipping direct PR checkout:"));
+      expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
+    });
+
+    it("does not validate an unrelated side-repository dispatch input", async () => {
+      mockContext.payload.inputs = { pull_request_number: "invalid" };
+      vi.stubEnv("GH_AW_DIRECT_PR_TARGET_REPO", "other/repo");
+      await runScript();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
+    });
+
+    it.each(["0", "-1", "1e3", "123.0", " 123", "9007199254740992"])("should reject invalid direct PR-number dispatch %s before API or checkout operations", async pullRequestNumber => {
+      mockContext.payload.inputs = { pull_request_number: pullRequestNumber };
+
+      await runScript();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("canonical positive PR number"));
+      expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
+      expect(mockExec.exec).not.toHaveBeenCalled();
+    });
+
+    it("should not let a direct PR-number input override aw_context", async () => {
+      mockContext.payload.inputs.pull_request_number = "456";
+
+      await runScript();
+
+      expect(mockGithub.rest.pulls.get).toHaveBeenCalledWith(expect.objectContaining({ pull_number: 123 }));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it("should not bypass malformed aw_context with a direct PR-number input", async () => {
+      mockContext.payload.inputs = { aw_context: "invalid JSON", pull_request_number: "123" };
+
+      await runScript();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("invalid aw_context"));
+      expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
+      expect(mockExec.exec).not.toHaveBeenCalled();
+    });
+
+    it.each(["fork", "router", "read-only actor"])("should retain checkout trust checks for a direct PR-number dispatch from a %s", async untrustedContext => {
+      mockContext.payload.inputs = { pull_request_number: "123" };
+      if (untrustedContext === "fork") mockContext.payload.repository.fork = true;
+      if (untrustedContext === "router") mockContext.actor = "github-actions[bot]";
+      if (untrustedContext === "read-only actor") {
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "read" } });
+      }
+
+      await runScript();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Refusing PR checkout"));
+      expect(mockExec.getExecOutput).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]), expect.anything());
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
     });
 
     it("should refuse PR replay when the runtime repository is a fork", async () => {

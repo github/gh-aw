@@ -497,19 +497,41 @@ async function preStagePatch(entry, index, workspace) {
 
   ensureGitIdentity(repoCwd);
 
-  // Start from the base branch so the diff is meaningful. Tolerate the case
-  // where the base ref doesn't exist locally — fall back to HEAD.
-  try {
-    runGit(["checkout", DEFAULT_BASE_BRANCH], repoCwd);
-  } catch (err) {
-    core.warning(`apply_samples: could not check out base branch ${DEFAULT_BASE_BRANCH}: ${getErrorMessage(err)}; staying on current HEAD`);
-  }
+  // New PRs start at the base branch; incremental pushes must preserve the
+  // PR head prepared by checkout rather than replaying on the base branch.
+  if (entry.tool !== "push_to_pull_request_branch") {
+    try {
+      runGit(["checkout", DEFAULT_BASE_BRANCH], repoCwd);
+    } catch (err) {
+      core.warning(`apply_samples: could not check out base branch ${DEFAULT_BASE_BRANCH}: ${getErrorMessage(err)}; staying on current HEAD`);
+    }
 
-  // Create the branch (or check it out if it already exists from a previous sample).
-  try {
-    runGit(["checkout", "-b", branch], repoCwd);
-  } catch {
-    runGit(["checkout", branch], repoCwd);
+    // Create the branch (or check it out if it already exists from a previous sample).
+    try {
+      runGit(["checkout", "-b", branch], repoCwd);
+    } catch {
+      runGit(["checkout", branch], repoCwd);
+    }
+  } else {
+    try {
+      runGit(["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], repoCwd);
+      core.debug(`apply_samples: sample[${index}] using prepared local PR-head branch`);
+    } catch {
+      try {
+        runGit(["show-ref", "--verify", "--quiet", `refs/remotes/origin/${branch}`], repoCwd);
+      } catch {
+        core.debug(`apply_samples: sample[${index}] has no prepared local branch or origin tracking ref`);
+        throw new Error(`${ERR_VALIDATION}: apply_samples: missing prepared PR-head branch '${branch}'. Configure checkout to provide the PR head or its origin tracking ref before replaying samples.`);
+      }
+      core.debug(`apply_samples: sample[${index}] creating PR-head branch from origin tracking ref`);
+      runGit(["checkout", "-b", branch, `refs/remotes/origin/${branch}`], repoCwd);
+    }
+    runGit(["switch", "--", branch], repoCwd);
+    try {
+      runGit(["diff", "--cached", "--quiet"], repoCwd);
+    } catch {
+      throw new Error(`${ERR_VALIDATION}: apply_samples: cannot replay a push sample with existing staged changes.`);
+    }
   }
 
   // Write patch to a temp file and apply it.
@@ -520,14 +542,19 @@ async function preStagePatch(entry, index, workspace) {
     throw new Error(`${ERR_SYSTEM}: Failed to write file ${tmpPatch}: ${getErrorMessage(err)}`, { cause: err });
   }
   try {
-    runGit(["apply", "--whitespace=nowarn", tmpPatch], repoCwd);
+    runGit(["apply", ...(entry.tool === "push_to_pull_request_branch" ? ["--index"] : []), "--whitespace=nowarn", tmpPatch], repoCwd);
   } catch (err) {
     // Fall back to --3way for patches that don't apply cleanly on top of an
     // empty working tree (uncommon but possible for synthetic samples).
+    core.debug(`apply_samples: sample[${index}] patch did not apply directly; trying three-way application`);
     runGit(["apply", "--3way", "--whitespace=nowarn", tmpPatch], repoCwd);
   }
 
-  runGit(["add", "-A"], repoCwd);
+  if (entry.tool !== "push_to_pull_request_branch") {
+    runGit(["add", "-A"], repoCwd);
+  } else {
+    core.debug(`apply_samples: sample[${index}] committing indexed patch without staging other workspace changes`);
+  }
   runGit(["commit", "-m", `gh-aw sample ${index + 1}: ${entry.tool}`, "--allow-empty"], repoCwd);
 }
 

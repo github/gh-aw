@@ -661,6 +661,7 @@ Multi-checkout workflow exercising the per-repo token map.
 	lock := string(b)
 
 	require.Contains(t, lock, "Replay safe-outputs samples (deterministic)")
+	assert.Contains(t, lock, `GH_AW_DIRECT_PR_TARGET: "${{ inputs.pull_request_number }}"`)
 	require.Contains(t, lock, "GH_AW_REPO_TOKENS: |", "expected GH_AW_REPO_TOKENS env var in lock file")
 
 	tokensJSON := extractGHAWRepoTokensJSON(t, lock)

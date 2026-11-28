@@ -19,9 +19,11 @@
  *    - Review events bind to the review/comment commit; issue comments select
  *      the current head, not a historically approved revision
  *
- * 4. workflow_dispatch with aw_context:
+ * 4. workflow_dispatch with aw_context or pull_request_number:
  *    - When aw_context input contains item_type=="pull_request" and item_number,
  *      the PR number is extracted and a specific head SHA is fetched
+ *    - A direct pull_request_number input selects the current PR head when
+ *      aw_context is absent; the same trust checks still apply
  *    - Mirrors the guard in the compiled workflow's if: condition
  *
  * NOTE: This handler operates within the PR context from the workflow event
@@ -554,6 +556,29 @@ async function main() {
         core.setOutput("checkout_pr_success", "false");
         core.setFailed(`${ERR_PERMISSION}: Refusing PR checkout: invalid aw_context: ${redactCheckoutDiagnostics(getErrorMessage(e))}`);
         return;
+      }
+    } else if (context.payload.inputs?.pull_request_number) {
+      const currentRepo = `${context.repo.owner}/${context.repo.repo}`.toLowerCase();
+      const targetRepo = (process.env.GH_AW_DIRECT_PR_TARGET_REPO || process.env.GH_AW_TARGET_REPO_SLUG || currentRepo).toLowerCase();
+      const checkoutRepo = (process.env.GH_AW_DIRECT_PR_CHECKOUT_REPO || currentRepo).toLowerCase();
+      const target = (process.env.GH_AW_DIRECT_PR_TARGET || "").replace(/^#/, "");
+      if (target && targetRepo === currentRepo && checkoutRepo === currentRepo && process.env.GH_AW_DIRECT_PR_MULTIPLE_REPOS !== "true") {
+        const prNumber = parsePullRequestNumber(context.payload.inputs.pull_request_number);
+        if (prNumber === null) {
+          core.setOutput("checkout_pr_success", "false");
+          core.setFailed(`${ERR_PERMISSION}: Refusing PR checkout: pull_request_number must identify a canonical positive PR number`);
+          return;
+        }
+        if (parsePullRequestNumber(target) === prNumber) {
+          pullRequest = { number: prNumber, state: "open" };
+          core.info(`Detected workflow_dispatch event for PR #${prNumber} via pull_request_number, will fetch PR ref`);
+        } else {
+          core.info("Skipping direct PR checkout: configured target does not match the dispatch PR number");
+        }
+      } else {
+        core.info(
+          `Skipping direct PR checkout: target configured=${Boolean(target)}, target repository matches=${targetRepo === currentRepo}, checkout repository matches=${checkoutRepo === currentRepo}, multiple repositories=${process.env.GH_AW_DIRECT_PR_MULTIPLE_REPOS === "true"}`
+        );
       }
     }
   }

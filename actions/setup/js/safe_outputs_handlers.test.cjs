@@ -3361,7 +3361,7 @@ describe("safe_outputs_handlers", () => {
       }
     });
 
-    it("uses recorded PR-head baseline when persisting fork PR branch updates", async () => {
+    it.each(["triggering", "fixed", "prefixed"])("uses recorded PR-head baseline for %s target when persisting fork PR branch updates", async target => {
       const repoDir = path.join(testWorkspaceDir, "fork-pr-repo");
       fs.mkdirSync(repoDir, { recursive: true });
       execSync("git init -b main", { cwd: repoDir, stdio: "pipe" });
@@ -3382,8 +3382,8 @@ describe("safe_outputs_handlers", () => {
 
       const originalEventName = mockContext.eventName;
       const originalPayload = mockContext.payload;
-      mockContext.eventName = "pull_request";
-      mockContext.payload = { pull_request: { number: 123 } };
+      mockContext.eventName = target === "triggering" ? "pull_request" : "workflow_dispatch";
+      mockContext.payload = target === "triggering" ? { pull_request: { number: 123 } } : { inputs: { pull_request_number: "123" } };
       process.env.GITHUB_WORKSPACE = repoDir;
       process.env.GITHUB_BASE_REF = "main";
       process.env.GITHUB_REPOSITORY = "test-owner/test-repo";
@@ -3393,10 +3393,8 @@ describe("safe_outputs_handlers", () => {
       process.env.GH_AW_PR_HEAD_BASE_SHA = prHeadSha;
       process.env.GH_AW_PR_HEAD_BASE_PR_NUMBER = "123";
       try {
-        const result = await handlers.pushToPullRequestBranchHandler({
-          branch: "feature/fork-only",
-          pull_request_number: 123,
-        });
+        const selectedHandlers = target === "triggering" ? handlers : createHandlers(mockServer, mockAppendSafeOutput, { push_to_pull_request_branch: { target: target === "fixed" ? "123" : "#123" } });
+        const result = await selectedHandlers.pushToPullRequestBranchHandler({ message: "Sample update" });
 
         expect(result.isError).toBeFalsy();
         const responseData = JSON.parse(result.content[0].text);
@@ -3527,9 +3525,11 @@ describe("safe_outputs_handlers", () => {
       process.env.GH_AW_PR_HEAD_BASE_SHA = prHeadSha;
       process.env.GH_AW_PR_HEAD_BASE_PR_NUMBER = "123";
       try {
-        const result = await handlers.pushToPullRequestBranchHandler({
+        const wildcardHandlers = createHandlers(mockServer, mockAppendSafeOutput, { push_to_pull_request_branch: { target: "*" } });
+        const result = await wildcardHandlers.pushToPullRequestBranchHandler({
           branch: "feature/fork-only",
           pull_request_number: 456,
+          repo: "test-owner/test-repo",
         });
 
         // The mismatched baseline must not be reused: with no origin/<branch> present

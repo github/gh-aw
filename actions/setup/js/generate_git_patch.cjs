@@ -273,7 +273,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
   try {
     // Strategy 1: If we have a branch name, check if that branch exists and get its diff
     if (branchName) {
-      resolvedTipRef = options.pinnedSha || branchName;
+      resolvedTipRef = options.pinnedSha || `refs/heads/${branchName}`;
       // SECURITY: When pinnedSha is provided, use it directly as the tip commit instead
       // of dereferencing refs/heads/<branchName>. This prevents TOCTOU races where the
       // agent can flip the branch ref between patch and bundle generation.
@@ -321,7 +321,7 @@ async function generateGitPatch(branchName, baseBranch, options = {}) {
             // Same-repository fallback: use only the pre-fetched local tracking ref.
             debugLog(`Strategy 1 (incremental): Resolving origin/${branchName}`);
             if (hasLocalOriginRemoteTrackingRef(branchName, { cwd, suppressLogs: true })) {
-              baseRef = `origin/${branchName}`;
+              baseRef = `refs/remotes/origin/${branchName}`;
               debugLog(`Strategy 1 (incremental): Using existing remote tracking ref, baseRef=${baseRef}`);
             } else {
               debugLog(`Strategy 1 (incremental): origin/${branchName} not present locally, failing without fetching`);

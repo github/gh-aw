@@ -205,7 +205,8 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
     if (branchName) {
       debugLog(`Strategy 1: Checking if branch '${branchName}' exists locally`);
       try {
-        execGitSync(["show-ref", "--verify", "--quiet", `refs/heads/${branchName}`], { cwd });
+        const branchRef = `refs/heads/${branchName}`;
+        execGitSync(["show-ref", "--verify", "--quiet", branchRef], { cwd });
         debugLog(`Strategy 1: Branch '${branchName}' exists locally`);
 
         // Determine base ref for bundle generation
@@ -239,7 +240,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
             // Same-repository fallback: use only the pre-fetched local tracking ref.
             debugLog(`Strategy 1 (incremental): Resolving origin/${branchName}`);
             if (hasLocalOriginRemoteTrackingRef(branchName, { cwd, suppressLogs: true })) {
-              baseRef = `origin/${branchName}`;
+              baseRef = `refs/remotes/origin/${branchName}`;
               debugLog(`Strategy 1 (incremental): Using existing remote tracking ref, baseRef=${baseRef}`);
             } else {
               debugLog(`Strategy 1 (incremental): origin/${branchName} not present locally, failing without fetching`);
@@ -288,12 +289,12 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
             // and on a partial clone it needs base-side objects that were never fetched.
             // GITHUB_SHA is the commit the agent started from and is fully local.
             const dispatchedSha = normalizeCommitSHA(githubSha);
-            const branchTipSha = execGitSync(["rev-parse", branchName], { cwd }).trim();
-            if (defaultBranchRef && dispatchedSha && dispatchedSha !== branchTipSha && isAncestorCommit(dispatchedSha, branchName, cwd) && !isAncestorCommit(dispatchedSha, defaultBranchRef, cwd)) {
+            const branchTipSha = execGitSync(["rev-parse", branchRef], { cwd }).trim();
+            if (defaultBranchRef && dispatchedSha && dispatchedSha !== branchTipSha && isAncestorCommit(dispatchedSha, branchRef, cwd) && !isAncestorCommit(dispatchedSha, defaultBranchRef, cwd)) {
               baseRef = dispatchedSha;
               debugLog(`Strategy 1 (full): GITHUB_SHA ${dispatchedSha} is not contained in origin/${defaultBranch} (non-default-branch run); using it as the bundle base instead of the merge-base`);
             } else if (defaultBranchRef) {
-              baseRef = execGitSync(["merge-base", "--", defaultBranchRef, branchName], { cwd }).trim();
+              baseRef = execGitSync(["merge-base", "--", defaultBranchRef, branchRef], { cwd }).trim();
               debugLog(`Strategy 1 (full): Computed merge-base: ${baseRef}`);
             } else {
               debugLog(`Strategy 1 (full): No remote refs available, falling through to Strategy 2`);
@@ -308,7 +309,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
         debugLog(`Strategy 1: Resolved baseRef ${baseRef} to SHA ${baseCommitSha}`);
 
         // Count commits to be included
-        const commitCount = parseInt(execGitSync(["rev-list", "--count", `${baseRef}..${branchName}`], { cwd }).trim(), 10);
+        const commitCount = parseInt(execGitSync(["rev-list", "--count", `${baseRef}..${branchRef}`], { cwd }).trim(), 10);
         debugLog(`Strategy 1: Found ${commitCount} commits between ${baseRef} and ${branchName}`);
 
         if (commitCount > 0) {
@@ -317,7 +318,7 @@ async function generateGitBundle(branchName, baseBranch, options = {}) {
           // In incremental mode, also exclude origin/<defaultBranch> when present so
           // a "merge base branch into PR branch" workflow does not re-embed upstream
           // commits that the remote already has.
-          const bundleCreateArgs = ["bundle", "create", bundlePath, `${baseRef}..${branchName}`];
+          const bundleCreateArgs = ["bundle", "create", bundlePath, `${baseRef}..${branchRef}`];
           if (mode === "incremental") {
             const hasLocalDefaultBranch = hasLocalOriginRemoteTrackingRef(defaultBranch, {
               cwd,

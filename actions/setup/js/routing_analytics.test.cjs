@@ -193,10 +193,12 @@ describe("routing analytics in aw_session.jsonl", () => {
 
   it("model_config_survives_selection_or_startup_failure", async () => {
     // Runner publication precedes selection: the compiled policy is already recorded.
+    const compiled = JSON.parse(fixtures.compiledInfoEnv(routedClaude.workflow, fixtures.awInfo(routedClaude.id)).GH_AW_INFO_MODEL_CONFIG);
+    const { allowed_models, candidate_models } = compiled.routing;
     const published = await generateAwInfo(routedClaude);
     expect(published.model_routing).toBeUndefined();
     expect(published.model_config).toEqual({
-      routing: { enabled: true, goal: "cost", mode: "economy", requested: "router/economy", allowed_models: ["claude-haiku-5.5"], candidate_models: ["github-copilot/claude-haiku-5.5"] },
+      routing: { enabled: true, goal: "cost", mode: "economy", requested: "router/economy", allowed_models, candidate_models },
       models: { allowed: [], blocked: [] },
       max_ai_credits: 1000,
       max_ai_credits_source: "default",
@@ -207,7 +209,7 @@ describe("routing analytics in aw_session.jsonl", () => {
     const configs = ofType(events, "model.config");
     expect(configs).toHaveLength(1);
     expect(configs[0].data).toEqual({
-      routing: { enabled: true, goal: "cost", mode: "economy", requested: "router/economy", allowedModels: ["claude-haiku-5.5"], candidateModels: ["github-copilot/claude-haiku-5.5"] },
+      routing: { enabled: true, goal: "cost", mode: "economy", requested: "router/economy", allowedModels: allowed_models, candidateModels: candidate_models },
       models: { allowed: [], blocked: [] },
       maxAiCredits: 1000,
       maxAiCreditsSource: "default",
