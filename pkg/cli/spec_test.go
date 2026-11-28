@@ -7,11 +7,59 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/github/gh-aw/pkg/cli"
 )
+
+// TestSpec_Types_NumericID validates Additional exported symbols (2026-10-06):
+// integer identifiers accept both a JSON number and its string form.
+// SPEC_AMBIGUITY: Fractional, null, overflow, and malformed inputs are unspecified.
+func TestSpec_Types_NumericID(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		json string
+		want cli.NumericID
+	}{
+		{name: "numeric identifier", json: `123`, want: 123},
+		{name: "string identifier", json: `"123"`, want: 123},
+		{name: "large numeric identifier", json: `9007199254740993`, want: 9007199254740993},
+		{name: "large string identifier", json: `"9007199254740993"`, want: 9007199254740993},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var got cli.NumericID
+			require.NoError(t, json.Unmarshal([]byte(tt.json), &got), "the documented integer representation should decode")
+			assert.Equal(t, tt.want, got, "numeric and string forms should preserve the integer identifier exactly")
+		})
+	}
+}
+
+// TestSpec_PublicAPI_CommandConstructors validates Public API and the additional
+// exported command tables: constructors provide the named Cobra command.
+func TestSpec_PublicAPI_CommandConstructors(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name      string
+		construct func() *cobra.Command
+	}{
+		{name: "models", construct: cli.NewModelsCommand},
+		{name: "sessions", construct: cli.NewSessionsCommand},
+		{name: "work", construct: cli.NewWorkCommand},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			command := tt.construct()
+			require.NotNil(t, command, "the documented constructor should return a Cobra command")
+			assert.True(t, command.Name() == tt.name || command.HasAlias(tt.name),
+				"the constructor should expose %q as its command name or an alias (name=%q, aliases=%v)",
+				tt.name, command.Name(), command.Aliases)
+		})
+	}
+}
 
 // TestSpec_PublicAPI_ValidateWorkflowName validates the documented behavior.
 // Spec: empty names and names with invalid characters return errors.

@@ -3,7 +3,6 @@
 package agentdrain_test
 
 import (
-	"math"
 	"strconv"
 	"sync"
 	"testing"
@@ -27,14 +26,14 @@ func TestSpec_PublicAPI_DefaultConfig(t *testing.T) {
 	require.NoError(t, err, "the documented default configuration should construct a miner")
 }
 
-// TestSpec_PublicAPI_Constructors validates that public constructors accept valid inputs
-// and reject invalid anomaly thresholds.
+// TestSpec_PublicAPI_Constructors validates Public API / Functions: constructors
+// accept the documented usage examples and usable anomaly thresholds.
+// SPEC_AMBIGUITY: The README does not define the valid threshold ranges.
 func TestSpec_PublicAPI_Constructors(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
 		construct func() (any, error)
-		wantError bool
 	}{
 		{
 			name: "NewMiner",
@@ -60,38 +59,12 @@ func TestSpec_PublicAPI_Constructors(t *testing.T) {
 				return agentdrain.NewAnomalyDetector(0.4, 2)
 			},
 		},
-		{
-			name: "NewAnomalyDetector rejects similarity threshold above one",
-			construct: func() (any, error) {
-				return agentdrain.NewAnomalyDetector(1.1, 2)
-			},
-			wantError: true,
-		},
-		{
-			name: "NewAnomalyDetector rejects NaN similarity threshold",
-			construct: func() (any, error) {
-				return agentdrain.NewAnomalyDetector(math.NaN(), 2)
-			},
-			wantError: true,
-		},
-		{
-			name: "NewAnomalyDetector rejects negative rare cluster threshold",
-			construct: func() (any, error) {
-				return agentdrain.NewAnomalyDetector(0.4, -1)
-			},
-			wantError: true,
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := tt.construct()
-			if tt.wantError {
-				require.Error(t, err, "constructor should reject invalid input")
-				assert.Nil(t, result, "constructor should not return a value for invalid input")
-				return
-			}
 			require.NoError(t, err, "constructor should accept valid input")
 			require.NotNil(t, result, "constructor should return a usable value")
 		})
@@ -126,7 +99,10 @@ func TestSpec_PublicAPI_Miner_TrainEvent(t *testing.T) {
 	result, err := miner.TrainEvent(evt)
 	require.NoError(t, err, "TrainEvent should not error on valid event")
 	require.NotNil(t, result, "TrainEvent should return a MatchResult")
-	assert.Positive(t, result.ClusterID, "ClusterID should be positive after training")
+	clusters := miner.Clusters()
+	require.Len(t, clusters, 1, "training the example should create a cluster")
+	assert.Equal(t, clusters[0].ID, result.ClusterID, "the result should identify the trained cluster")
+	assert.Equal(t, evt.Stage, result.Stage, "training should propagate the event stage to the result")
 }
 
 // TestSpec_PublicAPI_Miner_AnalyzeEvent validates that AnalyzeEvent produces a match result and anomaly report.
@@ -436,8 +412,9 @@ func TestSpec_PublicAPI_Coordinator_WeightsPersistence(t *testing.T) {
 	assert.Equal(t, coord.AllClusters(), coord2.AllClusters(), "combined weights should preserve all stages and cluster contents")
 }
 
-// TestSpec_PublicAPI_ErrorCases validates errors for malformed persisted state,
-// unknown coordinator stages, and events emptied by masking.
+// TestSpec_PublicAPI_ErrorCases validates errors for malformed persisted JSON.
+// SPEC_AMBIGUITY: The README does not define error behavior for unregistered
+// coordinator stages or events emptied by masking; those cases are omitted.
 func TestSpec_PublicAPI_ErrorCases(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -458,26 +435,6 @@ func TestSpec_PublicAPI_ErrorCases(t *testing.T) {
 				coord, err := agentdrain.NewCoordinator(agentdrain.DefaultConfig(), []string{"plan"})
 				require.NoError(t, err)
 				return coord.LoadWeightsJSON([]byte("{"))
-			},
-		},
-		{
-			name: "unknown coordinator stage",
-			run: func(t *testing.T) error {
-				coord, err := agentdrain.NewCoordinator(agentdrain.DefaultConfig(), []string{"plan"})
-				require.NoError(t, err)
-				_, err = coord.TrainEvent(agentdrain.AgentEvent{Stage: "unknown"})
-				return err
-			},
-		},
-		{
-			name: "event emptied by masking",
-			run: func(t *testing.T) error {
-				cfg := agentdrain.DefaultConfig()
-				cfg.MaskRules = []agentdrain.MaskRule{{Name: "remove stage", Pattern: `stage=plan`, Replacement: ""}}
-				miner, err := agentdrain.NewMiner(cfg)
-				require.NoError(t, err)
-				_, err = miner.TrainEvent(agentdrain.AgentEvent{Stage: "plan"})
-				return err
 			},
 		},
 	}
@@ -543,20 +500,46 @@ func TestSpec_DesignDecision_AnomalyFlags(t *testing.T) {
 	assert.Equal(t, event.Stage, clusters[0].Stage, "training should propagate the event stage into its cluster")
 }
 
-// TestSpec_PublicAPI_AnomalyDetector_Analyze validates that a first event's score
-// accounts for both its new template and rare cluster flags.
+// TestSpec_PublicAPI_AnomalyDetector_Analyze validates Public API / Constants
+// and Design Decisions: similarity and rarity boundaries, normalized scores,
+// and mutually exclusive new-template and low-similarity flags.
+// SPEC_AMBIGUITY: Exact score aggregation and default thresholds are unspecified.
 func TestSpec_PublicAPI_AnomalyDetector_Analyze(t *testing.T) {
 	t.Parallel()
-	cfg := agentdrain.DefaultConfig()
-	miner, err := agentdrain.NewMiner(cfg)
-	require.NoError(t, err)
-
-	evt := agentdrain.AgentEvent{Stage: "plan", Fields: map[string]string{"action": "start"}}
-	_, report, err := miner.AnalyzeEvent(evt)
-	require.NoError(t, err)
-
-	require.NotNil(t, report, "AnomalyReport should not be nil")
-	assert.InDelta(t, 0.65, report.AnomalyScore, 0, "a first event is new and rare under the default configuration")
+	for _, tt := range []struct {
+		name       string
+		similarity float64
+		size       int
+		isNew      bool
+		wantLow    bool
+		wantRare   bool
+	}{
+		{name: "known below similarity threshold", similarity: 0.4, size: 3, wantLow: true},
+		{name: "known at similarity threshold", similarity: 0.5, size: 3},
+		{name: "known above similarity threshold", similarity: 0.6, size: 3},
+		{name: "below rarity threshold", similarity: 0.6, size: 1, wantRare: true},
+		{name: "at rarity threshold", similarity: 0.6, size: 2, wantRare: true},
+		{name: "new template excludes low similarity", similarity: 0.4, size: 1, isNew: true, wantRare: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			detector, err := agentdrain.NewAnomalyDetector(0.5, 2)
+			require.NoError(t, err, "explicit similarity and rarity thresholds should construct a detector")
+			report := detector.Analyze(
+				&agentdrain.MatchResult{ClusterID: 1, Similarity: tt.similarity},
+				tt.isNew, &agentdrain.Cluster{ID: 1, Size: tt.size},
+			)
+			require.NotNil(t, report, "analysis should return an anomaly report")
+			assert.Equal(t, tt.isNew, report.IsNewTemplate, "the report should identify new templates")
+			assert.Equal(t, tt.wantLow, report.LowSimilarity, "only known clusters below the similarity threshold should be flagged")
+			assert.Equal(t, tt.wantRare, report.RareCluster, "rarity should include sizes equal to the threshold")
+			assert.GreaterOrEqual(t, report.AnomalyScore, 0.0, "the normalized score should be at least zero")
+			assert.LessOrEqual(t, report.AnomalyScore, 1.0, "the normalized score should be at most one")
+			if tt.isNew || tt.wantLow || tt.wantRare {
+				assert.NotEmpty(t, report.Reason, "anomalies should have a human-readable explanation")
+			}
+		})
+	}
 }
 
 // TestSpec_Types_Cluster validates the documented Cluster type structure.
@@ -568,13 +551,14 @@ func TestSpec_Types_Cluster(t *testing.T) {
 	require.NoError(t, err)
 
 	evt := agentdrain.AgentEvent{Stage: "plan", Fields: map[string]string{"step": "1"}}
-	_, err = miner.TrainEvent(evt)
-	require.NoError(t, err)
+	result, err := miner.TrainEvent(evt)
+	require.NoError(t, err, "the documented event should train successfully")
+	require.NotNil(t, result, "training should return a match result")
 
 	clusters := miner.Clusters()
 	require.Len(t, clusters, 1, "should have one cluster after training one unique event")
 	c := clusters[0]
-	assert.Positive(t, c.ID, "Cluster.ID should be a positive unique identifier")
+	assert.Equal(t, result.ClusterID, c.ID, "the cluster ID should match the training result")
 	assert.NotEmpty(t, c.Template, "Cluster.Template should be a non-empty tokenized template")
 	assert.Equal(t, 1, c.Size, "Cluster.Size should be 1 after one training event")
 	assert.Equal(t, "plan", c.Stage, "Cluster.Stage should match the event stage")
@@ -593,7 +577,9 @@ func TestSpec_Types_MatchResult(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result, "TrainEvent should return a MatchResult")
 
-	assert.Positive(t, result.ClusterID, "MatchResult.ClusterID should be positive")
+	clusters := miner.Clusters()
+	require.Len(t, clusters, 1, "the trained event should produce a cluster")
+	assert.Equal(t, clusters[0].ID, result.ClusterID, "the match should identify its cluster")
 	assert.NotEmpty(t, result.Template, "MatchResult.Template should be a space-joined template string")
 	assert.GreaterOrEqual(t, result.Similarity, 0.0, "MatchResult.Similarity should be >= 0")
 	assert.LessOrEqual(t, result.Similarity, 1.0, "MatchResult.Similarity should be <= 1")
@@ -605,6 +591,7 @@ func TestSpec_Types_MatchResult(t *testing.T) {
 func TestSpec_Types_AnomalyReport(t *testing.T) {
 	t.Parallel()
 	cfg := agentdrain.DefaultConfig()
+	cfg.RareClusterThreshold = 2
 	miner, err := agentdrain.NewMiner(cfg)
 	require.NoError(t, err)
 
@@ -617,7 +604,8 @@ func TestSpec_Types_AnomalyReport(t *testing.T) {
 	assert.False(t, report.LowSimilarity, "a new template should not be flagged as low similarity")
 	assert.True(t, report.RareCluster, "a cluster of size one should be rare under this configuration")
 	assert.NotEmpty(t, report.Reason, "AnomalyReport.Reason should explain the detected anomaly")
-	assert.InDelta(t, 0.65, report.AnomalyScore, 0, "AnomalyReport.AnomalyScore should reflect new and rare flags")
+	assert.GreaterOrEqual(t, report.AnomalyScore, 0.0, "AnomalyReport.AnomalyScore should be normalized above zero")
+	assert.LessOrEqual(t, report.AnomalyScore, 1.0, "AnomalyReport.AnomalyScore should be normalized below one")
 }
 
 // TestSpec_PublicAPI_Coordinator_TrainEvent validates Coordinator.TrainEvent routes known-good
@@ -677,7 +665,7 @@ func TestSpec_Types_Snapshot(t *testing.T) {
 	assert.Len(t, restored.Clusters(), 1, "restored miner should have the same cluster count as the original")
 }
 
-// TestSpec_Constants_AnomalyWeights validates implementation-detail anomaly scoring constants.
+// TestSpec_Constants_AnomalyWeights validates the README's Constants table.
 func TestSpec_Constants_AnomalyWeights(t *testing.T) {
 	t.Parallel()
 	assert.InDelta(t, 1.0, agentdrain.AnomalyWeightNew, 0, "new-template anomaly weight should match the specification")

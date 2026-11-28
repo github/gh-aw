@@ -6,6 +6,7 @@ package actionpins_test
 import (
 	"context"
 	"errors"
+	"maps"
 	"strings"
 	"sync"
 	"testing"
@@ -360,6 +361,35 @@ func TestSpec_PublicAPI_ResolveActionPin_Mappings(t *testing.T) {
 			assert.Equal(t, tt.ref, resolver.version, "the resolver should receive the replacement ref")
 			assert.Equal(t, tt.repo+"@"+specResolvedSHA+" # "+tt.ref, got,
 				"the result should resolve against the selected repository and ref")
+		})
+	}
+}
+
+// TestSpec_PublicAPI_MappingDiagnosticsOnce checks Action Pin Mappings:
+// reusing a context emits a mapping diagnostic only once via Warnings.
+func TestSpec_PublicAPI_MappingDiagnosticsOnce(t *testing.T) {
+	t.Parallel()
+	for _, version := range []string{"v4", "v5"} {
+		t.Run(version, func(t *testing.T) {
+			t.Parallel()
+			ctx := &actionpins.PinContext{
+				Resolver: &specSHAResolver{sha: specResolvedSHA},
+				Warnings: make(map[string]bool),
+				Mappings: map[string]string{
+					"actions/checkout@" + version: "acme-corp/checkout@" + version,
+				},
+			}
+			want := "acme-corp/checkout@" + specResolvedSHA + " # " + version
+			first, err := actionpins.ResolveActionPin("actions/checkout", version, ctx)
+			require.NoError(t, err, "the mapped action should resolve dynamically")
+			assert.Equal(t, want, first, "resolution should use the mapped repository")
+			require.NotEmpty(t, ctx.Warnings, "mapping diagnostics should populate the shared deduplication map")
+			warnings := maps.Clone(ctx.Warnings)
+
+			again, err := actionpins.ResolveActionPin("actions/checkout", version, ctx)
+			require.NoError(t, err, "repeated resolution should accept the same mapping")
+			assert.Equal(t, want, again, "deduplication should preserve the resolved reference")
+			assert.Equal(t, warnings, ctx.Warnings, "the same mapping should reuse its diagnostic deduplication entries")
 		})
 	}
 }
