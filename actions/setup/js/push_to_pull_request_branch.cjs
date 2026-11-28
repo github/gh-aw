@@ -39,7 +39,7 @@ const { parseReportMarkdown } = require("./report_markdown.cjs");
 const { renderSizedReport } = require("./report_size.cjs");
 const { attachExecutionState } = require("./safe_output_execution_metadata.cjs");
 const { resolveTransportPaths } = require("./resolve_transport_paths.cjs");
-const { recoverObjectPack, isObjectPack, recoveryToken, traceObjectPack } = require("./object_pack_transport.cjs");
+const { OBJECT_PACK_PREVIEW_HEADER, recoverObjectPack, isObjectPack, recoveryToken, traceObjectPack } = require("./object_pack_transport.cjs");
 const { buildManualBranchApplyCommands, buildFallbackIssueBlocks, withTransientPushRetry } = require("./create_pull_request_helpers.cjs");
 
 /**
@@ -707,7 +707,7 @@ async function main(config = {}) {
       throw new Error(`Failed to read file ${patchFilePath}: ${getErrorMessage(err)}`, { cause: err });
     }
 
-    if (!hasBundleFile && patchContent.startsWith("GH-AW object-pack recovery preview v1")) {
+    if (!hasBundleFile && patchContent.startsWith(`${OBJECT_PACK_PREVIEW_HEADER}\n`)) {
       return { success: false, error: "Object-pack recovery envelope is missing. The preview changed after packaging, so the push cannot be applied." };
     }
     if (bundleFilePath && !hasBundleFile) {

@@ -8,6 +8,7 @@ useExecutionProvenanceFixture();
 
 const { getPatchPathForBranch, getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
 const { getBundlePathForBranch, getBundlePathForBranchInRepo } = require("./generate_git_bundle.cjs");
+const { OBJECT_PACK_PREVIEW_HEADER } = require("./object_pack_transport.cjs");
 const promptsSourceDir = path.resolve(__dirname, "../md");
 
 // The privileged handler derives patch/bundle paths from `branch` (and `repo`)
@@ -1165,7 +1166,7 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
 
   describe("repository state scenarios", () => {
     it("rejects an orphaned object-pack preview without invoking git am", async () => {
-      createPatchFile("orphaned-object-pack", "GH-AW object-pack recovery preview v1\nObject preview\n");
+      createPatchFile("orphaned-object-pack", `${OBJECT_PACK_PREVIEW_HEADER}\nObject preview\n`);
       const module = await loadModule();
       const handler = await module.main({});
       const result = await handler({ branch: "orphaned-object-pack" }, {});

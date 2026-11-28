@@ -100,7 +100,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     git(remote, ["config", "uploadpack.allowFilter", "true"]);
     git(remote, ["config", "uploadpack.allowAnySHA1InWant", "true"]);
     write(author, "text.txt", "first agent edit\n");
-    if (maskReference) write(author, ".github/workflows/example.lock.yml", 'run: echo "::add-mask::${MCP_GATEWAY_AGENT_ID}"\n');
+    if (maskReference) write(author, ".github/workflows/example.lock.yml", 'run: echo "::add-mask::${MCP_GATEWAY_AGENT_ID}"\nrun: echo "::add-mask::$session_id"\n');
     write(author, "binary.bin", Buffer.from([255, 0, 17, 0, 128]));
     write(author, "new-binary.bin", Buffer.from([0, 128, 255, 0]));
     write(author, "new-empty.txt", "");
@@ -366,6 +366,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
         ? paths => {
             const preview = fs.readFileSync(paths.patchPath, "utf8");
             expect(preview).toContain('echo "::add-mask::${MCP_GATEWAY_AGENT_ID}"');
+            expect(preview).toContain('echo "::add-mask::$session_id"');
             const masks = collectAddMaskedValues('run: echo "::add-mask::${MCP_GATEWAY_AGENT_ID}"\n::add-mask::unrelated-runtime-value');
             fs.writeFileSync(paths.patchPath, redactArtifactContent(preview, [], masks).content);
             expect(validateEnvelope(paths.bundlePath)).toBe(false);
@@ -424,7 +425,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     const publishedBranch = result.branch_name;
     expect(git(remote, ["rev-parse", `refs/heads/${publishedBranch}^{tree}`])).toBe(expectedTree);
     if (maskReference) {
-      expect(git(remote, ["show", `refs/heads/${publishedBranch}:.github/workflows/example.lock.yml`])).toBe('run: echo "::add-mask::${MCP_GATEWAY_AGENT_ID}"');
+      expect(git(remote, ["show", `refs/heads/${publishedBranch}:.github/workflows/example.lock.yml`])).toBe('run: echo "::add-mask::${MCP_GATEWAY_AGENT_ID}"\nrun: echo "::add-mask::$session_id"');
       expect(fs.existsSync(paths.bundlePath)).toBe(true);
     }
     expect(git(remote, ["rev-parse", "refs/heads/main"])).toBe(baseline);
