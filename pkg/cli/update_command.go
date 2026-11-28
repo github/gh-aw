@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/constants"
@@ -280,12 +281,12 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) (runEr
 	// Pass --no-release-bump to revert to only forcing updates for core (actions/*) actions.
 	updateLog.Printf("Updating GitHub Actions versions in actions-lock.json: allowMajor=%v, disableReleaseBump=%v", opts.AllowMajor, opts.DisableReleaseBump)
 	if err := updateActions(ctx, actionDeps, opts.AllowMajor, opts.Verbose, opts.DisableReleaseBump, opts.CoolDown); err != nil {
+		firstErr = errors.Join(firstErr, fmt.Errorf("failed to update actions-lock.json: %w", err))
 		reportUpdateWarning(ctx, "actions", err)
-		// Non-fatal: warn but don't fail the update
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update actions-lock.json: %v", err)))
 	}
 	if err := ctx.Err(); err != nil {
-		return err
+		return errors.Join(firstErr, err)
 	}
 
 	// Update action references in user-provided steps within workflow .md files.
@@ -309,8 +310,8 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) (runEr
 				firstErr = errors.Join(firstErr, compileErr)
 			}
 		} else {
+			firstErr = errors.Join(firstErr, fmt.Errorf("failed to update action references: %w", err))
 			reportUpdateWarning(ctx, "workflow_actions", err)
-			// Non-fatal: warn but don't fail the update
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update action references in workflow files: %v", err)))
 		}
 	}
@@ -335,8 +336,8 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) (runEr
 		newContainerPins, err = updateContainerPins(ctx, defaultContainerPinUpdateDeps(), opts.WorkflowsDir, opts.Verbose, containerPinUpdateOptions{refreshExisting: true})
 	}
 	if err != nil {
+		firstErr = errors.Join(firstErr, fmt.Errorf("failed to update container pins: %w", err))
 		reportUpdateWarning(ctx, "containers", err)
-		// Non-fatal: Docker may not be available in all environments.
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update container pins: %v", err)))
 	}
 	if err := ctx.Err(); err != nil {
@@ -541,7 +542,7 @@ func shallowCloneTargetRepo(ctx context.Context, repo, destination string) error
 	cmd := exec.CommandContext(ctx, "gh", "repo", "clone", repo, destination, "--", "--depth=1", "--filter=blob:none", "--sparse")
 	output, err := runMaintenanceCheckoutCommand(ctx, cmd)
 	if err != nil {
-		trimmed := strings.TrimSpace(string(output))
+		trimmed := string(bytes.TrimSpace(output))
 		if trimmed == "" {
 			return fmt.Errorf("failed to shallow clone %s: %w", repo, err)
 		}
@@ -552,7 +553,7 @@ func shallowCloneTargetRepo(ctx context.Context, repo, destination string) error
 	sparseCmd := exec.CommandContext(ctx, "git", sparseArgs...)
 	output, err = runMaintenanceCheckoutCommand(ctx, sparseCmd)
 	if err != nil {
-		trimmed := strings.TrimSpace(string(output))
+		trimmed := string(bytes.TrimSpace(output))
 		if trimmed == "" {
 			return fmt.Errorf("failed to configure sparse checkout for %s: %w", repo, err)
 		}
@@ -563,6 +564,8 @@ func shallowCloneTargetRepo(ctx context.Context, repo, destination string) error
 
 // Stream checkout diagnostics while retaining them in actionable failure messages.
 func runMaintenanceCheckoutCommand(ctx context.Context, cmd *exec.Cmd) ([]byte, error) {
+	configureOrgRolloutProcess(cmd)
+	cmd.WaitDelay = 5 * time.Second
 	var output bytes.Buffer
 	writer := io.MultiWriter(os.Stderr, &output)
 	cmd.Stdout = writer

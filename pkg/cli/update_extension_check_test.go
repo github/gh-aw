@@ -11,7 +11,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -432,12 +434,13 @@ func TestNormalizeVersion(t *testing.T) {
 // redirect extension upgrade/install/remove commands to the wrong host.
 func TestGhCmdForExtension(t *testing.T) {
 	t.Run("sets GH_HOST to github.com", func(t *testing.T) {
-		cmd := ghCmdForExtension("extension", "list")
+		cmd := ghCmdForExtension(context.Background(), "extension", "list")
 		ghHost := ""
 		for _, e := range cmd.Env {
 			if v, ok := strings.CutPrefix(e, "GH_HOST="); ok {
 				ghHost = v
 			}
+
 		}
 		assert.Equal(t, "github.com", ghHost, "GH_HOST must be github.com")
 	})
@@ -445,7 +448,7 @@ func TestGhCmdForExtension(t *testing.T) {
 	t.Run("overrides existing GH_HOST set to a GHE instance", func(t *testing.T) {
 		t.Setenv("GH_HOST", "ghe.example.com")
 
-		cmd := ghCmdForExtension("extension", "upgrade", extensionRepo, "--force")
+		cmd := ghCmdForExtension(context.Background(), "extension", "upgrade", extensionRepo, "--force")
 		ghHostValues := []string{}
 		for _, e := range cmd.Env {
 			if v, ok := strings.CutPrefix(e, "GH_HOST="); ok {
@@ -457,7 +460,64 @@ func TestGhCmdForExtension(t *testing.T) {
 	})
 
 	t.Run("uses gh as executable", func(t *testing.T) {
-		cmd := ghCmdForExtension("extension", "list")
+		cmd := ghCmdForExtension(context.Background(), "extension", "list")
 		assert.Equal(t, "gh", filepath.Base(cmd.Path), "executable must be gh")
 	})
+}
+
+func TestUpgradeExtensionCanceledBeforeLookup(t *testing.T) {
+	before := getLatestExtensionReleaseFn
+	t.Cleanup(func() { getLatestExtensionReleaseFn = before })
+	getLatestExtensionReleaseFn = func(context.Context, bool) (string, error) {
+		t.Fatal("canceled upgrade must not query release metadata")
+		return "", nil
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	upgraded, _, err := upgradeExtensionIfOutdated(ctx, false, true)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.False(t, upgraded)
+	require.ErrorIs(t, ghCmdForExtension(ctx, "extension", "install", extensionRepo).Run(), context.Canceled)
+}
+
+func TestUpgradeExtensionCancellationStopsRetry(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires a shell executable fixture")
+	}
+	beforeVersion, beforeLookup, beforeRelease := GetVersion(), getLatestExtensionReleaseFn, workflow.IsRelease()
+	t.Cleanup(func() {
+		SetVersionInfo(beforeVersion)
+		getLatestExtensionReleaseFn = beforeLookup
+		workflow.SetIsRelease(beforeRelease)
+	})
+	SetVersionInfo("v0.1.0")
+	workflow.SetIsRelease(true)
+	getLatestExtensionReleaseFn = func(context.Context, bool) (string, error) { return "v0.2.0", nil }
+	dir := t.TempDir()
+	ready, calls := filepath.Join(dir, "ready"), filepath.Join(dir, "calls")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "gh"), []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$GH_AW_EXTENSION_CALLS\"\nprintf ready > \"$GH_AW_EXTENSION_READY\"\nexec sleep 30\n"), 0o755))
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("GH_AW_EXTENSION_READY", ready)
+	t.Setenv("GH_AW_EXTENSION_CALLS", calls)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	completed := make(chan error, 1)
+	go func() {
+		_, _, err := upgradeExtensionIfOutdated(ctx, false, false)
+		completed <- err
+	}()
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(ready)
+		return err == nil
+	}, 10*time.Second, 10*time.Millisecond)
+	cancel()
+	select {
+	case err := <-completed:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(2 * time.Second):
+		t.Fatal("extension installation did not stop after cancellation")
+	}
+	invocations, err := os.ReadFile(calls)
+	require.NoError(t, err)
+	assert.Equal(t, "extension upgrade github/gh-aw --force\n", string(invocations), "cancellation must prevent remove/reinstall retries")
 }

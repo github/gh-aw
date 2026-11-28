@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,12 +16,14 @@ import (
 	"golang.org/x/mod/semver"
 
 	"github.com/github/gh-aw/pkg/console"
+	"github.com/github/gh-aw/pkg/ctxutil"
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/semverutil"
 	"github.com/github/gh-aw/pkg/workflow"
 )
 
 var updateExtensionCheckLog = logger.New("cli:update_extension_check")
+var getLatestExtensionReleaseFn = getLatestRelease
 
 // maxBackupCleanupAttempts is the number of times cleanupStaleWindowsBackups
 // retries removing a stale .bak file before giving up.
@@ -46,10 +49,17 @@ const backupCleanupRetryDelay = 300 * time.Millisecond
 // baked in. The caller should re-launch the freshly-installed binary (at
 // installPath) so that subsequent work (e.g. lock-file compilation) uses the
 // correct new version string.
+//
+//nolint:largefunc // Self-upgrade checks, platform-specific backup handling, and ordered rollback share one retry lifecycle.
 func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrereleases bool) (upgraded bool, installPath string, runErr error) {
+	ctx = ctxutil.OrBackground(ctx)
+	if err := ctx.Err(); err != nil {
+		return false, "", err
+	}
 	var targetVersion string
 	currentVersionBefore := GetVersion()
 	defer func() {
+		runErr = errors.Join(runErr, ctx.Err())
 		if upgraded && runErr == nil {
 			runErr = emitUpdateEvent(ctx, updateJSONLEvent{Event: "change", Kind: "extension",
 				Operation: "modified", Before: currentVersionBefore, After: targetVersion})
@@ -68,8 +78,11 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 	}
 
 	// Query GitHub API for latest release
-	latestVersion, err := getLatestRelease(ctx, includePrereleases)
+	latestVersion, err := getLatestExtensionReleaseFn(ctx, includePrereleases)
 	targetVersion = latestVersion
+	if ctx.Err() != nil {
+		return false, "", ctx.Err()
+	}
 	if err != nil {
 		// Fail silently - don't block the upgrade command if we can't reach GitHub
 		updateExtensionCheckLog.Printf("Failed to check for latest release (silently ignoring): %v", err)
@@ -128,19 +141,22 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 	// version.
 	if includePrereleases && !needsRenameWorkaround() {
 		updateExtensionCheckLog.Printf("Prerelease upgrade on macOS: skipping gh extension upgrade (uses /releases/latest, ignores prereleases), using pin-based install for %s", latestVersion)
-		removeCmd := ghCmdForExtension("extension", "remove", extensionRepo)
+		removeCmd := ghCmdForExtension(ctx, "extension", "remove", extensionRepo)
 		removeCmd.Stdout = os.Stderr
 		removeCmd.Stderr = os.Stderr
 		if removeErr := removeCmd.Run(); removeErr != nil {
 			updateExtensionCheckLog.Printf("Could not remove extension before pin-based install (continuing anyway): %v", removeErr)
 		}
-		pinCmd := ghCmdForExtension("extension", "install", extensionRepo, "--pin", latestVersion)
+		if ctx.Err() != nil {
+			return false, "", ctx.Err()
+		}
+		pinCmd := ghCmdForExtension(ctx, "extension", "install", extensionRepo, "--pin", latestVersion)
 		pinCmd.Stdout = os.Stderr
 		pinCmd.Stderr = os.Stderr
 		if pinErr := pinCmd.Run(); pinErr != nil {
 			return false, "", fmt.Errorf("failed to install gh-aw extension at version %s: %w", renderReleaseVersion(latestVersion), pinErr)
 		}
-		_, versionErr := verifyInstalledVersion(latestVersion)
+		_, versionErr := verifyInstalledVersion(ctx, latestVersion)
 		if versionErr != nil {
 			return false, "", fmt.Errorf("failed to verify gh-aw extension version after upgrade: %w", versionErr)
 		}
@@ -159,17 +175,22 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 	// rename+retry path succeeds and the user is not shown a confusing failure.
 	var firstAttemptBuf bytes.Buffer
 	firstAttemptOut := firstAttemptWriter(os.Stderr, &firstAttemptBuf)
-	firstCmd := ghCmdForExtension(extensionUpgradeArgs()...)
+	firstCmd := ghCmdForExtension(ctx, extensionUpgradeArgs()...)
 	firstCmd.Stdout = firstAttemptOut
 	firstCmd.Stderr = firstAttemptOut
 	firstErr := firstCmd.Run()
+	if ctx.Err() != nil {
+		return false, "", ctx.Err()
+	}
 	if firstErr == nil {
 		// First attempt succeeded without any file manipulation.
 		if needsRenameWorkaround() {
 			// Replay the buffered output that was not shown during the attempt.
-			_, _ = io.Copy(os.Stderr, &firstAttemptBuf)
+			if _, err := io.Copy(os.Stderr, &firstAttemptBuf); err != nil {
+				return false, "", fmt.Errorf("failed to display extension upgrade output: %w", err)
+			}
 		}
-		installedVersion, versionErr := installedExtensionVersion()
+		installedVersion, versionErr := installedExtensionVersion(ctx)
 		if versionErr != nil {
 			return false, "", fmt.Errorf("failed to verify gh-aw extension version after upgrade: %w", versionErr)
 		}
@@ -275,7 +296,13 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 	// been moved to the OS temp directory (above) so the remove step can always
 	// succeed.  In both cases we clear backupPath after a successful remove to
 	// avoid a misleading restore attempt on subsequent failures.
-	removeCmd := ghCmdForExtension("extension", "remove", extensionRepo)
+	if ctx.Err() != nil {
+		if backupPath != "" {
+			restoreExecutableBackup(installPath, backupPath)
+		}
+		return false, "", ctx.Err()
+	}
+	removeCmd := ghCmdForExtension(ctx, "extension", "remove", extensionRepo)
 	removeCmd.Stdout = os.Stderr
 	removeCmd.Stderr = os.Stderr
 	if removeErr := removeCmd.Run(); removeErr == nil {
@@ -284,8 +311,14 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 	} else {
 		updateExtensionCheckLog.Printf("Could not remove extension before reinstall (will attempt install anyway): %v", removeErr)
 	}
+	if ctx.Err() != nil {
+		if backupPath != "" {
+			restoreExecutableBackup(installPath, backupPath)
+		}
+		return false, "", ctx.Err()
+	}
 
-	retryCmd := ghCmdForExtension("extension", "install", extensionRepo, "--pin", latestVersion)
+	retryCmd := ghCmdForExtension(ctx, "extension", "install", extensionRepo, "--pin", latestVersion)
 	retryCmd.Stdout = os.Stderr
 	retryCmd.Stderr = os.Stderr
 	if retryErr := retryCmd.Run(); retryErr != nil {
@@ -293,6 +326,9 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 		// (only possible when the remove step above did not succeed).
 		if backupPath != "" {
 			restoreExecutableBackup(installPath, backupPath)
+		}
+		if ctx.Err() != nil {
+			return false, "", ctx.Err()
 		}
 		if runtime.GOOS == "windows" && isWindowsLockError(firstAttemptBuf.String(), retryErr) {
 			// On Windows, self-upgrade may not be possible while the binary is
@@ -307,7 +343,7 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 		return false, "", fmt.Errorf("failed to upgrade gh-aw extension: %w", retryErr)
 	}
 
-	_, versionErr := verifyInstalledVersion(latestVersion)
+	_, versionErr := verifyInstalledVersion(ctx, latestVersion)
 	if versionErr != nil {
 		// Verification failed; leave the backup in place so the user can roll
 		// back manually if needed.
@@ -375,7 +411,7 @@ func restoreExecutableBackup(installPath, backupPath string) {
 		}
 	} else {
 		// New binary is present (upgrade partially succeeded); just clean up.
-		_ = os.Remove(backupPath)
+		cleanupExecutableBackup(backupPath)
 	}
 }
 
@@ -465,8 +501,10 @@ func extensionUpgradeArgs() []string {
 // environments where GH_HOST points at a GHE instance, the default gh
 // commands would hit the wrong host and report "already up to date" or fail.
 // Pinning GH_HOST=github.com in the child process environment prevents that.
-func ghCmdForExtension(args ...string) *exec.Cmd {
-	cmd := exec.Command("gh", args...)
+func ghCmdForExtension(ctx context.Context, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "gh", args...)
+	configureOrgRolloutProcess(cmd)
+	cmd.WaitDelay = 5 * time.Second
 	// Inherit the full environment so that PATH, HOME, etc. remain intact,
 	// then override (or add) GH_HOST to ensure github.com is always used.
 	env := make([]string, 0, len(os.Environ())+1)
@@ -511,13 +549,13 @@ func extensionInstallHelpCommand(targetVersion string) string {
 	return "gh extension install " + extensionRepo
 }
 
-func installedExtensionVersion() (string, error) {
+func installedExtensionVersion(ctx context.Context) (string, error) {
 	var out bytes.Buffer
-	cmd := ghCmdForExtension("aw", "version")
+	cmd := ghCmdForExtension(ctx, "aw", "version")
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to query installed gh-aw version: %w (output: %s)", err, summarizeCommandOutput(out.String()))
+		return "", fmt.Errorf("failed to query installed gh-aw version: %w (output: %s)", errors.Join(err, ctx.Err()), summarizeCommandOutput(out.String()))
 	}
 	version, err := parseInstalledVersionOutput(out.String())
 	if err != nil {
@@ -526,8 +564,8 @@ func installedExtensionVersion() (string, error) {
 	return version, nil
 }
 
-func verifyInstalledVersion(targetVersion string) (string, error) {
-	installedVersion, err := installedExtensionVersion()
+func verifyInstalledVersion(ctx context.Context, targetVersion string) (string, error) {
+	installedVersion, err := installedExtensionVersion(ctx)
 	if err != nil {
 		return "", err
 	}

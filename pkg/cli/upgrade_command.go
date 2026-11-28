@@ -148,6 +148,10 @@ This command upgrades all Markdown files in the workflow directory (default .git
 
 			// Handle audit mode
 			if auditFlag {
+				enterprise, _ := cmd.Flags().GetString("enterprise")
+				if targetRepo != "" || targetOrg != "" || enterprise != "" {
+					return errors.New("--audit does not support --repo, --org, or --enterprise; run gh aw upgrade --audit in the target repository")
+				}
 				return runDependencyAudit(cmd.Context(), verbose, jsonOutput)
 			}
 
@@ -171,6 +175,14 @@ This command upgrades all Markdown files in the workflow directory (default .git
 				prMessage:            prMessage,
 			}
 
+			if targetRepo != "" || targetOrg != "" {
+				if err := ensureUpgradeExtension(opts); err != nil {
+					return err
+				}
+				// Never relaunch from a target checkout: the original --repo
+				// arguments would clone that target recursively inside itself.
+				opts.skipExtensionUpgrade = true
+			}
 			if targetRepo != "" {
 				return runUpgradeForTargetRepoFn(cmd.Context(), targetRepo, opts, createPR, verbose)
 			}
@@ -295,30 +307,8 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 	upgradeLog.Printf("Running upgrade command: verbose=%v, workflowDir=%s, noFix=%v, noCompile=%v, noActions=%v, disabledCodemodIDs=%v, skipExtensionUpgrade=%v",
 		opts.verbose, opts.workflowDir, opts.noFix, opts.noCompile, opts.noActions, opts.disabledCodemodIDs, opts.skipExtensionUpgrade)
 
-	// Step 0b: Ensure gh-aw extension is on the latest version.
-	// If the extension was just upgraded, re-launch the freshly-installed binary
-	// with the same flags so that all subsequent steps (e.g. lock-file compilation)
-	// use the correct new version string.  The hidden --skip-extension-upgrade flag
-	// prevents the re-launched process from entering this branch again.
-	if !opts.skipExtensionUpgrade {
-		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Checking gh-aw extension version..."))
-		upgraded, installPath, err := upgradeExtensionIfOutdated(opts.ctx, opts.verbose, opts.preReleases)
-		if err != nil {
-			upgradeLog.Printf("Extension upgrade failed: %v", err)
-			return err
-		}
-		if upgraded {
-			upgradeLog.Print("Extension was upgraded; re-launching with new binary")
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Continuing upgrade with newly installed version..."))
-			// Pass installPath so relaunchUpgradeWithContext uses the pre-rename path;
-			// on Linux os.Executable() returns a "(deleted)" suffix after the rename.
-			if err := relaunchUpgradeWithContext(opts.ctx, "--skip-extension-upgrade", installPath); err != nil {
-				return err
-			}
-			// The child process completed all upgrade steps (including any PR creation).
-			// Signal the entry-point to exit cleanly without repeating those steps.
-			return &ExitCodeError{Code: 0}
-		}
+	if err := ensureUpgradeExtension(opts); err != nil {
+		return err
 	}
 
 	workflowDir, err := resolveUpgradeWorkflowDir(opts.workflowDir)
@@ -329,7 +319,13 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 	if err != nil {
 		return err
 	}
-	defer func() { runErr = errors.Join(runErr, finish()) }()
+	defer func() {
+		runErr = errors.Join(runErr, finish())
+		if runErr == nil {
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Upgrade complete"))
+		}
+	}()
 
 	// Step 1: Update dispatcher skill and related Copilot artifacts (like init command)
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Updating dispatcher skill..."))
@@ -499,11 +495,29 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 		return runErr
 	}
 
-	// Print success message
-	fmt.Fprintln(os.Stderr, "")
-	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Upgrade complete"))
-
 	return nil
+}
+
+// Check the extension before changing into any remote checkout. A successful
+// self-upgrade relaunches the original CLI invocation, preserving its targets.
+func ensureUpgradeExtension(opts upgradeOptions) error {
+	if opts.skipExtensionUpgrade {
+		return nil
+	}
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Checking gh-aw extension version..."))
+	upgraded, installPath, err := upgradeExtensionIfOutdated(opts.ctx, opts.verbose, opts.preReleases)
+	if err != nil {
+		return err
+	}
+	if !upgraded {
+		return nil
+	}
+	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Continuing upgrade with newly installed version..."))
+	// The captured install path remains valid after the running binary is renamed.
+	if err := relaunchUpgradeWithContext(opts.ctx, "--skip-extension-upgrade", installPath); err != nil {
+		return err
+	}
+	return &ExitCodeError{Code: 0}
 }
 
 // updateCopilotArtifacts updates the dispatcher skill and related Copilot setup artifacts.

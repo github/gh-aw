@@ -4,7 +4,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -41,7 +40,7 @@ case "$*" in
 esac
 case "$*" in
   *actions/workflows\?*)
-    printf '[{"workflows":[{"id":11,"path":".github/workflows/first.lock.yml","state":"%s"},{"id":12,"path":".github/workflows/second.lock.yml","state":"active"},{"id":13,"path":".github/workflows/ci.yml","state":"active"}]}]\n' "$MAINTENANCE_STATE" ;;
+    printf '[{"workflows":[{"id":11,"path":".github/workflows/first.lock.yml","state":"%s"},{"id":12,"path":".github/workflows/second.lock.yml","state":"active"},{"id":13,"path":".github/workflows/ci.yml","state":"active"},{"id":14,"path":".github/workflows/first.yml","state":"active"}]}]\n' "$MAINTENANCE_STATE" ;;
   *actions/workflows/11/runs\?*)
     if [ -n "$MAINTENANCE_RUNS" ]; then echo "$MAINTENANCE_RUNS"; else echo '[{"workflow_runs":[{"id":101}]},{"workflow_runs":[{"id":102}]}]'; fi ;;
   *actions/workflows/12/runs\?*) echo '[{"workflow_runs":[]}]' ;;
@@ -88,6 +87,8 @@ func TestMaintenanceRepositoryWideSelection(t *testing.T) {
 			calls := maintenanceCalls(t, logPath)
 			assert.NotContains(t, calls, "workflow enable 13")
 			assert.NotContains(t, calls, "workflow disable 13")
+			assert.NotContains(t, calls, "workflow enable 14")
+			assert.NotContains(t, calls, "workflow disable 14")
 			if enable {
 				assert.Contains(t, calls, "workflow enable 11 --repo owner/target")
 				assert.NotContains(t, calls, "run cancel")
@@ -131,16 +132,38 @@ func TestMaintenanceFailuresDoNotReportSuccess(t *testing.T) {
 
 func TestMaintenanceCancellation(t *testing.T) {
 	withFakeBlockingGH(t)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	start := time.Now()
 	err := cancelMaintenanceWorkflowRuns(ctx, "11", "owner/target")
-	require.True(t, errors.Is(err, context.Canceled), "error: %v", err)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Less(t, time.Since(start), 5*time.Second)
 }
 
+func TestMaintenanceLocalWorkflowSelection(t *testing.T) {
+	logPath := fakeMaintenanceGH(t)
+	require.NoError(t, os.MkdirAll(".github/workflows", 0o755))
+	require.NoError(t, os.WriteFile(".github/workflows/first.md", []byte("---\non: push\n---\nTest workflow."), 0o600))
+	require.NoError(t, os.WriteFile(".github/workflows/first.lock.yml", []byte("name: Test"), 0o600))
+	require.NoError(t, DisableWorkflowsByNames(context.Background(), []string{"first.md"}, ""))
+	calls := maintenanceCalls(t, logPath)
+	assert.Contains(t, calls, "repos/{owner}/{repo}/actions/workflows/11/runs?status=in_progress")
+	assert.Contains(t, calls, "run cancel 101\n")
+	assert.Contains(t, calls, "workflow disable first.lock.yml\n")
+	assert.NotContains(t, calls, "--repo")
+}
+
+func TestMaintenanceEnableCompilationFailure(t *testing.T) {
+	logPath := fakeMaintenanceGH(t)
+	require.NoError(t, os.MkdirAll(".github/workflows", 0o755))
+	require.NoError(t, os.WriteFile(".github/workflows/unregistered.md", []byte("---\non: [\n---\nInvalid workflow."), 0o600))
+	err := EnableWorkflowsByNames(context.Background(), []string{"unregistered"}, "")
+	require.ErrorContains(t, err, "failed to compile workflow unregistered")
+	assert.NotContains(t, maintenanceCalls(t, logPath), "workflow enable")
+}
+
 func TestMaintenanceRejectsMalformedRuns(t *testing.T) {
-	for _, response := range []string{"not json", `[{"workflows":[]}]`, `[{"workflow_runs":null}]`, `[{"workflow_runs":[{"id":0}]}]`} {
+	for _, response := range []string{"not json", "null", "[]", `[{"workflows":[]}]`, `[{"workflow_runs":null}]`, `[{"workflow_runs":[{"id":0}]}]`} {
 		t.Run(response, func(t *testing.T) {
 			logPath := fakeMaintenanceGH(t)
 			t.Setenv("MAINTENANCE_RUNS", response)
@@ -170,7 +193,7 @@ func TestMaintenanceStreamsAndCancelsMutation(t *testing.T) {
 				_ = reader.Close()
 				_ = writer.Close()
 			})
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			result := make(chan error, 1)
 			go func() {

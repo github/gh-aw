@@ -40,9 +40,9 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	normalizedNames := make([]string, len(workflowNames))
-	for i, name := range workflowNames {
-		normalizedNames[i] = normalizeWorkflowID(name)
+	normalizedNames := make([]string, 0, len(workflowNames))
+	for _, name := range workflowNames {
+		normalizedNames = append(normalizedNames, normalizeWorkflowID(name))
 	}
 	workflowNames = normalizedNames
 	if repoOverride != "" {
@@ -94,7 +94,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 
 	// Get GitHub workflows status for comparison; warn but continue if unavailable
 	enableLog.Print("Fetching GitHub workflows status for comparison")
-	githubWorkflows, err := fetchGitHubWorkflows(ctx, repoOverride, false)
+	githubWorkflows, err := fetchGitHubWorkflowsFiltered(ctx, repoOverride, false, true)
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -139,9 +139,9 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 					if _, err := os.Stat(lockFile); os.IsNotExist(err) {
 						if err := compileWorkflow(ctx, file, false, false, ""); err != nil {
 							fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to compile workflow %s to create lock file: %v", name, err)))
-							// If we can't compile and there's no GitHub entry, skip because we can't address it
+							// Without a GitHub entry, compilation must succeed before enabling.
 							if !exists {
-								continue
+								return fmt.Errorf("failed to compile workflow %s for enabling: %w", name, err)
 							}
 						}
 					}
@@ -203,7 +203,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 	if len(targets) == 0 {
 		enableLog.Printf("No workflows need to be %sd - all already in desired state", action)
 		fmt.Fprintf(os.Stderr, "All specified workflows are already %sd\n", action)
-		return nil
+		return ctx.Err()
 	}
 
 	enableLog.Printf("Proceeding to %s %d workflows", action, len(targets))
@@ -291,7 +291,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 		}
 	}
 
-	return nil
+	return ctx.Err()
 }
 
 // DisableAllWorkflowsExcept disables all workflows except the specified ones

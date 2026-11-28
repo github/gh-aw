@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -16,8 +16,10 @@ import (
 )
 
 // toggleRemoteWorkflows selects registered agentic workflows without requiring a local checkout.
+//
+//nolint:largefunc // Validate every exact selection before ordered cancellation and toggle operations.
 func toggleRemoteWorkflows(ctx context.Context, names []string, enable bool, repo string) error {
-	workflows, err := fetchGitHubWorkflows(ctx, repo, true)
+	workflows, err := fetchGitHubWorkflowsFiltered(ctx, repo, true, true)
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -34,7 +36,7 @@ func toggleRemoteWorkflows(ctx context.Context, names []string, enable bool, rep
 		for name := range targets {
 			names = append(names, name)
 		}
-		sort.Strings(names)
+		slices.Sort(names)
 	}
 	if len(names) == 0 {
 		return errors.New("no registered agentic workflows found in target repository")
@@ -53,12 +55,15 @@ func toggleRemoteWorkflows(ctx context.Context, names []string, enable bool, rep
 	if enable {
 		action = "enable"
 	}
-	seen := make(map[string]bool)
+	seen := make(map[string]struct{})
 	for _, name := range names {
-		if seen[name] {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if _, ok := seen[name]; ok {
 			continue
 		}
-		seen[name] = true
+		seen[name] = struct{}{}
 		target := targets[name]
 		id := strconv.FormatInt(target.ID, 10)
 		if enable && target.State == "active" {
@@ -85,7 +90,7 @@ func toggleRemoteWorkflows(ctx context.Context, names []string, enable bool, rep
 		}
 		fmt.Fprintf(os.Stderr, "%sd workflow: %s\n", strings.ToUpper(action[:1])+action[1:], name)
 	}
-	return nil
+	return ctx.Err()
 }
 
 // cancelMaintenanceWorkflowRuns paginates all targeted in-progress runs before disabling.
@@ -100,7 +105,9 @@ func cancelMaintenanceWorkflowRuns(ctx context.Context, id, repo string) error {
 	if hostname != "" {
 		args = append(args, "--hostname", hostname)
 	}
-	output, err := workflow.ExecGHContext(ctx, args...).Output()
+	cmd := workflow.ExecGHContext(ctx, args...)
+	cmd.Stderr = os.Stderr
+	output, err := cmd.Output()
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -114,6 +121,9 @@ func cancelMaintenanceWorkflowRuns(ctx context.Context, id, repo string) error {
 	}
 	if err := json.Unmarshal(output, &pages); err != nil {
 		return fmt.Errorf("failed to parse in-progress runs: %w", err)
+	}
+	if len(pages) == 0 {
+		return errors.New("in-progress runs response is missing pages")
 	}
 	for _, page := range pages {
 		if page.Runs == nil {
@@ -142,5 +152,5 @@ func cancelMaintenanceWorkflowRuns(ctx context.Context, id, repo string) error {
 			}
 		}
 	}
-	return nil
+	return ctx.Err()
 }

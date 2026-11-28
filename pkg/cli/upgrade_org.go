@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -257,7 +258,7 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	// the dispatcher skill (ensureAgenticWorkflowsDispatcher) and needs that path present.
 	sparseAddCmd := exec.CommandContext(ctx, "git", "-C", checkoutDir, "sparse-checkout", "add", orgUpgradeSkillsDir)
 	if output, err := runMaintenanceCheckoutCommand(ctx, sparseAddCmd); err != nil {
-		trimmed := strings.TrimSpace(string(output))
+		trimmed := string(bytes.TrimSpace(output))
 		if trimmed == "" {
 			return fmt.Errorf("failed to extend sparse checkout for %s: %w", repo, err)
 		}
