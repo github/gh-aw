@@ -522,6 +522,9 @@ func processImportsTextBased(frontmatterText, baseDir, rootDir string, visited m
 
 func resolveHashImportPath(importPath, baseDir, rootDir string) (string, error) {
 	importPath, _ = splitPathAndSection(importPath)
+	if builtinPath, handled, err := resolveBuiltinConnectorAlias(importPath); handled {
+		return builtinPath, err
+	}
 	resolveBase := rootDir
 	if isFileRelativeImportPath(importPath) {
 		resolveBase = baseDir

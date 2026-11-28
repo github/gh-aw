@@ -214,6 +214,22 @@ Use config variable: ${{ vars.MY_CONFIG }}
 	}
 }
 
+func TestHashConsistencyWithBuiltinConnectorAlias(t *testing.T) {
+	connectorContent, err := os.ReadFile("../../.github/workflows/connectors/linear.md")
+	require.NoError(t, err)
+	RegisterBuiltinVirtualFile(BuiltinPathPrefix+"connectors/linear.md", connectorContent)
+
+	workflowPath := filepath.Join(t.TempDir(), "workflow.md")
+	workflowContent := "---\nengine: copilot\nimports:\n  - connector:linear\n---\nReview approved evidence.\n"
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0600))
+
+	goHash, err := ComputeFrontmatterHashFromFile(workflowPath, NewImportCache(""))
+	require.NoError(t, err)
+	jsHash, err := computeHashViaNode(workflowPath)
+	require.NoError(t, err)
+	assert.Equal(t, goHash, jsHash)
+}
+
 // TestHashStability_SameInputSameOutput validates that computing the hash
 // multiple times for the same input always produces the same result.
 func TestHashStability_SameInputSameOutput(t *testing.T) {

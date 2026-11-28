@@ -49,16 +49,14 @@ func TestConnectorLocalDeclarationsAreEditable(t *testing.T) {
 func TestEmbeddedConnectorDeclarationsMatchRepositorySources(t *testing.T) {
 	sources, err := filepath.Glob("../../.github/workflows/connectors/*.md")
 	require.NoError(t, err)
-	embedded, err := builtinConnectorFS.ReadDir("data/connectors")
-	require.NoError(t, err)
-	require.Len(t, embedded, len(sources))
+	require.Len(t, builtinConnectorSources, len(sources))
 
 	for _, source := range sources {
 		id := strings.TrimSuffix(filepath.Base(source), ".md")
 		sourceContent, err := os.ReadFile(source)
 		require.NoError(t, err)
-		embeddedContent, err := builtinConnectorFS.ReadFile("data/connectors/" + id + ".md")
-		require.NoError(t, err)
+		embeddedContent, ok := builtinConnectorSources[id]
+		require.True(t, ok, "missing generated connector %s", id)
 		require.Equal(t, string(sourceContent), string(embeddedContent), "embedded connector %s is stale", id)
 		require.True(t, parser.BuiltinVirtualFileExists(builtinConnectorPath(id)))
 		registeredContent, err := parser.ReadFile(builtinConnectorPath(id))

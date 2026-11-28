@@ -68,11 +68,9 @@ func TestConnectorGoldenWorkflows(t *testing.T) {
 }
 
 func TestConnectorShortNameGoldenWorkflows(t *testing.T) {
-	entries, err := builtinConnectorFS.ReadDir("data/connectors")
-	require.NoError(t, err)
 	var embedded, scenarios []string
-	for _, entry := range entries {
-		embedded = append(embedded, strings.TrimSuffix(entry.Name(), ".md"))
+	for id := range builtinConnectorSources {
+		embedded = append(embedded, id)
 	}
 	for _, scenario := range connectorCompilerScenarios {
 		scenarios = append(scenarios, scenario.provider)
