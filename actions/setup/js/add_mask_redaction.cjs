@@ -277,11 +277,29 @@ function redactMixedMaskedValues(text, maskedValues, replacementForValue, matchR
   }
   if (repetitions) parts.push(repeated.repeat(repetitions));
   parts.push(text.slice(cursor));
-  const redacted = transformJSONStrings(parts.join(""), encoded => {
-    const value = decodeJSONString(encoded);
-    const withoutCommands = applyAddMaskRedaction(value, []);
-    return withoutCommands === value ? encoded : JSON.stringify(withoutCommands);
-  });
+  const result = parts.join("");
+  let position = 0;
+  const redacted = transformJSONStrings(
+    result,
+    encoded => {
+      const start = position;
+      position += encoded.length;
+      if (matchRawText) {
+        const lineStart = result.lastIndexOf("\n", start - 1) + 1;
+        const lineEnd = result.indexOf("\n", position);
+        const line = result.slice(lineStart, lineEnd < 0 ? undefined : lineEnd);
+        const match = line.match(ADD_MASK_COMMAND_RE);
+        if (match && isUnexpandedMaskSource(line, match)) return encoded;
+      }
+      const value = decodeJSONString(encoded);
+      const withoutCommands = applyAddMaskRedaction(value, []);
+      return withoutCommands === value ? encoded : JSON.stringify(withoutCommands);
+    },
+    plain => {
+      position += plain.length;
+      return plain;
+    }
+  );
   // A registered raw whole-line value removes all of the original syntax.
   return ambiguous && !maskedValues.includes(text) ? JSON.stringify(redacted) : redacted;
 }
