@@ -62,6 +62,7 @@ post-steps:
           executionOutcome: process.env.SMOKE_EXECUTION,
           allowedModels: ["gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"],
           mainEndpoint: "/responses",
+          expectedSelectionSource: "router",
           expectSelectedEffort: "max",
           expectRequestedEffortMatchesSelection: true,
         });

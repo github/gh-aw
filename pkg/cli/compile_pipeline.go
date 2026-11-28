@@ -65,6 +65,9 @@ func compileSpecificFiles(
 		stage.batch.workflowDir = config.dryRunWorkflowDir
 	}
 	strictGrantErr, batchToolErr := runBatchExternalTools(ctx, config, stage.batch, stats, validationResults)
+	if errors.Is(batchToolErr, context.Canceled) || errors.Is(batchToolErr, context.DeadlineExceeded) {
+		return stage.workflows, batchToolErr
+	}
 	return stage.finishSpecific(ctx, strictGrantErr, batchToolErr)
 }
 
@@ -144,6 +147,9 @@ func compileAllFilesInDirectory(
 		stage.batch.workflowDir = firstNonEmpty(config.dryRunWorkflowDir, workflowsDir)
 	}
 	strictGrantErr, batchToolErr := runBatchExternalTools(ctx, config, stage.batch, stats, validationResults)
+	if errors.Is(batchToolErr, context.Canceled) || errors.Is(batchToolErr, context.DeadlineExceeded) {
+		return stage.workflows, batchToolErr
+	}
 	return stage.finishDirectory(ctx, gitRoot, workflowsDir, mdFiles, purgeData, strictGrantErr, batchToolErr)
 }
 

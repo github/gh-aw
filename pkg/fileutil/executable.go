@@ -3,6 +3,7 @@ package fileutil
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,7 +26,7 @@ func ValidateExecutablePath(path string) (string, error) {
 	resolvedPath, err := filepath.EvalSymlinks(cleanPath)
 	if err == nil {
 		cleanPath = resolvedPath
-	} else if os.IsNotExist(err) {
+	} else if errors.Is(err, fs.ErrNotExist) {
 		return "", fmt.Errorf("executable path %q does not exist", path)
 	} else {
 		return "", fmt.Errorf("failed to resolve executable path %q: %w", path, err)

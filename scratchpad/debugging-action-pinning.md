@@ -27,7 +27,7 @@ The issue occurs because:
 
 ### Example Flow
 
-```
+```text
 Workflow A: uses actions/github-script@v8
   → Resolves to SHA ed597411...
   → Cache stores: actions/github-script@v8 → ed597411...
@@ -110,7 +110,7 @@ When you run with `DEBUG=workflow:action_*`, look for these key messages:
 
 #### Action Pin Resolution Flow
 
-```
+```text
 workflow:action_pins Resolving action pin: repo=actions/github-script, version=v8
 workflow:action_pins Attempting dynamic resolution for actions/github-script@v8
 workflow:action_resolver Cache hit for actions/github-script@v8: ed597411...
@@ -119,7 +119,7 @@ workflow:action_pins Dynamic resolution succeeded: actions/github-script@v8 → 
 
 #### Cache Operations
 
-```
+```text
 workflow:action_cache Loading action cache from: .github/aw/actions-lock.json
 workflow:action_cache Successfully loaded cache with 15 entries
 workflow:action_cache Setting cache entry: key=actions/github-script@v8, sha=ed597411...
@@ -131,7 +131,7 @@ workflow:action_cache Deduplicated 1 entries, 14 entries remaining
 
 The system logs warnings when cache keys don't match their stored version:
 
-```
+```text
 workflow:action_pins WARNING: Key/version mismatch in action_pins.json: 
   key=actions/github-script@v8 has version=v8 but pin.Version=v8.0.0
 ```
@@ -148,7 +148,7 @@ The action cache automatically deduplicates entries when saving. The deduplicati
 
 Versions are ranked by precision:
 
-```
+```text
 v8.0.0     (most precise - 3 components)
 v8.0       (medium - 2 components)
 v8         (least precise - 1 component)
@@ -161,7 +161,7 @@ v8         (least precise - 1 component)
 Ensure all workflows use the same version tag format:
 
 ```yaml
-# ✅ Good - consistent
+# ✅ Recommended - consistent
 uses: actions/github-script@v8.0.0
 uses: actions/setup-node@v6.1.0
 
@@ -238,7 +238,7 @@ Action maintainers may create new tags pointing to existing commits:
 
 ### Normal Operation
 
-```
+```text
 workflow:action_pins Resolving action pin: repo=actions/github-script, version=v8.0.0
 workflow:action_cache Cache hit for actions/github-script@v8.0.0: ed597411...
 workflow:action_pins Dynamic resolution succeeded
@@ -248,7 +248,7 @@ workflow:action_pins Dynamic resolution succeeded
 
 ### First Resolution
 
-```
+```text
 workflow:action_pins Resolving action pin: repo=actions/github-script, version=v8
 workflow:action_cache Cache miss for key=actions/github-script@v8
 workflow:action_resolver Querying GitHub API: /repos/actions/github-script/git/ref/tags/v8
@@ -260,7 +260,7 @@ workflow:action_cache Setting cache entry: key=actions/github-script@v8, sha=ed5
 
 ### Deduplication
 
-```
+```text
 workflow:action_cache Deduplicating: keeping actions/github-script@v8.0.0, removing actions/github-script@v8
 workflow:action_cache Deduplicated 1 entries, 14 entries remaining
 ```
@@ -269,7 +269,7 @@ workflow:action_cache Deduplicated 1 entries, 14 entries remaining
 
 ### Fallback to Hardcoded Pins
 
-```
+```text
 workflow:action_pins Dynamic resolution failed for actions/github-script@v8: API error
 workflow:action_pins Falling back to hardcoded pins
 workflow:action_pins Exact version match: requested=v8.0.0, found=v8.0.0

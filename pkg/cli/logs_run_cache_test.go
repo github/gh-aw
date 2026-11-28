@@ -15,6 +15,7 @@ import (
 )
 
 func TestCachedJSONDownloadResultRejectsNonAgenticWorkflow(t *testing.T) {
+	t.Parallel()
 	updatedAt := time.Now()
 	run := WorkflowRun{
 		DatabaseID: 2,
@@ -42,6 +43,7 @@ func TestCachedJSONDownloadResultRejectsNonAgenticWorkflow(t *testing.T) {
 }
 
 func TestCachedJSONDownloadResultRejectsRegularCurrentWorkflow(t *testing.T) {
+	t.Parallel()
 	updatedAt := time.Now()
 	run := WorkflowRun{
 		DatabaseID:   2,
@@ -70,7 +72,9 @@ func TestCachedJSONDownloadResultRejectsRegularCurrentWorkflow(t *testing.T) {
 }
 
 func TestApplyCachedRunWorkflowPathGateHonorsCurrentPath(t *testing.T) {
+	t.Parallel()
 	t.Run("agentic current path is retained", func(t *testing.T) {
+		t.Parallel()
 		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
 			DatabaseID:   10,
 			WorkflowPath: ".github/workflows/agentic.lock.yml",
@@ -83,6 +87,7 @@ func TestApplyCachedRunWorkflowPathGateHonorsCurrentPath(t *testing.T) {
 	})
 
 	t.Run("regular current path is skipped", func(t *testing.T) {
+		t.Parallel()
 		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
 			DatabaseID:   11,
 			WorkflowPath: ".github/workflows/stale.lock.yml",
@@ -95,6 +100,7 @@ func TestApplyCachedRunWorkflowPathGateHonorsCurrentPath(t *testing.T) {
 	})
 
 	t.Run("unverified empty current path clears stale cached path", func(t *testing.T) {
+		t.Parallel()
 		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
 			DatabaseID:   12,
 			WorkflowPath: ".github/workflows/stale.lock.yml",
@@ -107,6 +113,7 @@ func TestApplyCachedRunWorkflowPathGateHonorsCurrentPath(t *testing.T) {
 	})
 
 	t.Run("verified empty current path preserves metadata path", func(t *testing.T) {
+		t.Parallel()
 		result := &DownloadResult{RunAnalysis: RunAnalysis{Run: WorkflowRun{
 			DatabaseID:   13,
 			WorkflowPath: ".github/workflows/agentic.lock.yml",

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 
 	"github.com/github/gh-aw/pkg/workflow"
@@ -214,7 +215,11 @@ func runBatchScriptLinters(ctx context.Context, config CompileConfig, opts batch
 			return err
 		}
 		err := runBatchShellcheckOnLockFilesAndResources(ctx, opts.lockFilesForShellcheck, opts.shellcheckResources, config.Verbose && !config.JSONOutput, config.Strict)
+		scanErr := err
 		err = opts.recordResult("shellcheck", len(opts.lockFilesForShellcheck)+len(opts.shellcheckResources), err)
+		if errors.Is(scanErr, context.Canceled) || errors.Is(scanErr, context.DeadlineExceeded) {
+			return errors.Join(firstErr, scanErr, err)
+		}
 		if err != nil {
 			if config.Strict && firstErr == nil {
 				firstErr = err
@@ -274,7 +279,6 @@ func runBatchExternalTools(
 	if err := runBatchLinters(ctx, config, opts); err != nil && batchToolErr == nil {
 		batchToolErr = err
 	}
-
 	if err := runBatchDirScanners(ctx, config, opts); err != nil && batchToolErr == nil {
 		batchToolErr = err
 	}
@@ -287,9 +291,10 @@ func runBatchExternalTools(
 		batchToolErr = containerErr
 	}
 
-	if err := runBatchScriptLinters(ctx, config, opts); err != nil && batchToolErr == nil {
+	if err := runBatchScriptLinters(ctx, config, opts); errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return nil, errors.Join(strictGrantErr, batchToolErr, err)
+	} else if err != nil && batchToolErr == nil {
 		batchToolErr = err
 	}
-
 	return strictGrantErr, batchToolErr
 }

@@ -6,6 +6,7 @@ import os from "os";
 import path from "path";
 import { createRequire } from "module";
 import zlib from "zlib";
+import { OBJECT_PACK_PREVIEW_HEADER } from "./object_pack_constants.cjs";
 import { createObjectPack, recoverObjectPack, canRecoverPatch, isObjectPack, recoveryToken, inspectObjectPack } from "./object_pack_transport.cjs";
 import { createTransportIntegrity } from "./transport_integrity.cjs";
 import { generateGitPatch } from "./generate_git_patch.cjs";
@@ -16,6 +17,12 @@ useExecutionProvenanceFixture();
 const require = createRequire(import.meta.url);
 const { withClaimExecution } = require("./work_queue_claim_scope.cjs");
 const { OBJECT_PACK_LIMIT_ENV } = require("./object_pack_limits.cjs");
+
+describe("object-pack preview header", () => {
+  it("uses the shared header constant", () => {
+    expect(require("./object_pack_transport.cjs").OBJECT_PACK_PREVIEW_HEADER).toBe(OBJECT_PACK_PREVIEW_HEADER);
+  });
+});
 
 const RECOVERY_STAGES = ["fetch-ready", "import-ready", "baseline-resolved", "regeneration-ready", "recovery-ready"];
 const SUBPROCESS_ERRNO_CODES = ["EAGAIN", "ENOMEM", "ENOSPC", "ENOENT", "ENOBUFS", "ETIMEDOUT"];

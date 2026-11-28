@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -120,7 +121,7 @@ func writeAndCompileEditedWorkflow(ctx context.Context, workflowPath string, con
 	lockPath := stringutil.MarkdownToLockFile(workflowPath)
 	previousLock, lockErr := os.ReadFile(lockPath)
 	lockExisted := lockErr == nil
-	if lockErr != nil && !os.IsNotExist(lockErr) {
+	if lockErr != nil && !errors.Is(lockErr, fs.ErrNotExist) {
 		return fmt.Errorf("read generated lock file: %w", lockErr)
 	}
 	if err := writeFileAtomically(workflowPath, []byte(updated)); err != nil {

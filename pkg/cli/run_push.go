@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -60,7 +61,7 @@ func collectWorkflowFiles(ctx context.Context, workflowPath string, verbose bool
 	runPushLog.Printf("Checking lock file: %s", lockFilePath)
 
 	// Always recompile, but check and log hash status for observability
-	if fileutil.FileExists(lockFilePath) {
+	if _, err := os.Stat(lockFilePath); err == nil {
 		runPushLog.Printf("Lock file exists: %s", lockFilePath)
 		// Check frontmatter hash for observability
 		runPushLog.Print("Checking frontmatter hash for observability")
@@ -78,7 +79,7 @@ func collectWorkflowFiles(ctx context.Context, workflowPath string, verbose bool
 				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Recompiling workflow..."))
 			}
 		}
-	} else if os.IsNotExist(err) {
+	} else if errors.Is(err, fs.ErrNotExist) {
 		// Lock file doesn't exist
 		runPushLog.Printf("Lock file not found: %s", lockFilePath)
 		if verbose {

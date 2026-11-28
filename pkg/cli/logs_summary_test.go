@@ -18,6 +18,7 @@ import (
 )
 
 func TestRunSummaryAndDownloadResultEmbedRunAnalysis(t *testing.T) {
+	t.Parallel()
 	commonFields := map[string]struct{}{
 		"Run":                     {},
 		"Metrics":                 {},
@@ -515,6 +516,7 @@ func TestSaveAndLoadRunSummary_SafeItemsCount(t *testing.T) {
 // "safe_items_count" (snake_case) in JSON so downstream audit tools (e.g. api-consumption-
 // report) can read it directly from run_summary.json without a fallback.
 func TestSafeItemsCountJSONKey(t *testing.T) {
+	t.Parallel()
 	run := WorkflowRun{SafeItemsCount: 7}
 	data, err := json.Marshal(run)
 	if err != nil {

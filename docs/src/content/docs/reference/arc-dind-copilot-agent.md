@@ -146,12 +146,12 @@ These are historical component-specific fix floors, not an end-to-end support ma
 
 | Component | Minimum version | Why |
 | --- | --- | --- |
-| `gh-aw` | `v0.82.8` | Includes ARC DinD workspace/detection fixes and the MCP gateway Docker socket access fix. |
+| `gh-aw` | `v0.82.8` | Historical floor for this walkthrough, including the MCP gateway Docker socket access fix. |
 | AWF (`agentic-workflow-firewall`) | `v0.27.22` | Includes DinD squid log permission fixes. |
 
 The compiler's narrower ARC startup gate is AWF `v0.27.20+` for sysroot/chroot mount fixes; the walkthrough's `v0.27.22` floor includes subsequent log-permission fixes. See [version constants](https://github.com/github/gh-aw/blob/main/pkg/constants/version_constants.go) and [ARC validation](https://github.com/github/gh-aw/blob/main/pkg/workflow/runner_topology_validation.go).
 
-If you're on `gh-aw` `v0.82.5`–`v0.82.7`, upgrade and recompile before using this guide:
+If you're on a `gh-aw` release earlier than `v0.82.8`, upgrade and recompile before using this guide:
 
 ```bash
 gh aw upgrade
@@ -229,7 +229,7 @@ The file must contain `jobs.copilot-setup-steps.steps`. gh-aw imports only those
 
 ### Agent reports empty workspace
 
-The agent sees no files and exits with a no-op message. This was fixed in gh-aw v0.82.5. Upgrade and recompile:
+The agent sees no files and exits with a no-op message. Upgrade to the [required version](#7-required-versions) and recompile, and check that the runner and DinD daemon share the workspace at the same absolute path:
 
 ```bash
 gh aw upgrade
@@ -238,7 +238,7 @@ gh aw compile
 
 ### Detection job fails with `spawn /usr/local/bin/copilot ENOENT`
 
-The threat-detection job can't find the Copilot binary. This was fixed in gh-aw v0.82.5 ([#44445](https://github.com/github/gh-aw/pull/44445)). The fix is the same — upgrade and recompile.
+The threat-detection job can't find the Copilot binary. This was fixed in gh-aw `v0.82.7` ([#44445](https://github.com/github/gh-aw/pull/44445)). If you're on an earlier release, upgrade and recompile. For this walkthrough, use at least `v0.82.8` as described in [Required versions](#7-required-versions).
 
 ### `sudo: The "no new privileges" flag is set`
 
