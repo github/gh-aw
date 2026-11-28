@@ -25,8 +25,8 @@ const EXPERIMENT_ASSIGNMENTS_PATH = "/tmp/gh-aw/experiments/assignments.json";
  *
  * @returns {Record<string, string> | null}
  */
-function readExperimentAssignments() {
-  const stateDir = process.env.GH_AW_EXPERIMENT_STATE_DIR || "";
+function readStoredExperimentAssignments(env = process.env) {
+  const stateDir = env.GH_AW_EXPERIMENT_STATE_DIR || "";
   const filePath = stateDir ? path.join(stateDir, "assignments.json") : EXPERIMENT_ASSIGNMENTS_PATH;
   try {
     const raw = fs.readFileSync(filePath, "utf8");
@@ -41,7 +41,7 @@ function readExperimentAssignments() {
 
   /** @type {Record<string, string>} */
   const fromEnv = {};
-  for (const [key, value] of Object.entries(process.env)) {
+  for (const [key, value] of Object.entries(env)) {
     if (!key.startsWith("GH_AW_EXPERIMENTS_")) {
       continue;
     }
@@ -57,4 +57,28 @@ function readExperimentAssignments() {
   return null;
 }
 
-module.exports = { readExperimentAssignments, EXPERIMENT_ASSIGNMENTS_PATH };
+/**
+ * A matrix job's local assignment takes precedence over restored production state.
+ * Invalid context must not alter ordinary instrumentation.
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {{experiment: string, variant: string, id?: string} | null}
+ */
+function readParallelExperimentAssignment(env = process.env) {
+  try {
+    const value = JSON.parse(env.GH_AW_PARALLEL_EXPERIMENT || "null");
+    return value && typeof value.experiment === "string" && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value.experiment) && typeof value.variant === "string" && value.variant.length > 0 && !/[\r\n]/.test(value.variant)
+      ? { experiment: value.experiment, variant: value.variant, ...(typeof value.id === "string" && /^[a-zA-Z0-9_-]+$/.test(value.id) ? { id: value.id } : {}) }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** @param {NodeJS.ProcessEnv} [env] @returns {Record<string, string> | null} */
+function readExperimentAssignments(env = process.env) {
+  const stored = readStoredExperimentAssignments(env);
+  const local = readParallelExperimentAssignment(env);
+  return local ? { ...stored, [local.experiment]: local.variant } : stored;
+}
+
+module.exports = { readExperimentAssignments, readParallelExperimentAssignment, EXPERIMENT_ASSIGNMENTS_PATH };

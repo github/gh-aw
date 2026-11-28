@@ -115,6 +115,9 @@ func (d *CopilotCodingAgentDetector) hasAgentLogPatterns() bool {
 			copilotCodingAgentLog.Printf("walk error at %s: %v", path, err)
 			return nil
 		}
+		if path != d.runDir && info != nil && info.IsDir() && isParallelExperimentArtifact(info.Name()) {
+			return filepath.SkipDir
+		}
 		if info == nil || info.IsDir() {
 			return nil
 		}

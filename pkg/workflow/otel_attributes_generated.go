@@ -107,6 +107,9 @@ const (
 	OTelAttrGhAwEvalsYes                            = "gh-aw.evals.yes"
 	OTelAttrGhAwEventName                           = "gh-aw.event_name"
 	OTelAttrGhAwExperiments                         = "gh-aw.experiments"
+	OTelAttrGhAwParallelExperimentID                = "gh-aw.parallel_experiment.id"
+	OTelAttrGhAwParallelExperimentName              = "gh-aw.parallel_experiment.name"
+	OTelAttrGhAwParallelExperimentVariant           = "gh-aw.parallel_experiment.variant"
 	OTelAttrGhAwFailureCategories                   = "gh-aw.failure.categories"
 	OTelAttrGhAwFirewallAllowedRequests             = "gh-aw.firewall.allowed_requests"
 	OTelAttrGhAwFirewallBlockedRequests             = "gh-aw.firewall.blocked_requests"
@@ -316,6 +319,9 @@ var otelAttributeNamesByValue = map[string]string{
 	"gh-aw.evals.yes":                              "gh-aw.evals.yes",
 	"gh-aw.event_name":                             "gh-aw.event_name",
 	"gh-aw.experiments":                            "gh-aw.experiments",
+	"gh-aw.parallel_experiment.id":                 "gh-aw.parallel_experiment.id",
+	"gh-aw.parallel_experiment.name":               "gh-aw.parallel_experiment.name",
+	"gh-aw.parallel_experiment.variant":            "gh-aw.parallel_experiment.variant",
 	"gh-aw.failure.categories":                     "gh-aw.failure.categories",
 	"gh-aw.firewall.allowed_requests":              "gh-aw.firewall.allowed_requests",
 	"gh-aw.firewall.blocked_requests":              "gh-aw.firewall.blocked_requests",

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -268,6 +269,9 @@ func (cfg auditRunConfig) auditOptions() AuditOptions {
 // everything the requested audit needs, invalidating download markers where a
 // re-download is required.
 func cachedAuditArtifactsUsable(cfg auditRunConfig) (bool, error) {
+	if slices.Contains(cfg.artifactFilter, parallelExperimentArtifactPrefix) {
+		return false, nil
+	}
 	if cfg.models && len(findMissingFilterEntries(ResolveArtifactFilter([]string{"agent", "usage", "info"}), cfg.outputDir)) > 0 {
 		return false, invalidateCompleteArtifactDownloadMarker(cfg.outputDir)
 	}

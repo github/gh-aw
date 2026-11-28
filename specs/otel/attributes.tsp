@@ -114,6 +114,9 @@ model AttributeNames {
   ghAwEvalsYes: "gh-aw.evals.yes";
   ghAwEventName: "gh-aw.event_name";
   ghAwExperiments: "gh-aw.experiments";
+  ghAwParallelExperimentId: "gh-aw.parallel_experiment.id";
+  ghAwParallelExperimentName: "gh-aw.parallel_experiment.name";
+  ghAwParallelExperimentVariant: "gh-aw.parallel_experiment.variant";
   ghAwFailureCategories: "gh-aw.failure.categories";
   ghAwFirewallAllowedRequests: "gh-aw.firewall.allowed_requests";
   ghAwFirewallBlockedRequests: "gh-aw.firewall.blocked_requests";

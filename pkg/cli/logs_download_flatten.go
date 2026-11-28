@@ -26,7 +26,7 @@ func flattenSingleFileArtifacts(outputDir string, verbose bool) error {
 		return fmt.Errorf("failed to read output directory: %w", err)
 	}
 	for _, entry := range entries {
-		if entry.IsDir() && entry.Name() != downloadedArtifactsMarkerDir {
+		if entry.IsDir() && entry.Name() != downloadedArtifactsMarkerDir && !isParallelExperimentArtifact(entry.Name()) {
 			flattenSingleFileArtifact(outputDir, entry, verbose)
 		}
 	}
@@ -114,7 +114,7 @@ func findArtifactDir(outputDir, baseName string, legacyName string) string {
 	}
 	suffix := "-" + baseName
 	for _, entry := range entries {
-		if entry.IsDir() && strings.HasSuffix(entry.Name(), suffix) {
+		if entry.IsDir() && !isParallelExperimentArtifact(entry.Name()) && strings.HasSuffix(entry.Name(), suffix) {
 			return filepath.Join(outputDir, entry.Name())
 		}
 	}

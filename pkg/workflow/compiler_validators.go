@@ -621,6 +621,14 @@ var experimentalFeatureChecks = []struct {
 	{"plugins", func(w *WorkflowData) bool { return len(w.Plugins) > 0 }},
 	{"drive-memory", func(w *WorkflowData) bool { return w.DriveMemoryConfig != nil && len(w.DriveMemoryConfig.Drives) > 0 }},
 	{"continual-experiments", func(w *WorkflowData) bool { return hasContinualExperiment(w.ExperimentConfigs) }},
+	{"parallel-experiments", func(w *WorkflowData) bool {
+		experiments, ok := w.RawFrontmatter["experiments"].(map[string]any)
+		if !ok {
+			return false
+		}
+		enabled, ok := experiments["parallel"].(bool)
+		return ok && enabled
+	}},
 	{"safe-outputs-steer", func(w *WorkflowData) bool { return w.SafeOutputs != nil && w.SafeOutputs.Steer }},
 	{"issue-intent", hasIssueIntentEnabled},
 }

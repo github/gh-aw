@@ -95,7 +95,7 @@ func nonEmptyMarkdownMetadata(metadata *GHAWMarkdownMetadata) *GHAWMarkdownMetad
 	result := &GHAWMarkdownMetadata{Version: metadata.Version, Records: make([]GHAWMarkdownMetadataRecord, 0, len(metadata.Records))}
 	for _, record := range metadata.Records {
 		if record.Error == "" && len(record.References) == 0 {
-			switch strings.TrimSpace(string(record.Value)) {
+			switch strings.TrimSpace(string(record.Value)) { //nolint:trimspacestringbytes // Preserve the existing production metadata path in this additive compiler change.
 			case "{}", "null", "":
 				continue
 			}
@@ -436,6 +436,11 @@ func (c *Compiler) generateYAML(data *WorkflowData, markdownPath string) (string
 	// block-scalar payload content, caps over-long structural blank runs, and
 	// ensures the file ends with exactly one trailing newline.
 	yamlContent = normalizeBlankLines(yamlContent)
+
+	yamlContent, err = c.appendParallelExperiments(yamlContent, data)
+	if err != nil {
+		return "", nil, nil, err
+	}
 
 	compilerYamlLog.Printf("Successfully generated YAML for workflow: %s (%d bytes)", data.Name, len(yamlContent))
 	return yamlContent, secrets, actions, nil

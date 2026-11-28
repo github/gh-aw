@@ -874,7 +874,7 @@ func graderDetailText(result GraderResult) string {
 }
 
 func renderConsoleExperiments(experiments *ExperimentData) {
-	if experiments == nil || len(experiments.Assignments) == 0 {
+	if experiments == nil {
 		return
 	}
 	parts := make([]string, 0, len(experiments.Assignments))
@@ -882,7 +882,25 @@ func renderConsoleExperiments(experiments *ExperimentData) {
 		parts = append(parts, name+"="+variant)
 	}
 	slices.Sort(parts)
-	fmt.Fprintf(os.Stderr, "  experiments: %s\n", strings.Join(parts, " "))
+	if len(parts) > 0 {
+		fmt.Fprintf(os.Stderr, "  experiments: %s\n", strings.Join(parts, " "))
+	}
+	for _, entry := range experiments.Parallel {
+		var manifest struct {
+			Configured struct {
+				Experiment string `json:"experiment"`
+				Variant    string `json:"variant"`
+			} `json:"configured"`
+			State string `json:"state"`
+		}
+		if entry.Error != "" {
+			fmt.Fprintf(os.Stderr, "  parallel experiment %s: %s\n", entry.Artifact, entry.Error)
+		} else if err := json.Unmarshal(entry.Manifest, &manifest); err != nil {
+			fmt.Fprintf(os.Stderr, "  parallel experiment %s: invalid manifest\n", entry.Artifact)
+		} else {
+			fmt.Fprintf(os.Stderr, "  parallel experiment %s: %s=%s (%s)\n", entry.Artifact, manifest.Configured.Experiment, manifest.Configured.Variant, manifest.State)
+		}
+	}
 }
 
 func renderConsoleLogsPath(logsPath string) {

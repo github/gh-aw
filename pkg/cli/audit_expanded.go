@@ -393,6 +393,9 @@ func findAgentStdioLogPath(logsPath string) string {
 
 	var found string
 	walkErr := filepath.WalkDir(logsPath, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && d != nil && d.IsDir() && path != logsPath && isParallelExperimentArtifact(d.Name()) {
+			return filepath.SkipDir
+		}
 		if err != nil || d == nil || d.IsDir() {
 			return nil
 		}

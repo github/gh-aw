@@ -3482,6 +3482,10 @@
             "description": "Reserved key for the experiments broker endpoint."
           },
           {
+            "const": "parallel-options",
+            "description": "Reserved key for parallel experiment resource limits."
+          },
+          {
             "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
             "description": "Experiment names must be valid identifiers: start with a letter or underscore, followed by letters, digits, or underscores."
           }
@@ -3716,6 +3720,22 @@
         }
       ],
       "properties": {
+        "parallel": {
+          "description": "Enable experimental parallel execution, or define an experiment named parallel.",
+          "oneOf": [{ "type": "boolean" }, { "$ref": "#/properties/experiments/additionalProperties" }]
+        },
+        "parallel-options": {
+          "type": "object",
+          "description": "Resource limits for experimental parallel execution.",
+          "additionalProperties": false,
+          "properties": {
+            "max-jobs": { "type": "integer", "minimum": 1, "maximum": 16, "default": 4 },
+            "max-parallel": { "type": "integer", "minimum": 1, "maximum": 4, "default": 2 },
+            "timeout-minutes": { "type": "integer", "minimum": 1, "maximum": 30, "default": 10 },
+            "max-ai-credits": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 100 },
+            "max-total-ai-credits": { "type": "integer", "minimum": 1, "maximum": 4000, "default": 400 }
+          }
+        },
         "storage": {
           "type": "string",
           "enum": ["cache", "repo", "broker"],
