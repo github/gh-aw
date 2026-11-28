@@ -44,6 +44,9 @@ func TestLegacyConnectorImportsCodemod(t *testing.T) {
 		{"remote import", "imports:\n  - uses: github/gh-aw/.github/workflows/connectors/jira.md@abcdef\n    with: {projects: [APP]}\nsafe-outputs:\n  jira-create-issue:\n",
 			[]any{map[string]any{"uses": "github/gh-aw/.github/workflows/connectors/jira.md@abcdef", "with": map[string]any{"projects": []any{"APP"}}}},
 			map[string]any{"jira-create-issue": nil}},
+		{"relative import", "imports:\n  - uses: ./connectors/linear.md\n    with: {teams: [approved]}\nsafe-outputs:\n  linear-add-comment:\n  linear-token: ${{ secrets.CUSTOM }}\n",
+			[]any{map[string]any{"uses": "./connectors/linear.md", "with": map[string]any{"teams": []any{"approved"}, "writer-secret": "CUSTOM"}}},
+			map[string]any{"linear-add-comment": nil}},
 		{"mixed providers", "safe-outputs:\n  linear-add-comment:\n  jira-add-comment:\n  ado-link-work-items:\n  create-issue:\n",
 			[]any{".github/workflows/connectors/linear.md", ".github/workflows/connectors/jira.md", map[string]any{"uses": ".github/workflows/connectors/azure-devops.md", "with": map[string]any{"organization": "", "project": "", "project-name": ""}}},
 			map[string]any{"linear-add-comment": nil, "jira-add-comment": nil, "azure-devops-link-work-items": nil, "create-issue": nil}},
@@ -63,6 +66,7 @@ func TestLegacyConnectorImportsCodemod(t *testing.T) {
 			if strings.Contains(content, "# keep selection") {
 				assert.Contains(t, result, "# keep selection")
 			}
+
 			if strings.Contains(content, "# keep import") {
 				assert.Contains(t, result, "# keep import")
 			}
@@ -142,9 +146,7 @@ func TestLegacyConnectorImportsCodemodCompiler(t *testing.T) {
 				}
 				mapping := entry.(map[string]any)
 				inputs := maps.Clone(mapping["with"].(map[string]any))
-				for key, value := range test.grants {
-					inputs[key] = value
-				}
+				maps.Copy(inputs, test.grants)
 				return f.Set([]string{"imports"}, []any{map[string]any{"uses": mapping["uses"], "with": inputs}})
 			})
 			require.NoError(t, err)
@@ -153,4 +155,22 @@ func TestLegacyConnectorImportsCodemodCompiler(t *testing.T) {
 			require.NotNil(t, data.Connectors[test.provider].SafeOutputs)
 		})
 	}
+}
+
+func TestLegacyConnectorImportsCodemodObjectImports(t *testing.T) {
+	t.Parallel()
+	content := "---\nimports:\n  aw:\n    - common.md # keep import\n  skills: [example/skill]\nsafe-outputs:\n  jira-add-comment:\n---\nBody\n"
+	parsed, err := parser.ExtractFrontmatterFromContent(content)
+	require.NoError(t, err)
+	result, applied, err := getLegacyConnectorImportsCodemod().Apply(content, parsed.Frontmatter)
+	require.NoError(t, err)
+	require.True(t, applied)
+	updated, err := parser.ExtractFrontmatterFromContent(result)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"aw": []any{"common.md", ".github/workflows/connectors/jira.md"}, "skills": []any{"example/skill"}}, updated.Frontmatter["imports"])
+	assert.Contains(t, result, "# keep import")
+	repeated, applied, err := getLegacyConnectorImportsCodemod().Apply(result, updated.Frontmatter)
+	require.NoError(t, err)
+	assert.False(t, applied)
+	assert.Equal(t, result, repeated)
 }

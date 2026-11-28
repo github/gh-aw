@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"regexp"
@@ -36,95 +37,12 @@ func getLegacyConnectorImportsCodemod() Codemod {
 			}
 			result, applied, err := codemod.Apply(content, func(f *codemod.Frontmatter) error {
 				for _, provider := range providers {
-					if !slices.ContainsFunc(provider.outputs, func(key string) bool {
+					if slices.ContainsFunc(provider.outputs, func(key string) bool {
 						_, exists := outputs[key]
 						return exists
 					}) {
-						continue
-					}
-					path := ".github/workflows/connectors/" + provider.name + ".md"
-					imports, exists := f.Lookup("imports")
-					var entries []any
-					if exists {
-						var ok bool
-						entries, ok = imports.([]any)
-						if !ok {
-							return fmt.Errorf("cannot migrate %s: imports must be a sequence", provider.name)
-						}
-						entries = slices.Clone(entries)
-					}
-					index := slices.IndexFunc(entries, func(entry any) bool {
-						if mapping, ok := entry.(map[string]any); ok {
-							entry = mapping["uses"]
-						}
-						uses, ok := entry.(string)
-						return ok && (uses == path || uses == strings.TrimSuffix(path, ".md") ||
-							strings.HasPrefix(uses, "github/gh-aw/"+path+"@"))
-					})
-					var secretName string
-					if provider.name == "linear" {
-						if token, exists := outputs["linear-token"]; exists && token != nil {
-							text, ok := token.(string)
-							match := connectorSecretReference.FindStringSubmatch(text)
-							if !ok || match == nil {
-								return fmt.Errorf("cannot migrate linear-token: use a single secrets.NAME reference, then bind its name through the Linear import writer-secret")
-							}
-							secretName = match[1]
-						}
-					}
-					if index < 0 {
-						entry := any(path)
-						if provider.name == "azure-devops" {
-							entry = map[string]any{"uses": path, "with": map[string]any{
-								"organization": "", "project": "", "project-name": "",
-							}}
-						}
-						if secretName != "" {
-							entry = map[string]any{"uses": path, "with": map[string]any{"writer-secret": secretName}}
-						}
-						entries = append(slices.Clone(entries), entry)
-					} else if secretName != "" {
-						entry := map[string]any{"uses": entries[index]}
-						if mapping, ok := entries[index].(map[string]any); ok {
-							entry = maps.Clone(mapping)
-						}
-						inputs, exists := entry["with"]
-						if !exists {
-							inputs = map[string]any{}
-							entry["with"] = inputs
-						}
-						mapping, ok := inputs.(map[string]any)
-						if !ok {
-							return fmt.Errorf("cannot migrate linear-token: import with must be a mapping")
-						}
-						if current, exists := mapping["writer-secret"]; exists && current != secretName {
-							return fmt.Errorf("cannot migrate linear-token: existing writer-secret conflicts with the legacy token")
-						}
-						mapping = maps.Clone(mapping)
-						mapping["writer-secret"] = secretName
-						entry["with"] = mapping
-						entries[index] = entry
-					}
-					if err := f.Set([]string{"imports"}, entries); err != nil {
-						return err
-					}
-					if provider.name == "linear" {
-						if err := f.Remove("safe-outputs", "linear-token"); err != nil {
+						if err := migrateLegacyConnector(f, provider.name, provider.outputs); err != nil {
 							return err
-						}
-					}
-					if provider.name == "azure-devops" {
-						for _, key := range provider.outputs {
-							destination := strings.Replace(key, "ado-", "azure-devops-", 1)
-							if _, found := outputs[key]; !found {
-								continue
-							}
-							if _, found := f.Lookup("safe-outputs", destination); found {
-								return fmt.Errorf("cannot migrate %s: %s already exists", key, destination)
-							}
-							if err := f.Rename([]string{"safe-outputs", key}, destination); err != nil {
-								return err
-							}
 						}
 					}
 				}
@@ -136,4 +54,117 @@ func getLegacyConnectorImportsCodemod() Codemod {
 			return result, applied, err
 		},
 	}
+}
+
+func migrateLegacyConnector(f *codemod.Frontmatter, provider string, keys []string) error {
+	path, entries, err := legacyConnectorImportEntries(f)
+	if err != nil {
+		return err
+	}
+	importPath := repositoryConnectorDirectory + provider + ".md"
+	index := slices.IndexFunc(entries, func(entry any) bool {
+		if mapping, ok := entry.(map[string]any); ok {
+			entry = mapping["uses"]
+		}
+		uses, ok := entry.(string)
+		if !ok {
+			return false
+		}
+		local := strings.TrimPrefix(strings.TrimSpace(uses), "./")
+		return local == importPath || local == strings.TrimSuffix(importPath, ".md") ||
+			local == "connectors/"+provider+".md" || local == "connectors/"+provider ||
+			strings.HasPrefix(local, "github/gh-aw/"+importPath+"@")
+	})
+	var entry any = importPath
+	if index >= 0 && index < len(entries) {
+		entry = entries[index]
+	} else if provider == "azure-devops" {
+		entry = map[string]any{"uses": importPath, "with": map[string]any{
+			"organization": "", "project": "", "project-name": "",
+		}}
+	}
+	if provider == "linear" {
+		entry, err = migrateLegacyLinearToken(f, entry)
+		if err != nil {
+			return err
+		}
+	}
+	if index >= 0 && index < len(entries) {
+		entries[index] = entry
+	} else {
+		entries = append(entries, entry)
+	}
+	if err := f.Set(path, entries); err != nil {
+		return err
+	}
+	if provider == "linear" {
+		return f.Remove("safe-outputs", "linear-token")
+	}
+	if provider == "azure-devops" {
+		return renameLegacyADOOutputs(f, keys)
+	}
+	return nil
+}
+
+func legacyConnectorImportEntries(f *codemod.Frontmatter) ([]string, []any, error) {
+	path := []string{"imports"}
+	imports, exists := f.Lookup(path...)
+	if _, ok := imports.(map[string]any); ok {
+		path = append(path, "aw")
+		imports, exists = f.Lookup(path...)
+	}
+	if !exists {
+		return path, nil, nil
+	}
+	entries, ok := imports.([]any)
+	if !ok {
+		return nil, nil, errors.New("cannot migrate connectors: imports or imports.aw must be a sequence")
+	}
+	return path, slices.Clone(entries), nil
+}
+
+func migrateLegacyLinearToken(f *codemod.Frontmatter, entry any) (any, error) {
+	token, exists := f.Lookup("safe-outputs", "linear-token")
+	if !exists || token == nil {
+		return entry, nil
+	}
+	text, ok := token.(string)
+	if !ok || !connectorSecretReference.MatchString(text) {
+		return nil, errors.New("cannot migrate linear-token: use a single secrets.NAME reference, then bind its name through the Linear import writer-secret")
+	}
+	secretName := connectorSecretReference.ReplaceAllString(text, "$1")
+	mapping := map[string]any{"uses": entry}
+	if existing, ok := entry.(map[string]any); ok {
+		mapping = maps.Clone(existing)
+	}
+	inputs := map[string]any{}
+	if value, exists := mapping["with"]; exists {
+		existing, ok := value.(map[string]any)
+		if !ok {
+			return nil, errors.New("cannot migrate linear-token: import with must be a mapping")
+		}
+		inputs = maps.Clone(existing)
+	}
+	if current, exists := inputs["writer-secret"]; exists && current != secretName {
+		return nil, errors.New("cannot migrate linear-token: existing writer-secret conflicts with the legacy token")
+	}
+	inputs["writer-secret"] = secretName
+	mapping["with"] = inputs
+	return mapping, nil
+}
+
+func renameLegacyADOOutputs(f *codemod.Frontmatter, keys []string) error {
+	for _, key := range keys {
+		if _, found := f.Lookup("safe-outputs", key); !found {
+			continue
+		}
+		destination := strings.Replace(key, "ado-", "azure-devops-", 1)
+		if _, found := f.Lookup("safe-outputs", destination); found {
+			return fmt.Errorf("cannot migrate %s: %s already exists", key, destination)
+		}
+		if err := f.Rename([]string{"safe-outputs", key}, destination); err != nil {
+			return err
+		}
+	}
+	return nil
 }
