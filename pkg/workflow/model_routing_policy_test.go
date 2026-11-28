@@ -243,3 +243,67 @@ func TestWarnRoutedModelPolicy(t *testing.T) {
 		require.Zero(t, count)
 	})
 }
+
+func TestBuildAWFConfigJSON_ModelRoutingEndpoints(t *testing.T) {
+	t.Run("emits engine-supported endpoints on v0.29.21 and newer", func(t *testing.T) {
+		for _, tc := range []struct {
+			name     string
+			engine   string
+			provider LLMProvider
+			want     []string
+		}{
+			{name: "copilot on github", engine: "copilot", provider: LLMProviderGitHub, want: []string{"/responses", "/chat/completions"}},
+			{name: "claude on github", engine: "claude", provider: LLMProviderGitHub, want: []string{"/v1/messages"}},
+			{name: "claude on native anthropic", engine: "claude", provider: LLMProviderAnthropic, want: []string{"/v1/messages"}},
+			{name: "codex on github", engine: "codex", provider: LLMProviderGitHub, want: []string{"/responses"}},
+			{name: "codex on native openai", engine: "codex", provider: LLMProviderOpenAI, want: []string{"/responses"}},
+			{name: "pi on github", engine: "pi", provider: LLMProviderGitHub, want: []string{"/v1/messages", "/responses", "/chat/completions"}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				data := routedPolicyWorkflowData(tc.engine, "", nil, nil, nil)
+				data.EngineConfig.LLMProvider = tc.provider
+				require.True(t, apiProxySupportsRoutingEndpoints(data))
+				routing := buildRoutedAPIProxyConfig(t, tc.engine, data)["routing"].(map[string]any)
+				require.Equal(t, anySlice(tc.want), routing["endpoints"])
+			})
+		}
+	})
+
+	t.Run("omits endpoints on older AWF pins across all engines", func(t *testing.T) {
+		for _, engine := range []string{"copilot", "claude", "codex", "pi"} {
+			t.Run(engine, func(t *testing.T) {
+				data := routedPolicyWorkflowData(engine, "v0.29.20", nil, nil, nil)
+				require.False(t, apiProxySupportsRoutingEndpoints(data))
+				routing := buildRoutedAPIProxyConfig(t, engine, data)["routing"].(map[string]any)
+				require.NotContains(t, routing, "endpoints")
+			})
+		}
+	})
+
+	t.Run("respects custom sandbox.agent.images.apiProxy tag", func(t *testing.T) {
+		for _, tc := range []struct {
+			name            string
+			firewallVersion string
+			imageTag        string
+			wantEndpoints   bool
+		}{
+			{name: "matching v0.29.21 image on v0.29.21", firewallVersion: "v0.29.21", imageTag: "0.29.21", wantEndpoints: true},
+			{name: "older 0.29.20 image on v0.29.21", firewallVersion: "v0.29.21", imageTag: "0.29.20", wantEndpoints: false},
+			{name: "unpinned latest image on v0.29.21", firewallVersion: "v0.29.21", imageTag: "latest", wantEndpoints: false},
+			{name: "unpinned latest firewall with 0.29.21 image", firewallVersion: "latest", imageTag: "0.29.21", wantEndpoints: false},
+			{name: "newer 0.29.21 image on older v0.29.20 firewall", firewallVersion: "v0.29.20", imageTag: "0.29.21", wantEndpoints: false},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				data := routedPolicyWorkflowData("codex", tc.firewallVersion, nil, nil, []string{"gpt-5.6-luna"})
+				setRoutingCandidateModelsProxyImage(data, tc.imageTag)
+				require.Equal(t, tc.wantEndpoints, apiProxySupportsRoutingEndpoints(data))
+				routing := buildRoutedAPIProxyConfig(t, "codex", data)["routing"].(map[string]any)
+				if tc.wantEndpoints {
+					require.Equal(t, []any{"/responses"}, routing["endpoints"])
+				} else {
+					require.NotContains(t, routing, "endpoints")
+				}
+			})
+		}
+	})
+}

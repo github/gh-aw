@@ -171,10 +171,15 @@ func BuildAWFConfigJSON(config AWFCommandConfig) (string, error) { //nolint:larg
 	}
 	if isModelRoutingEnabled(config.WorkflowData) {
 		routing := config.WorkflowData.EngineConfig.ModelRouting
+		var endpoints []string
+		if apiProxySupportsRoutingEndpoints(config.WorkflowData) {
+			endpoints = modelRoutingEngineEndpoints(config.EngineName)
+		}
 		apiProxy.Routing = &AWFModelRoutingConfig{
 			Provider:  modelRoutingNativeProvider(config.EngineName, config.WorkflowData),
 			Objective: AWFModelRoutingObjective{Goal: routing.Goal, Mode: routing.Mode},
 			Task:      AWFModelRoutingTask{ConversationFile: modelRoutingConversationFile},
+			Endpoints: endpoints,
 		}
 	}
 	if hostedWeb := buildHostedWebConfig(config.EngineName, config.EngineRuntimeID, config.WorkflowData, firewallConfig); hostedWeb != nil {

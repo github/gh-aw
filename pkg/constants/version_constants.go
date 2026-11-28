@@ -119,6 +119,10 @@ const AWFModelRoutingMinVersion Version = "v0.28.29"
 // AWFCostOnlyModelRoutingMinVersion is the first AWF release that rejects cost-speed routing goals.
 const AWFCostOnlyModelRoutingMinVersion Version = "v0.29.17"
 
+// AWFModelRoutingFallbackMinVersion is the first AWF release that supports
+// deterministic eligible-model fallback and apiProxy.routing.endpoints filtering.
+const AWFModelRoutingFallbackMinVersion Version = "v0.29.21"
+
 // AWFCloudHypervisorModelRoutingMinVersion is the first AWF release whose
 // primary-agent model routing supports the cloud-hypervisor runtime.
 const AWFCloudHypervisorModelRoutingMinVersion Version = "v0.29.12"

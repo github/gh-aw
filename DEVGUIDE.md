@@ -992,7 +992,7 @@ This documentation provides:
    - If no smoke run is queued after setting `smoke`, or additional changes require another smoke run, toggle the `smoke` label (remove and re-add), then approve workflows again
    - For changes to model routing (`engine.model-routing`), add the `smoke-routing` label and approve workflows. It runs nine routed smokes on the PR's code:
      - `smoke-copilot-routed`: Copilot CLI with routing and no sub-agents. It also runs the default threat-detection engine on a pinned model, and a detection-job post-step checks that detection completed on that model without routing (`D1`–`D3`)
-     - `smoke-claude-routed`: Claude Code with routing on `model-provider: github`; AWF selects `/chat/completions` and the main agent must use `/v1/messages`
+     - `smoke-claude-routed`: Claude Code with routing on `model-provider: github`; AWF filters candidates to `/v1/messages` and the main agent must use `/v1/messages`
      - `smoke-pi-routed`: pi with routing and two cross-family declared sub-agents (Claude and GPT)
      - `smoke-codex-routed`: Codex with routing on `model-provider: github` over `gpt-5.6-*` candidates; the main agent must use `/responses`, `H2` fails unless the proxy-selected effort is `max`, and `H3` fails unless every main-agent request the proxy recorded (`firewall.model_routing` `stage: request`) has `requestedEffort` equal to the selected effort
      - `smoke-copilot-sdk-routed`: Copilot SDK with routing and a Claude sub-agent under a GPT main agent
