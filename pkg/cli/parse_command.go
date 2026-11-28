@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,15 +29,21 @@ Missing or empty frontmatter produces {}. Malformed frontmatter is an error.`,
 		// Parsing must not load project configuration through the root hook.
 		PersistentPreRun: func(*cobra.Command, []string) {},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var source string
+			if len(args) > 0 {
+				source = args[0]
+			} else {
+				return errors.New("a Markdown file path or '-' for stdin is required")
+			}
 			var content []byte
 			var err error
-			if args[0] == "-" {
+			if source == "-" {
 				content, err = io.ReadAll(cmd.InOrStdin())
 			} else {
-				content, err = os.ReadFile(args[0])
+				content, err = os.ReadFile(source)
 			}
 			if err != nil {
-				return fmt.Errorf("failed to read Markdown from %q: %w", args[0], err)
+				return fmt.Errorf("failed to read Markdown from %q: %w", source, err)
 			}
 
 			result, err := parser.ExtractFrontmatterFromContent(string(content))
