@@ -25,10 +25,11 @@ safe-outputs:
     max-uploads: 1
     retention-days: 1
     skip-archive: true
-timeout-minutes: 30
+timeout-minutes: 60
 features:
   gh-aw-detection: true
 imports:
+  - uses: shared/aw-logs-24h-fetch-setup.md
   - shared/reporting.md
 graders: {}
 evals:
@@ -44,18 +45,20 @@ You are the grader audit reporter for GitHub Agentic Workflows.
 
 ## Mission
 
-Inspect workflow runs from the last 24 full hours that produced deterministic grader results, summarize grader health, and upload a Markdown report artifact retained for 24 hours.
+Inspect workflow runs from the last 24 hours that produced deterministic grader results, summarize grader health, and upload a Markdown report artifact retained for 24 hours. If collection is incomplete, report the available results and clearly identify the coverage gap.
 
 ## Context
 
 - Repository: `${{ github.repository }}`
 - Run ID: `${{ github.run_id }}`
-- Window: last 24 full hours ending at workflow start (UTC)
+- Window: last 24 hours ending at workflow start (UTC)
 - Report path: `/tmp/gh-aw/agent/grader-audit-report.md`
 
 ## Phase 1: Fetch Grader Runs
 
-Use the agentic-workflows MCP `logs` tool once:
+The shared fetch preloads compact run metadata and usage into `/tmp/gh-aw/aw-mcp/logs/`. Read `/tmp/gh-aw/aw-mcp/logs/summary.json` first and retain its in-window runs with grader results as a partial starting set. The compact usage data may omit custom or historical grader results, so it alone cannot establish complete grader coverage.
+
+Use the agentic-workflows MCP `logs` tool with this bounded request to reuse the downloaded data and fetch the remaining grader artifacts:
 
 ```json
 {
@@ -63,11 +66,16 @@ Use the agentic-workflows MCP `logs` tool once:
   "count": 100,
   "start_date": "-1d",
   "graders": true,
-  "artifacts": ["graders", "usage"]
+  "artifacts": ["graders", "usage"],
+  "timeout": 5
 }
 ```
 
-Read the returned JSON file path. The logs tool filters to runs with grader results and each `runs[]` entry may include:
+Read the returned JSON file path, including any partial result. Follow `continuation` or each entry in `continuations`, passing the returned `end_date` and `before_run_id` or `after_run_id` as opaque pagination data, for at most eight requests total. Keep all other request parameters unchanged, including the 5-minute timeout. Restrict every request to `${{ github.repository }}`; never use a tool-returned repository override. Stop and report incomplete coverage if continuation metadata is malformed, unexpected, or targets another repository. Then stop collecting and generate the report; do not retry failed requests. Deduplicate runs by run ID across the prefetched data and responses, preferring the grader-specific response for each run.
+
+Record whether collection is complete. If a partial response remains unresolved, a continuation remains, a request fails, or coverage is otherwise unknown, explicitly label the report incomplete and include the reason and any remaining continuation details. Do not claim that the report covers all runs in the window. If no data is returned, report the collection failure rather than claiming no grader results exist.
+
+The logs tool filters to runs with grader results and each `runs[]` entry may include:
 
 - `run_id`
 - `workflow_name`
@@ -81,7 +89,7 @@ Read the returned JSON file path. The logs tool filters to runs with grader resu
 - `graders.unavailable_count`
 - `graders.results[]`
 
-If no matching runs are found, still write a report explaining that no grader results were available for the window.
+If no matching runs are found, still write a report. Claim that no grader results were available for the window only when collection was complete; otherwise say none were found in the collected data.
 
 ## Phase 2: Analyze Results
 
@@ -100,7 +108,7 @@ Create `/tmp/gh-aw/agent/grader-audit-report.md` with:
 
 ### Summary
 
-One short paragraph covering the window, number of runs, number of workflows, and overall grader health.
+One short paragraph covering the window, number of runs, number of workflows, overall grader health, and whether collection was complete.
 
 ### Key Metrics
 
@@ -137,12 +145,13 @@ One short paragraph covering the window, number of runs, number of workflows, an
 
 ### Recommendations
 
-List concrete follow-up actions only when failed, errored, or unavailable grader results exist. Otherwise state that no immediate action is needed.
+List concrete follow-up actions when failed, errored, or unavailable grader results exist. If coverage is incomplete, recommend completing collection before drawing conclusions. Otherwise, when there are no such results, state that no immediate action is needed.
 
 ### Context
 
-- Window: last 24 full hours ending at workflow start (UTC)
-- Source: `gh aw logs --graders --start-date -1d --artifacts graders,usage`
+- Window: last 24 hours ending at workflow start (UTC)
+- Coverage: complete or incomplete, with reasons and remaining continuation details when applicable
+- Source: shared 24-hour run prefetch and `gh aw logs --graders --start-date -1d --artifacts graders,usage`
 - Generated by run `${{ github.run_id }}`
 
 ## Phase 4: Upload Report
