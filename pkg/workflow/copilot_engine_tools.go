@@ -24,7 +24,7 @@ package workflow
 import (
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -295,7 +295,7 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 			}
 			expectValue = !expectValue
 		}
-		sort.Strings(values)
+		slices.Sort(values)
 
 		// Rebuild args with sorted, deduplicated values
 		newArgs := make([]string, 0, len(args))
@@ -334,7 +334,7 @@ func (e *CopilotEngine) generateCopilotToolArgumentsComment(tools map[string]any
 			expectValue = true
 			continue
 		}
-		fmt.Fprintf(&comment, "%s# %s %s\n", indent, flag, arg)
+		fmt.Fprintf(&comment, "%s# %s %s\n", indent, flag, arg) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
 		expectValue = false
 	}
 
