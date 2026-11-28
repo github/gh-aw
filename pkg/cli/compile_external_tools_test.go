@@ -45,6 +45,42 @@ func TestHandleBatchToolErrorPropagatesInStrictMode(t *testing.T) {
 	}
 }
 
+func TestShellcheckCancellationOverridesNonStrictAndEarlierErrors(t *testing.T) {
+	originalShellcheck := runBatchShellcheckOnLockFilesAndResources
+	originalYamllint := runBatchYamllintOnFiles
+	t.Cleanup(func() {
+		runBatchShellcheckOnLockFilesAndResources = originalShellcheck
+		runBatchYamllintOnFiles = originalYamllint
+	})
+	earlier := errors.New("earlier scanner error")
+	runBatchYamllintOnFiles = func([]string, bool, bool) error { return earlier }
+	for _, cancellation := range []error{context.Canceled, context.DeadlineExceeded} {
+		for _, strict := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%v/strict=%t", cancellation, strict), func(t *testing.T) {
+				wrapped := fmt.Errorf("scan interrupted: %w", cancellation)
+				require.ErrorIs(t, handleBatchToolError("shellcheck", wrapped, strict, false), cancellation)
+				runBatchShellcheckOnLockFilesAndResources = func(context.Context, []string, []workflow.ShellScriptResource, bool, bool) error {
+					return wrapped
+				}
+				opts := batchToolsOptions{
+					filterResult: func(tool string, err error) error {
+						if tool == "shellcheck" {
+							return nil
+						}
+						return err
+					},
+				}
+				config := CompileConfig{Shellcheck: true, Yamllint: true, Strict: strict}
+				_, err := runBatchExternalTools(context.Background(), config, opts, &CompilationStats{}, &[]ValidationResult{})
+				require.ErrorIs(t, err, cancellation)
+				if strict {
+					require.ErrorIs(t, err, earlier)
+				}
+			})
+		}
+	}
+}
+
 // TestRunBatchExternalToolsExecutesSequentialToolsWithoutEarlyAborting verifies the
 // regression this PR fixes: when an early scanner (actionlint) returns an error, every
 // other enabled scanner still runs to completion, in pipeline order, and the first
