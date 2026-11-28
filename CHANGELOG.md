@@ -18,6 +18,27 @@ and mixed edits continue to require write-or-higher repository permission.
 
 ### Breaking changes
 
+#### Work-queue protocol v4
+
+The work queue now uses protocol v4. The `work_queue` configuration no longer
+accepts `mode`, `class_weights`, `accounting_weights`, or
+`retry.backoff_seconds`; configure scheduling through pool limits in
+`.github/workflows/aw.json` instead. The `work-queue-policy` frontmatter field
+and `safe-outputs.dispatch-workflow.authorization` are removed. Delete these
+fields and recompile workflows.
+
+`gh aw work-queue sync-issues` and the `work_queue_explain` MCP tool are
+removed. Use `work-queue state` or `inspect` for queue state, and
+`work_queue_read` for MCP reads; scheduled `agentics-maintenance` now projects
+backing Issues. The worker `work_queue_assignment` input is now
+`{"version":4,"dispatch_id":"…"}`; recompile workers and dispatchers together.
+
+The first v4 dispatcher, producer, or maintenance run converts a v3 ledger:
+available Work and linked Issues carry over in FIFO order, while claimed,
+completed, and cancelled Work does not. Effects are at-least-once, so workers
+must tolerate a retry if a job stops after applying an effect. The v4 protocol
+does not retain a v3 compatibility mode.
+
 `issue-intent` is now experimental and disabled by default for `close-issue`,
 `add-labels`, `assign-to-agent`, `assign-to-user`, `set-issue-type`, and
 `set-issue-field`. Workflows that relied on the implicit default no longer
