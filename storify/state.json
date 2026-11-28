@@ -1,17 +1,18 @@
 {
   "last_run_window": {
-    "start": "2026-11-25T07:53:07Z",
-    "end": "2026-11-26T07:53:07Z",
-    "coverage": "partial; 299 in-window cached records from 2026-11-25T21:55:34Z through 2026-11-26T07:51:02Z; count-limited"
+    "start": "2026-11-27T07:52:54Z",
+    "end": "2026-11-28T07:52:54Z",
+    "coverage": "partial; 301 in-window cached runs from 2026-11-27T21:06:52Z through 2026-11-28T07:50:50Z; count-limited"
   },
   "key_themes": [
-    "Automated spec PR merged as review fan-out began; review publication failed",
-    "Trusted work queue controls failed in two dispatchers while smoke dispatches succeeded",
-    "Auditor collection was intermittent; a successful agent run was observed"
+    "Copilot Session Insights completed and produced a discussion after merged repair and dashboard request for validation",
+    "Auditor collection remains intermittent despite a final successful agent run",
+    "Three workflows failed safe output processing after successful agent and evaluations"
   ],
   "carry_forward_questions": [
-    "Why did three safe-output processing steps fail and were review findings delivered?",
-    "Why do trusted controls fail while separate smoke dispatches succeed?",
-    "Will Auditor collection and agent execution remain reliable?"
+    "Does Copilot Session Insights remain healthy and what was the impact of its reported missing data?",
+    "Will Auditor collection and agent execution remain reliable?",
+    "What caused failed safe output processing and were intended outputs delivered?",
+    "Why did simulator memory validation and push fail again?"
   ]
 }
