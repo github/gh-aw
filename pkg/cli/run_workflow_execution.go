@@ -457,14 +457,26 @@ func formatWorkflowRunError(err error, stderr []byte) error {
 }
 
 func resolveWorkflowRunInfo(lockFileName, output string, opts RunOptions) (*WorkflowRunInfo, error) {
-	if parsedRunInfo := parseRunInfoFromOutput(output); parsedRunInfo != nil {
-		if !opts.JSON || (parsedRunInfo.DatabaseID > 0 && strings.TrimSpace(output) == parsedRunInfo.URL) {
-			executionLog.Printf("Parsed run info from gh output: id=%d, url=%s", parsedRunInfo.DatabaseID, parsedRunInfo.URL)
-			return parsedRunInfo, nil
-		}
-	}
 	if opts.JSON {
+		var runInfo *WorkflowRunInfo
+		for line := range strings.SplitSeq(output, "\n") {
+			line = strings.TrimSpace(line)
+			parsed := parseRunInfoFromOutput(line)
+			if parsed != nil && parsed.DatabaseID > 0 && line == parsed.URL {
+				if runInfo != nil && (runInfo.DatabaseID != parsed.DatabaseID || runInfo.URL != parsed.URL) {
+					return nil, errors.New("dispatch returned multiple workflow run identities")
+				}
+				runInfo = parsed
+			}
+		}
+		if runInfo != nil {
+			return runInfo, nil
+		}
 		return nil, errors.New("dispatch did not return a workflow run identity")
+	}
+	if parsedRunInfo := parseRunInfoFromOutput(output); parsedRunInfo != nil {
+		executionLog.Printf("Parsed run info from gh output: id=%d, url=%s", parsedRunInfo.DatabaseID, parsedRunInfo.URL)
+		return parsedRunInfo, nil
 	}
 	return getLatestWorkflowRunWithRetry(lockFileName, opts.RepoOverride, opts.Verbose)
 }
@@ -491,12 +503,15 @@ func waitForWorkflowRunCompletion(ctx context.Context, opts RunOptions, runInfo 
 	}
 	targetRepo := resolveWorkflowTargetRepo(opts)
 	if targetRepo == "" || runInfo == nil {
+		if opts.JSON && opts.RepeatCount > 0 {
+			return errors.New("cannot track dispatched workflow run for repeat")
+		}
 		return nil
 	}
 	printWorkflowWaitMessage(opts.AutoMergePRs)
 	runIDStr := strconv.FormatInt(runInfo.DatabaseID, 10)
 	if err := WaitForWorkflowCompletion(ctx, targetRepo, runIDStr, workflowCompletionWaitTimeoutMinutes, opts.Verbose); err != nil {
-		if ctx.Err() != nil || errors.Is(err, ErrInterrupted) {
+		if ctx.Err() != nil || errors.Is(err, ErrInterrupted) || (opts.JSON && opts.RepeatCount > 0) {
 			return err
 		}
 		printWorkflowCompletionWarning(opts.AutoMergePRs, err)
@@ -674,31 +689,14 @@ func RunWorkflowsOnGitHub(ctx context.Context, workflowNames []string, opts RunO
 			return executeAllWorkflowsOnce(ctx, workflowNames, runOpts)
 		}, workflowNames, opts)
 	}
-	repeatCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	var repeatErr error
-	if opts.JSON {
-		runOnce := runAllWorkflows
-		runAllWorkflows = func() error {
-			err := runOnce()
-			if err != nil {
-				repeatErr = err
-				cancel()
-			}
-			return err
-		}
-	}
-	err := ExecuteWithRepeat(RepeatOptions{
-		Ctx:           repeatCtx,
+	return ExecuteWithRepeat(RepeatOptions{
+		Ctx:           ctx,
 		RepeatCount:   opts.RepeatCount,
 		RepeatMessage: "Repeating workflow run",
 		ExecuteFunc:   runAllWorkflows,
 		UseStderr:     opts.JSON,
+		StopOnError:   opts.JSON,
 	})
-	if repeatErr != nil {
-		return repeatErr
-	}
-	return err
 }
 
 // runInfoURLRegexp matches GitHub Actions run URLs of the form:
