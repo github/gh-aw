@@ -16,6 +16,40 @@ Experiments work best when you test one workflow choice at a time, such as:
 - whether to delegate to a sub-agent
 - which subskill (inline skill) to invoke
 
+## Parallel execution
+
+Parallel experiments are an opt-in compilation pass that appends an experimental
+matrix job after compiling the production workflow. Existing production jobs,
+dependencies, permissions, and outputs remain unchanged. Without the opt-in,
+compilation follows the existing path.
+
+Each admitted entry varies one experiment, not a Cartesian product of all
+experiments. Experimental jobs have the production agent's upstream dependencies
+and can become runnable alongside it, using the same repository revision, event,
+and workflow inputs. Scheduling is best effort: runner availability, organization
+concurrency limits, provider throttling, and GitHub Actions scheduling can delay
+individual jobs. There is no start barrier or guarantee of simultaneous execution.
+
+Experimental failures do not gate production jobs. The matrix disables fail-fast
+and tolerates experimental job failures. Its jobs can still extend the workflow's
+overall duration, consume runner capacity, and be cancelled by workflow-level
+cancellation or concurrency policies. An overall successful workflow conclusion
+does not prove that every experiment succeeded.
+
+### Offline evaluation
+
+Experimental execution collects evidence but does not add threat-detection,
+safe-output execution, grader, eval, or aggregation jobs. Safe-output requests are
+retained as staged intents, not delivered effects. Operators download experimental
+artifacts and run graders, BinEval, or comparative analysis separately.
+
+Keep production and experimental accounting separate. Existing across-run
+experiment state and analysis are not evidence that every parallel variant ran.
+A configured or admitted variant is not an executed variant: runner cancellation,
+setup failure, or missing artifacts can leave execution and consumption unknown.
+Do not treat missing consumption as zero or infer a completed execution from an
+assignment alone.
+
 ## Declaring experiments
 
 Add an `experiments` map to the workflow frontmatter. Each key names an
