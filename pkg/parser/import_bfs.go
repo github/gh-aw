@@ -454,6 +454,9 @@ func enqueueNestedImportEntry(entry nestedImportEntry, item importQueueItem, bas
 }
 
 func resolveNestedImportPathAndOrigin(item importQueueItem, nestedFilePath string) (string, *remoteImportOrigin, error) {
+	if _, handled, err := resolveBuiltinConnectorAlias(nestedFilePath); handled {
+		return nestedFilePath, nil, err
+	}
 	if item.remoteOrigin != nil && !IsWorkflowSpec(nestedFilePath) {
 		return resolveRemoteNestedPath(item, nestedFilePath)
 	}

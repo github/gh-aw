@@ -99,6 +99,34 @@ describe("frontmatter_hash_pure (text-based)", () => {
     });
   });
 
+  describe("bundled connector imports", () => {
+    it("hashes the connector source shipped with the action", async () => {
+      const workflowPath = ".github/workflows/connector-hash.md";
+      const workflow = "---\nengine: copilot\nimports:\n  - connector:linear\n---\nReview.\n";
+      const connectorPath = path.resolve(__dirname, "../../../.github/workflows/connectors/linear.md");
+      const connector = fs.readFileSync(connectorPath, "utf8");
+      const { frontmatterText: connectorFrontmatter } = extractFrontmatterAndBody(connector);
+      const fileReader = vi.fn(async filePath => {
+        if (filePath === workflowPath) return workflow;
+        throw new Error(`Unexpected repository read: ${filePath}`);
+      });
+      const expected = crypto
+        .createHash("sha256")
+        .update(
+          marshalCanonicalJSON({
+            "frontmatter-text": "engine: copilot\nimports:\n  - connector:linear",
+            imports: ["connector:linear"],
+            "imported-frontmatters": normalizeFrontmatterText(connectorFrontmatter),
+          })
+        )
+        .digest("hex");
+
+      await expect(computeFrontmatterHash(workflowPath, { fileReader, readerMode: "github-api" })).resolves.toBe(expected);
+      expect(fileReader).toHaveBeenCalledTimes(1);
+      expect(fileReader).toHaveBeenCalledWith(workflowPath);
+    });
+  });
+
   describe("import read failures", () => {
     const workflowPath = ".github/workflows/test.md";
     const cases = [

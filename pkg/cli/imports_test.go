@@ -25,6 +25,9 @@ func TestProcessImportsWithWorkflowSpec_PreservesFormatting(t *testing.T) {
 		rewrite bool
 	}{
 		{"unchanged", "  - local.md # keep local\n  - uses: other/repo/shared.md@abc123 # pinned", false},
+		{"connector scalar", "  - connector:linear # bundled", false},
+		{"connector uses mixed", "  - uses: connector:linear\n    with:\n      teams: [approved]\n  - shared/config.md", true},
+		{"connector aw", "  aw:\n    - connector:linear\n    - uses: connector:jira", false},
 		{"plain", "  - shared/config.md # shared/config.md stays in this comment", true},
 		{"single quoted", "  - 'shared/config.md' # keep quotes", true},
 		{"double quoted", "  - \"shared/config.md\" # keep quotes", true},

@@ -10,7 +10,9 @@ ordinary workflow Markdown file under `.github/workflows/connectors/`, declaring
 its endpoints, credential names, exact resource grants, and capabilities.
 Importing a connector makes those capabilities available; it does not enable them.
 The [connector source directory](https://github.com/github/gh-aw/tree/main/.github/workflows/connectors)
-contains the declarations used by these examples.
+contains the reviewed source declarations. The compiler embeds these declarations
+in each gh-aw release; `connector:<id>` imports the matching bundled version.
+Use a local or pinned URL import when a workflow needs a customized declaration.
 
 Start with the [copyable workflow](#configuration), then choose an integration.
 Each integration includes an example and its credential and resource requirements.
@@ -69,8 +71,8 @@ Save the following as `.github/workflows/linear-review.md`. It reads one approve
 Linear issue and stages at most one comment; it does not post the comment.
 Before running it:
 
-1. Copy the reviewed connector declaration to
-   `.github/workflows/connectors/linear.md`. A relative import does not install it.
+1. Import the bundled declaration with `uses: connector:linear`. Use a local or
+   pinned URL import if the declaration needs customization.
 2. Replace the specimen UUIDs in both the configuration and task with approved
    issue, organization, and team IDs. Grants must exist before a read; returned
    IDs never expand them.
@@ -88,7 +90,7 @@ permissions:
 network:
   allowed: [defaults, api.linear.app]
 imports:
-  - uses: ".github/workflows/connectors/linear.md"
+  - uses: connector:linear
     with:
       issues: [22222222-2222-4222-8222-222222222222]
       organizations: [11111111-1111-4111-8111-111111111111]

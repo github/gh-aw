@@ -31,13 +31,13 @@ func TestLegacyConnectorImportsCodemod(t *testing.T) {
 		outputs      map[string]any
 	}{
 		{"linear", "safe-outputs:\n  linear-create-issue: {max: 2} # keep selection\n  linear-token: ${{ secrets.LINEAR_CUSTOM }}\n",
-			[]any{map[string]any{"uses": ".github/workflows/connectors/linear.md", "with": map[string]any{"writer-secret": "LINEAR_CUSTOM"}}},
+			[]any{map[string]any{"uses": "connector:linear", "with": map[string]any{"writer-secret": "LINEAR_CUSTOM"}}},
 			map[string]any{"linear-create-issue": map[string]any{"max": uint64(2)}}},
 		{"jira", "safe-outputs:\n  jira-create-issue:\n  jira-update-issue: {}\n  jira-add-comment: {staged: true}\n  jira-add-label:\n",
-			[]any{map[string]any{"uses": ".github/workflows/connectors/jira.md", "with": map[string]any{"site": "", "issue-types": []any{}}}},
+			[]any{map[string]any{"uses": "connector:jira", "with": map[string]any{"site": "", "issue-types": []any{}}}},
 			map[string]any{"jira-create-issue": nil, "jira-update-issue": map[string]any{}, "jira-add-comment": map[string]any{"staged": true}, "jira-add-label": nil}},
 		{"ado", "safe-outputs:\n  ado-create-work-item:\n  ado-update-work-item:\n  ado-comment-on-work-item: {max: 2} # keep selection\n  ado-assign-work-item:\n  ado-link-work-items:\n",
-			[]any{map[string]any{"uses": ".github/workflows/connectors/azure-devops.md", "with": map[string]any{"organization": "", "project": "", "project-name": "", "work-item": "", "related-work-item": "", "assignee": ""}}},
+			[]any{map[string]any{"uses": "connector:azure-devops", "with": map[string]any{"organization": "", "project": "", "project-name": "", "work-item": "", "related-work-item": "", "assignee": ""}}},
 			map[string]any{"azure-devops-create-work-item": nil, "azure-devops-update-work-item": nil, "azure-devops-comment-on-work-item": map[string]any{"max": uint64(2)}, "azure-devops-assign-work-item": nil, "azure-devops-link-work-items": nil}},
 		{"existing import", "imports:\n  - common.md # keep import\n  - uses: .github/workflows/connectors/linear.md\n    with:\n      teams: [approved]\nsafe-outputs:\n  linear-add-comment:\n  linear-token: ${{ secrets.LINEAR_CUSTOM }} # rotated quarterly\n",
 			[]any{"common.md", map[string]any{"uses": ".github/workflows/connectors/linear.md", "with": map[string]any{"teams": []any{"approved"}, "writer-secret": "LINEAR_CUSTOM"}}},
@@ -49,7 +49,7 @@ func TestLegacyConnectorImportsCodemod(t *testing.T) {
 			[]any{map[string]any{"uses": "./connectors/linear.md", "with": map[string]any{"teams": []any{"approved"}, "writer-secret": "CUSTOM"}}},
 			map[string]any{"linear-add-comment": nil}},
 		{"mixed providers", "safe-outputs:\n  linear-add-comment:\n  jira-add-comment:\n  ado-link-work-items:\n  create-issue:\n",
-			[]any{".github/workflows/connectors/linear.md", map[string]any{"uses": ".github/workflows/connectors/jira.md", "with": map[string]any{"site": ""}}, map[string]any{"uses": ".github/workflows/connectors/azure-devops.md", "with": map[string]any{"organization": "", "project": "", "project-name": "", "work-item": "", "related-work-item": ""}}},
+			[]any{"connector:linear", map[string]any{"uses": "connector:jira", "with": map[string]any{"site": ""}}, map[string]any{"uses": "connector:azure-devops", "with": map[string]any{"organization": "", "project": "", "project-name": "", "work-item": "", "related-work-item": ""}}},
 			map[string]any{"linear-add-comment": nil, "jira-add-comment": nil, "azure-devops-link-work-items": nil, "create-issue": nil}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -131,7 +131,7 @@ func TestLegacyConnectorImportsCodemodEmptyImports(t *testing.T) {
 		updated, err := parser.ExtractFrontmatterFromContent(result)
 		require.NoError(t, err)
 		assert.Equal(t, []any{map[string]any{
-			"uses": ".github/workflows/connectors/jira.md",
+			"uses": "connector:jira",
 			"with": map[string]any{"site": ""},
 		}}, updated.Frontmatter["imports"])
 	}
@@ -307,10 +307,27 @@ func TestLegacyConnectorImportsCodemodObjectImports(t *testing.T) {
 	require.True(t, applied)
 	updated, err := parser.ExtractFrontmatterFromContent(result)
 	require.NoError(t, err)
-	assert.Equal(t, map[string]any{"aw": []any{"common.md", map[string]any{"uses": ".github/workflows/connectors/jira.md", "with": map[string]any{"site": ""}}}, "skills": []any{"example/skill"}}, updated.Frontmatter["imports"])
+	assert.Equal(t, map[string]any{"aw": []any{"common.md", map[string]any{"uses": "connector:jira", "with": map[string]any{"site": ""}}}, "skills": []any{"example/skill"}}, updated.Frontmatter["imports"])
 	assert.Contains(t, result, "# keep import")
 	repeated, applied, err := getLegacyConnectorImportsCodemod().Apply(result, updated.Frontmatter)
 	require.NoError(t, err)
 	assert.False(t, applied)
 	assert.Equal(t, result, repeated)
+}
+
+func TestLegacyConnectorImportsCodemodReusesShortName(t *testing.T) {
+	content := "---\nimports:\n  - uses: connector:jira\n    with:\n      projects: [APP]\nsafe-outputs:\n  jira-add-comment:\n---\nBody\n"
+	parsed, err := parser.ExtractFrontmatterFromContent(content)
+	require.NoError(t, err)
+	result, applied, err := getLegacyConnectorImportsCodemod().Apply(content, parsed.Frontmatter)
+	require.NoError(t, err)
+	require.True(t, applied)
+	updated, err := parser.ExtractFrontmatterFromContent(result)
+	require.NoError(t, err)
+	imports := updated.Frontmatter["imports"].([]any)
+	require.Len(t, imports, 1)
+	entry := imports[0].(map[string]any)
+	assert.Equal(t, "connector:jira", entry["uses"])
+	assert.Equal(t, map[string]any{"projects": []any{"APP"}, "site": ""}, entry["with"])
+	assert.NotContains(t, result, ".github/workflows/connectors/jira.md")
 }

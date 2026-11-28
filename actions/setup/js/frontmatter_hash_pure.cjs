@@ -231,7 +231,7 @@ async function processImportsTextBased(frontmatterText, baseDir, visited = new S
   const sortedImports = [...imports].sort();
 
   for (const importPath of sortedImports) {
-    // Join import path with base directory (preserves relative paths for GitHub API compatibility)
+    // Resolve imports for GitHub API compatibility; connector aliases use the action snapshot.
     const fullPath = resolveHashImportPath(importPath, baseDir, rootDir);
 
     // Skip if already visited (cycle detection)
@@ -240,7 +240,7 @@ async function processImportsTextBased(frontmatterText, baseDir, visited = new S
 
     // Read imported file
     try {
-      const importContent = await fileReader(fullPath);
+      const importContent = await readHashImport(importPath, fullPath, fileReader);
       const { frontmatterText: importFrontmatterText } = extractFrontmatterAndBody(importContent);
 
       // Add to imported files list
@@ -700,7 +700,7 @@ async function collectImportedBodies(frontmatterText, baseDir, visited = new Set
     visited.add(fullPath);
 
     try {
-      const importContent = await fileReader(fullPath);
+      const importContent = await readHashImport(importPath, fullPath, fileReader);
       const { frontmatterText: importFrontmatterText, markdown: importBody } = extractFrontmatterAndBody(importContent);
 
       importedBodyTexts.push(importBody);
@@ -736,6 +736,17 @@ function isWorkflowSpecImport(importPath) {
  */
 function resolveHashImportPath(importPath, baseDir, rootDir) {
   importPath = importPath.split("#", 1)[0];
+  if (importPath.startsWith("connector:")) {
+    const id = importPath.slice("connector:".length);
+    if (!/^[a-z][a-z0-9-]{0,62}$/.test(id)) {
+      throw new Error(`${ERR_VALIDATION}: invalid built-in connector import ${importPath}`);
+    }
+    const connectorPath = path.resolve(__dirname, "../../../.github/workflows/connectors", `${id}.md`);
+    if (!fs.existsSync(connectorPath)) {
+      throw new Error(`${ERR_VALIDATION}: built-in connector ${id} not found`);
+    }
+    return connectorPath;
+  }
   const fileRelative = !importPath.includes("/") || importPath.startsWith("./");
   let resolveBase = fileRelative ? baseDir : rootDir;
   const githubFolder = findGitHubFolder(resolveBase);
@@ -765,6 +776,13 @@ function resolveHashImportPath(importPath, baseDir, rootDir) {
     throw new Error(`${ERR_VALIDATION}: security: path ${importPath} must be within ${path.basename(securityBase)} folder (resolves to: ${relativePath})`);
   }
   return fullPath;
+}
+
+async function readHashImport(importPath, fullPath, fileReader) {
+  if (importPath.split("#", 1)[0].startsWith("connector:")) {
+    return defaultFileReader(fullPath);
+  }
+  return fileReader(fullPath);
 }
 
 /**

@@ -46,6 +46,52 @@ func TestConnectorLocalDeclarationsAreEditable(t *testing.T) {
 	}
 }
 
+func TestEmbeddedConnectorDeclarationsMatchRepositorySources(t *testing.T) {
+	sources, err := filepath.Glob("../../.github/workflows/connectors/*.md")
+	require.NoError(t, err)
+	require.Len(t, builtinConnectorSources, len(sources))
+
+	for _, source := range sources {
+		id := strings.TrimSuffix(filepath.Base(source), ".md")
+		sourceContent, err := os.ReadFile(source)
+		require.NoError(t, err)
+		embeddedContent, ok := builtinConnectorSources[id]
+		require.True(t, ok, "missing generated connector %s", id)
+		require.Equal(t, string(sourceContent), string(embeddedContent), "embedded connector %s is stale", id)
+		require.True(t, parser.BuiltinVirtualFileExists(builtinConnectorPath(id)))
+		registeredContent, err := parser.ReadFile(builtinConnectorPath(id))
+		require.NoError(t, err)
+		require.Equal(t, string(sourceContent), string(registeredContent))
+	}
+}
+
+func TestConnectorShortNameImportsUseEmbeddedDeclarations(t *testing.T) {
+	c, root := awConnectorCompiler(t)
+	content := awConnectorHeader + `imports:
+  - connector:linear
+---
+Review approved evidence.
+`
+	data, err := c.ParseWorkflowString(content, filepath.Join(root, ".github", "workflows", "review.md"))
+	require.NoError(t, err)
+	require.Empty(t, data.Connectors, "importing alone must not select a capability")
+
+	frontmatter := map[string]any{"imports": []any{
+		map[string]any{
+			"uses": "connector:linear",
+			"with": map[string]any{"teams": []any{"33333333-3333-4333-8333-333333333333"}},
+		},
+	}}
+	require.NoError(t, c.normalizeImportedConnectors(frontmatter, filepath.Join(root, ".github", "workflows", "review.md"), ""))
+	registrations, ok := frontmatter["connectors"].(map[string]any)
+	require.True(t, ok)
+	connector, ok := registrations["linear"].(map[string]any)
+	require.True(t, ok)
+	resources, ok := connector["resources"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, []any{"33333333-3333-4333-8333-333333333333"}, resources["teams"])
+}
+
 func TestCompilerRejectsBrokenLocalConnectorImports(t *testing.T) {
 	for _, test := range []struct {
 		path, message string

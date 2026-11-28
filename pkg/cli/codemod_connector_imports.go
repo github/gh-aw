@@ -20,7 +20,7 @@ func getLegacyConnectorImportsCodemod() Codemod {
 	return Codemod{
 		ID:           "legacy-connector-imports",
 		Name:         "Import connectors for legacy Linear, Jira, and ADO safe outputs",
-		Description:  "Adds connector imports, renames supported ado-* outputs to azure-devops-*, and moves linear-token secret references to writer-secret. Explicit resource grants and unsupported legacy options still require review.",
+		Description:  "Adds bundled connector short-name imports, renames supported ado-* outputs to azure-devops-*, and moves linear-token secret references to writer-secret. Explicit resource grants and unsupported legacy options still require review.",
 		IntroducedIn: "1.0.0",
 		Guided:       true,
 		Apply: func(content string, frontmatter map[string]any) (string, bool, error) {
@@ -127,7 +127,7 @@ func findOrCreateConnectorImport(f *codemod.Frontmatter, provider string) ([]str
 		if _, found := f.Lookup("connectors", provider); found {
 			return nil, nil, -1, nil, fmt.Errorf("cannot migrate %s: an inline connector registration already exists; bind its inputs manually before running gh aw fix", provider)
 		}
-		entry = repositoryConnectorDirectory + provider + ".md"
+		entry = "connector:" + provider
 	}
 	return path, entries, index, entry, nil
 }
@@ -248,6 +248,9 @@ func isConnectorImport(entry any, provider string) bool {
 	}
 
 	source = strings.TrimSpace(source)
+	if source == "connector:"+provider {
+		return true
+	}
 	if remotePath, found := strings.CutPrefix(source, "github/gh-aw/"); found {
 		source = remotePath
 		if at := strings.IndexByte(source, '@'); at >= 0 {

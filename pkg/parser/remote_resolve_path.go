@@ -16,6 +16,9 @@ import (
 func ResolveIncludePath(filePath, baseDir string, cache *ImportCache) (string, error) {
 	remoteLog.Printf("Resolving include path: file_path=%s, base_dir=%s", filePath, baseDir)
 
+	if builtinPath, handled, err := resolveBuiltinConnectorAlias(filePath); handled {
+		return builtinPath, err
+	}
 	if builtinPath, handled, err := resolveBuiltinIncludePath(filePath); handled {
 		return builtinPath, err
 	}

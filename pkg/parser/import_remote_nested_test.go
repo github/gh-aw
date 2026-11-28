@@ -206,6 +206,31 @@ func TestLocalImportResolutionBaseline(t *testing.T) {
 	assert.NotNil(t, result, "Result should not be nil")
 }
 
+func TestRemoteWrapperImportsBuiltinConnector(t *testing.T) {
+	dir := t.TempDir()
+	cache := NewImportCache(dir)
+	const sha = "0123456789012345678901234567890123456789"
+	const alias = "connector:remote-wrapper-test"
+	const builtinPath = BuiltinPathPrefix + "connectors/remote-wrapper-test.md"
+	RegisterBuiltinVirtualFile(builtinPath, []byte("---\ntools:\n  edit:\n---\n"))
+	_, err := cache.Set("owner", "repo", "wrapper.md", sha, []byte("---\nimports:\n  - "+alias+"\n---\n"))
+	require.NoError(t, err)
+
+	result, err := ProcessImportsFromFrontmatterWithSource(
+		map[string]any{"imports": []any{"owner/repo/wrapper.md@" + sha}}, dir, cache, "", "")
+	require.NoError(t, err)
+	require.Contains(t, result.MergedTools, "edit")
+
+	resolved, origin, err := resolveNestedImportPathAndOrigin(importQueueItem{remoteOrigin: &remoteImportOrigin{Owner: "owner", Repo: "repo", Ref: sha}}, alias)
+	require.NoError(t, err)
+	require.Equal(t, alias, resolved)
+	require.Nil(t, origin)
+
+	_, origin, err = resolveNestedImportPathAndOrigin(importQueueItem{remoteOrigin: &remoteImportOrigin{Owner: "owner", Repo: "repo", Ref: sha}}, "connector:Missing")
+	require.ErrorContains(t, err, "invalid built-in connector import")
+	require.Nil(t, origin)
+}
+
 // TestSiblingImportResolution verifies that a file in a subdirectory (e.g.
 // shared/mcp/serena-go.md) can import a sibling file using either a bare filename
 // ("serena.md") or an explicit same-directory prefix ("./serena.md"), and that in
