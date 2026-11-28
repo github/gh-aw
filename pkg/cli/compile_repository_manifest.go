@@ -179,7 +179,7 @@ func scanLocalRepositoryPackageInstallablePaths(packageDir string) ([]string, er
 			return nil
 		})
 		if err != nil {
-			if os.IsNotExist(err) {
+			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
 			return nil, fmt.Errorf("failed to scan %q: %w", sourcePath, err)

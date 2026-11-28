@@ -54,6 +54,30 @@ on: workflow_dispatch
 	assert.True(t, fileSet[lockFilePath], "Should include lock .yml file")
 }
 
+func TestCollectWorkflowFiles_MissingLockMessage(t *testing.T) {
+	tmpDir := t.TempDir()
+	workflowPath := filepath.Join(tmpDir, "test-workflow.md")
+	workflowContent := `---
+name: Test Workflow
+on: workflow_dispatch
+---
+# Test Workflow
+This is a test workflow.
+`
+	require.NoError(t, os.WriteFile(workflowPath, []byte(workflowContent), 0644))
+
+	var files []string
+	_, stderr := captureOutput(t, func() error {
+		var err error
+		files, err = collectWorkflowFiles(context.Background(), workflowPath, true, false)
+		return err
+	})
+
+	assert.Contains(t, stderr, "Lock file not found, compiling workflow...")
+	assert.Contains(t, files, workflowPath)
+	assert.Contains(t, files, filepath.Join(tmpDir, "test-workflow.lock.yml"))
+}
+
 func TestCollectWorkflowFiles_WithImports(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir := t.TempDir()
