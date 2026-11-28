@@ -644,6 +644,14 @@ target options such as `target` and `team-id`, and `on.gateway-dispatch.linear-i
 Safe-output selections accept null, `{}`, or per-operation `max`/`staged` options. Generated tools are `linear_create_issue`, `linear_update_issue`, and `linear_add_comment`. Canonical
 targets are typed UUID arguments constrained by the resource arrays, never arbitrary URLs or credentials.
 
+`gh aw fix --write` adds connector imports for legacy Linear, Jira, and supported `ado-*` safe outputs.
+It renames supported `ado-*` selections to `azure-devops-*` and converts a single
+`linear-token: ${{ secrets.NAME }}` reference to the Linear import's `writer-secret: NAME`.
+Existing imports are reused; new ADO imports leave organization and project inputs empty for review
+instead of adopting specimen defaults. The codemod does not install declarations, invent resource grants,
+or remove unsupported legacy options. Review the import's `with` grants and credential names
+before compiling; missing grants remain fail-closed.
+
 The create operation requires team, project, title, and body. The team-only creator omits the project.
 Updates replace both title and body, while sparse selectors replace one field. Explicit clearing uses
 fixed authored empty text. Titles are 20 to 128 Unicode characters, and bodies are capped at 65,000

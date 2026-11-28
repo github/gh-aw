@@ -110,6 +110,7 @@ func getLaterCodemods() []Codemod {
 		getSafeOutputDispatchRepositoryKeyCodemod(), // Rename deprecated safe-outputs.dispatch_repository key
 		getSafeOutputMissingToolCodemod(),
 		getSafeOutputMissingDataCodemod(),
+		getLegacyConnectorImportsCodemod(),
 		getSafeJobRunnerCodemod(),                         // Rename deprecated safe-outputs.jobs runner fields
 		getSafeInputsToMCPScriptsCodemod(),                // Rename safe-inputs to mcp-scripts
 		getRateLimitToUserRateLimitCodemod(),              // Rename rate-limit to user-rate-limit with max key migration
