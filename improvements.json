@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-11-27",
+  "last_updated": "2026-11-28",
   "pending_tasks": [
     {
       "file": "docs/src/content/docs/reference/serena.md",
@@ -228,6 +228,30 @@
       "created": "2026-11-27",
       "status": "pending",
       "issue": "Task 2 in the 2026-11-27 discussion. run-success (line 49) says 'has optimized your workflow' but fires on comment-only and noop runs (notify_comment_error.cjs:303-307 keys off agent conclusion). Reword to neutral finished-with-findings text. Recompile to regenerate the lock file (derived). Same root cause as the smoke-agent-public-approved, spec-librarian and cloclo entries; a shared fix belongs in notify_comment_error.cjs"
+    },
+    {
+      "file": "pkg/workflow/repository_features_validation.go",
+      "created": "2026-11-28",
+      "status": "pending",
+      "issue": "Task 1 in the 2026-11-28 discussion. Discussions-disabled warning (lines 132-136) prints only under c.verbose, so create-discussion users get no default signal. Print it unconditionally, dedupe per repo (validator runs per workflow, compiler.go:340), and change 'may not have' to 'does not have'. Header line 18 lists ClearRepositoryFeaturesCache(), which is not defined in pkg/; remove or define it. No test asserts the warning text"
+    },
+    {
+      "file": "docs/src/content/docs/guides/safe-rollout.md",
+      "created": "2026-11-28",
+      "status": "pending",
+      "issue": "Task 2 in the 2026-11-28 discussion. Rollout step 2 (line 11) lacks the staged: true example from reference/staged-mode.md; add it with a link. Split the ~90-word shadow-evaluation sentence (lines 21-23) into bullets. Promotion criteria are not stated and need maintainer input; do not invent them. Docs-only change"
+    },
+    {
+      "file": ".github/workflows/dev-hawk.md",
+      "created": "2026-11-28",
+      "status": "pending",
+      "issue": "run-success (line 41) 'Intel delivered!' fires on the no-PR abandon path (line 76), where no comment is posted. Same root cause as q.md, spec-librarian, cloclo and smoke-agent-public-approved; a shared fix belongs in notify_comment_error.cjs:303-307. Nit: run-started renders 'this event' because workflow_run is missing from EVENT_TYPE_DESCRIPTIONS (workflow_metadata_helpers.cjs:55-64). Recompile to regenerate the lock file (derived)"
+    },
+    {
+      "file": "docs/src/content/docs/blog/2026-01-13-meet-the-workflows-interactive-chatops.md",
+      "created": "2026-11-28",
+      "status": "pending",
+      "issue": "Line 85 and the install command at line 109 point to grumpy-reviewer.md, which this repo marks DEPRECATED (line 271, notice at line 305). Upstream githubnext/agentics copy unverified. Dated post: maintainer call between a note and a rewrite. The 69/88 merge stat is repeated at lines 84 and 88"
     }
   ]
 }

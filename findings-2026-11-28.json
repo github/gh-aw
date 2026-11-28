@@ -1,0 +1,54 @@
+{
+  "date": "2026-11-28",
+  "run_id": "46156006110",
+  "files_analyzed": {
+    "documentation": [
+      "docs/src/content/docs/guides/safe-rollout.md",
+      "docs/src/content/docs/blog/2026-01-13-meet-the-workflows-interactive-chatops.md"
+    ],
+    "cli": [
+      "gh aw compile"
+    ],
+    "messages": [
+      ".github/workflows/dev-hawk.md",
+      ".github/workflows/grumpy-reviewer.md"
+    ],
+    "validation": [
+      "pkg/workflow/repository_features_validation.go"
+    ]
+  },
+  "overall_quality": "needs-work",
+  "quality_highlights": [
+    "repository_features_validation.go: the issues-disabled error gives a remedy and an example (lines 154-158), and API lookup failures warn instead of blocking compile (lines 143-151)",
+    "safe-rollout.md line 15 separates staged preview from shadow evaluation in one sentence",
+    "dev-hawk.md defines run-started, run-success, run-failure and footer in frontmatter, so user-facing copy is reviewable in one place"
+  ],
+  "single_file_improvements": [
+    {
+      "file": "pkg/workflow/repository_features_validation.go",
+      "priority": "high",
+      "issue": "Discussions-disabled warning (lines 132-136) prints only when c.verbose is set, so users who configure create-discussion get no default compile-time signal. Wording 'may not have' understates an authoritative hasDiscussionsEnabled=false. validateRepositoryFeatures runs once per workflow (compiler.go:340), so an unconditional print needs per-repo dedupe. File header (line 18) lists ClearRepositoryFeaturesCache(), which is not defined in pkg/."
+    },
+    {
+      "file": "docs/src/content/docs/guides/safe-rollout.md",
+      "priority": "medium",
+      "issue": "Rollout step 2 (line 11) names staged without the staged: true syntax documented in reference/staged-mode.md (line 18-25). Lines 21-23 hold five conditions in one ~90-word sentence. Title promises 'evidence and control' but the body gives no promotion criteria."
+    },
+    {
+      "file": ".github/workflows/dev-hawk.md",
+      "priority": "medium",
+      "issue": "run-success (line 41) 'Intel delivered!' fires on agent success, including the no-PR abandon path (line 76) where no comment is posted. Same root cause as q.md; shared fix belongs in notify_comment_error.cjs:303-307. Nit: run-started renders 'this event' because workflow_run is absent from EVENT_TYPE_DESCRIPTIONS (workflow_metadata_helpers.cjs:55-64)."
+    }
+  ],
+  "tasks_proposed": [
+    "pkg/workflow/repository_features_validation.go",
+    "docs/src/content/docs/guides/safe-rollout.md"
+  ],
+  "unverified": [
+    "Promotion criteria for safe rollout: no source was found that states them, so the doc fix does not invent them",
+    "Upstream githubnext/agentics copy of grumpy-reviewer.md: deprecation was read only in this repo's copy (line 271 and line 305)",
+    "Whether the 2026-01-13 blog should be edited, since it is a dated post; a note may be preferable to a rewrite",
+    "Dedupe approach for the discussions warning is proposed, not implemented or tested"
+  ],
+  "caveats": "No repository files were edited, no tests were run, and no workflows were compiled or dispatched. Tasks are proposals in the discussion. grumpy-reviewer.md is deprecated and was not rated. No agent-directed instructions were found in the sampled content."
+}
