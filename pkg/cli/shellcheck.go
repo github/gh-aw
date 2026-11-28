@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/github/gh-aw/pkg/console"
 	"github.com/github/gh-aw/pkg/logger"
@@ -312,6 +313,7 @@ func runShellcheckOnScript(ctx context.Context, info runStepInfo, ignoreCodes []
 	// from controlled values (shell name and SC codes). The temp file path is
 	// OS-generated and not user-controlled.
 	cmd := exec.CommandContext(ctx, "shellcheck", args...)
+	cmd.WaitDelay = time.Second
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -376,9 +378,7 @@ func stepLabel(info runStepInfo) string {
 // calls do not interleave their diagnostic blocks.
 func runShellcheckOnScriptViaDocker(ctx context.Context, info runStepInfo, ignoreCodes []string, verbose bool) ([]byte, error) {
 	shellcheckLog.Printf("Running shellcheck via Docker on step %q (shell=%s)", info.Name, info.Shell)
-
 	var out bytes.Buffer
-
 	sanitizedScript := sanitizeGHAExpressions(info.Script)
 
 	args := []string{
@@ -418,6 +418,9 @@ func runShellcheckOnScriptViaDocker(ctx context.Context, info runStepInfo, ignor
 	}
 
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return out.Bytes(), fmt.Errorf("shellcheck (docker) failed: %w", ctxErr)
+		}
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 			if exitErr.ExitCode() == 1 {
@@ -471,6 +474,11 @@ func runShellcheckOnLockFilesAndResources(ctx context.Context, lockFiles []strin
 
 	useDocker, available := shellcheckDockerFallback(ctx)
 	if !available {
+		if err := ctx.Err(); err != nil {
+			err = errors.Join(append(extractionErrors, err)...)
+			reportCompileScannerResult(ctx, "shellcheck", err)
+			return err
+		}
 		err := errors.Join(append(extractionErrors, errors.New("shellcheck binary not found and Docker is unavailable; install ShellCheck or Docker to lint run steps"))...)
 		reportCompileScannerResult(ctx, "shellcheck", err)
 		if strict {

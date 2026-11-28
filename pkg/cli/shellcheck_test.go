@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -403,6 +404,83 @@ func TestRunShellcheckOnScriptNativeCancellation(t *testing.T) {
 	}
 }
 
+func TestRunShellcheckOnScriptCancellationWithInheritedPipes(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses shell script stub")
+	}
+	sleep, err := exec.LookPath("sleep")
+	require.NoError(t, err)
+	dir := t.TempDir()
+	pidFile := filepath.Join(dir, "child.pid")
+	script := fmt.Sprintf("#!/bin/sh\n%q 30 &\nprintf 'diagnostic before cancellation\\n'\necho $! > \"$SHELLCHECK_CHILD_PID\"\nwait\n", sleep)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "shellcheck"), []byte(script), 0o755))
+	t.Setenv("PATH", dir)
+	t.Setenv("SHELLCHECK_CHILD_PID", pidFile)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	var output []byte
+	var scanErr error
+	go func() {
+		output, scanErr = runShellcheckOnScript(ctx, runStepInfo{Script: "echo hello"}, nil, false)
+		close(done)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		if pidBytes, err := os.ReadFile(pidFile); err == nil {
+			if pid, err := strconv.Atoi(strings.TrimSpace(string(pidBytes))); err == nil {
+				if child, err := os.FindProcess(pid); err == nil {
+					_ = child.Kill()
+				}
+			}
+		}
+		<-done
+	})
+	require.Eventually(t, func() bool {
+		pid, err := os.ReadFile(pidFile)
+		return err == nil && len(strings.TrimSpace(string(pid))) > 0
+	}, 5*time.Second, 10*time.Millisecond)
+	cancel()
+	select {
+	case <-done:
+		require.ErrorIs(t, scanErr, context.Canceled)
+		assert.Contains(t, string(output), "diagnostic before cancellation")
+	case <-time.After(3 * time.Second):
+		t.Fatal("native ShellCheck waited for a child holding output pipes")
+	}
+}
+
+func TestShellcheckCancellationThroughPublicAndBatchRunners(t *testing.T) {
+	for _, batch := range []bool{false, true} {
+		for _, strict := range []bool{false, true} {
+			t.Run(fmt.Sprintf("batch=%t/strict=%t", batch, strict), func(t *testing.T) {
+				startedDir := stubBlockingNativeShellcheck(t)
+				ctx, cancel := context.WithCancel(context.Background())
+				resources := []workflow.ShellScriptResource{{Script: "echo hello"}}
+				done := make(chan struct{})
+				var scanErr error
+				go func() {
+					if batch {
+						_, scanErr = runBatchExternalTools(ctx, CompileConfig{Shellcheck: true, Strict: strict}, batchToolsOptions{shellcheckResources: resources}, &CompilationStats{}, &[]ValidationResult{})
+					} else {
+						scanErr = RunShellcheckOnLockFilesAndResources(ctx, nil, resources, false, strict)
+					}
+					close(done)
+				}()
+				t.Cleanup(func() { cancel(); <-done })
+				waitForNativeShellcheckStarts(t, startedDir, 1)
+				cancel()
+				select {
+				case <-done:
+					require.ErrorIs(t, scanErr, context.Canceled)
+				case <-time.After(3 * time.Second):
+					t.Fatal("ShellCheck runner did not return after cancellation")
+				}
+			})
+		}
+	}
+}
+
 func TestRunShellcheckWorkersCancellationWhileWaiting(t *testing.T) {
 	for _, strict := range []bool{false, true} {
 		t.Run(fmt.Sprintf("strict=%t", strict), func(t *testing.T) {
@@ -545,6 +623,30 @@ exit 2
 		assert.Contains(t, err.Error(), "shellcheck (docker) failed")
 		assert.Contains(t, err.Error(), "cannot connect to daemon")
 	})
+
+	t.Run("cancellation retains context error", func(t *testing.T) {
+		restore := stubDockerCommand(t, "#!/bin/sh\nexit 0\n")
+		defer restore()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := runShellcheckOnScriptViaDocker(ctx, runStepInfo{Script: "echo hello"}, nil, false)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+}
+
+func TestShellcheckDockerFallbackCancellation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses shell script stub")
+	}
+	dir := t.TempDir()
+	t.Setenv("PATH", dir)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	var reported error
+	ctx = context.WithValue(ctx, compileScannerReporterKey{}, func(_ string, err error) { reported = err })
+	err := RunShellcheckOnLockFilesAndResources(ctx, nil, []workflow.ShellScriptResource{{Script: "echo hello"}}, false, false)
+	require.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, reported, context.Canceled)
 }
 
 func TestRunShellcheckOnLockFiles_UsesDockerFallbackWhenBinaryMissing(t *testing.T) {
