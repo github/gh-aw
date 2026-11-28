@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/github/gh-aw/pkg/actionpins"
+	"github.com/github/gh-aw/pkg/testutil"
 )
 
 const specResolvedSHA = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -368,10 +369,8 @@ func TestSpec_PublicAPI_ResolveActionPin_Mappings(t *testing.T) {
 // TestSpec_PublicAPI_MappingDiagnosticsOnce checks Action Pin Mappings:
 // reusing a context emits a mapping diagnostic only once via Warnings.
 func TestSpec_PublicAPI_MappingDiagnosticsOnce(t *testing.T) {
-	t.Parallel()
 	for _, version := range []string{"v4", "v5"} {
 		t.Run(version, func(t *testing.T) {
-			t.Parallel()
 			ctx := &actionpins.PinContext{
 				Resolver: &specSHAResolver{sha: specResolvedSHA},
 				Warnings: make(map[string]bool),
@@ -380,16 +379,22 @@ func TestSpec_PublicAPI_MappingDiagnosticsOnce(t *testing.T) {
 				},
 			}
 			want := "acme-corp/checkout@" + specResolvedSHA + " # " + version
-			first, err := actionpins.ResolveActionPin("actions/checkout", version, ctx)
-			require.NoError(t, err, "the mapped action should resolve dynamically")
+			var first, again string
+			var firstErr, againErr error
+			var warnings map[string]bool
+			stderrOutput := testutil.CaptureStderr(t, func() {
+				first, firstErr = actionpins.ResolveActionPin("actions/checkout", version, ctx)
+				warnings = maps.Clone(ctx.Warnings)
+				again, againErr = actionpins.ResolveActionPin("actions/checkout", version, ctx)
+			})
+			require.NoError(t, firstErr, "the mapped action should resolve dynamically")
 			assert.Equal(t, want, first, "resolution should use the mapped repository")
 			require.NotEmpty(t, ctx.Warnings, "mapping diagnostics should populate the shared deduplication map")
-			warnings := maps.Clone(ctx.Warnings)
-
-			again, err := actionpins.ResolveActionPin("actions/checkout", version, ctx)
-			require.NoError(t, err, "repeated resolution should accept the same mapping")
+			require.NoError(t, againErr, "repeated resolution should accept the same mapping")
 			assert.Equal(t, want, again, "deduplication should preserve the resolved reference")
 			assert.Equal(t, warnings, ctx.Warnings, "the same mapping should reuse its diagnostic deduplication entries")
+			assert.Equal(t, 1, strings.Count(stderrOutput, "Action pin mapping applied:"),
+				"the mapping diagnostic should be emitted exactly once")
 		})
 	}
 }
