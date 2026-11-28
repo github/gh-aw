@@ -1,6 +1,6 @@
 // @ts-check
 // @safe-outputs-exempt USE-001 — standalone credential transport with no dependency on safe-output handlers.
-const { startBroker, runBroker, stopBroker, renewableToken, validBearer, brokerDebug } = require("./connector_credential_broker.cjs");
+const { startBroker, runBroker, stopBroker, publishAudit, renewableToken, validBearer, brokerDebug } = require("./connector_credential_broker.cjs");
 
 const hosts = { public: "login.microsoftonline.com", usgovernment: "login.microsoftonline.us", china: "login.chinacloudapi.cn" };
 const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu;
@@ -76,7 +76,7 @@ function tokenSource(env, fetchImpl = globalThis.fetch, now = Date.now, debug = 
 
 async function start(env) {
   tokenSource(env); // Validate before advertising a socket; do not mint on startup.
-  return startBroker(__filename, env, ["ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "GH_AW_AZURE_TENANT_ID", "GH_AW_AZURE_CLIENT_ID", "GH_AW_AZURE_SCOPE", "GH_AW_AZURE_AUDIENCE", "GH_AW_AZURE_CLOUD"]);
+  return startBroker(__filename, env, ["ACTIONS_ID_TOKEN_REQUEST_URL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN", "GH_AW_AZURE_TENANT_ID", "GH_AW_AZURE_CLIENT_ID", "GH_AW_AZURE_SCOPE", "GH_AW_AZURE_AUDIENCE", "GH_AW_AZURE_CLOUD"], true);
 }
 
 module.exports = { tokenSource, start };
@@ -84,6 +84,7 @@ if (require.main === module) {
   (async () => {
     if (process.argv[2] === "start") return start(process.env);
     if (process.argv[2] === "stop") return stopBroker(process.env);
+    if (process.argv[2] === "publish") return publishAudit(process.env);
     if (process.argv[2] !== "serve" || !process.send) throw failure();
     runBroker(process.argv[3], tokenSource(process.env), Number(process.argv[4]));
   })().catch(() => {

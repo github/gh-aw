@@ -6,10 +6,13 @@ const path = require("node:path");
 const { fork } = require("node:child_process");
 const { createHash } = require("node:crypto");
 const { createLogger, debugEnabled } = require("./mcp_logger.cjs");
+const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
 
 const limit = 64 * 1024;
 const timeout = 11000;
 const debugFileName = "token-broker.log";
+const auditFileName = "azure_token_broker.jsonl";
+const auditLimit = 1024 * 1024;
 const failure = () => new Error("Connector credential broker unavailable");
 const validBearer = value => typeof value === "string" && value.length > 0 && value.length <= limit && /^[A-Za-z0-9._~+/-]+=*$/u.test(value) && !/\s/u.test(value);
 const log = createLogger("connector:credential-broker");
@@ -17,6 +20,7 @@ const events = new Set([
   "broker.ready",
   "broker.request",
   "broker.request.failed",
+  "broker.audit.truncated",
   "token.cache.hit",
   "token.renew.start",
   "token.renew.join",
@@ -29,13 +33,23 @@ const events = new Set([
   "azure.exchange.failed",
 ]);
 let debugCount = 0;
+let auditCount = 0;
 
 function brokerDebugEnabled() {
   return process.env.RUNNER_DEBUG === "1" || process.env.ACTIONS_RUNNER_DEBUG === "true" || debugEnabled("connector:credential-broker");
 }
 
 function brokerDebug(event) {
-  if (process.env.GH_AW_CONNECTOR_BROKER_DEBUG !== "1" || !events.has(event) || debugCount++ >= 256) return;
+  if (!events.has(event)) return;
+  if (process.env.GH_AW_CONNECTOR_BROKER_AUDIT === "1" && auditCount <= 4096) {
+    try {
+      fs.writeSync(4, JSON.stringify({ event: auditCount === 4096 ? "broker.audit.truncated" : event, timestamp: new Date().toISOString() }) + "\n");
+    } catch {
+      // Audit failures must not expose credentials or affect their delivery.
+    }
+    auditCount++;
+  }
+  if (process.env.GH_AW_CONNECTOR_BROKER_DEBUG !== "1" || debugCount++ >= 256) return;
   try {
     fs.writeSync(3, event + "\n");
   } catch {
@@ -124,6 +138,74 @@ function jobRoot(env) {
   return fs.realpathSync(env.RUNNER_TEMP);
 }
 
+function auditRecords(content) {
+  const result = [];
+  for (const entry of iterateJsonlEvents(content)) {
+    if (entry.type !== "json" || entry.rawLine.length > 257) continue;
+    try {
+      const record = entry.value;
+      if (!record || typeof record !== "object" || !events.has(record.event) || typeof record.timestamp !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/u.test(record.timestamp)) continue;
+      const time = new Date(record.timestamp);
+      if (!Number.isFinite(time.getTime()) || time.toISOString() !== record.timestamp) continue;
+      result.push(JSON.stringify({ event: record.event, timestamp: record.timestamp }));
+    } catch {
+      // Discard malformed and untrusted records.
+    }
+  }
+  return result;
+}
+
+function readAudit(dir, env) {
+  const prefix = jobPrefix(env.RUNNER_TRACKING_ID);
+  if (typeof dir !== "string" || dir !== path.resolve(dir) || path.dirname(dir) !== jobRoot(env) || !new RegExp(`^${prefix}[a-zA-Z0-9]{6}$`, "u").test(path.basename(dir))) throw failure();
+  const stat = fs.lstatSync(dir);
+  if (!stat.isDirectory() || (stat.mode & 0o077) !== 0 || stat.uid !== process.getuid?.()) throw failure();
+  const source = path.join(dir, auditFileName);
+  const fd = fs.openSync(source, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+  try {
+    const file = fs.fstatSync(fd);
+    if (!file.isFile() || file.uid !== stat.uid || file.nlink !== 1 || (file.mode & 0o077) !== 0 || file.size > auditLimit) throw failure();
+    const buffer = Buffer.alloc(file.size);
+    const length = fs.readSync(fd, buffer, 0, buffer.length, 0);
+    return auditRecords(buffer.subarray(0, length).toString("utf8"));
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function publishAudit(env) {
+  const records = [];
+  let bytes = 0;
+  let truncated = false;
+  const marker = JSON.stringify({ event: "broker.audit.truncated", timestamp: new Date().toISOString() });
+  for (let index = 0; Object.hasOwn(env, `GH_AW_CONNECTOR_AUDIT_DIRECTORY_${index}`); index++) {
+    const dir = env[`GH_AW_CONNECTOR_AUDIT_DIRECTORY_${index}`];
+    if (!dir) continue;
+    for (const record of readAudit(dir, env)) {
+      const size = Buffer.byteLength(record) + 1;
+      if (bytes + size + Buffer.byteLength(marker) + 1 > auditLimit) {
+        truncated = true;
+        continue;
+      }
+      records.push(record);
+      bytes += size;
+    }
+  }
+  if (truncated) records.push(marker);
+  if (!records.length) return;
+  const content = records.join("\n") + "\n";
+  if (!env.GITHUB_OUTPUT) throw failure();
+  const directory = fs.mkdtempSync(path.join(jobRoot(env), jobPrefix(env.RUNNER_TRACKING_ID)));
+  const output = path.join(directory, auditFileName);
+  try {
+    fs.writeFileSync(output, content, { flag: "wx", mode: 0o600 });
+    fs.appendFileSync(env.GITHUB_OUTPUT, `path=${output}\n`);
+  } catch {
+    fs.rmSync(directory, { recursive: true, force: true });
+    throw failure();
+  }
+}
+
 // Unlink only this job's private Unix socket, never signal a PID from disk.
 // The broker watches its socket directory and exits when the endpoint is removed.
 function stopBroker(env) {
@@ -133,6 +215,11 @@ function stopBroker(env) {
   const stat = fs.lstatSync(dir, { throwIfNoEntry: false });
   if (!stat) return; // A prior stop or deadline already retired the capability.
   if (!stat.isDirectory() || (stat.mode & 0o077) !== 0 || stat.uid !== process.getuid?.()) throw failure();
+  try {
+    fs.rmSync(path.join(dir, auditFileName), { force: true });
+  } catch {
+    // Runner cleanup removes any remaining private files.
+  }
   const debugFile = path.join(dir, debugFileName);
   try {
     const fd = fs.openSync(debugFile, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
@@ -170,7 +257,7 @@ function stopBroker(env) {
   }
 }
 
-async function startBroker(moduleFile, env, keys) {
+async function startBroker(moduleFile, env, keys, audit = false) {
   const prefix = jobPrefix(env.RUNNER_TRACKING_ID);
   const minutes = env.GH_AW_CONNECTOR_BROKER_TIMEOUT_MINUTES;
   if (!env.GITHUB_OUTPUT || !/^[1-9][0-9]{0,3}$/u.test(minutes) || Number(minutes) > 7200) throw failure();
@@ -179,21 +266,27 @@ async function startBroker(moduleFile, env, keys) {
   const socketPath = path.join(dir, "token.sock");
   let child;
   let debugFD;
+  let auditFD;
   try {
     if (Buffer.byteLength(socketPath) > 103) throw failure();
     const debug = brokerDebugEnabled();
     if (debug) debugFD = fs.openSync(path.join(dir, debugFileName), "wx", 0o600);
+    if (audit) auditFD = fs.openSync(path.join(dir, auditFileName), "wx", 0o600);
     // Preserve runner job-end process tracking, but never inherit unrelated
     // secrets, Node preload flags, or step file-command handles.
     child = fork(moduleFile, ["serve", socketPath, String(deadline)], {
-      env: { ...Object.fromEntries([...keys, "RUNNER_TRACKING_ID", "NODE_EXTRA_CA_CERTS"].map(key => [key, env[key]])), ...(debug ? { GH_AW_CONNECTOR_BROKER_DEBUG: "1" } : {}) },
+      env: { ...Object.fromEntries([...keys, "RUNNER_TRACKING_ID", "NODE_EXTRA_CA_CERTS"].map(key => [key, env[key]])), ...(debug ? { GH_AW_CONNECTOR_BROKER_DEBUG: "1" } : {}), ...(audit ? { GH_AW_CONNECTOR_BROKER_AUDIT: "1" } : {}) },
       execArgv: [],
       detached: true,
-      stdio: ["ignore", "ignore", "ignore", debugFD ?? "ignore", "ipc"],
+      stdio: ["ignore", "ignore", "ignore", debugFD ?? "ignore", auditFD ?? "ignore", "ipc"],
     });
     if (debugFD !== undefined) {
       fs.closeSync(debugFD);
       debugFD = undefined;
+    }
+    if (auditFD !== undefined) {
+      fs.closeSync(auditFD);
+      auditFD = undefined;
     }
     const proc = child;
     await new Promise((resolve, reject) => {
@@ -219,10 +312,12 @@ async function startBroker(moduleFile, env, keys) {
     return proc;
   } catch {
     if (debugFD !== undefined) fs.closeSync(debugFD);
+    if (auditFD !== undefined) fs.closeSync(auditFD);
     child?.kill();
     try {
       fs.rmSync(socketPath, { force: true });
       fs.rmSync(path.join(dir, debugFileName), { force: true });
+      fs.rmSync(path.join(dir, auditFileName), { force: true });
       fs.rmdirSync(dir);
     } catch {
       /* Child cleanup may have already run. */
@@ -263,4 +358,4 @@ function runBroker(socketPath, getToken, deadline) {
   });
 }
 
-module.exports = { validBearer, renewableToken, readToken, serve, startBroker, runBroker, stopBroker, brokerDebug };
+module.exports = { validBearer, renewableToken, readToken, serve, startBroker, runBroker, stopBroker, publishAudit, brokerDebug };

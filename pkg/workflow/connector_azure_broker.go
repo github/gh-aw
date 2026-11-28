@@ -82,6 +82,7 @@ func (c *Compiler) connectorAzureBrokerSteps(data *WorkflowData, phase string, t
 			if teardown {
 				directory := connectorAzureDirectory(secret)
 				steps = append(steps, fmt.Sprintf("      - name: Stop connector Azure OIDC broker %s/%s\n", alias, name),
+					"        id: "+connectorAppStepID(secret)+"_stop\n",
 					"        if: ${{ always() && "+directory+" != '' }}\n",
 					"        env:\n", formatYAMLEnv("          ", "GH_AW_CONNECTOR_BROKER_DIRECTORY", "${{ "+directory+" }}"),
 					"        run: node \"$RUNNER_TEMP/gh-aw/actions/connector_azure_oidc.cjs\" stop\n")
@@ -114,6 +115,60 @@ func (c *Compiler) connectorAzureBrokerSteps(data *WorkflowData, phase string, t
 		}
 	}
 	return steps
+}
+
+func (c *Compiler) connectorAzureBrokerAuditSteps(data *WorkflowData, phase string) ([]string, []string) {
+	var started, clean, directories []string
+	for _, alias := range sliceutil.SortedKeys(data.Connectors) {
+		config := data.Connectors[alias]
+		plan := config.Agent
+		if phase == "safe-output" {
+			plan = config.SafeOutputs
+		}
+		if plan == nil {
+			continue
+		}
+		for _, name := range sliceutil.SortedKeys(config.AzureOIDC) {
+			secret := connectorAppSecret(alias, name)
+			if !slices.Contains(plan.Secrets(), secret) {
+				continue
+			}
+			if _, _, enabled := connectorCredentialMintCondition(c, data, config, secret, phase); !enabled {
+				continue
+			}
+			step := "steps." + connectorAppStepID(secret)
+			started = append(started, step+".outcome == 'success'")
+			clean = append(clean, "("+step+".outcome == 'skipped' || ("+step+".outcome == 'success' && "+step+"_stop.outcome == 'success'))")
+			directories = append(directories, connectorAzureDirectory(secret))
+		}
+	}
+	if len(started) == 0 {
+		return nil, nil
+	}
+	publish := []string{
+		"      - name: Publish sanitized Azure token broker evidence\n",
+		"        id: publish_azure_broker_audit\n",
+		"        if: always()\n",
+		"        continue-on-error: true\n",
+		"        env:\n",
+	}
+	for i, directory := range directories {
+		publish = append(publish, formatYAMLEnv("          ", fmt.Sprintf("GH_AW_CONNECTOR_AUDIT_DIRECTORY_%d", i), "${{ "+directory+" }}"))
+	}
+	publish = append(publish,
+		"        run: node \"$RUNNER_TEMP/gh-aw/actions/connector_azure_oidc.cjs\" publish\n",
+	)
+	upload := []string{
+		"      - name: Upload Azure token broker " + phase + " evidence\n",
+		"        if: ${{ always() && steps.publish_azure_broker_audit.outcome == 'success' && steps.publish_azure_broker_audit.outputs.path != '' && (" + strings.Join(started, " || ") + ") && " + strings.Join(clean, " && ") + " }}\n",
+		"        continue-on-error: true\n",
+		"        uses: " + c.getActionPin("actions/upload-artifact") + "\n",
+		"        with:\n",
+		"          name: " + artifactPrefixExprForDownstreamJob(data) + "azure-token-broker-" + phase + "\n",
+		"          path: ${{ steps.publish_azure_broker_audit.outputs.path }}\n",
+		"          if-no-files-found: ignore\n",
+	}
+	return publish, upload
 }
 
 func (c *Compiler) validateConnectorAzureBoundary(data *WorkflowData) error {

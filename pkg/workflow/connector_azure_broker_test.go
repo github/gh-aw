@@ -4,11 +4,13 @@ package workflow
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -120,6 +122,178 @@ func TestConnectorAzureBrokerPhaseIsolation(t *testing.T) {
 	}
 }
 
+func TestConnectorAzureBrokerEvidenceArtifacts(t *testing.T) {
+	const read = "tools:\n  tracker: [get-issue]\n"
+	const write = "safe-outputs:\n  environment: connector-publish\n  tracker-add-comment:\n"
+	for _, tc := range []struct {
+		name, selection string
+		reader, writer  bool
+	}{
+		{"import-only", "", false, false},
+		{"reader", read, true, false},
+		{"writer", write, false, true},
+		{"both", read + write, true, true},
+		{"staged", read + "safe-outputs:\n  tracker-add-comment:\n    staged: true\n", true, false},
+		{"conditional", "safe-outputs:\n  environment: connector-publish\n  tracker-add-comment:\n    staged: ${{ inputs.stage }}\n", false, true},
+	} {
+		for _, workflowCall := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/call=%t", tc.name, workflowCall), func(t *testing.T) {
+				c, root := awConnectorCompiler(t)
+				header := awConnectorHeader
+				prefix := ""
+				if workflowCall {
+					header = strings.Replace(header, "on: workflow_dispatch\n", "on: workflow_call\n", 1)
+					prefix = "${{ needs.activation.outputs.artifact_prefix }}"
+				}
+				source := connectorAzureSource(t)
+				require.NoError(t, os.WriteFile(filepath.Join(root, "connector.md"), []byte("---\n"+source+"---\n"), 0600))
+				data, err := c.ParseWorkflowString(header+"imports: [connector.md]\n"+tc.selection+"---\nReview.\n", root+"/proof.md")
+				require.NoError(t, err)
+				output, err := c.CompileToYAML(data, root+"/proof.md")
+				require.NoError(t, err)
+				var workflow struct {
+					Jobs map[string]struct {
+						Permissions map[string]string
+						Steps       []map[string]any
+					}
+				}
+				require.NoError(t, yaml.Unmarshal([]byte(output), &workflow))
+				conclusion := workflow.Jobs["conclusion"]
+				require.Equal(t, "read", conclusion.Permissions["actions"])
+				for _, phase := range []struct {
+					name, job string
+					selected  bool
+				}{{"agent", "agent", tc.reader}, {"safe-output", "safe_outputs", tc.writer}} {
+					job := workflow.Jobs[phase.job]
+					uploadName := "Upload Azure token broker " + phase.name + " evidence"
+					downloadName := "Download Azure token broker " + phase.name + " evidence"
+					upload, stop, publish, clear, download, generation, manifest := -1, -1, -1, -1, -1, -1, -1
+					for i, step := range job.Steps {
+						name, _ := step["name"].(string)
+						if strings.HasPrefix(name, "Stop connector Azure OIDC broker ") {
+							stop = i
+							env := step["env"].(map[string]any)
+							require.NotContains(t, env, "GH_AW_CONNECTOR_AUDIT_OUTPUT")
+						}
+						if name == "Publish sanitized Azure token broker evidence" {
+							publish = i
+							require.Equal(t, "publish_azure_broker_audit", step["id"])
+							require.Equal(t, "always()", step["if"])
+							require.Equal(t, true, step["continue-on-error"])
+							credential := "reader"
+							if phase.name == "safe-output" {
+								credential = "writer"
+							}
+							require.Equal(t, "${{ "+connectorAzureDirectory(connectorAppSecret("tracker", credential))+" }}", step["env"].(map[string]any)["GH_AW_CONNECTOR_AUDIT_DIRECTORY_0"])
+							require.Equal(t, "node \"$RUNNER_TEMP/gh-aw/actions/connector_azure_oidc.cjs\" publish", step["run"])
+						}
+						if name == uploadName {
+							upload = i
+							condition := step["if"].(string)
+							require.Contains(t, condition, "always() && steps.publish_azure_broker_audit.outcome == 'success' && steps.publish_azure_broker_audit.outputs.path != ''")
+							credential := "reader"
+							if phase.name == "safe-output" {
+								credential = "writer"
+							}
+							broker := "steps." + connectorAppStepID(connectorAppSecret("tracker", credential))
+							require.Contains(t, condition, broker+".outcome == 'success'")
+							require.Contains(t, condition, broker+".outcome == 'skipped'")
+							require.Contains(t, condition, broker+"_stop.outcome == 'success'")
+							require.Equal(t, true, step["continue-on-error"])
+							require.Equal(t, strings.Split(c.getActionPin("actions/upload-artifact"), " #")[0], step["uses"])
+							with := step["with"].(map[string]any)
+							require.Equal(t, prefix+"azure-token-broker-"+phase.name, with["name"])
+							require.Equal(t, "${{ steps.publish_azure_broker_audit.outputs.path }}", with["path"])
+							require.Equal(t, "ignore", with["if-no-files-found"])
+						}
+					}
+					for i, step := range conclusion.Steps {
+						switch step["name"] {
+						case "Download Safe Outputs Items Manifest":
+							manifest = i
+						case "Clear Azure token broker evidence directory":
+							clear = i
+							require.Equal(t, "clear_azure_broker_evidence", step["id"])
+							require.Equal(t, "always()", step["if"])
+							require.Contains(t, step["run"], "rm -rf -- /tmp/gh-aw/azure-broker")
+							require.Contains(t, step["run"], "test ! -L /tmp/gh-aw")
+						case downloadName:
+							download = i
+							require.Equal(t, "always() && steps.clear_azure_broker_evidence.outcome == 'success'", step["if"])
+							require.Equal(t, true, step["continue-on-error"])
+							require.Equal(t, strings.Split(c.getActionPin("actions/download-artifact"), " #")[0], step["uses"])
+							with := step["with"].(map[string]any)
+							require.Equal(t, prefix+"azure-token-broker-"+phase.name, with["name"])
+							require.Equal(t, "/tmp/gh-aw/azure-broker/"+phase.name, with["path"])
+						case "Generate usage activity summary and unified session":
+							generation = i
+							require.Equal(t, "always() && steps.clear_azure_broker_evidence.outcome == 'success'", step["if"])
+						}
+					}
+					require.NotEqual(t, -1, generation)
+					require.GreaterOrEqual(t, clear, 0)
+					require.GreaterOrEqual(t, manifest, 0)
+					require.Less(t, manifest, clear)
+					require.Less(t, clear, generation)
+					if phase.selected {
+						require.NotEqual(t, -1, stop)
+						require.Less(t, publish, stop)
+						require.Greater(t, upload, stop)
+						require.Equal(t, len(job.Steps)-1, upload)
+						require.GreaterOrEqual(t, download, 0)
+						require.Less(t, clear, download)
+						require.Less(t, download, generation)
+					} else {
+						require.Equal(t, -1, stop)
+						require.Equal(t, -1, publish)
+						require.Equal(t, -1, upload)
+						require.Equal(t, -1, download)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestConnectorAzureBrokerClearUntrustedEvidence(t *testing.T) {
+	c, root := awConnectorCompiler(t)
+	data, err := c.ParseWorkflowString(awConnectorHeader+connectorAzureSource(t)+"---\nReview.\n", root+"/proof.md")
+	require.NoError(t, err)
+	output, err := c.CompileToYAML(data, root+"/proof.md")
+	require.NoError(t, err)
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []map[string]any
+		}
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(output), &workflow))
+	var clear string
+	for _, step := range workflow.Jobs["conclusion"].Steps {
+		if step["name"] == "Clear Azure token broker evidence directory" {
+			require.Equal(t, "bash", step["shell"])
+			clear = step["run"].(string)
+		}
+	}
+	require.NotEmpty(t, clear)
+	workspace := t.TempDir()
+	target := filepath.Join(workspace, "gh-aw")
+	require.NoError(t, os.MkdirAll(filepath.Join(target, "azure-broker", "agent"), 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(target, "azure-broker", "agent", "azure_token_broker.jsonl"), []byte("spoof"), 0600))
+	run := strings.ReplaceAll(clear, "/tmp/gh-aw", strconv.Quote(target))
+	require.NoError(t, exec.Command("bash", "-e", "-o", "pipefail", "-c", run).Run())
+	_, err = os.Lstat(filepath.Join(target, "azure-broker"))
+	require.True(t, os.IsNotExist(err))
+
+	require.NoError(t, os.Symlink(workspace, filepath.Join(target, "azure-broker")))
+	require.NoError(t, exec.Command("bash", "-e", "-o", "pipefail", "-c", run).Run())
+	_, err = os.Lstat(filepath.Join(target, "azure-broker"))
+	require.True(t, os.IsNotExist(err))
+
+	require.NoError(t, os.Remove(target))
+	require.NoError(t, os.Symlink(workspace, target))
+	require.Error(t, exec.Command("bash", "-e", "-o", "pipefail", "-c", run).Run())
+}
+
 func TestConnectorAzureReaderPrivateSocketConfig(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("private connector sockets require Linux")
@@ -223,6 +397,40 @@ func TestConnectorAzureReaderMultiplePrivateSockets(t *testing.T) {
 	for i, alias := range []string{"other", "tracker"} {
 		require.Contains(t, output, strings.TrimSpace(formatYAMLEnv("", connectorAzurePrivateDirEnv(i), "${{ "+connectorAzureDirectory(connectorAppSecret(alias, "reader"))+" }}")))
 		require.Contains(t, output, "--exclude-env "+connectorAzurePrivateDirEnv(i))
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []map[string]any
+		}
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(output), &workflow))
+	steps := workflow.Jobs["agent"].Steps
+	stops, uploads := 0, 0
+	for i, step := range steps {
+		name, _ := step["name"].(string)
+		if strings.HasPrefix(name, "Stop connector Azure OIDC broker ") {
+			stops++
+			require.Less(t, i, len(steps)-1)
+			require.NotContains(t, step["env"].(map[string]any), "GH_AW_CONNECTOR_AUDIT_OUTPUT")
+		}
+		if name == "Upload Azure token broker agent evidence" {
+			uploads++
+		}
+	}
+	require.Equal(t, 2, stops)
+	publish := steps[len(steps)-4]
+	require.Equal(t, "Publish sanitized Azure token broker evidence", publish["name"])
+	for i, alias := range []string{"other", "tracker"} {
+		require.Equal(t, "${{ "+connectorAzureDirectory(connectorAppSecret(alias, "reader"))+" }}", publish["env"].(map[string]any)[fmt.Sprintf("GH_AW_CONNECTOR_AUDIT_DIRECTORY_%d", i)])
+	}
+	require.Equal(t, "Upload Azure token broker agent evidence", steps[len(steps)-1]["name"])
+	require.Equal(t, 1, uploads)
+	condition := steps[len(steps)-1]["if"].(string)
+	for _, alias := range []string{"other", "tracker"} {
+		broker := "steps." + connectorAppStepID(connectorAppSecret(alias, "reader"))
+		require.Contains(t, condition, broker+".outcome == 'success'")
+		require.Contains(t, condition, broker+".outcome == 'skipped'")
+		require.Contains(t, condition, broker+"_stop.outcome == 'success'")
 	}
 }
 

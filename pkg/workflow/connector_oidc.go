@@ -119,7 +119,10 @@ func (c *Compiler) ensureConnectorOIDCJobPermissions(data *WorkflowData) {
 			continue
 		}
 		cleanup := c.connectorAzureBrokerSteps(data, phase, true)
+		publish, upload := c.connectorAzureBrokerAuditSteps(data, phase)
+		job.Steps = append(job.Steps, publish...)
 		job.Steps = append(job.Steps, cleanup...)
+		job.Steps = append(job.Steps, upload...)
 		if (phase != "agent" || !usesConnectorInferenceOIDC(data)) &&
 			len(c.connectorOIDCSteps(data, phase))+len(cleanup) == 0 {
 			continue

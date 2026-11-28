@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { tokenSource, start } from "./connector_azure_oidc.cjs";
-import { startBroker, stopBroker, readToken } from "./connector_credential_broker.cjs";
+import { startBroker, stopBroker, publishAudit, readToken } from "./connector_credential_broker.cjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import os from "node:os";
@@ -96,6 +96,93 @@ describe("trusted connector Entra exchange", () => {
       "azure.exchange.failed",
       "token.renew.failed",
     ]);
+  });
+
+  it.skipIf(process.platform === "win32")("collects timestamped broker activity without serializing untrusted data", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "broker-test-"));
+    const output = path.join(root, "output");
+    const fixture = path.join(root, "fixture.cjs");
+    const broker = path.resolve("connector_credential_broker.cjs");
+    fs.writeFileSync(fixture, `const b = require(${JSON.stringify(broker)}); b.runBroker(process.argv[3], b.renewableToken(async () => ({ value: "private-token", expiresAt: Date.now() + 60000 })), Number(process.argv[4]));`);
+    const job = { RUNNER_TEMP: root, GITHUB_OUTPUT: output, RUNNER_TRACKING_ID: "private-job-id", GH_AW_CONNECTOR_BROKER_TIMEOUT_MINUTES: "30" };
+    let child;
+    try {
+      child = await startBroker(fixture, job, [], true);
+      const directory = fs.readFileSync(output, "utf8").match(/^directory=(.+)\n$/u)[1];
+      expect(await readToken(path.join(directory, "token.sock"))).toBe("private-token");
+      expect(await readToken(path.join(directory, "token.sock"))).toBe("private-token");
+      fs.appendFileSync(
+        path.join(directory, "azure_token_broker.jsonl"),
+        JSON.stringify({ event: "azure.exchange.success", timestamp: "2026-01-01T00:00:00.000Z", secret: "private-field" }) + "\n" + JSON.stringify({ event: "private-user-string", timestamp: "2026-01-01T00:00:00.000Z" }) + "\n"
+      );
+      publishAudit({ ...job, GH_AW_CONNECTOR_AUDIT_DIRECTORY_0: directory });
+      const auditOutput = fs.readFileSync(output, "utf8").match(/^path=(.+)$/mu)[1];
+      const exited = once(child, "exit");
+      stopBroker({ ...job, GH_AW_CONNECTOR_BROKER_DIRECTORY: directory });
+      await exited;
+      child = undefined;
+      const serialized = fs.readFileSync(auditOutput, "utf8");
+      const records = serialized
+        .trim()
+        .split("\n")
+        .map(line => JSON.parse(line));
+      expect(records.map(record => record.event)).toEqual(expect.arrayContaining(["broker.ready", "broker.request", "token.renew.start", "token.renew.success", "token.cache.hit"]));
+      for (const record of records) {
+        expect(Object.keys(record).sort()).toEqual(["event", "timestamp"]);
+        expect(new Date(record.timestamp).toISOString()).toBe(record.timestamp);
+      }
+      for (const value of ["private-token", "private-field", "private-user-string", job.RUNNER_TRACKING_ID, directory]) expect(serialized).not.toContain(value);
+    } finally {
+      if (child) {
+        const exited = once(child, "exit");
+        child.kill();
+        await exited;
+      }
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(process.platform === "win32")("does not publish unselected or unsafe broker directories", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "broker-test-"));
+    const output = path.join(root, "output");
+    const job = { RUNNER_TEMP: root, GITHUB_OUTPUT: output, RUNNER_TRACKING_ID: "job-a" };
+    try {
+      publishAudit({ ...job, GH_AW_CONNECTOR_AUDIT_DIRECTORY_0: "" });
+      expect(fs.existsSync(output)).toBe(false);
+      expect(() => publishAudit({ ...job, GH_AW_CONNECTOR_AUDIT_DIRECTORY_0: root })).toThrow("unavailable");
+      expect(fs.existsSync(output)).toBe(false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(process.platform === "win32")("bounds multiple broker logs and rejects symlinked audit files", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "broker-test-"));
+    const output = path.join(root, "output");
+    const tracking = "job-a";
+    const job = { RUNNER_TEMP: root, GITHUB_OUTPUT: output, RUNNER_TRACKING_ID: tracking };
+    const prefix = "aw-" + createHash("sha256").update(tracking).digest("hex").slice(0, 16) + "-";
+    const record = JSON.stringify({ event: "azure.exchange.success", timestamp: "2026-01-01T00:00:00.000Z" }) + "\n";
+    try {
+      const directories = Array.from({ length: 5 }, () => {
+        const directory = fs.mkdtempSync(path.join(root, prefix));
+        fs.writeFileSync(path.join(directory, "azure_token_broker.jsonl"), record.repeat(4096), { mode: 0o600 });
+        return directory;
+      });
+      const inputs = Object.fromEntries(directories.map((directory, i) => [`GH_AW_CONNECTOR_AUDIT_DIRECTORY_${i}`, directory]));
+      publishAudit({ ...job, ...inputs });
+      const auditOutput = fs.readFileSync(output, "utf8").match(/^path=(.+)$/mu)[1];
+      const published = fs.readFileSync(auditOutput, "utf8");
+      expect(Buffer.byteLength(published)).toBeLessThanOrEqual(1024 * 1024);
+      expect(published).toContain('"event":"broker.audit.truncated"');
+      fs.unlinkSync(output);
+      fs.unlinkSync(path.join(directories[0], "azure_token_broker.jsonl"));
+      fs.symlinkSync(path.join(directories[1], "azure_token_broker.jsonl"), path.join(directories[0], "azure_token_broker.jsonl"));
+      expect(() => publishAudit({ ...job, ...inputs })).toThrow();
+      expect(fs.existsSync(output)).toBe(false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it.skipIf(process.platform === "win32").each([
@@ -250,7 +337,8 @@ describe("trusted connector Entra exchange", () => {
       const directory = fs.readFileSync(output, "utf8").match(/^directory=(.+)\n$/u)[1];
       expect(path.dirname(directory)).toBe(root);
       expect(fs.statSync(directory).mode & 0o077).toBe(0);
-      expect(fs.readdirSync(directory)).toEqual(["token.sock"]);
+      expect(fs.readdirSync(directory).sort()).toEqual(["azure_token_broker.jsonl", "token.sock"]);
+      expect(fs.readFileSync(path.join(directory, "azure_token_broker.jsonl"), "utf8")).not.toContain(env.ACTIONS_ID_TOKEN_REQUEST_TOKEN);
       const socket = fs.lstatSync(path.join(directory, "token.sock"));
       expect(socket.isSocket()).toBe(true);
       expect(socket.mode & 0o077).toBe(0);
