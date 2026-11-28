@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -112,6 +113,9 @@ func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, opts RunO
 		opts.onDispatch(runResult.runInfo)
 	}
 	handleWorkflowRunInfo(runResult.runInfo, runResult.runInfoErr, opts)
+	if opts.JSON && opts.RepeatCount > 0 && runResult.runInfo == nil {
+		return errors.New("workflow was dispatched, but its identity is unknown; cannot safely repeat without waiting for it")
+	}
 	return waitForWorkflowRunCompletion(ctx, opts, runResult.runInfo, runResult.runInfoErr, workflowStartTime, ref)
 }
 
@@ -420,7 +424,7 @@ func executeWorkflowRun(ctx context.Context, lockFileName string, args []string,
 		}
 		return nil, formatWorkflowRunError(err, stderr)
 	}
-	output := strings.TrimSpace(string(stdout))
+	output := string(bytes.TrimSpace(stdout))
 	if output != "" {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(output))
 	}
@@ -628,7 +632,7 @@ func wrapRunWithJSONOutput(inner func(RunOptions) error, workflowNames []string,
 			results = append(results, WorkflowRunResult{Workflow: normalizedID, LockFile: normalizedID + ".lock.yml", Status: status, RunIdentity: "unknown"})
 		}
 		opts.onResult = func(index int, info *WorkflowRunInfo) {
-			if info != nil {
+			if info != nil && index >= 0 && index < len(results) {
 				results[index].RunIdentity = "known"
 				results[index].RunID = info.DatabaseID
 				results[index].RunURL = info.URL
@@ -670,13 +674,31 @@ func RunWorkflowsOnGitHub(ctx context.Context, workflowNames []string, opts RunO
 			return executeAllWorkflowsOnce(ctx, workflowNames, runOpts)
 		}, workflowNames, opts)
 	}
-	return ExecuteWithRepeat(RepeatOptions{
-		Ctx:           ctx,
+	repeatCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var repeatErr error
+	if opts.JSON {
+		runOnce := runAllWorkflows
+		runAllWorkflows = func() error {
+			err := runOnce()
+			if err != nil {
+				repeatErr = err
+				cancel()
+			}
+			return err
+		}
+	}
+	err := ExecuteWithRepeat(RepeatOptions{
+		Ctx:           repeatCtx,
 		RepeatCount:   opts.RepeatCount,
 		RepeatMessage: "Repeating workflow run",
 		ExecuteFunc:   runAllWorkflows,
 		UseStderr:     opts.JSON,
 	})
+	if repeatErr != nil {
+		return repeatErr
+	}
+	return err
 }
 
 // runInfoURLRegexp matches GitHub Actions run URLs of the form:

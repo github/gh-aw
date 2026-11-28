@@ -50,18 +50,21 @@ esac
 		workflows  []string
 		dryRun     bool
 		wait       bool
+		repeat     int
 		wantErr    bool
 		identities []string
 		statuses   []string
 	}{
-		{"known and unknown", []string{"known", "unknown"}, false, false, false, []string{"known", "unknown"}, []string{"triggered", "triggered"}},
-		{"unavailable identity with wait", []string{"unknown"}, false, true, false, []string{"unknown"}, []string{"triggered"}},
-		{"error after dispatch", []string{"known", "fail"}, false, false, true, []string{"known", "unknown"}, []string{"error", "error"}},
-		{"dispatch error", []string{"fail"}, false, false, true, []string{"unknown"}, []string{"error"}},
-		{"dry run", []string{"known"}, true, false, false, []string{"unknown"}, []string{"dry_run"}},
+		{"known and unknown", []string{"known", "unknown"}, false, false, 0, false, []string{"known", "unknown"}, []string{"triggered", "triggered"}},
+		{"unavailable identity with wait", []string{"unknown"}, false, true, 0, false, []string{"unknown"}, []string{"triggered"}},
+		{"unknown identity stops repeat", []string{"unknown"}, false, false, 2, true, []string{"unknown"}, []string{"error"}},
+		{"error after dispatch", []string{"known", "fail"}, false, false, 0, true, []string{"known", "unknown"}, []string{"error", "error"}},
+		{"dispatch error", []string{"fail"}, false, false, 0, true, []string{"unknown"}, []string{"error"}},
+		{"dry run", []string{"known"}, true, false, 0, false, []string{"unknown"}, []string{"dry_run"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require.NoError(t, os.WriteFile(logPath, nil, 0o600))
 			read, write, err := os.Pipe()
 			require.NoError(t, err)
 			oldStdout := os.Stdout
@@ -69,6 +72,7 @@ esac
 			runErr := RunWorkflowsOnGitHub(context.Background(), tt.workflows, RunOptions{
 				WorkflowRunFlags:  WorkflowRunFlags{RepoOverride: "owner/repo", DryRun: tt.dryRun},
 				WaitForCompletion: tt.wait,
+				RepeatCount:       tt.repeat,
 				JSON:              true,
 			})
 			os.Stdout = oldStdout
@@ -98,12 +102,15 @@ esac
 					assert.Contains(t, result.Error, "failed to run workflow")
 				}
 			}
+			calls, err := os.ReadFile(logPath)
+			require.NoError(t, err)
+			assert.NotContains(t, string(calls), "run list")
+			assert.NotContains(t, string(calls), "/runs")
+			if tt.repeat > 0 {
+				assert.Equal(t, 1, strings.Count(string(calls), "workflow run"))
+			}
 		})
 	}
-	calls, err := os.ReadFile(logPath)
-	require.NoError(t, err)
-	assert.NotContains(t, string(calls), "run list")
-	assert.NotContains(t, string(calls), "/runs")
 }
 
 func TestRunJSONConcurrentDispatches(t *testing.T) {
@@ -122,15 +129,13 @@ done
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	var wg sync.WaitGroup
 	for _, id := range []string{"101", "202"} {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			result, err := executeWorkflowRun(context.Background(), "test.lock.yml", []string{"workflow", "run", "test.lock.yml", "-f", "identity=" + id}, RunOptions{JSON: true})
 			if assert.NoError(t, err) && assert.NotNil(t, result.runInfo) {
 				assert.Equal(t, "https://github.com/owner/repo/actions/runs/"+id, result.runInfo.URL)
 				assert.Equal(t, id, strconv.FormatInt(result.runInfo.DatabaseID, 10))
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }
