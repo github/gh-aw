@@ -3,12 +3,14 @@
 package workflow
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/github/gh-aw/pkg/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.yaml.in/yaml/v3"
@@ -92,18 +94,18 @@ func TestParallelExperimentsCompiledFixture(t *testing.T) {
 
 func TestParallelExperimentsAppendPreservesProductionBytes(t *testing.T) {
 	compiler, data, file := parallelExperimentFixture(t)
-	configuration := data.RawFrontmatter["parallel-experiments"]
-	data.RawFrontmatter["parallel-experiments"] = false
+	experiments := data.RawFrontmatter["experiments"].(map[string]any)
+	experiments["parallel"] = false
 	production, _, _, err := compiler.generateYAML(data, file)
 	require.NoError(t, err)
 	disabled, err := compiler.appendParallelExperiments(production, data)
 	require.NoError(t, err)
 	require.Equal(t, production, disabled)
-	delete(data.RawFrontmatter, "parallel-experiments")
+	delete(experiments, "parallel")
 	absent, err := compiler.appendParallelExperiments(production, data)
 	require.NoError(t, err)
 	require.Equal(t, production, absent)
-	data.RawFrontmatter["parallel-experiments"] = configuration
+	experiments["parallel"] = true
 	var before, after strings.Builder
 	compiler.jobManager.WriteJobsYAML(&before)
 	enabled, err := compiler.appendParallelExperiments(production, data)
@@ -121,30 +123,37 @@ func TestParallelExperimentsAdmissionAndValidation(t *testing.T) {
 		config map[string]any
 		error  string
 	}{
-		{"empty", map[string]any{"include": []any{}}, "between 1 and 16"},
-		{"unknown", map[string]any{"include": []any{}, "unknown-control": 2}, "unknown field"},
+		{"unknown", map[string]any{"unknown-control": 2}, "unknown field"},
 		{"unbounded", map[string]any{"max-ai-credits": -1}, "integer from 1"},
 		{"fractional", map[string]any{"timeout-minutes": 0.5}, "cannot unmarshal"},
-		{"unknown variant", map[string]any{"include": []any{map[string]any{"experiment": "model", "variant": "absent"}}}, "must belong"},
-		{"unknown engine", map[string]any{"include": []any{map[string]any{"experiment": "model", "variant": "gpt-5", "engine": "custom"}}}, "only the sandboxed copilot"},
-		{"harness", map[string]any{"include": []any{map[string]any{"experiment": "model", "variant": "gpt-5", "harness": "evil.cjs"}}}, "harness must"},
-		{"expression model", map[string]any{"include": []any{map[string]any{"experiment": "model", "variant": "gpt-5", "model": "${{ secrets.KEY }}"}}}, "literal model"},
+		{"include not supported", map[string]any{"include": []any{}}, "unknown field"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, data, _ := parallelExperimentFixture(t)
-			data.RawFrontmatter["parallel-experiments"] = tc.config
+			data.RawFrontmatter["experiments"].(map[string]any)["parallel-options"] = tc.config
 			_, err := parseParallelExperiments(data)
 			require.ErrorContains(t, err, tc.error)
 		})
 	}
 	_, data, _ := parallelExperimentFixture(t)
-	config := data.RawFrontmatter["parallel-experiments"].(map[string]any)
+	config := map[string]any{}
+	data.RawFrontmatter["experiments"].(map[string]any)["parallel-options"] = config
 	config["max-total-ai-credits"] = 150
 	parsed, err := parseParallelExperiments(data)
 	require.NoError(t, err)
 	assert.True(t, parsed.Include[0].Admitted)
 	assert.False(t, parsed.Include[1].Admitted)
 	assert.Equal(t, "admission-limit", parsed.Include[1].SkipReason)
+	assert.Equal(t, []string{"model", "model", "prompt", "prompt"}, []string{
+		parsed.Include[0].Experiment, parsed.Include[1].Experiment,
+		parsed.Include[2].Experiment, parsed.Include[3].Experiment,
+	})
+	data.Experiments = nil
+	_, err = parseParallelExperiments(data)
+	require.ErrorContains(t, err, "between 1 and 16")
+	data.Experiments = map[string][]string{"many": make([]string, 17)}
+	_, err = parseParallelExperiments(data)
+	require.ErrorContains(t, err, "between 1 and 16")
 }
 
 func TestParallelExperimentsIsolationRejectsUnsupported(t *testing.T) {
@@ -209,13 +218,8 @@ permissions:
   issues: read
   pull-requests: read
 experiments:
+  parallel: true
   style: [concise, detailed]
-parallel-experiments:
-  include:
-    - experiment: style
-      variant: concise
-    - experiment: style
-      variant: detailed
 ---
 {{#if experiments.style == 'concise'}}
 Summarize this repository concisely.
@@ -230,6 +234,55 @@ Summarize this repository in detail.
 	require.NoError(t, err)
 	_, err = compiler.CompileToYAML(data, file)
 	require.NoError(t, err)
+}
+
+func TestParallelExperimentsExperimentalWarning(t *testing.T) {
+	compiler, data, _ := parallelExperimentFixture(t)
+	var output bytes.Buffer
+	compiler.emitExperimentalFeatureWarningsTo(data, &output)
+	assert.Contains(t, output.String(), "Using experimental feature: parallel experiments")
+	data.RawFrontmatter["experiments"].(map[string]any)["parallel"] = false
+	output.Reset()
+	compiler.emitExperimentalFeatureWarningsTo(data, &output)
+	assert.NotContains(t, output.String(), "Using experimental feature: parallel experiments")
+}
+
+func TestParallelExperimentNamedParallel(t *testing.T) {
+	source := `---
+on: workflow_dispatch
+experiments:
+  parallel: [first, second]
+---
+Hello.
+`
+	file := filepath.Join(t.TempDir(), "named-parallel.md")
+	compiler := NewCompiler(WithVersion("v1.0.0"), WithNoEmit(true))
+	data, err := compiler.ParseWorkflowString(source, file)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"first", "second"}, data.Experiments["parallel"])
+	config, err := parseParallelExperiments(data)
+	require.NoError(t, err)
+	assert.Nil(t, config)
+}
+
+func TestParallelExperimentsSchema(t *testing.T) {
+	for _, parallel := range []any{true, false, []any{"first", "second"}, map[string]any{"variants": []any{"first", "second"}}} {
+		frontmatter := map[string]any{
+			"on":          "workflow_dispatch",
+			"experiments": map[string]any{"parallel": parallel, "style": []any{"a", "b"}, "parallel-options": map[string]any{"max-jobs": 2}},
+		}
+		require.NoError(t, parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "workflow.md"))
+	}
+	for _, options := range []any{map[string]any{"include": []any{}}, map[string]any{"max-jobs": 0}, true} {
+		frontmatter := map[string]any{
+			"on":          "workflow_dispatch",
+			"experiments": map[string]any{"parallel": true, "style": []any{"a", "b"}, "parallel-options": options},
+		}
+		require.Error(t, parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(frontmatter, "workflow.md"))
+	}
+	require.Error(t, parser.ValidateMainWorkflowFrontmatterWithSchemaAndLocation(map[string]any{
+		"on": "workflow_dispatch", "parallel-experiments": false,
+	}, "workflow.md"))
 }
 
 func TestParallelExperimentsRejectsNetworkInput(t *testing.T) {

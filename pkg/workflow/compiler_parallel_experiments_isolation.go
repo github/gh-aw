@@ -12,7 +12,7 @@ import (
 func (c *Compiler) validateParallelExperimentIsolation(data *WorkflowData) error { //nolint:largefunc // Keep the complete fail-closed capability boundary in one reviewable allowlist.
 	allowed := []string{
 		"name", "description", "on", "permissions", "network", "engine", "experiments",
-		"parallel-experiments", "safe-outputs", "timeout-minutes", "max-ai-credits",
+		"safe-outputs", "timeout-minutes", "max-ai-credits",
 		"max-daily-ai-credits", "strict", "tools", "if", "observability", "model-routing",
 	}
 	for field := range data.RawFrontmatter {

@@ -12,22 +12,12 @@ tools:
   github: false
 experiments:
   storage: cache
+  parallel: true
   model: [gpt-4.1, gpt-5]
   prompt: [concise, detailed]
 safe-outputs:
   add-comment:
     max: 1
-parallel-experiments:
-  include:
-    - experiment: model
-      variant: gpt-5
-      harness: copilot-cli
-    - experiment: prompt
-      variant: concise
-      model: gpt-4.1
-      harness: copilot-sdk
-    - experiment: prompt
-      variant: detailed
 ---
 {{#if experiments.prompt == 'concise'}}
 Be concise.

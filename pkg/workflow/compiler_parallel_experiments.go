@@ -32,7 +32,7 @@ type parallelExperimentEntry struct {
 }
 
 type parallelExperimentsConfig struct {
-	Include           []parallelExperimentEntry `json:"include"`
+	Include           []parallelExperimentEntry `json:"-"`
 	MaxJobs           int                       `json:"max-jobs"`
 	MaxParallel       int                       `json:"max-parallel"`
 	TimeoutMinutes    int                       `json:"timeout-minutes"`
@@ -41,9 +41,16 @@ type parallelExperimentsConfig struct {
 }
 
 func parseParallelExperiments(data *WorkflowData) (*parallelExperimentsConfig, error) { //nolint:largefunc // Admission and reference validation remain adjacent to the bounded configuration decode.
-	raw, exists := data.RawFrontmatter["parallel-experiments"]
-	if !exists || raw == false {
+	experiments, ok := data.RawFrontmatter["experiments"].(map[string]any)
+	if !ok {
 		return nil, nil
+	}
+	if enabled, ok := experiments["parallel"].(bool); !ok || !enabled {
+		return nil, nil
+	}
+	raw := experiments["parallel-options"]
+	if raw == nil {
+		raw = map[string]any{}
 	}
 	encoded, err := json.Marshal(raw)
 	if err != nil {
@@ -53,10 +60,10 @@ func parseParallelExperiments(data *WorkflowData) (*parallelExperimentsConfig, e
 	decoder := json.NewDecoder(bytes.NewReader(encoded))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&config); err != nil {
-		return nil, fmt.Errorf("parallel-experiments: expected an include list and bounded execution controls: %w", err)
+		return nil, fmt.Errorf("experiments.parallel-options: expected bounded execution controls: %w", err)
 	}
 	if err := decoder.Decode(new(any)); err != io.EOF {
-		return nil, errors.New("parallel-experiments: expected exactly one configuration object")
+		return nil, errors.New("experiments.parallel-options: expected exactly one configuration object")
 	}
 	for _, bound := range []struct {
 		name       string
@@ -67,20 +74,25 @@ func parseParallelExperiments(data *WorkflowData) (*parallelExperimentsConfig, e
 		{"max-total-ai-credits", config.MaxTotalAICredits, 4000},
 	} {
 		if bound.value < 1 || bound.value > bound.max {
-			return nil, fmt.Errorf("parallel-experiments.%s: expected an integer from 1 to %d", bound.name, bound.max)
+			return nil, fmt.Errorf("experiments.parallel-options.%s: expected an integer from 1 to %d", bound.name, bound.max)
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(data.Experiments)) {
+		for _, variant := range data.Experiments[name] {
+			config.Include = append(config.Include, parallelExperimentEntry{Experiment: name, Variant: variant})
 		}
 	}
 	if len(config.Include) == 0 || len(config.Include) > 16 {
-		return nil, errors.New("parallel-experiments.include: provide between 1 and 16 entries")
+		return nil, errors.New("experiments.parallel: provide between 1 and 16 experiment variants")
 	}
 	admitted := min(config.MaxJobs, config.MaxParallel, config.MaxTotalAICredits/config.MaxAICredits)
 	if admitted == 0 {
-		return nil, errors.New("parallel-experiments: max-total-ai-credits must admit at least one per-job budget")
+		return nil, errors.New("experiments.parallel-options: max-total-ai-credits must admit at least one per-job budget")
 	}
 	for i := range config.Include {
 		entry := &config.Include[i]
 		if !slices.Contains(data.Experiments[entry.Experiment], entry.Variant) {
-			return nil, fmt.Errorf("parallel-experiments.include[%d]: variant %q must belong to the existing experiments.%s definition", i, entry.Variant, entry.Experiment)
+			return nil, fmt.Errorf("experiments.parallel: variant %q must belong to the existing experiments.%s definition", entry.Variant, entry.Experiment)
 		}
 		if strings.ContainsAny(entry.Variant, "\"'\r\n") || containsExpression(entry.Variant) {
 			return nil, errors.New("parallel-experiments: variants must not contain quotes, line breaks or expression delimiters")

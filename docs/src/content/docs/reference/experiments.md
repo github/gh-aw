@@ -23,8 +23,9 @@ matrix job after compiling the production workflow. Existing production jobs,
 dependencies, permissions, and outputs remain unchanged. Without the opt-in,
 compilation follows the existing path.
 
-The top-level `parallel-experiments` field selects variants from existing
-`experiments` definitions. Omit it or set it to `false` to disable the pass.
+Set `experiments.parallel: true` to run the declared variants in parallel.
+This feature is experimental and produces a compilation warning. Omit the flag
+or set it to `false` to disable the pass.
 
 ```aw wrap
 ---
@@ -39,13 +40,8 @@ permissions:
   issues: read
   pull-requests: read
 experiments:
+  parallel: true
   style: [concise, detailed]
-parallel-experiments:
-  include:
-    - experiment: style
-      variant: concise
-    - experiment: style
-      variant: detailed
 ---
 
 {{#if experiments.style == 'concise'}}
@@ -55,11 +51,9 @@ Summarize this repository in detail.
 {{/if}}
 ```
 
-Each `include` entry names an existing `experiment` and one of its `variant`
-values. Optional `engine`, `model`, and `harness` fields override that entry only.
-Model overrides must be literal names or aliases. The initial implementation
-supports sandboxed Copilot with the `copilot-cli` or `copilot-sdk` harness, not
-arbitrary engines or custom harness code.
+The initial implementation supports sandboxed Copilot with the `copilot-cli`
+or `copilot-sdk` harness, not arbitrary engines or custom harness code. Configure
+optional resource controls under `experiments.parallel-options`.
 
 | Control | Default | Range | Scope |
 |---------|---------|-------|-------|
@@ -69,12 +63,13 @@ arbitrary engines or custom harness code.
 | `max-ai-credits` | `100` | `1`–`1000` | Proxy credit limit of each experimental job |
 | `max-total-ai-credits` | `400` | `1`–`4000` | Admission-time experimental credit allocation |
 
-The `include` list accepts up to 16 entries. Admission follows list order and
+The definitions accept up to 16 variants in total. Admission follows experiment
+name order and then variant declaration order, and
 admits at most the smallest of `max-jobs`, `max-parallel`, and
 `floor(max-total-ai-credits / max-ai-credits)`. Remaining entries are recorded as
 skipped with an admission-limit reason, rather than scheduled in later batches.
 The total credit allocation must cover at least one per-job budget.
-Only listed variants participate; existing across-run experiment selection is
+All declared variants participate; existing across-run experiment selection is
 unchanged. Parallel selection is explicit: it does not apply the across-run
 picker's weights, date windows, or adaptive allocation.
 

@@ -6,9 +6,9 @@
       {
         "id": "entry-1",
         "experiment": "model",
-        "variant": "gpt-5",
+        "variant": "gpt-4.1",
         "engine": "copilot",
-        "model": "${{ 'gpt-5' }}",
+        "model": "${{ 'gpt-4.1' }}",
         "harness": "copilot-cli",
         "max_ai_credits": 100,
         "timeout_minutes": 10,
@@ -16,11 +16,11 @@
       },
       {
         "id": "entry-2",
-        "experiment": "prompt",
-        "variant": "concise",
+        "experiment": "model",
+        "variant": "gpt-5",
         "engine": "copilot",
-        "model": "gpt-4.1",
-        "harness": "copilot-sdk",
+        "model": "${{ 'gpt-5' }}",
+        "harness": "copilot-cli",
         "max_ai_credits": 100,
         "timeout_minutes": 10,
         "admitted": true

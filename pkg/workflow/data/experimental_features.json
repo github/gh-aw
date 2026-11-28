@@ -90,6 +90,12 @@
       "cracktro": [{ "slide": "Experiments, graders & evals", "badge": "experiments · graders" }]
     },
     {
+      "id": "parallel-experiments",
+      "name": "Parallel experiments",
+      "compiler_warning": "parallel experiments",
+      "docs": ["/reference/experiments/"]
+    },
+    {
       "id": "continual-experiments",
       "name": "Continual experiments",
       "compiler_warning": "continual experiments",
