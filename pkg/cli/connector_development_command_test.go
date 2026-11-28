@@ -370,6 +370,7 @@ func TestConnectorDevelopmentIdentityRoutes(t *testing.T) {
 	}{
 		{"GitHub App", "github-app:\n          client-id: ${{ vars.DEMO_APP_ID }}\n          private-key: ${{ secrets.DEMO_APP_KEY }}\n          permissions:\n            issues: read", "GitHub App identity"},
 		{"GitHub OIDC", "github-oidc:\n          audience: https://identity.example.test", "GitHub Actions OIDC identity"},
+		{"Azure OIDC", "azure-oidc:\n          azure-tenant-id: ${{ vars.DEMO_TENANT }}\n          azure-client-id: ${{ vars.DEMO_READER }}\n          azure-scope: https://identity.example.test/.default", "Azure OIDC identity"},
 	} {
 		t.Run(route.name, func(t *testing.T) {
 			content := strings.Replace(developmentConnectorFixture, "token:\n          secret: ${{ github.aw.import-inputs.reader-secret }}", route.declaration, 1)

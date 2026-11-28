@@ -1742,6 +1742,14 @@ jobs:
           pattern: safe-outputs-items
           merge-multiple: true
           path: /tmp/gh-aw/
+      - name: Clear Azure token broker evidence directory
+        id: clear_azure_broker_evidence
+        if: always()
+        shell: bash
+        run: |
+          test ! -L /tmp/gh-aw
+          rm -rf -- /tmp/gh-aw/azure-broker
+          test ! -e /tmp/gh-aw/azure-broker && test ! -L /tmp/gh-aw/azure-broker
       - name: Process no-op messages
         id: noop
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -1930,7 +1938,7 @@ jobs:
           GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/collect_usage_artifact_files.sh"
       - name: Generate usage activity summary and unified session
-        if: always()
+        if: always() && steps.clear_azure_broker_evidence.outcome == 'success'
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

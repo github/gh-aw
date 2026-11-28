@@ -7,7 +7,7 @@ const { isSessionEvent, isNestedSessionEvent } = require("./agent_session.cjs");
 const { hasCopilotConversation, deduplicateCopilotFallback, normalizeCopilotSession } = require("./copilot_session.cjs");
 const { collectAddMaskedValues, serializeSessionArtifact, writeSessionArtifact, removeFailedSessionArtifacts } = require("./session_artifact.cjs");
 const { getErrorMessage } = require("./error_helpers.cjs");
-const { normalizeUnifiedSessionEvent, normalizeModelInventoryData, evalResultRunId } = require("./unified_session_payload.cjs");
+const { normalizeUnifiedSessionEvent, normalizeModelInventoryData, evalResultRunId, azureBrokerEvent } = require("./unified_session_payload.cjs");
 const { ERR_SYSTEM, ERR_VALIDATION, ERR_PARSE } = require("./error_codes.cjs");
 const { collectAgentExecution, parseAgentExitCode, validateAgentExitCode, isAgentExecutionEvent } = require("./agent_execution.cjs");
 const { normalizeEngineLogEntries, normalizeEngineSessionEvents, parseEngineLog } = require("./engine_log_parser.cjs");
@@ -257,6 +257,7 @@ function collectUnifiedSession({
   let currentRunAttempt = liveIdentity ? String(liveIdentity.runAttempt) : dailyAIC.GITHUB_RUN_ATTEMPT;
   /** @type {SessionSource[]} */
   const sources = [];
+  const brokerSources = new Set();
   const masks = new Set();
   const incompleteSources = new Set();
   /** @type {SessionEvent[]} */
@@ -473,6 +474,39 @@ function collectUnifiedSession({
       events.push({ type: record.type, data, ...(timestampMs !== undefined ? { timestamp: new Date(timestampMs).toISOString() } : {}) });
     }
     sources.push({ component: "durable", phase: "agent", path: path.relative(rootDir, durableFile), events });
+  }
+  for (const phase of ["agent", "safe-output"]) {
+    const file = path.join(rootDir, "azure-broker", phase, "azure_token_broker.jsonl");
+    if (!exists(file)) continue;
+    /** @type {SessionEvent[]} */
+    const events = [];
+    const indices = [];
+    for (const [index, record] of records(file).entries()) {
+      const line = recordLines.get(file)?.[index];
+      const name = azureBrokerEvent(record?.event);
+      const timestamp = record?.timestamp;
+      const timestampMs = typeof timestamp === "string" && timestamp.length === 24 && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(timestamp) ? sessionTimestamp({ timestamp }) : undefined;
+      if (
+        !record ||
+        typeof record !== "object" ||
+        Array.isArray(record) ||
+        Object.keys(record).length !== 2 ||
+        !Object.hasOwn(record, "event") ||
+        !Object.hasOwn(record, "timestamp") ||
+        !name ||
+        timestampMs === undefined ||
+        new Date(timestampMs).toISOString() !== timestamp
+      ) {
+        incompleteSources.add(file);
+        report(file, "invalid_azure_token_broker", line);
+        continue;
+      }
+      events.push({ type: "connector.azure_token_broker", timestamp: new Date(timestampMs).toISOString(), data: { event: name } });
+      indices.push(line === undefined ? index : line - 1);
+    }
+    const source = { component: "connector", phase, path: path.relative(rootDir, file), events, indices };
+    sources.push(source);
+    brokerSources.add(source);
   }
   const selectedPrSha = dailyAIC.GH_AW_PR_HEAD_BASE_SHA;
   const selectedPrNumberText = dailyAIC.GH_AW_PR_HEAD_BASE_PR_NUMBER;
@@ -1037,11 +1071,12 @@ function collectUnifiedSession({
       }
     }
   }
-  // Only the collector publishes routing verdicts; no source can supply its own.
+  // Only the dedicated broker files and collector can publish these observations.
   for (const source of sources) {
-    if (!source.events.some(event => event.type === "routing.observation")) continue;
-    source.indices = source.events.flatMap((event, index) => (event.type === "routing.observation" ? [] : [source.indices?.[index] ?? index]));
-    source.events = source.events.filter(event => event.type !== "routing.observation");
+    const isSpoofed = event => event.type === "routing.observation" || (event.type === "connector.azure_token_broker" && !brokerSources.has(source));
+    if (!source.events.some(isSpoofed)) continue;
+    source.indices = source.events.flatMap((event, index) => (isSpoofed(event) ? [] : [source.indices?.[index] ?? index]));
+    source.events = source.events.filter(event => !isSpoofed(event));
   }
   /** @type {SessionEvent[]} */
   const routingObservations = [];

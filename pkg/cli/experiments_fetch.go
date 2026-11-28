@@ -428,32 +428,46 @@ func fetchLocalExperiments() ([]ExperimentInfo, error) {
 func fetchRemoteExperiments(repoOverride string) ([]ExperimentInfo, error) {
 	experimentsLog.Printf("Fetching remote experiment branches: repo=%s", repoOverride)
 
-	args, err := repositoryAPIArgs(repoOverride, "", "branches",
-		"--paginate",
-		"--jq", `[.[] | select(.name | startswith("`+experimentsBranchPrefix+`")) | .name]`,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("invalid remote branches endpoint: %w", err)
-	}
-	cmd := workflow.ExecGH(args...)
-	output, err := cmd.Output()
-	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return nil, fmt.Errorf("failed to fetch branches (exit %d): %s", exitErr.ExitCode(), strings.TrimSpace(string(exitErr.Stderr)))
+	var branchNames []string
+	const pageSize = 100
+	for page := 1; ; page++ {
+		args, err := repositoryAPIArgs(repoOverride, "", "branches",
+			"--method", "GET", "--raw-field", fmt.Sprintf("per_page=%d", pageSize),
+			"--raw-field", fmt.Sprintf("page=%d", page), "--jq", `[.[].name]`,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("invalid remote branches endpoint: %w", err)
 		}
-		return nil, fmt.Errorf("failed to fetch branches: %w", err)
-	}
-
-	branchNames, err := parsePagedJSONArray[string](string(output))
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse branch list: %w", err)
+		cmd := workflow.ExecGH(args...)
+		output, err := cmd.Output()
+		if err != nil {
+			var exitErr *exec.ExitError
+			if errors.As(err, &exitErr) {
+				return nil, fmt.Errorf("failed to fetch branches (exit %d): %s", exitErr.ExitCode(), strings.TrimSpace(string(exitErr.Stderr)))
+			}
+			return nil, fmt.Errorf("failed to fetch branches: %w", err)
+		}
+		var names []string
+		if err := json.Unmarshal(output, &names); err != nil {
+			return nil, fmt.Errorf("failed to parse branch list: %w", err)
+		}
+		for _, name := range names {
+			if strings.HasPrefix(name, experimentsBranchPrefix) {
+				branchNames = append(branchNames, name)
+			}
+		}
+		if len(names) < pageSize {
+			break
+		}
 	}
 
 	var experiments []ExperimentInfo
 	for _, branchName := range branchNames {
 		workflowID := strings.TrimPrefix(branchName, experimentsBranchPrefix)
-		state := readRemoteExperimentState(repoOverride, branchName)
+		state, err := readRemoteExperimentState(repoOverride, branchName)
+		if err != nil {
+			return nil, err
+		}
 		experiments = append(experiments, experimentInfoFromState(workflowID, branchName, state))
 	}
 
@@ -502,6 +516,9 @@ func fetchRemoteExperimentDetails(repoOverride, branchName, workflowID string) (
 		return nil, fmt.Errorf("failed to fetch experiment branch: %w", err)
 	}
 
-	state := readRemoteExperimentState(repoOverride, branchName)
+	state, err := readRemoteExperimentState(repoOverride, branchName)
+	if err != nil {
+		return nil, err
+	}
 	return experimentDetailsFromState(workflowID, branchName, state), nil
 }

@@ -193,6 +193,9 @@ func ComputeAWFExcludeEnvVarNames(workflowData *WorkflowData, coreSecretVarNames
 	// The runner-owned gateway forwards them only for HTTP MCP github-oidc authentication.
 	addUnique("ACTIONS_ID_TOKEN_REQUEST_URL")
 	addUnique("ACTIONS_ID_TOKEN_REQUEST_TOKEN")
+	for i := range connectorAzureReaderSecrets(workflowData) {
+		addUnique(connectorAzurePrivateDirEnv(i))
+	}
 	if workflowData.TokenBrokerEnabled || usesTokenBrokerGitHubTool(workflowData) || usesTokenBrokerSafeOutputs(workflowData) {
 		addUnique("GH_AW_TOKEN_BROKER_URL")
 	}

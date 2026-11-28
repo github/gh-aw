@@ -148,7 +148,7 @@ func (c *Compiler) appendConclusionUsageSteps(steps []string, data *WorkflowData
 	steps = append(steps, buildUsageArtifactCollectionStep(IsDetectionJobEnabled(data.SafeOutputs))...)
 	// Admission still runs in dry-run mode; record its decision without applying
 	// its budget to agent, detection, or evals execution.
-	steps = append(steps, buildUsageActivityGenerationStep(data.AdmissionEnabled, hasMaxDailyAICGuardrail(data), !isWorkQueueParticipant(data) && conclusionReportFailedJobsEnabled(data), c.getActionPin, usageEnv...)...)
+	steps = append(steps, buildUsageActivityGenerationStepWithCondition("always() && steps.clear_azure_broker_evidence.outcome == 'success'", data.AdmissionEnabled, hasMaxDailyAICGuardrail(data), !isWorkQueueParticipant(data) && conclusionReportFailedJobsEnabled(data), c.getActionPin, usageEnv...)...)
 	steps = append(steps, buildUsageArtifactUploadStep(artifactPrefixExprForDownstreamJob(data), usesExperimentsBroker(data), c.getActionPin)...)
 	if data.AdmissionEnabled {
 		if err := validateAdmissionWorkflowHashes(data); err != nil {
@@ -479,9 +479,13 @@ func buildUsageSafeJobResultsEnv(safeJobNames []string, jobs map[string]*SafeJob
 }
 
 func buildUsageActivityGenerationStep(hasAdmission, hasDailyAICGuardrail, reuseJobDurations bool, pinAction func(string) string, gradersEnv ...string) []string {
+	return buildUsageActivityGenerationStepWithCondition("always()", hasAdmission, hasDailyAICGuardrail, reuseJobDurations, pinAction, gradersEnv...)
+}
+
+func buildUsageActivityGenerationStepWithCondition(condition string, hasAdmission, hasDailyAICGuardrail, reuseJobDurations bool, pinAction func(string) string, gradersEnv ...string) []string {
 	steps := []string{
 		"      - name: Generate usage activity summary and unified session\n",
-		"        if: always()\n",
+		"        if: " + condition + "\n",
 		"        continue-on-error: true\n",
 		fmt.Sprintf("        uses: %s\n", pinAction("actions/github-script")),
 	}

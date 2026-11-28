@@ -205,6 +205,23 @@ func (c *Compiler) generateEngineExecutionSteps(yaml *strings.Builder, data *Wor
 		for _, line := range step {
 			if strings.Contains(line, "id: agentic_execution") {
 				step = injectComponentExecutionStarted(step, "agent", agentExecutionEvidencePath)
+				if secrets := connectorAzureReaderSecrets(data); len(secrets) > 0 {
+					for i := range secrets {
+						key := connectorAzurePrivateDirEnv(i) + ":"
+						step = slices.DeleteFunc(step, func(line string) bool {
+							return strings.HasPrefix(line, "          "+key)
+						})
+					}
+					envIndex := slices.Index(step, "        env:")
+					if envIndex < 0 {
+						step = append(step, "        env:")
+						envIndex = len(step) - 1
+					}
+					for i, secret := range secrets {
+						envLine := strings.TrimSuffix(formatYAMLEnv("          ", connectorAzurePrivateDirEnv(i), "${{ "+connectorAzureDirectory(secret)+" }}"), "\n")
+						step = slices.Insert(step, envIndex+1+i, envLine)
+					}
+				}
 				break
 			}
 		}
