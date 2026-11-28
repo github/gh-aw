@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -90,7 +91,7 @@ func scanUpgradeRepo(ctx context.Context, repo string, verbose bool) (orgRepoPre
 }
 
 func previewUpgradeRepoCheckout(repo, checkoutDir string, verbose bool) (orgRepoPreview, bool, error) {
-	workflowsDir := filepath.Join(checkoutDir, constants.GetWorkflowDir())
+	workflowsDir := filepath.Join(checkoutDir, constants.WorkflowsDir)
 	// Count .md workflow files (excluding lock files).
 	mdCount, missing, err := countUpgradeWorkflowFiles(workflowsDir)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -256,8 +257,8 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	// Extend sparse checkout to include .github/skills; upgrade also updates
 	// the dispatcher skill (ensureAgenticWorkflowsDispatcher) and needs that path present.
 	sparseAddCmd := exec.CommandContext(ctx, "git", "-C", checkoutDir, "sparse-checkout", "add", orgUpgradeSkillsDir)
-	if output, err := sparseAddCmd.CombinedOutput(); err != nil {
-		trimmed := strings.TrimSpace(string(output))
+	if output, err := runMaintenanceCheckoutCommand(ctx, sparseAddCmd); err != nil {
+		trimmed := string(bytes.TrimSpace(output))
 		if trimmed == "" {
 			return fmt.Errorf("failed to extend sparse checkout for %s: %w", repo, err)
 		}
@@ -287,15 +288,15 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	}
 
 	// Override fields that must be adjusted for a remote-repo upgrade.
-	// workflowDir is intentionally reset: --dir is a local-machine concept and
-	// must not be forwarded to remote repos where that path may not exist.
+	// --dir and GH_AW_WORKFLOWS_DIR are local-machine settings; all remote
+	// phases, including PR summaries, must use the target checkout's directory.
 	opts.ctx = ctx
 	if rollout := orgRolloutFromContext(ctx); rollout != nil && rollout.worker {
 		opts.ctx = withUpdateGitHubClient(ctx, verbose)
 	}
 	opts.skipExtensionUpgrade = true
 	opts.verbose = verbose
-	opts.workflowDir = ""
+	opts.workflowDir = constants.WorkflowsDir
 	if createPR {
 		opts.summary, err = newUpdatePRSummary(ctx, opts.workflowDir)
 		if err != nil {

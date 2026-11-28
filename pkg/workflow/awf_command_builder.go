@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -58,20 +57,12 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 	toolCacheMountProbe, toolCacheMountRef := buildToolCacheMountSettings(isCloudHypervisor || isNVXRuntime(config.WorkflowData))
 	var expandableArgs string
 	expandableArgs, arcDindDockerHostProbe = buildExpandableAWFArgs(config, isCloudHypervisor, isArcDind, arcDindDockerHostProbe)
-	var configFileSetup string
-	awfConfigJSON, err := BuildAWFConfigJSON(config)
+	configFileSetup, err := buildAWFCommandConfigSetup(config)
 	if err != nil {
-		if enclavesEnabled(config.WorkflowData) {
-			return "echo " + shellEscapeArg(err.Error()) + " >&2; exit 1"
-		}
-		awfHelpersLog.Printf("Warning: failed to build AWF config JSON: %v", err)
-	} else {
-		configFileSetup = buildAWFConfigFileSetup(config, awfConfigJSON)
-		if isModelRoutingRuntimeGuarded(config.WorkflowData) {
-			configFileSetup = buildGuardedAWFConfigFileSetup(config, awfConfigJSON)
-		}
+		return "echo " + shellEscapeArg(err.Error()) + " >&2; exit 1"
+	}
+	if configFileSetup != "" {
 		expandableArgs = fmt.Sprintf("--config %q ", awfConfigRuntimePathExpr) + expandableArgs
-		awfHelpersLog.Print("Using AWF config file (--config flag)")
 	}
 	modelsJSONPathExport := buildModelsJSONPathExportScript(isArcDind)
 	engineCommand := rewriteEngineCommandForRuntime(config.EngineCommand, isArcDind)
@@ -112,6 +103,22 @@ func BuildAWFCommand(config AWFCommandConfig) string {
 
 	awfHelpersLog.Print("Successfully built AWF command")
 	return prependHostGitHubTokenCheck(command, config.WorkflowData)
+}
+
+func buildAWFCommandConfigSetup(config AWFCommandConfig) (string, error) {
+	awfConfigJSON, err := BuildAWFConfigJSON(config)
+	if err != nil {
+		if enclavesEnabled(config.WorkflowData) || len(connectorAzureReaderSecrets(config.WorkflowData)) > 0 {
+			return "", err
+		}
+		awfHelpersLog.Printf("Warning: failed to build AWF config JSON: %v", err)
+		return "", nil
+	}
+	awfHelpersLog.Print("Using AWF config file (--config flag)")
+	if isModelRoutingRuntimeGuarded(config.WorkflowData) {
+		return buildGuardedAWFConfigFileSetup(config, awfConfigJSON), nil
+	}
+	return buildAWFConfigFileSetup(config, awfConfigJSON), nil
 }
 
 func validateAWFCommandConfig(config AWFCommandConfig) error {
@@ -338,6 +345,13 @@ func finishAWFConfigFileSetup(config AWFCommandConfig, maxAICreditsExportLine, c
 	if mkdirScript := buildCloudHypervisorFilesystemMkdirScript(config.WorkflowData); mkdirScript != "" {
 		configFileSetup = mkdirScript + "\n" + configFileSetup
 	}
+	if secrets := connectorAzureReaderSecrets(config.WorkflowData); len(secrets) > 0 {
+		var names []string
+		for i := range secrets {
+			names = append(names, shellEscapeArg(connectorAzurePrivateDirEnv(i)))
+		}
+		configFileSetup += "\nnode -e " + shellEscapeArg(`const fs = require("node:fs"); const path = require("node:path"); const file = process.argv[1]; const dirs = process.argv.slice(2).map(name => process.env[name]); if (process.platform !== "linux" || dirs.some(dir => !dir || !path.isAbsolute(dir) || !fs.lstatSync(dir).isDirectory() || !fs.lstatSync(path.join(dir, "token.sock")).isSocket()) || new Set(dirs).size !== dirs.length) throw new Error("Invalid private connector socket directory"); const config = JSON.parse(fs.readFileSync(file, "utf8")); config.filesystem ??= {}; config.filesystem.privateHostSocketDirs = dirs; fs.writeFileSync(file, JSON.stringify(config));`) + fmt.Sprintf(" %q ", awfConfigRuntimePathExpr) + strings.Join(names, " ") + " || exit 1"
+	}
 	return configFileSetup + fmt.Sprintf("\ncp %q %s", awfConfigRuntimePathExpr, constants.AWFConfigFilePath)
 }
 
@@ -374,7 +388,7 @@ func buildCloudHypervisorFilesystemMkdirScript(workflowData *WorkflowData) strin
 	if len(targets) == 0 {
 		return ""
 	}
-	sort.Strings(targets)
+	slices.Sort(targets)
 	quoted := make([]string, 0, len(targets))
 	for _, target := range targets {
 		quoted = append(quoted, shellEscapeArgWithVarsPreserved(target, "GITHUB_WORKSPACE"))
@@ -711,7 +725,7 @@ func appendCustomMountArgs(workflowData *WorkflowData, agentConfig *AgentSandbox
 	}
 	sortedMounts := make([]string, len(agentConfig.Mounts))
 	copy(sortedMounts, agentConfig.Mounts)
-	sort.Strings(sortedMounts)
+	slices.Sort(sortedMounts)
 	for _, mount := range sortedMounts {
 		if usesArcDindDetectionMount(workflowData) && mount == threatDetectionRWMount {
 			continue // Emitted with shell expansion by buildExpandableAWFArgs.
@@ -853,7 +867,7 @@ func collectAllowedHostPorts(workflowData *WorkflowData, agentConfig *AgentSandb
 	for port := range ports {
 		result = append(result, port)
 	}
-	sort.Ints(result)
+	slices.Sort(result)
 	return result
 }
 
@@ -887,6 +901,9 @@ func GetAWFCommandPrefix(workflowData *WorkflowData) string {
 	if agentConfig != nil && agentConfig.Command != "" {
 		awfHelpersLog.Printf("Using custom AWF command: %s", agentConfig.Command)
 		return agentConfig.Command
+	}
+	if len(connectorAzureReaderSecrets(workflowData)) > 0 {
+		return constants.AWFPrivilegedCommand
 	}
 	if hasCloudHypervisorEnclaves(workflowData) {
 		return constants.AWFCloudHypervisorCommand

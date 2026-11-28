@@ -35,7 +35,7 @@ Keep the reviewed Azure Monitor declaration at the imported path. Provision
 Entra service-to-service access token for `https://api.loganalytics.io`,
 using scope `https://api.loganalytics.io/.default`. The service principal
 needs read/query RBAC on this workspace; delegated `Data.Read` is not an
-application permission. No Azure writer token is needed. The connector does
+application permission. No Azure writer token is needed. The selected reader does
 not log in, exchange a GitHub OIDC JWT or renew tokens.
 
 Call `get_activity_count` once with `workspace-id`

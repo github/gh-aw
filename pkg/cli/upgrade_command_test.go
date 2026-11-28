@@ -3,12 +3,16 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -348,4 +352,232 @@ func TestRelaunchUpgradeWithContextRejectsUnknownExtraFlag(t *testing.T) {
 	err := relaunchUpgradeWithContext(context.Background(), "--unknown-flag", "/bin/echo")
 	require.Error(t, err)
 	require.ErrorContains(t, err, "invalid relaunch flag")
+}
+
+func TestUpgradeTargetWorkflowEnvironmentIsolation(t *testing.T) {
+	original := runUpgradeForTargetRepoFn
+	t.Cleanup(func() { runUpgradeForTargetRepoFn = original })
+	outside := filepath.Join(t.TempDir(), "outside-workflows")
+	t.Setenv("GH_AW_WORKFLOWS_DIR", outside)
+	runUpgradeForTargetRepoFn = func(_ context.Context, _ string, _ upgradeOptions, _ bool, _ bool) error {
+		assert.Equal(t, outside, os.Getenv("GH_AW_WORKFLOWS_DIR"))
+		return assert.AnError
+	}
+	cmd := NewUpgradeCommand(upgradeValidateEngineStub)
+	cmd.SetArgs([]string{"--repo", "owner/repo", "--skip-extension-upgrade"})
+	require.ErrorIs(t, cmd.Execute(), assert.AnError)
+	assert.Equal(t, outside, os.Getenv("GH_AW_WORKFLOWS_DIR"))
+}
+
+func TestUpgradeOrgPreviewsDoNotCheckExtension(t *testing.T) {
+	version, lookup, search, scan := GetVersion(), getLatestExtensionReleaseFn, searchOrgLockWorkflowReposFn, scanUpgradeRepoFn
+	t.Cleanup(func() {
+		SetVersionInfo(version)
+		getLatestExtensionReleaseFn, searchOrgLockWorkflowReposFn, scanUpgradeRepoFn = lookup, search, scan
+	})
+	SetVersionInfo("v1.0.0")
+	getLatestExtensionReleaseFn = func(context.Context, bool) (string, error) {
+		t.Error("preview checked the extension")
+		return "", nil
+	}
+	outside := filepath.Join(t.TempDir(), "caller")
+	searchOrgLockWorkflowReposFn = func(context.Context, string, bool) ([]string, error) {
+		assert.Equal(t, outside, os.Getenv("GH_AW_WORKFLOWS_DIR"))
+		return nil, nil
+	}
+	scanUpgradeRepoFn = func(context.Context, string, bool) (orgRepoPreview, bool, error) {
+		assert.Equal(t, outside, os.Getenv("GH_AW_WORKFLOWS_DIR"))
+		return orgRepoPreview{}, false, nil
+	}
+	t.Setenv("GH_AW_WORKFLOWS_DIR", outside)
+	for _, args := range [][]string{
+		{"--org", "example"},
+		{"--org", "example", "--dry-run", "--create-pull-request"},
+		{"--repo", "example/repo", "--rollout-worker", "--dry-run"},
+	} {
+		cmd := NewUpgradeCommand(upgradeValidateEngineStub)
+		cmd.SetArgs(args)
+		require.NoError(t, cmd.Execute())
+		assert.Equal(t, outside, os.Getenv("GH_AW_WORKFLOWS_DIR"))
+	}
+}
+
+func TestUpgradeMissingWorkflowDirectorySkipsDependentPhases(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, initTestGitRepo(dir))
+	chdirForTest(t, dir)
+	t.Setenv("GH_AW_WORKFLOWS_DIR", "")
+	cmd := NewUpgradeCommand(upgradeValidateEngineStub)
+	cmd.SetArgs([]string{"--skip-extension-upgrade", "--no-agent", "--no-mcp", "--no-skill"})
+	require.NoError(t, cmd.Execute())
+	assert.NoDirExists(t, filepath.Join(dir, ".github", "workflows"))
+}
+
+func TestUpgradeCompilesRelativeWorkflowDirectories(t *testing.T) {
+	for _, test := range []struct {
+		name, directory, option string
+	}{
+		{"default", ".github/workflows", ""},
+		{"explicit default", ".github/workflows", ".github/workflows"},
+		{"custom", "custom/workflows", "custom/workflows"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, initTestGitRepo(dir))
+			chdirForTest(t, dir)
+			t.Setenv("GH_AW_WORKFLOWS_DIR", "")
+			require.NoError(t, os.MkdirAll(filepath.Join(dir, test.directory), 0o755))
+			err := runUpgradeCommand(upgradeOptions{
+				ctx: context.Background(), workflowDir: test.option, skipExtensionUpgrade: true,
+				noAgent: true, noMCP: true, noSkill: true, noActions: true,
+			})
+			require.ErrorContains(t, err, "no workflow markdown files")
+		})
+	}
+}
+
+func TestUpgradePreviewUsesCheckoutWorkflowDirectory(t *testing.T) {
+	checkout, outside := t.TempDir(), t.TempDir()
+	workflows := filepath.Join(checkout, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflows, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(workflows, "test.md"), []byte("---\non: workflow_dispatch\n---\n"), 0o644))
+	t.Setenv("GH_AW_WORKFLOWS_DIR", outside)
+	preview, include, err := previewUpgradeRepoCheckout("owner/repo", checkout, false)
+	require.NoError(t, err)
+	require.True(t, include)
+	assert.Equal(t, 1, preview.TotalWorkflows)
+	assert.Equal(t, outside, os.Getenv("GH_AW_WORKFLOWS_DIR"))
+}
+
+func TestUpgradeTargetUsesCheckoutWorkflowDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fixture uses a shell script")
+	}
+	gitPath, err := exec.LookPath("git")
+	require.NoError(t, err)
+	source, workspace, bin := t.TempDir(), t.TempDir(), t.TempDir()
+	require.NoError(t, initTestGitRepo(source))
+	require.NoError(t, initTestGitRepo(workspace))
+	workflows := filepath.Join(source, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflows, 0o755))
+	content := "---\non: workflow_dispatch\nrate-limit:\n  max-runs: 5\n  window: 60\n---\n\n# Test workflow\n"
+	require.NoError(t, os.WriteFile(filepath.Join(workflows, "test.md"), []byte(content), 0o644))
+	for _, args := range [][]string{
+		{"-C", source, "add", "."},
+		{"-C", source, "-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false", "commit", "-qm", "fixture"},
+	} {
+		output, err := exec.Command(gitPath, args...).CombinedOutput()
+		require.NoError(t, err, "%s", output)
+	}
+	script := "#!/bin/sh\nexec \"$GH_AW_TEST_GIT\" clone --no-local --depth=1 \"$GH_AW_TEST_SOURCE\" \"$4\"\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "gh"), []byte(script), 0o755))
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("GH_AW_TEST_GIT", gitPath)
+	t.Setenv("GH_AW_TEST_SOURCE", source)
+	chdirForTest(t, workspace)
+	outside := filepath.Join(t.TempDir(), "caller")
+	require.NoError(t, os.MkdirAll(outside, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(outside, "test.md"), []byte(content), 0o644))
+	t.Setenv("GH_AW_WORKFLOWS_DIR", outside)
+	err = runUpgradeForTargetRepo(context.Background(), "owner/repo", upgradeOptions{
+		workflowDir: outside,
+		noAgent:     true, noMCP: true, noSkill: true, noActions: true, noCompile: true,
+	}, false, false)
+	require.NoError(t, err)
+	upgraded, err := os.ReadFile(filepath.Join(workspace, ".github", "aw", "updates", "owner__repo", ".github", "workflows", "test.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(upgraded), "user-rate-limit:")
+	original, err := os.ReadFile(filepath.Join(outside, "test.md"))
+	require.NoError(t, err)
+	assert.Equal(t, content, string(original))
+	assert.Equal(t, outside, os.Getenv("GH_AW_WORKFLOWS_DIR"))
+}
+
+func TestUpgradeContainerPinsRemainBestEffort(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fixture uses shell scripts")
+	}
+	dir := t.TempDir()
+	require.NoError(t, initTestGitRepo(dir))
+	chdirForTest(t, dir)
+	workflows := filepath.Join(dir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflows, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(workflows, "test.lock.yml"),
+		[]byte("run: bash download_docker_images.sh ghcr.io/example/agent:v1\n"), 0o644))
+	t.Setenv("GH_AW_WORKFLOWS_DIR", "")
+	bin := t.TempDir()
+	for _, name := range []string{"docker", "crane"} {
+		require.NoError(t, os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\nexit 1\n"), 0o755))
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	var output bytes.Buffer
+	reporter := &updateJSONLReporter{writer: &output, command: "upgrade"}
+	ctx := context.WithValue(context.Background(), updateJSONLKey{}, reporter)
+	err := runUpgradeCommand(upgradeOptions{
+		ctx: ctx, skipExtensionUpgrade: true, noAgent: true, noMCP: true, noSkill: true, noCompile: true,
+	})
+	require.NoError(t, err)
+	assert.Contains(t, output.String(), "registry metadata lookup failed")
+	assert.Contains(t, output.String(), `"containers"`)
+
+	lockFile := filepath.Join(dir, ".github", "aw", "actions-lock.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(lockFile), 0o755))
+	require.NoError(t, os.WriteFile(lockFile, []byte("invalid json"), 0o644))
+	err = runUpgradeCommand(upgradeOptions{
+		ctx: context.Background(), skipExtensionUpgrade: true, noAgent: true, noMCP: true, noSkill: true, noCompile: true,
+	})
+	require.ErrorContains(t, err, "failed to update container pins")
+
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = runUpgradeCommand(upgradeOptions{
+		ctx: cancelCtx, skipExtensionUpgrade: true, noAgent: true, noMCP: true, noSkill: true, noCompile: true,
+	})
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestUpgradeRelaunchFlagsPrecedeTerminator(t *testing.T) {
+	original := runUpgradeForTargetRepoFn
+	t.Cleanup(func() { runUpgradeForTargetRepoFn = original })
+	runUpgradeForTargetRepoFn = func(_ context.Context, _ string, opts upgradeOptions, _ bool, _ bool) error {
+		assert.True(t, opts.skipExtensionUpgrade)
+		assert.Equal(t, "--", opts.prMessage)
+		return nil
+	}
+	cmd := NewUpgradeCommand(upgradeValidateEngineStub)
+	args := upgradeRelaunchArgs(
+		[]string{"upgrade", "--repo", "owner/repo", "--pr-message", "--", "--yes", "--jsonl", "--"},
+		[]string{"--skip-extension-upgrade", "--jsonl-continuation"},
+		cmd.Flags(),
+	)
+	assert.Equal(t, []string{"upgrade", "--repo", "owner/repo", "--pr-message", "--", "--yes", "--jsonl", "--skip-extension-upgrade", "--jsonl-continuation", "--"}, args)
+	cmd.SetArgs(args[1:])
+	require.NoError(t, cmd.Execute())
+}
+
+func TestUpgradeRelaunchUsesInheritedFlagsAndShorthandClusters(t *testing.T) {
+	original := runUpgradeForTargetRepoFn
+	t.Cleanup(func() { runUpgradeForTargetRepoFn = original })
+	root := &cobra.Command{Use: "gh-aw"}
+	root.PersistentFlags().BoolP("verbose", "v", false, "")
+	root.PersistentFlags().StringP("config", "c", "", "")
+	upgrade := NewUpgradeCommand(upgradeValidateEngineStub)
+	root.AddCommand(upgrade)
+	runUpgradeForTargetRepoFn = func(_ context.Context, _ string, opts upgradeOptions, _ bool, _ bool) error {
+		flags := opts.relaunchFlags
+		require.NotNil(t, flags)
+		extra := []string{"--skip-extension-upgrade", "--jsonl-continuation"}
+		for _, test := range []struct {
+			args, want []string
+		}{
+			{[]string{"upgrade", "--config", "--", "--"}, []string{"upgrade", "--config", "--", "--skip-extension-upgrade", "--jsonl-continuation", "--"}},
+			{[]string{"upgrade", "-vc", "--", "--"}, []string{"upgrade", "-vc", "--", "--skip-extension-upgrade", "--jsonl-continuation", "--"}},
+			{[]string{"upgrade", "-vcvalue", "--"}, []string{"upgrade", "-vcvalue", "--skip-extension-upgrade", "--jsonl-continuation", "--"}},
+		} {
+			assert.Equal(t, test.want, upgradeRelaunchArgs(test.args, extra, flags))
+		}
+		return nil
+	}
+	root.SetArgs([]string{"upgrade", "--repo", "owner/repo", "--skip-extension-upgrade"})
+	require.NoError(t, root.Execute())
 }

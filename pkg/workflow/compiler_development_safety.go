@@ -41,6 +41,9 @@ func (c *Compiler) validateDryRunEffects(data *WorkflowData) error {
 	}
 	unsupported = append(unsupported, dryRunResolvedOutputEffects(data)...)
 	permissions := NewPermissionsParser(data.Permissions).ToPermissions()
+	if usesConnectorInferenceOIDC(data) {
+		unsupported = append(unsupported, "connector inference using Azure OIDC")
+	}
 	if level, _ := permissions.Get(PermissionIdToken); level == PermissionWrite {
 		unsupported = append(unsupported, "permissions.id-token")
 	}

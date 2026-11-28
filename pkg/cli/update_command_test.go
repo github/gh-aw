@@ -1411,6 +1411,24 @@ func TestRunUpdateWorkflows_MergeConflictStopsLaterPhases(t *testing.T) {
 	assert.Zero(t, requests, "dependency update phases must stop after source update failures")
 }
 
+func TestRunUpdateWorkflows_SourceCancellation(t *testing.T) {
+	originalResolve := resolveLatestRefFn
+	t.Cleanup(func() { resolveLatestRefFn = originalResolve })
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	resolveLatestRefFn = func(context.Context, string, string, bool, bool, time.Duration) (latestRefResolution, error) {
+		cancel()
+		return latestRefResolution{}, context.Canceled
+	}
+	dir := t.TempDir()
+	t.Chdir(dir)
+	content := "---\nsource: owner/repo/workflows/test.md@v1.0.0\n---\n\n# Original\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "test.md"), []byte(content), 0o600))
+
+	err := RunUpdateWorkflows(ctx, UpdateWorkflowsOptions{WorkflowsDir: dir, NoCompile: true})
+	require.ErrorIs(t, err, context.Canceled)
+}
+
 func TestUpdateWorkflows_PartialFailureContract(t *testing.T) {
 	originalResolve, originalDownload := resolveLatestRefFn, downloadWorkflowContentFn
 	t.Cleanup(func() {
