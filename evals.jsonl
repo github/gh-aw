@@ -150,3 +150,5 @@
 {"id":"report_created_or_regression_flagged","question":"Was a performance report produced, or was a regression flagged when performance degraded?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-26T14:56:03.268Z","runid":"45842959178"}
 {"id":"benchmarks_run","question":"Did the agent run CLI performance benchmarks and track performance trends?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-27T14:56:10.351Z","runid":"46019386890"}
 {"id":"report_created_or_regression_flagged","question":"Was a performance report produced, or was a regression flagged when performance degraded?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-27T14:56:10.351Z","runid":"46019386890"}
+{"id":"benchmarks_run","question":"Did the agent run CLI performance benchmarks and track performance trends?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-28T14:55:10.333Z","runid":"46156647845"}
+{"id":"report_created_or_regression_flagged","question":"Was a performance report produced, or was a regression flagged when performance degraded?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-28T14:55:10.333Z","runid":"46156647845"}
