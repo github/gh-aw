@@ -648,9 +648,11 @@ targets are typed UUID arguments constrained by the resource arrays, never arbit
 It renames supported `ado-*` selections to `azure-devops-*` and converts a single
 `linear-token: ${{ secrets.NAME }}` reference to the Linear import's `writer-secret: NAME`.
 Existing imports are reused; new ADO imports leave organization and project inputs empty for review
-instead of adopting specimen defaults. The codemod does not install declarations, invent resource grants,
-or remove unsupported legacy options. Review the import's `with` grants and credential names
-before compiling; missing grants remain fail-closed.
+instead of adopting specimen defaults. Missing Jira site and creation issue-type inputs, and missing
+ADO organization, project, project-name, and work-item targets, also remain empty for review; existing
+non-null bindings are preserved. The codemod does not install declarations, invent resource grants,
+or remove unsupported legacy options. Review each import's `with` or `inputs` bindings and credential
+names before compiling; missing grants remain fail-closed.
 
 The create operation requires team, project, title, and body. The team-only creator omits the project.
 Updates replace both title and body, while sparse selectors replace one field. Explicit clearing uses
