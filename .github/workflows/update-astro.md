@@ -76,7 +76,8 @@ jobs:
         working-directory: ./docs
         run: |
           ncu_output="$(mktemp)"
-          npx --yes npm-check-updates --jsonUpgraded --cooldown 3 >"$ncu_output" 2>/dev/null || true
+          trap 'rm -f "$ncu_output"' EXIT
+          npx --yes npm-check-updates --jsonUpgraded --cooldown 3 >"$ncu_output"
 
           if [ -s "$ncu_output" ] && [ "$(tr -d '[:space:]' <"$ncu_output")" != "{}" ]; then
             echo "has_updates=true" >> "$GITHUB_OUTPUT"
@@ -88,8 +89,6 @@ jobs:
             echo "has_updates=false" >> "$GITHUB_OUTPUT"
             echo "No npm updates available in docs folder, skipping agent job"
           fi
-
-          rm -f "$ncu_output"
 
 sandbox:
   agent:
@@ -133,6 +132,11 @@ This updates `package.json` with the latest versions. Then install the updated d
 ```bash
 cd docs && npm install
 ```
+
+If npm cannot fetch packages because of a certificate error, Node 24 can use the
+system trust store with `NODE_USE_SYSTEM_CA=1`. Keep TLS verification enabled;
+never disable it or switch to an unapproved registry. If the error persists,
+stop and report the task as incomplete as described below.
 
 ### 2. Review Migration Guides
 
@@ -202,12 +206,12 @@ Updates npm packages in `docs/` to their latest versions.
 
 ## Important
 
-Before finishing, you **MUST** call exactly one terminal safe-output tool:
+Before finishing, you **MUST** report one of these outcomes:
 
 - `create_pull_request` after updating dependencies and verifying `npm run build` passes.
-- `noop` when no dependency changes are needed after inspection, or when a docs build failure cannot be fixed safely.
-- `report_missing_tool` when infrastructure or tooling prevents meaningful work (for example, unavailable shell commands, missing Node/npm, or inaccessible repository state).
+- `noop` only when no dependency changes are needed after inspection.
+- `report_incomplete` with the concrete blocker when the update or build cannot be completed safely, including npm certificate failures. Do not create a PR or use `noop` in this case.
 
-```json
-{"noop": {"message": "No action needed: [brief explanation]"}}
-```
+If a tool is unavailable, you may also call `report_missing_tool` with details,
+but it is diagnostic only and does not replace `report_incomplete`. Do not
+report npm as missing when it is present but cannot download packages.
