@@ -57,7 +57,7 @@ beforeEach(() => {
 it("releases the max slot when a temporary target is deferred", async () => {
   const handler = await main({ max: 1, target: "*" });
   const deferred = await handler({ status: "Todo", issue_number: "aw_target" }, {});
-  expect(deferred).toMatchObject({ success: false, deferred: true });
+  expect(deferred).toMatchObject({ success: false, deferred: true, error: expect.stringMatching(/^ERR_VALIDATION:/) });
   const retried = await handler({ status: "Todo", issue_number: "aw_target" }, { aw_target: { repo: "owner/repo", number: 42 } });
   expect(retried.success).toBe(true);
   expect(patches()).toHaveLength(1);
@@ -116,7 +116,7 @@ describe("native planning status resolution", () => {
 
   it.each([403, 404, 422, 500])("propagates unavailable API status %i without fallback", async status => {
     client.request.mockRejectedValue(Object.assign(new Error("API failed"), { status }));
-    expect((await handle()).success).toBe(false);
+    expect((await handle()).error).toMatch(status === 403 ? /^ERR_PERMISSION:/ : /^ERR_API:/);
     expect(client.rest.issues.update).not.toHaveBeenCalled();
     expect(patches()).toHaveLength(0);
   });
@@ -151,7 +151,7 @@ describe("set_issue_status", () => {
 
   it.each(["Done", "Not planned", "Duplicate"])("requires explicit close authorization for %s", async status => {
     const result = await handle({ status, duplicate_of: status === "Duplicate" ? 9 : undefined });
-    expect(result.error).toContain("allow-close");
+    expect(result.error).toMatch(/^ERR_PERMISSION:.*allow-close/);
     expect(patches()).toHaveLength(0);
   });
 
@@ -228,7 +228,7 @@ describe("set_issue_status", () => {
       .mockResolvedValueOnce({ repository: { issue: { number: 42, duplicateOf: { fullDatabaseId: "201", number: 10, repository: { nameWithOwner: "owner/repo" } } } } });
     const result = await handle({ status: "Duplicate", duplicate_of: 9 }, { allow_close: true });
     expect(result).toMatchObject({ success: false, issue_number: 42, url: current.html_url });
-    expect(result.error).toContain("PATCH was sent to owner/repo#42");
+    expect(result.error).toMatch(/^ERR_API: PATCH was sent to owner\/repo#42/);
     expect(result.error).toContain("may have been applied");
     expect(result.error).toContain("canonical duplicate");
     expect(extractCreatedItemFromResult("set_issue_status", result)).toBeNull();
@@ -307,7 +307,7 @@ describe("set_issue_status", () => {
     updated = { ...current, ...changes };
     const result = await handle();
     expect(result).toMatchObject({ success: false, issue_number: 42, url: current.html_url });
-    expect(result.error).toContain("did not apply");
+    expect(result.error).toMatch(/^ERR_API:.*did not apply/);
     expect(extractCreatedItemFromResult("set_issue_status", result)).toBeNull();
     expect(buildSafeOutputExecutions([{ type: "set_issue_status", result }])[0]).toMatchObject({ status: "failed" });
     expect(buildSafeOutputExecutions([{ type: "set_issue_status", result }])[0]).not.toHaveProperty("url");
@@ -363,7 +363,7 @@ describe("set_issue_status", () => {
 
   it("rejects foreign temporary IDs", async () => {
     const handler = await main({ target: "*" });
-    expect((await handler({ status: "Todo", issue_number: "aw_new" }, { aw_new: { repo: "other/repo", number: 42 } })).success).toBe(false);
+    expect((await handler({ status: "Todo", issue_number: "aw_new" }, { aw_new: { repo: "other/repo", number: 42 } })).error).toMatch(/^ERR_VALIDATION:/);
     expect(patches()).toHaveLength(0);
   });
 
@@ -374,9 +374,9 @@ describe("set_issue_status", () => {
   });
 
   it("enforces repository, labels and title prefix restrictions before status writes", async () => {
-    expect((await handle({ repo: "other/repo" })).success).toBe(false);
-    expect((await handle({}, { required_labels: ["approved"] })).success).toBe(false);
-    expect((await handle({}, { required_title_prefix: "[Approved]" })).success).toBe(false);
+    expect((await handle({ repo: "other/repo" })).error).toMatch(/^ERR_VALIDATION:/);
+    expect((await handle({}, { required_labels: ["approved"] })).error).toMatch(/^ERR_PERMISSION:/);
+    expect((await handle({}, { required_title_prefix: "[Approved]" })).error).toMatch(/^ERR_PERMISSION:/);
     expect(patches()).toHaveLength(0);
   });
 
@@ -396,8 +396,21 @@ describe("set_issue_status", () => {
       if (route.startsWith("GET ")) return { data: statuses };
       throw Object.assign(new Error("Forbidden"), { status: 403 });
     });
-    expect(await handle()).toMatchObject({ success: false, error: "Forbidden" });
+    expect(await handle()).toMatchObject({ success: false, error: "ERR_PERMISSION: Forbidden" });
     expect(patches()).toHaveLength(1);
     expect(client.rest.issues.update).not.toHaveBeenCalled();
+  });
+
+  it("classifies status selection and allowlist failures", async () => {
+    expect((await handle({ status: "" })).error).toMatch(/^ERR_VALIDATION:/);
+    expect((await handle({ status: "Unknown" })).error).toMatch(/^ERR_VALIDATION:/);
+    expect((await handle({}, { allowed: ["Backlog"] })).error).toMatch(/^ERR_PERMISSION:/);
+  });
+
+  it("classifies invalid targets and preserves skipped results", async () => {
+    expect((await handle({ issue_number: -1 }, { target: "*" })).error).toMatch(/^ERR_VALIDATION:/);
+    global.context.payload = {};
+    global.context.eventName = "workflow_dispatch";
+    expect(await handle()).toMatchObject({ success: false, skipped: true, error: expect.stringMatching(/^ERR_VALIDATION:/) });
   });
 });
