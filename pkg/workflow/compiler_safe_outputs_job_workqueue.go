@@ -72,6 +72,7 @@ func (c *Compiler) buildWorkQueueFinishStep(data *WorkflowData) []string {
 		env = append(env, "        env:\n")
 	}
 	env = append(env,
+		"          GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}\n",
 		"          GH_AW_WORK_QUEUE_FINISH_INTENT: "+constants.WorkQueueFinishIntentPath+"\n",
 		"          GH_AW_WORK_QUEUE_EFFECTS: "+constants.WorkQueueEffectsPath+"\n",
 	)
@@ -122,6 +123,7 @@ func (c *Compiler) buildWorkQueueControlProcessingStep(data *WorkflowData) ([]st
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
 	}
 	env := workQueuePolicyEnvironment(data)
+	env = append(env, "          GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}\n")
 	var staged *TemplatableBool
 	if data.SafeOutputs != nil {
 		staged = data.SafeOutputs.Staged

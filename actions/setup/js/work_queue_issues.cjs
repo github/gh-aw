@@ -5,7 +5,7 @@ const { loadQueue, publishRequest } = require("./work_queue_binding.cjs");
 const { readWorkQueuePolicyEnv } = require("./work_queue_policy.cjs");
 const { fifoCompare } = require("./work_queue_scheduler.cjs");
 const { addComment, closeIssue, createIssue, getIssue, issueResource, listLabelledOpenIssues, recentComments, repositoryId, writerId } = require("./work_queue_issue_api.cjs");
-const { claimComment, commentMarker, issueBody, issueTitle, markedWorkId, orphanComment, terminalComment } = require("./work_queue_issue_messages.cjs");
+const { claimComment, commentMarker, issueBody, issueTitle, markedWorkId, orphanComment, terminalComment, workQueueFooter } = require("./work_queue_issue_messages.cjs");
 
 // Work items projected per invocation; the rest wait for the next projection.
 const MAX_PROJECTED_WORK = 50;
@@ -35,6 +35,7 @@ async function projectIssues({ githubClient, context, core: coreApi = undefined,
   try {
     const repo = { owner: context.repo.owner, repo: context.repo.repo };
     const repository = `${repo.owner}/${repo.repo}`;
+    const workflowName = process.env.GH_AW_WORKFLOW_NAME || context.workflow || process.env.GITHUB_WORKFLOW || "Work queue";
     const queue = { githubClient, context, role: "projector", core: coreApi, ...(branch === undefined ? {} : { branch }) };
     const current = state ?? (await loadQueue({ ...queue, policy })).state;
 
@@ -63,7 +64,7 @@ async function projectIssues({ githubClient, context, core: coreApi = undefined,
     /**
      * Comment once per marker (checked on the projector's most recent comments) on the exact
      * Issue `resourceId`; returns the comment and the Issue.
-     * @param {{number: number, resourceId: string}} target @param {string} marker @param {string} body
+     * @param {{number: number, resourceId: string}} target @param {string} marker @param {import("./report_ast.cjs").ReportBlock[]} body
      */
     const commentOnce = async ({ number, resourceId }, marker, body) => {
       const issue = await getIssue(githubClient, repo, number);
@@ -71,7 +72,7 @@ async function projectIssues({ githubClient, context, core: coreApi = undefined,
       for (const comment of await recentComments(githubClient, repo, number, issue.comments)) {
         if (comment.body.includes(marker) && (await byProjector(comment.author))) return { comment, issue };
       }
-      const comment = await addComment(githubClient, repo, number, body);
+      const comment = await addComment(githubClient, repo, number, [...body, ...workQueueFooter(context)], workflowName);
       result.commented++;
       return { comment, issue };
     };
@@ -98,7 +99,7 @@ async function projectIssues({ githubClient, context, core: coreApi = undefined,
           const id = await localRepoId();
           let issue = marked.get(work.work_id);
           if (!issue) {
-            issue = await createIssue(githubClient, repo, { title: issueTitle(work, config), body: issueBody(work, repository), label: config.label });
+            issue = await createIssue(githubClient, repo, { title: issueTitle(work, config), body: [...issueBody(work, repository), ...workQueueFooter(context)], label: config.label, workflowName });
             result.created++;
           }
           const resource = issueResource(issue, repository, id);

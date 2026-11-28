@@ -92,6 +92,9 @@ beforeEach(() => {
     GITHUB_WORKFLOW_REF: WORKFLOW_REF,
     GITHUB_WORKFLOW_SHA: "a".repeat(40),
     GITHUB_SERVER_URL: "https://github.com",
+    GITHUB_JOB: "safe_outputs",
+    GH_AW_WORKFLOW_ID: "worker",
+    GH_AW_JOB_CHECK_RUN_ID: "7",
     GH_AW_AUTHORIZATION_WORKFLOW_HASH: "b".repeat(64),
     GH_AW_SAFE_OUTPUTS_STAGED: "false",
   });

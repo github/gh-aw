@@ -21,7 +21,15 @@ func buildMaintenanceWorkQueueCompactionJobs(opts buildMaintenanceWorkflowYAMLOp
 	writeMaintenanceSetupScriptsStep(&b, setupActionRef)
 	b.WriteString(`      - name: Reconcile and checkpoint work queue
         uses: ` + getCachedActionPinFromResolver("actions/github-script", opts.resolver) + "\n")
-	writeWorkQueueRepositoryPolicyEnvironment(&b, opts.workQueuePolicy)
+	if opts.workQueuePolicy != "" {
+		b.WriteString(`        env:
+          GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
+          GH_AW_WORKFLOW_ID: "agentics-maintenance"
+`)
+		for _, line := range workQueuePolicyJSONEnvironment(opts.workQueuePolicy) {
+			b.WriteString(line)
+		}
+	}
 	b.WriteString(`        with:
           script: |
             const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');
