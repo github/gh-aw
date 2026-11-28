@@ -151,8 +151,7 @@ func RunExperimentsList(config ExperimentsListConfig) error {
 	}
 
 	if err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(err.Error()))
-		return nil
+		return err
 	}
 
 	if config.JSONOutput {
@@ -195,8 +194,7 @@ func runExperimentsAnalyze(ctx context.Context, config ExperimentsAnalyzeConfig)
 	// (e.g., when analysing experiments from a remote repository without the workflow checked out).
 	frontmatterResult, details, metricEvalResults, err := loadExperimentAnalysisInputs(config)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, console.FormatErrorMessage(err.Error()))
-		return nil
+		return err
 	}
 
 	metricObservationSets, cleanup, err := loadMetricObservationSetsForAnalysis(
