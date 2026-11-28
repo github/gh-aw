@@ -4,9 +4,11 @@ package workflow
 
 import (
 	"encoding/json"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -119,6 +121,9 @@ func TestConnectorAzureBrokerPhaseIsolation(t *testing.T) {
 }
 
 func TestConnectorAzureReaderPrivateSocketConfig(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("private connector sockets require Linux")
+	}
 	for _, engine := range []string{"copilot", "claude", "codex", "gemini", "pi"} {
 		t.Run(engine, func(t *testing.T) {
 			c, root := awConnectorCompiler(t)
@@ -164,6 +169,10 @@ func TestConnectorAzureReaderPrivateSocketConfig(t *testing.T) {
 				configPath := filepath.Join(temp, "gh-aw", "awf-config.json")
 				require.NoError(t, os.WriteFile(configPath, []byte(`{"filesystem":{"allowWrite":["/workspace"]}}`), 0o600))
 				directory := filepath.Join(temp, `dir "with $special"`)
+				require.NoError(t, os.Mkdir(directory, 0o700))
+				listener, err := net.Listen("unix", filepath.Join(directory, "token.sock"))
+				require.NoError(t, err)
+				defer listener.Close()
 				cmd := exec.Command("bash", "-c", line)
 				cmd.Env = append(os.Environ(), "RUNNER_TEMP="+temp, connectorAzurePrivateDirEnv(0)+"="+directory)
 				require.NoError(t, cmd.Run())
@@ -180,6 +189,17 @@ func TestConnectorAzureReaderPrivateSocketConfig(t *testing.T) {
 				require.Equal(t, []string{"/workspace"}, config.Filesystem.AllowWrite)
 				cmd = exec.Command("bash", "-c", line)
 				cmd.Env = append(os.Environ(), "RUNNER_TEMP="+temp, connectorAzurePrivateDirEnv(0)+"=")
+				require.Error(t, cmd.Run())
+				require.NoError(t, listener.Close())
+				cmd = exec.Command("bash", "-c", line)
+				cmd.Env = append(os.Environ(), "RUNNER_TEMP="+temp, connectorAzurePrivateDirEnv(0)+"="+directory)
+				require.Error(t, cmd.Run())
+				require.NoError(t, os.WriteFile(filepath.Join(directory, "token.sock"), nil, 0o600))
+				cmd = exec.Command("bash", "-c", line)
+				cmd.Env = append(os.Environ(), "RUNNER_TEMP="+temp, connectorAzurePrivateDirEnv(0)+"="+directory)
+				require.Error(t, cmd.Run())
+				cmd = exec.Command("bash", "-c", line)
+				cmd.Env = append(os.Environ(), "RUNNER_TEMP="+temp, connectorAzurePrivateDirEnv(0)+"=relative")
 				require.Error(t, cmd.Run())
 				return
 			}
@@ -217,6 +237,7 @@ func TestConnectorAzureBrokerRejectsUnsafeRoutes(t *testing.T) {
 		{"non-bearer", "scheme: bearer", "scheme: raw", "", "Authorization/bearer"},
 		{"disabled", "", "", "sandbox:\n  agent: false\n", "sandbox"},
 		{"host-access", "", "", "sandbox:\n  agent:\n    runtime: docker-sudo-iptables\n", "sandbox"},
+		{"arc-dind", "", "", "runner:\n  topology: arc-dind\n", "privileged local Docker"},
 		{"sibling-mount", "", "", "mcp-servers:\n  sibling:\n    type: stdio\n    container: node:22-alpine\n    mounts: ['${RUNNER_TEMP}:/mount:ro']\n", "sibling"},
 		{"gateway-mount", "", "", "sandbox:\n  mcp:\n    mounts: ['${RUNNER_TEMP}:/mount:ro']\n", "trusted MCP gateway"},
 		{"container", "", "", "container: ubuntu:latest\n", "custom host access"},
@@ -226,6 +247,8 @@ func TestConnectorAzureBrokerRejectsUnsafeRoutes(t *testing.T) {
 		{"secret-masking", "", "", "secret-masking:\n  steps:\n    - run: echo setup\n", "authored runner steps"},
 		{"mcp-scripts", "", "", "mcp-scripts:\n  example:\n    description: example\n    script: return 1;\n", "mcp-scripts"},
 		{"old-awf", "", "", "sandbox:\n  agent:\n    version: v0.29.20\n", "private socket isolation"},
+		{"latest-awf", "", "", "sandbox:\n  agent:\n    version: latest\n", "pinned AWF release"},
+		{"prerelease-awf", "", "", "sandbox:\n  agent:\n    version: v0.30.0-rc.1\n", "pinned AWF release"},
 		{"workflow-env", "", "", "env:\n  NODE_OPTIONS: --require=/tmp/hook.js\n", "workflow env"},
 		{"engine-env", "engine: copilot", "engine:\n  id: copilot\n  env:\n    NODE_OPTIONS: --require=/tmp/hook.js", "", "engine.env"},
 	} {
@@ -255,6 +278,9 @@ func TestConnectorAzureBrokerRequiresAgentSandbox(t *testing.T) {
 		{"import-disabled", "sandbox:\n  agent: false\n", "", false},
 		{"writer-default", "", "safe-outputs:\n  environment: publish\n  tracker-add-comment:\n", false},
 		{"writer-enabled", "sandbox:\n  agent: awf\n", "safe-outputs:\n  environment: publish\n  tracker-add-comment:\n", false},
+		{"reader-minimum-awf", "sandbox:\n  agent:\n    version: v0.29.21\n", "tools:\n  tracker: [get-issue]\n", false},
+		{"reader-rootless-cli", "runner:\n  installation: rootless\n", "tools:\n  tracker: [get-issue]\n", false},
+		{"import-arc-dind", "runner:\n  topology: arc-dind\n", "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c, root := awConnectorCompiler(t)

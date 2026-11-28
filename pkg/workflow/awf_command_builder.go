@@ -350,7 +350,7 @@ func finishAWFConfigFileSetup(config AWFCommandConfig, maxAICreditsExportLine, c
 		for i := range secrets {
 			names = append(names, shellEscapeArg(connectorAzurePrivateDirEnv(i)))
 		}
-		configFileSetup += "\nnode -e " + shellEscapeArg(`const fs = require("node:fs"); const path = require("node:path"); const file = process.argv[1]; const dirs = process.argv.slice(2).map(name => process.env[name]); if (dirs.some(dir => !dir || !path.isAbsolute(dir))) throw new Error("Missing private connector socket directory"); const config = JSON.parse(fs.readFileSync(file, "utf8")); config.filesystem ??= {}; config.filesystem.privateHostSocketDirs = dirs; fs.writeFileSync(file, JSON.stringify(config));`) + fmt.Sprintf(" %q ", awfConfigRuntimePathExpr) + strings.Join(names, " ") + " || exit 1"
+		configFileSetup += "\nnode -e " + shellEscapeArg(`const fs = require("node:fs"); const path = require("node:path"); const file = process.argv[1]; const dirs = process.argv.slice(2).map(name => process.env[name]); if (process.platform !== "linux" || dirs.some(dir => !dir || !path.isAbsolute(dir) || !fs.lstatSync(dir).isDirectory() || !fs.lstatSync(path.join(dir, "token.sock")).isSocket()) || new Set(dirs).size !== dirs.length) throw new Error("Invalid private connector socket directory"); const config = JSON.parse(fs.readFileSync(file, "utf8")); config.filesystem ??= {}; config.filesystem.privateHostSocketDirs = dirs; fs.writeFileSync(file, JSON.stringify(config));`) + fmt.Sprintf(" %q ", awfConfigRuntimePathExpr) + strings.Join(names, " ") + " || exit 1"
 	}
 	return configFileSetup + fmt.Sprintf("\ncp %q %s", awfConfigRuntimePathExpr, constants.AWFConfigFilePath)
 }

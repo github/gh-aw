@@ -189,6 +189,9 @@ func (c *Compiler) validateConnectorAzureBrokerRunners(data *WorkflowData) error
 func validateConnectorAzureReaderHost(data *WorkflowData) error {
 	errHost := errors.New("connector Azure OIDC readers require a built-in sandboxed engine, standard AWF docker runtime and trusted MCP gateway (no custom host access)")
 	engine := data.EngineConfig
+	if isArcDindTopology(data) {
+		return errors.New("connector Azure OIDC readers require privileged local Docker; remove runner.topology: arc-dind")
+	}
 	if !slices.Contains([]string{"copilot", "claude", "codex", "gemini", "pi"}, data.AI) ||
 		(engine != nil && (engine.IsInlineDefinition || engine.Command != "")) || !isFirewallEnabled(data) ||
 		data.Container != "" || data.Services != "" || enclavesEnabled(data) {
@@ -209,8 +212,12 @@ func validateConnectorAzureReaderHost(data *WorkflowData) error {
 		return errors.New("connector Azure OIDC readers cannot share a job with mcp-scripts")
 	}
 	firewall := getFirewallConfig(data)
-	if !awfVersionAtLeast(firewall, constants.AWFPrivateHostSocketDirsMinVersion) {
-		return fmt.Errorf("connector Azure OIDC readers require AWF %s or newer for private socket isolation", constants.AWFPrivateHostSocketDirsMinVersion)
+	version := string(constants.DefaultFirewallVersion)
+	if firewall != nil && firewall.Version != "" {
+		version = firewall.Version
+	}
+	if !pinnedReleaseVersionPattern.MatchString(version) || !awfVersionAtLeast(firewall, constants.AWFPrivateHostSocketDirsMinVersion) {
+		return fmt.Errorf("connector Azure OIDC readers require a pinned AWF release %s or newer for private socket isolation", constants.AWFPrivateHostSocketDirsMinVersion)
 	}
 	if !awfSupportsExcludeEnv(firewall) {
 		return fmt.Errorf("connector Azure OIDC readers require AWF %s or newer to exclude Actions OIDC credentials", constants.AWFExcludeEnvMinVersion)

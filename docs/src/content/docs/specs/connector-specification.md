@@ -252,7 +252,10 @@ untrusted sibling MCP servers, gateway customization, enclaves, `engine.env`,
 and workflow `env` entries other than `DEBUG`.
 For each active reader broker, the compiler MUST supply its actual host socket
 directory to AWF's `filesystem.privateHostSocketDirs` before agent execution.
-Readers require AWF v0.29.21 or later and privileged local Linux Docker/runc;
+Readers require a pinned AWF release v0.29.21 or later and privileged local Linux Docker/runc;
+declared ARC/DinD MUST be rejected at compile time. Before invoking AWF, the
+runner MUST reject missing or invalid broker
+directories and socket endpoints.
 AWF MUST fail closed when it cannot verify that directory against the effective
 agent-visible mounts. The compiler MUST NOT substitute a guessed temporary path.
 
