@@ -247,21 +247,21 @@ As the budget is approached, AWF sends the agent budget notices before the run r
 > for `safe-outputs.threat-detection.max-ai-credits` (defaults to
 > `400`, overridable via `GH_AW_DEFAULT_DETECTION_MAX_AI_CREDITS`).
 
-### AI Credits with Dynamic Model Selectors
+### AI Credits with Routed and Dynamic Model Selectors
 
-Some engines accept a dynamic model selector instead of a concrete model name — for example `model: auto`, which lets the Copilot service pick the model server-side. AI Credits accounting for those selectors is handled natively by the firewall API proxy (gh-aw-firewall `v0.28.4` and newer), so `max-ai-credits` works with zero extra configuration:
+When a workflow uses `model: router` (or an alias or dynamic selector instead of a concrete model name), AI Credits accounting is handled natively by the firewall API proxy, so `max-ai-credits` works with zero extra configuration:
 
 ```aw wrap
 engine: copilot
-model: auto
+model: router
 max-ai-credits: 500
 ```
 
-Here `auto` is the engine or provider's own selector (Copilot's server-side selector in this example), not gh-aw's per-task router; to route each task with gh-aw, use `model: router` instead (see [Model Routing](/gh-aw/reference/model-routing/)).
+`model: auto` and `model: copilot/auto` are deprecated for main-agent workflows: on eligible workflows using AWF `v0.29.21` or newer, they route as `model: router`, including falling back to the best eligible model in your account when none is in the router tables (for example picking `gpt-5.3-codex` over `gpt-5-nano` with zero classifier overhead when only those two are available). Run `gh aw fix --write` to rewrite eligible workflows to `model: router` (see [Model Routing](/gh-aw/reference/model-routing/)).
 
-gh-aw does not compile a synthetic price for the selector itself. Requests are accounted against the concrete model reported by the response, so each model is charged at its own catalog rate. When a response omits model metadata, the proxy falls back to its conservative rate rather than undercounting.
+gh-aw does not compile a synthetic price for the selector itself. Requests are accounted against the concrete model reported by the response, so each model (whether router-picked, router-fallback, or alias-resolved) is charged at its own catalog rate. When a response omits model metadata, the proxy falls back to its conservative rate rather than undercounting.
 
-The same rule applies to `apiProxy.maxModelMultiplierCap`: the cap is evaluated against the multiplier of the *resolved* concrete model, not against the dynamic selector. A selector such as `auto` therefore never bypasses the cap — a request routed to a model whose multiplier exceeds the cap is rejected with HTTP 400 (`model_multiplier_cap_exceeded`). Models without an explicit multiplier use `defaultModelMultiplier` when configured, otherwise the highest configured multiplier.
+The same rule applies to `apiProxy.maxModelMultiplierCap`: the cap is evaluated against the multiplier of the *resolved* concrete model, not against the selector name. A selector therefore never bypasses the cap: a request routed to a model whose multiplier exceeds the cap is rejected with HTTP 400 (`model_multiplier_cap_exceeded`). Models without an explicit multiplier use `defaultModelMultiplier` when configured, otherwise the highest configured multiplier.
 
 For task-level model routing, see the [Model Routing guide](/gh-aw/reference/model-routing/) for configuration, and the [Audit](/gh-aw/reference/audit/) page for interpreting classifier overhead, selected-route costs, and deviations in `gh aw audit` and `gh aw logs`.
 

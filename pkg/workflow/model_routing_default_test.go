@@ -35,10 +35,17 @@ func TestCompileDefaultModelRouting_CloudHypervisor(t *testing.T) {
 		require.Contains(t, compiled.lock, "Prepare model-routing conversation")
 	})
 
-	t.Run("v0.29.12 boundary routes", func(t *testing.T) {
-		compiled := compileDefaultRoutingSource(t, routingRuntimeFixture("none", "sandbox:\n  agent:\n    runtime: cloud-hypervisor\n    version: v0.29.12\n"))
+	t.Run("v0.29.21 boundary routes", func(t *testing.T) {
+		compiled := compileDefaultRoutingSource(t, routingRuntimeFixture("none", "sandbox:\n  agent:\n    runtime: cloud-hypervisor\n    version: v0.29.21\n"))
 		require.NoError(t, compiled.err)
 		require.True(t, isModelRoutingImplicit(compiled.data))
+	})
+
+	t.Run("v0.29.20 stays non-routed without fallback support", func(t *testing.T) {
+		compiled := compileDefaultRoutingSource(t, routingRuntimeFixture("none", "sandbox:\n  agent:\n    runtime: cloud-hypervisor\n    version: v0.29.20\n"))
+		requireNoDefaultRouting(t, compiled)
+		require.Zero(t, compiled.warnings)
+		require.Contains(t, compiled.lock, "--container-runtime cloud-hypervisor")
 	})
 
 	t.Run("A2 v0.29.11 stays non-routed", func(t *testing.T) {
