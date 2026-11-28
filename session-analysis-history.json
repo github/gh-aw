@@ -460,8 +460,18 @@
       ],
       "human_prompt_noop_pct": 0.0,
       "human_prompt_change_pct": 73.7
+    },
+    {
+      "date": "2026-11-28",
+      "sessions": 21,
+      "completion_pct": 95.2,
+      "avg_dur_min": 19.91,
+      "median_dur_min": 19.65,
+      "loops": null,
+      "orphan_rate_pct": 0.0,
+      "data_quality": "metadata-only: 0/21 conversation transcripts; copilot-agent-only scope (no CI-gate runs); completion = success/total; duration = updated_at-created_at proxy; 1 in_progress"
     }
   ],
-  "last_updated": "2026-11-06",
+  "last_updated": "2026-11-28",
   "version": "1.11"
 }
