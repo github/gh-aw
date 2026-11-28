@@ -102,3 +102,5 @@
 {"id":"feedback_loops_documented","question":"Did the workflow produce a story that links multi-workflow behavior with human interventions?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-25T08:09:45.707Z","runid":"45571615556"}
 {"id":"episodes_analyzed","question":"Did the workflow identify and analyze episode-level activity from the last 24 hours?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-26T08:09:43.364Z","runid":"45778651069"}
 {"id":"feedback_loops_documented","question":"Did the workflow produce a story that links multi-workflow behavior with human interventions?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-26T08:09:43.364Z","runid":"45778651069"}
+{"id":"episodes_analyzed","question":"Did the workflow identify and analyze episode-level activity from the last 24 hours?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-28T08:09:40.881Z","runid":"46123217080"}
+{"id":"feedback_loops_documented","question":"Did the workflow produce a story that links multi-workflow behavior with human interventions?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-28T08:09:40.881Z","runid":"46123217080"}
