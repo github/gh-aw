@@ -125,6 +125,7 @@ tools:
   bash: false
   cli-proxy: false
   github:
+    mode: local
     min-integrity: none
 ```
 

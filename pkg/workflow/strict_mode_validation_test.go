@@ -686,10 +686,11 @@ func TestValidateStrictCacheMemoryScope(t *testing.T) {
 // TestValidateStrictMinIntegrityNoneBash tests that min-integrity: none requires explicit bash in strict mode
 func TestValidateStrictMinIntegrityNoneBash(t *testing.T) {
 	tests := []struct {
-		name        string
-		frontmatter map[string]any
-		expectError bool
-		errorMsg    string
+		name          string
+		frontmatter   map[string]any
+		expectError   bool
+		errorMsg      string
+		errorContains []string
 	}{
 		{
 			name: "min-integrity none without bash - rejected",
@@ -703,6 +704,12 @@ func TestValidateStrictMinIntegrityNoneBash(t *testing.T) {
 			},
 			expectError: true,
 			errorMsg:    "tools.bash",
+			errorContains: []string{
+				"gh aw fix --write",
+				"bash: false",
+				"cli-proxy: false",
+				"allowlist",
+			},
 		},
 		{
 			name: "min-integrity none with bash: true - allowed",
@@ -771,8 +778,8 @@ func TestValidateStrictMinIntegrityNoneBash(t *testing.T) {
 					t.Errorf("Expected error containing '%s', got '%s'", tt.errorMsg, err.Error())
 				}
 			}
-			if tt.expectError && err != nil {
-				for _, expected := range []string{"gh aw fix --write", "bash: false", "cli-proxy: false", "allowlist"} {
+			if err != nil {
+				for _, expected := range tt.errorContains {
 					if !strings.Contains(err.Error(), expected) {
 						t.Errorf("Expected error containing %q, got %q", expected, err.Error())
 					}
