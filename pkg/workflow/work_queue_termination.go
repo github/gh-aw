@@ -20,6 +20,9 @@ func (c *Compiler) buildWorkQueueTerminationStep(data *WorkflowData) []string {
 		fmt.Sprintf("        uses: %s\n", c.getActionPin("actions/github-script")),
 	)
 	steps = append(steps, workQueuePolicyEnvironment(data)...)
+	if issues && data.TrackerID != "" {
+		steps = append(steps, formatYAMLEnv("          ", "GH_AW_TRACKER_ID", data.TrackerID))
+	}
 	var staged *TemplatableBool
 	if data.SafeOutputs != nil {
 		staged = data.SafeOutputs.Staged

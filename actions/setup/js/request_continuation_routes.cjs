@@ -353,13 +353,16 @@ function parentNodeKey(workId) {
 async function createApprovalIssue({ client, context, member, request }) {
   const { createReportIssue } = require("./issue_report.cjs");
   const { issueResource, repositoryId } = require("./work_queue_issue_api.cjs");
+  const { workQueueFooter } = require("./work_queue_issue_messages.cjs");
   const repo = { owner: context.repo.owner, repo: context.repo.repo };
   const repository = `${repo.owner}/${repo.repo}`;
   const payloadRepository = context.payload?.repository;
   let repoId = payloadRepository?.full_name === repository && payloadRepository.id !== undefined ? String(payloadRepository.id) : undefined;
   repoId ??= await repositoryId(client, repo);
   if (!DECIMAL.test(String(repoId))) throw routeError("continuation_issue_invalid", "the queue repository has no native identity");
-  const report = approvalIssueReport({ nodeKey: parentNodeKey(member.work_id), workId: member.work_id, message: request.message, runUrl: sourceRunUrl(context) });
+  const runUrl = sourceRunUrl(context);
+  const report = approvalIssueReport({ nodeKey: parentNodeKey(member.work_id), workId: member.work_id, message: request.message, runUrl });
+  report.children.push(...workQueueFooter(context, runUrl));
   const response = await createReportIssue(client, { ...repo, title: report.title, body: "", request: { retries: 0 } }, report);
   const data = response?.data;
   const id = data?.id;

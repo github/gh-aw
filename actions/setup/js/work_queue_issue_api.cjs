@@ -1,7 +1,9 @@
 // @ts-check
 "use strict";
 
-const { createReportIssue } = require("./issue_report.cjs");
+const { buildIssueReport, createReportIssue } = require("./issue_report.cjs");
+const { renderSizedReport } = require("./report_size.cjs");
+const { MAX_COMMENT_LENGTH } = require("./comment_limit_helpers.cjs");
 const { expectedGitHubHost } = require("./work_queue_host.cjs");
 
 // Comment-marker idempotence only inspects the most recent comments of an Issue.
@@ -38,14 +40,15 @@ function issueResource(issue, repository, repoId) {
   return { kind: "issue", host: expectedGitHubHost(), repository, repository_id: String(repoId), resource_id: String(issue.id), number: String(issue.number) };
 }
 
-/** @param {any} githubClient @param {{owner: string, repo: string}} repo @param {{title: string, body: string, label: string}} issue */
+/** @param {any} githubClient @param {{owner: string, repo: string}} repo @param {{title: string, body: import("./report_ast.cjs").ReportBlock[], label: string}} issue */
 async function createIssue(githubClient, repo, { title, body, label }) {
-  const { data } = await createReportIssue(githubClient, { ...repo, title, body, labels: [label] });
+  const { data } = await createReportIssue(githubClient, { ...repo, title, labels: [label] }, buildIssueReport(title, body, { agentTainted: false }));
   return data;
 }
 
-/** @param {any} githubClient @param {{owner: string, repo: string}} repo @param {number} number @param {string} body */
-async function addComment(githubClient, repo, number, body) {
+/** @param {any} githubClient @param {{owner: string, repo: string}} repo @param {number} number @param {import("./report_ast.cjs").ReportBlock[]} children */
+async function addComment(githubClient, repo, number, children) {
+  const { body } = renderSizedReport({ type: "report", title: "Work queue status", children }, MAX_COMMENT_LENGTH);
   const { data } = await githubClient.rest.issues.createComment({ ...repo, issue_number: number, body });
   return data;
 }

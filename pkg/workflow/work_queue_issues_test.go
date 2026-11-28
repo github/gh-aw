@@ -121,7 +121,7 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "worker.md")
 	compile := func(issues string, trial bool) map[string]any {
-		source := "---\non: workflow_dispatch\nengine: claude\ntools:\n  work-queue:\n    worker: true\nsafe-outputs:\n  noop:\n---\nProcess Claims.\n"
+		source := "---\non: workflow_dispatch\nengine: claude\ntracker-id: queue-worker\ntools:\n  work-queue:\n    worker: true\nsafe-outputs:\n  noop:\n---\nProcess Claims.\n"
 		require.NoError(t, os.WriteFile(file, []byte(source), 0o600))
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, ".github", "workflows"), 0o755))
 		config := "{}"
@@ -175,6 +175,7 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 	}
 	require.NotNil(t, termination)
 	require.Equal(t, "always()", termination["if"])
+	require.Equal(t, "queue-worker", termination["env"].(map[string]any)["GH_AW_TRACKER_ID"])
 	var policy struct {
 		Issues map[string]any `json:"issues"`
 	}
