@@ -19,7 +19,7 @@
  *    - Review events bind to the review/comment commit; issue comments select
  *      the current head, not a historically approved revision
  *
- * 4. workflow_dispatch with aw_context:
+ * 4. workflow_dispatch with aw_context or pull_request_number:
  *    - When aw_context input contains item_type=="pull_request" and item_number,
  *      the PR number is extracted and a specific head SHA is fetched
  *    - Mirrors the guard in the compiled workflow's if: condition
@@ -555,6 +555,15 @@ async function main() {
         core.setFailed(`${ERR_PERMISSION}: Refusing PR checkout: invalid aw_context: ${redactCheckoutDiagnostics(getErrorMessage(e))}`);
         return;
       }
+    } else if (context.payload.inputs?.pull_request_number) {
+      const prNumber = parsePullRequestNumber(context.payload.inputs.pull_request_number);
+      if (prNumber === null) {
+        core.setOutput("checkout_pr_success", "false");
+        core.setFailed(`${ERR_PERMISSION}: Refusing PR checkout: pull_request_number must identify a canonical positive PR number`);
+        return;
+      }
+      pullRequest = { number: prNumber, state: "open" };
+      core.info(`Detected workflow_dispatch event for PR #${prNumber} via pull_request_number, will fetch PR ref`);
     }
   }
 

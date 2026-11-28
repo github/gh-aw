@@ -1680,6 +1680,38 @@ If the pull request is still open, verify that:
       expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
 
+    it("should prepare the incremental baseline for a direct PR-number dispatch", async () => {
+      mockContext.payload.inputs = { pull_request_number: "123" };
+
+      await runScript();
+
+      expect(mockGithub.rest.pulls.get).toHaveBeenCalledWith(expect.objectContaining({ pull_number: 123 }));
+      expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "-B", "feature-branch", "refs/remotes/origin/pr-head"]);
+      expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_SHA", "1111111111111111111111111111111111111111");
+      expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_PR_NUMBER", "123");
+      expect(mockCore.setOutput).toHaveBeenCalledWith("checked_out", "true");
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it.each(["0", "-1", "1e3", "123.0", " 123", "9007199254740992"])("should reject invalid direct PR-number dispatch %s before API or checkout operations", async pullRequestNumber => {
+      mockContext.payload.inputs = { pull_request_number: pullRequestNumber };
+
+      await runScript();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("canonical positive PR number"));
+      expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
+      expect(mockExec.exec).not.toHaveBeenCalled();
+    });
+
+    it("should not let a direct PR-number input override aw_context", async () => {
+      mockContext.payload.inputs.pull_request_number = "456";
+
+      await runScript();
+
+      expect(mockGithub.rest.pulls.get).toHaveBeenCalledWith(expect.objectContaining({ pull_number: 123 }));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
     it("should refuse PR replay when the runtime repository is a fork", async () => {
       mockContext.payload.repository.fork = true;
 

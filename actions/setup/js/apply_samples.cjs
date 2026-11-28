@@ -497,19 +497,32 @@ async function preStagePatch(entry, index, workspace) {
 
   ensureGitIdentity(repoCwd);
 
-  // Start from the base branch so the diff is meaningful. Tolerate the case
-  // where the base ref doesn't exist locally — fall back to HEAD.
-  try {
-    runGit(["checkout", DEFAULT_BASE_BRANCH], repoCwd);
-  } catch (err) {
-    core.warning(`apply_samples: could not check out base branch ${DEFAULT_BASE_BRANCH}: ${getErrorMessage(err)}; staying on current HEAD`);
-  }
+  // New PRs start at the base branch; incremental pushes must preserve the
+  // PR head prepared by checkout rather than replaying on the base branch.
+  if (entry.tool !== "push_to_pull_request_branch") {
+    try {
+      runGit(["checkout", DEFAULT_BASE_BRANCH], repoCwd);
+    } catch (err) {
+      core.warning(`apply_samples: could not check out base branch ${DEFAULT_BASE_BRANCH}: ${getErrorMessage(err)}; staying on current HEAD`);
+    }
 
-  // Create the branch (or check it out if it already exists from a previous sample).
-  try {
-    runGit(["checkout", "-b", branch], repoCwd);
-  } catch {
-    runGit(["checkout", branch], repoCwd);
+    // Create the branch (or check it out if it already exists from a previous sample).
+    try {
+      runGit(["checkout", "-b", branch], repoCwd);
+    } catch {
+      runGit(["checkout", branch], repoCwd);
+    }
+  } else {
+    try {
+      runGit(["checkout", branch], repoCwd);
+    } catch {
+      // Same-repository PRs may only have a pre-fetched tracking ref.
+      try {
+        runGit(["checkout", "-b", branch, `refs/remotes/origin/${branch}`], repoCwd);
+      } catch {
+        runGit(["checkout", "-b", branch], repoCwd);
+      }
+    }
   }
 
   // Write patch to a temp file and apply it.
