@@ -8,6 +8,7 @@ useExecutionProvenanceFixture();
 
 const { getPatchPathForBranch, getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
 const { getBundlePathForBranch, getBundlePathForBranchInRepo } = require("./generate_git_bundle.cjs");
+const { OBJECT_PACK_PREVIEW_HEADER } = require("./object_pack_transport.cjs");
 const promptsSourceDir = path.resolve(__dirname, "../md");
 
 // The privileged handler derives patch/bundle paths from `branch` (and `repo`)
@@ -1164,6 +1165,20 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
   // ──────────────────────────────────────────────────────
 
   describe("repository state scenarios", () => {
+    it("rejects an orphaned object-pack preview without invoking git am", async () => {
+      createPatchFile("orphaned-object-pack", `${OBJECT_PACK_PREVIEW_HEADER}\nObject preview\n`);
+      const module = await loadModule();
+      const handler = await module.main({});
+      const result = await handler({ branch: "orphaned-object-pack" }, {});
+
+      expect(result).toMatchObject({
+        success: false,
+        error: "Object-pack recovery envelope is missing. The preview changed after packaging, so the push cannot be applied.",
+      });
+      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+    });
+
     it.each(["warn", "error", "ignore"])("should handle successful normal push with %s no-change policy", async ifNoChanges => {
       const patchPath = createPatchFile("should-handle-successful-normal-push");
       mockExec.getExecOutput

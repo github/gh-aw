@@ -13,7 +13,7 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  */
 
 /** Matches an `::add-mask::` workflow command and captures its payload. */
-const ADD_MASK_COMMAND_RE = /::add-mask::(.*)$/;
+const ADD_MASK_COMMAND_RE = /::add-mask::(.*)\r?$/;
 
 const { MASK_REPLACEMENT, redactMaskedValues, maskedValueMatches, overlappingMatchGroups } = require("./mask_value_matcher.cjs");
 const { transformJSONStrings } = require("./json_string_scanner.cjs");
@@ -32,10 +32,21 @@ function unescapeWorkflowCommandValue(value) {
  * Check whether a log line is an `::add-mask::` workflow command.
  *
  * @param {string} line
+ * @param {boolean} [sourceOnly] - Preserve variable references in known source text
  * @returns {boolean}
  */
-function isAddMaskCommandLine(line) {
-  return ADD_MASK_COMMAND_RE.test(line);
+function isAddMaskCommandLine(line, sourceOnly = false) {
+  const match = line.match(ADD_MASK_COMMAND_RE);
+  return !!match && !(sourceOnly && isUnexpandedMaskSource(line, match));
+}
+
+/**
+ * @param {string} line
+ * @param {RegExpMatchArray} match
+ * @returns {boolean}
+ */
+function isUnexpandedMaskSource(line, match) {
+  return /^\s*[+-]?\s*(?:run:\s*)?echo\s+["']?$/.test(line.slice(0, match.index)) && /^\$(?:\{[A-Za-z_][A-Za-z0-9_]*\}|[A-Za-z_][A-Za-z0-9_]*)["']?\s*$/.test(match[1]);
 }
 
 /**
@@ -45,15 +56,16 @@ function isAddMaskCommandLine(line) {
  * that partial occurrences are redacted too.
  *
  * @param {string} logContent
+ * @param {{sourceOnly?: boolean}} [options] - Ignore variable references only for known source text
  * @returns {string[]} Unique masked values, longest first
  */
-function collectAddMaskedValues(logContent) {
+function collectAddMaskedValues(logContent, options = {}) {
   /** @type {Set<string>} */
   const values = new Set();
   if (!logContent) return [];
   for (const line of logContent.split("\n")) {
     const match = line.match(ADD_MASK_COMMAND_RE);
-    if (!match) continue;
+    if (!match || (options.sourceOnly && isUnexpandedMaskSource(line, match))) continue;
     const decoded = unescapeWorkflowCommandValue(match[1]);
     for (const candidate of decoded.split(/\r\n|\r|\n/)) {
       if (!candidate.trim()) continue;
@@ -76,11 +88,11 @@ function collectAddMaskedValues(logContent) {
  * @param {(value: string) => string} [replacementForValue]
  * @returns {string}
  */
-function applyAddMaskRedaction(text, maskedValues, replacementForValue) {
+function applyAddMaskRedaction(text, maskedValues, replacementForValue, preserveUnexpandedMaskSources = false) {
   if (!text) return text;
   const withoutCommands = text
     .split("\n")
-    .filter(line => !isAddMaskCommandLine(line))
+    .filter(line => !isAddMaskCommandLine(line, preserveUnexpandedMaskSources))
     .join("\n");
   return redactMaskedValues(withoutCommands, maskedValues, replacementForValue);
 }
@@ -145,15 +157,34 @@ function decodeJSONString(encoded) {
  * @param {Array<{start: number, end: number, value: string, replacement: string}>} [extraMatches]
  * @returns {string}
  */
-function redactMixedMaskedValues(text, maskedValues, replacementForValue, matchRawText = false, extraMatches = []) {
+function redactMixedMaskedValues(text, maskedValues, replacementForValue, matchRawText = false, extraMatches = [], preserveUnexpandedMaskSources = false) {
   const commandLines = new Set();
+  const sourceLineRanges = [];
   if (matchRawText) {
     const lines = text.split("\n");
+    let lineStart = 0;
     for (let index = 0; index < lines.length; index++) {
-      if (isAddMaskCommandLine(lines[index])) commandLines.add(lines[index] + (index < lines.length - 1 ? "\n" : ""));
+      const line = lines[index];
+      const match = line.match(ADD_MASK_COMMAND_RE);
+      if (isAddMaskCommandLine(line, preserveUnexpandedMaskSources)) commandLines.add(line + (index < lines.length - 1 ? "\n" : ""));
+      else if (preserveUnexpandedMaskSources && match && isUnexpandedMaskSource(line, match)) {
+        sourceLineRanges.push({ start: lineStart, end: lineStart + line.length });
+      }
+      lineStart += line.length + (index < lines.length - 1 ? 1 : 0);
     }
     maskedValues = [...maskedValues, ...commandLines];
   }
+  const isPreservedSourceMatch = match => {
+    let low = 0;
+    let high = sourceLineRanges.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if (sourceLineRanges[mid].start <= match.start) low = mid + 1;
+      else high = mid;
+    }
+    const line = sourceLineRanges[low - 1];
+    return !!line && match.start >= line.start && match.end <= line.end;
+  };
   maskedValues = [...maskedValues].sort((a, b) => b.length - a.length);
   const tokens = [];
   let scanned = 0;
@@ -205,6 +236,7 @@ function redactMixedMaskedValues(text, maskedValues, replacementForValue, matchR
     text,
     maskedValues,
     match => {
+      if (isPreservedSourceMatch(match)) return false;
       if (matchRawText) return true;
       const token = tokenAt(match.start);
       return token < 0 || match.end > tokens[token + 1];
@@ -216,6 +248,7 @@ function redactMixedMaskedValues(text, maskedValues, replacementForValue, matchR
     maskedValues,
     match => {
       const source = toSource(match);
+      if (isPreservedSourceMatch(source)) return false;
       const token = tokenAt(source.start);
       return token < 0 || source.end > tokens[token + 1] || (source.start > tokens[token] && source.end < tokens[token + 1]);
     },
@@ -267,11 +300,40 @@ function redactMixedMaskedValues(text, maskedValues, replacementForValue, matchR
   }
   if (repetitions) parts.push(repeated.repeat(repetitions));
   parts.push(text.slice(cursor));
-  const redacted = transformJSONStrings(parts.join(""), encoded => {
-    const value = decodeJSONString(encoded);
-    const withoutCommands = applyAddMaskRedaction(value, []);
-    return withoutCommands === value ? encoded : JSON.stringify(withoutCommands);
-  });
+  const result = parts.join("");
+  let position = 0;
+  let lineStart = 0;
+  let lineEnd = result.indexOf("\n", lineStart);
+  let sourceLineClassified = false;
+  let preserveSourceLine = false;
+  const redacted = transformJSONStrings(
+    result,
+    encoded => {
+      const start = position;
+      position += encoded.length;
+      if (matchRawText && preserveUnexpandedMaskSources) {
+        while (lineEnd >= 0 && start >= lineEnd) {
+          lineStart = lineEnd + 1;
+          lineEnd = result.indexOf("\n", lineStart);
+          sourceLineClassified = false;
+        }
+        if (!sourceLineClassified) {
+          const line = result.slice(lineStart, lineEnd < 0 ? undefined : lineEnd);
+          const match = line.match(ADD_MASK_COMMAND_RE);
+          preserveSourceLine = !!match && isUnexpandedMaskSource(line, match);
+          sourceLineClassified = true;
+        }
+        if (preserveSourceLine) return encoded;
+      }
+      const value = decodeJSONString(encoded);
+      const withoutCommands = applyAddMaskRedaction(value, []);
+      return withoutCommands === value ? encoded : JSON.stringify(withoutCommands);
+    },
+    plain => {
+      position += plain.length;
+      return plain;
+    }
+  );
   // A registered raw whole-line value removes all of the original syntax.
   return ambiguous && !maskedValues.includes(text) ? JSON.stringify(redacted) : redacted;
 }
@@ -285,25 +347,26 @@ function redactMixedMaskedValues(text, maskedValues, replacementForValue, matchR
  * @param {string[]} maskedValues
  * @param {(value: any) => any} [redactJSONValue] - Structured protocol redactor for valid JSON records
  * @param {(value: string) => string} [replacementForValue] - Marker for each matched registered value
- * @param {{textMode?: boolean, patternMatches?: Array<{start: number, end: number, value: string, replacement: string}>}} [options] - Match raw credential patterns together with registered secret values
+ * @param {{textMode?: boolean, patternMatches?: Array<{start: number, end: number, value: string, replacement: string}>, preserveUnexpandedMaskSources?: boolean}} [options] - Match raw credential patterns and preserve source references only when provenance is known
  * @returns {string}
  */
 function redactArtifactMaskedValues(content, maskedValues, redactJSONValue, replacementForValue, options = {}) {
-  if (!content || (!maskedValues.length && !redactJSONValue && !options.patternMatches?.length)) return content;
+  if (!content || (!maskedValues.length && !redactJSONValue && !options.patternMatches?.length && !content.includes("::add-mask::"))) return content;
   const preserveLexemes = !!replacementForValue && !redactJSONValue;
   const replacement = replacementForValue || (() => MASK_REPLACEMENT);
+  const preserveUnexpandedMaskSources = !!options.preserveUnexpandedMaskSources;
   if (options.textMode && preserveLexemes) {
     // Only multiline credentials can overlap a removed command-line boundary.
     if (!maskedValues.some(value => /[\r\n]/.test(value))) {
       content = content
         .split("\n")
-        .filter(line => !isAddMaskCommandLine(line))
+        .filter(line => !isAddMaskCommandLine(line, preserveUnexpandedMaskSources))
         .join("\n");
     }
-    return redactMixedMaskedValues(content, maskedValues, replacement, true, options.patternMatches);
+    return redactMixedMaskedValues(content, maskedValues, replacement, true, options.patternMatches, preserveUnexpandedMaskSources);
   }
   const redactValue = value => {
-    if (typeof value === "string") return applyAddMaskRedaction(value, maskedValues, replacementForValue);
+    if (typeof value === "string") return applyAddMaskRedaction(value, maskedValues, replacementForValue, preserveUnexpandedMaskSources);
     if (Array.isArray(value)) return value.map(redactValue);
     if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, nested]) => [redactMaskedValues(key, maskedValues, replacementForValue), redactValue(nested)]));
     return value;
@@ -364,11 +427,11 @@ function redactArtifactMaskedValues(content, maskedValues, redactJSONValue, repl
   for (const event of iterateJsonlEvents(content)) {
     const newline = event.rawLine.endsWith("\n") ? "\n" : "";
     const line = newline ? event.rawLine.slice(0, -1) : event.rawLine;
-    if (isAddMaskCommandLine(line.replace(/\r$/, ""))) continue;
+    if (isAddMaskCommandLine(line.replace(/\r$/, ""), preserveUnexpandedMaskSources)) continue;
     if (event.type === "json") {
       redactedLines.push(redactJson(event.rawLine, event.value));
     } else if (preserveLexemes) {
-      redactedLines.push(redactMixedMaskedValues(line, maskedValues, replacement), newline);
+      redactedLines.push(redactMixedMaskedValues(line, maskedValues, replacement, false, [], preserveUnexpandedMaskSources), newline);
     } else {
       // Mixed or malformed logs can still contain recoverable JSON strings.
       const decoded = transformJSONStrings(line, redactString);

@@ -2,7 +2,9 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,7 +30,7 @@ func loadLocalLogParserEngine(id string) (*workflow.BehaviorDefinedEngine, error
 			logsEngineDefinitionLog.Printf("Found engine catalog at %s, resolving log parser for engine %q", catalogPath, id)
 			return loadLocalLogParserEngineAt(directory, id, content)
 		}
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
 		parent := filepath.Dir(directory)
@@ -46,7 +48,7 @@ func resolvedLocalLogParserDefinition(root, definitionPath, id string) (string, 
 		return "", fmt.Errorf("failed to resolve engine definition root: %w", err)
 	}
 	resolvedDefinition, err := filepath.EvalSymlinks(definitionPath)
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return "", nil
 	}
 	if err != nil {

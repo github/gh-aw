@@ -10,6 +10,7 @@ import (
 )
 
 func TestIsValidToolName(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		toolName string
@@ -41,6 +42,7 @@ func TestIsValidToolName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := isValidToolName(tt.toolName)
 			assert.Equal(t, tt.want, got, "isValidToolName(%q)", tt.toolName)
 		})
@@ -48,8 +50,10 @@ func TestIsValidToolName(t *testing.T) {
 }
 
 func TestIsValidToolName_AllStopWords(t *testing.T) {
+	t.Parallel()
 	for word := range toolNameStopWords {
 		t.Run("stopword_"+word, func(t *testing.T) {
+			t.Parallel()
 			assert.False(t, isValidToolName(word), "stop word %q should be invalid", word)
 		})
 	}

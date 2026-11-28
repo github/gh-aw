@@ -137,7 +137,7 @@ func handleBatchToolError(toolName string, err error, strict, verbose bool) erro
 		return nil
 	}
 	var fatal *fatalFindingError
-	if strict || errors.As(err, &fatal) {
+	if strict || errors.As(err, &fatal) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return fmt.Errorf("%s failed: %w", toolName, err)
 	}
 	// In non-strict mode, errors are warnings

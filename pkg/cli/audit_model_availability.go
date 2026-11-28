@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -54,7 +55,7 @@ func generateLegacyPiModelAvailabilityFindings(run WorkflowRun) []AuditFinding {
 	}
 	logData, err := readModelAvailabilityArtifact(run.LogsPath, "agent-stdio.log", 32<<20)
 	if err != nil {
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, fs.ErrNotExist) {
 			auditReportLog.Printf("Could not read model availability startup log: %v", err)
 		}
 		return nil

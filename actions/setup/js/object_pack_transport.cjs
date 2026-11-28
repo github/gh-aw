@@ -14,6 +14,7 @@ const { getExcludedFiles, WORKFLOW_COMPILATION_NOTICE } = require("./workflow_fi
 const { currentClaimAssignment, currentClaimHandle } = require("./work_queue_claim_scope.cjs");
 
 const MAGIC = Buffer.from("GH-AW-OBJECT-PACK 1\n");
+const OBJECT_PACK_PREVIEW_HEADER = "GH-AW object-pack recovery preview v1";
 const oidPattern = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const hash = bytes => crypto.createHash("sha256").update(bytes).digest("hex");
 
@@ -166,7 +167,7 @@ function inspectObjectPack(pack, objectFormat, limits = getObjectPackLimits()) {
     objects.set(oid, { type, bytes });
   }
   if (offset !== end) throw new Error("Unexpected recovery pack data");
-  const chunks = [Buffer.from("GH-AW object-pack recovery preview v1\n")];
+  const chunks = [Buffer.from(`${OBJECT_PACK_PREVIEW_HEADER}\n`)];
   for (const oid of [...objects.keys()].sort()) {
     const { type, bytes } = objects.get(oid);
     chunks.push(Buffer.from(`\nObject ${oid} ${type} ${bytes.length}\n`), bytes);
@@ -413,4 +414,4 @@ async function recoverObjectPackChecked(transport, paths, options) {
   }
 }
 
-module.exports = { createObjectPack, recoverObjectPack, canRecoverPatch, isObjectPack, recoveryToken, traceObjectPack, inspectObjectPack };
+module.exports = { OBJECT_PACK_PREVIEW_HEADER, createObjectPack, recoverObjectPack, canRecoverPatch, isObjectPack, recoveryToken, traceObjectPack, inspectObjectPack };
