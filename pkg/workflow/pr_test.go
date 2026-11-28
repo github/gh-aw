@@ -591,13 +591,23 @@ func TestGeneratePRReadyForReviewCheckout_DoesNotForwardUnrelatedTargetExpressio
 }
 
 func TestGeneratePRReadyForReviewCheckout_BindsAlternativeDirectTargets(t *testing.T) {
-	for _, target := range []string{"${{inputs['pull_request_number']}}", "#123"} {
+	for _, target := range []string{"${{inputs['pull_request_number']}}", "${{ github.event.inputs.pull_request_number }}", "${{ github.event.inputs['pull_request_number'] }}", "#123"} {
 		var yaml strings.Builder
 		writePRReadyForReviewCheckoutAction(&yaml, &WorkflowData{
 			SafeOutputs: &SafeOutputsConfig{PushToPullRequestBranch: &PushToPullRequestBranchConfig{Target: target}},
 		}, true)
 		assert.Contains(t, yaml.String(), "GH_AW_DIRECT_PR_TARGET:")
 	}
+}
+
+func TestGeneratePRReadyForReviewCheckout_BindsBracketRepoInput(t *testing.T) {
+	var yaml strings.Builder
+	writePRReadyForReviewCheckoutAction(&yaml, &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{PushToPullRequestBranch: &PushToPullRequestBranchConfig{
+			Target: "${{ inputs.pull_request_number }}", TargetRepoSlug: "${{ inputs['target_repo'] }}",
+		}},
+	}, true)
+	assert.Contains(t, yaml.String(), `GH_AW_DIRECT_PR_TARGET_REPO: "${{ inputs['target_repo'] }}"`)
 }
 
 func TestGeneratePRReadyForReviewCheckout_BindsTrialRepository(t *testing.T) {

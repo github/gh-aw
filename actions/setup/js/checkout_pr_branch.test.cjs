@@ -1719,6 +1719,14 @@ If the pull request is still open, verify that:
       expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
     });
 
+    it("does not validate an unrelated side-repository dispatch input", async () => {
+      mockContext.payload.inputs = { pull_request_number: "invalid" };
+      vi.stubEnv("GH_AW_DIRECT_PR_TARGET_REPO", "other/repo");
+      await runScript();
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+      expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
+    });
+
     it.each(["0", "-1", "1e3", "123.0", " 123", "9007199254740992"])("should reject invalid direct PR-number dispatch %s before API or checkout operations", async pullRequestNumber => {
       mockContext.payload.inputs = { pull_request_number: pullRequestNumber };
 
