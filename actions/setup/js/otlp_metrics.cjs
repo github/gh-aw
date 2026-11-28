@@ -4,6 +4,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_ID, OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_NAME, OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_VARIANT } = require("./otel_attributes_generated.cjs");
 
 const OTEL_METRICS_JSONL_PATH = "/tmp/gh-aw/otel-metrics.jsonl";
 const DEFAULT_HISTOGRAM_BUCKETS = [1, 5, 15, 30, 60, 120, 300, 600, 1800, 3600];
@@ -20,7 +21,16 @@ const CUSTOM_METRIC_NAME_RE = /^[A-Za-z][A-Za-z0-9_.\-/]{0,254}$/;
 const CUSTOM_METRIC_UNIT_RE = /^[\x20-\x7e]{0,63}$/;
 const MAX_CUSTOM_METRIC_DESCRIPTION_LENGTH = 1023;
 const HIGH_CARDINALITY_ATTRIBUTE_KEY_RE = /(?:run[._-]?id|trace[._-]?id|span[._-]?id|commit|sha|actor|user|issue(?:[._-]?number)?|pull[._-]?request(?:[._-]?number)?|conversation|url|job[._-]?id)/i;
-const METRIC_RESOURCE_ATTRIBUTE_KEYS = new Set(["gh-aw.repository", "gh-aw.engine.id", "gh-aw.workflow.name", "github.event_name", "github.job"]);
+const METRIC_RESOURCE_ATTRIBUTE_KEYS = new Set([
+  "gh-aw.repository",
+  "gh-aw.engine.id",
+  "gh-aw.workflow.name",
+  "github.event_name",
+  "github.job",
+  OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_ID,
+  OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_NAME,
+  OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_VARIANT,
+]);
 const OTLP_METRIC_FAILURES_REPORTED_PATH = "/tmp/gh-aw/otlp-metric-failures-reported.txt";
 const pendingCustomMetrics = new Map();
 let pendingCustomMetricTraceContext;

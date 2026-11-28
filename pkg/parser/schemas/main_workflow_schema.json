@@ -3468,6 +3468,41 @@
         "minItems": 1
       }
     },
+    "parallel-experiments": {
+      "description": "Opt-in independent, staged experiment jobs appended after normal compilation. Entries reference existing experiment variants. Admission is deterministic and capped by max-jobs, max-parallel and the total reserved AI-credit budget; skipped entries publish manifests without running an agent.",
+      "oneOf": [
+        { "const": false },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["include"],
+          "properties": {
+            "include": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["experiment", "variant"],
+                "properties": {
+                  "experiment": { "type": "string", "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$" },
+                  "variant": { "type": "string" },
+                  "engine": { "enum": ["copilot"] },
+                  "model": { "type": "string", "minLength": 1 },
+                  "harness": { "enum": ["copilot-cli", "copilot-sdk"] }
+                }
+              }
+            },
+            "max-jobs": { "type": "integer", "minimum": 1, "maximum": 16, "default": 4 },
+            "max-parallel": { "type": "integer", "minimum": 1, "maximum": 4, "default": 2 },
+            "timeout-minutes": { "type": "integer", "minimum": 1, "maximum": 30, "default": 10 },
+            "max-ai-credits": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 100 },
+            "max-total-ai-credits": { "type": "integer", "minimum": 1, "maximum": 4000, "default": 400 }
+          }
+        }
+      ]
+    },
     "experiments": {
       "description": "A/B testing experiments. Each key is an experiment name; the value is either an array of two or more variant strings (bare-array form) or an object with a 'variants' field plus optional metadata fields (description, metric, weight, issue, start_date, end_date, hypothesis, secondary_metrics, guardrail_metrics, min_samples, analysis_type, decision). The reserved 'storage' key controls persistence: 'repo' (default) commits state to 'experiments/{sanitizedWorkflowID}'; 'cache' uses GitHub Actions cache; opt-in 'broker' delegates variant selection and aggregate result reporting to an OIDC-authenticated API. The optional 'broker-url' configures its HTTPS endpoint. Broker dry-runs use local ephemeral selection without broker calls or broker OIDC grants. Use ${{ experiments.<name> }} in the workflow prompt to reference the selected variant. Repo and cache modes use local least-used counters (weighted when 'weight' is provided), with random tie-breaking; in broker mode the API owns selection and cumulative counts.",
       "type": "object",

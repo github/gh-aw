@@ -23,6 +23,61 @@ matrix job after compiling the production workflow. Existing production jobs,
 dependencies, permissions, and outputs remain unchanged. Without the opt-in,
 compilation follows the existing path.
 
+The top-level `parallel-experiments` field selects variants from existing
+`experiments` definitions. Omit it or set it to `false` to disable the pass.
+
+```aw wrap
+---
+on: workflow_dispatch
+engine:
+  id: copilot
+model-routing: false
+network:
+  allowed: []
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+experiments:
+  style: [concise, detailed]
+parallel-experiments:
+  include:
+    - experiment: style
+      variant: concise
+    - experiment: style
+      variant: detailed
+---
+
+{{#if experiments.style == 'concise'}}
+Summarize this repository concisely.
+{{else}}
+Summarize this repository in detail.
+{{/if}}
+```
+
+Each `include` entry names an existing `experiment` and one of its `variant`
+values. Optional `engine`, `model`, and `harness` fields override that entry only.
+Model overrides must be literal names or aliases. The initial implementation
+supports sandboxed Copilot with the `copilot-cli` or `copilot-sdk` harness, not
+arbitrary engines or custom harness code.
+
+| Control | Default | Range | Scope |
+|---------|---------|-------|-------|
+| `max-jobs` | `4` | `1`–`16` | Maximum admitted experimental jobs |
+| `max-parallel` | `2` | `1`–`4` | Maximum concurrent experimental jobs |
+| `timeout-minutes` | `10` | `1`–`30` | Timeout of each experimental job |
+| `max-ai-credits` | `100` | `1`–`1000` | Proxy credit limit of each experimental job |
+| `max-total-ai-credits` | `400` | `1`–`4000` | Admission-time experimental credit allocation |
+
+The `include` list accepts up to 16 entries. Admission follows list order and
+admits at most the smallest of `max-jobs`, `max-parallel`, and
+`floor(max-total-ai-credits / max-ai-credits)`. Remaining entries are recorded as
+skipped with an admission-limit reason, rather than scheduled in later batches.
+The total credit allocation must cover at least one per-job budget.
+Only listed variants participate; existing across-run experiment selection is
+unchanged. Parallel selection is explicit: it does not apply the across-run
+picker's weights, date windows, or adaptive allocation.
+
 Each admitted entry varies one experiment, not a Cartesian product of all
 experiments. Experimental jobs have the production agent's upstream dependencies
 and can become runnable alongside it, using the same repository revision, event,
@@ -36,12 +91,88 @@ overall duration, consume runner capacity, and be cancelled by workflow-level
 cancellation or concurrency policies. An overall successful workflow conclusion
 does not prove that every experiment succeeded.
 
+### Isolation limits
+
+The initial pass accepts a deliberately restricted configuration. It requires the
+standard AWF sandbox on GitHub.com and `network.allowed: []`; inference goes
+through the sandbox API proxy. Model routing must be disabled. Experimental jobs
+use read-only repository permissions, disable GitHub tools, and do not persist
+memory or caches. They force Copilot bare mode and disable dynamic workflows;
+their ambient configuration can therefore differ from production.
+
+Unsupported host capabilities fail compilation rather than being treated as safe
+by staging alone. These include authored steps, custom credentials, custom MCP
+servers, plugins, imports, sub-agents, persistent memory, and custom engine code.
+Supported safe-output proposals are `create-issue`, `update-issue`, `add-comment`,
+and `noop`; experimental proposals never reach the production safe-output executor.
+Production configuration is not rewritten to accommodate these restrictions.
+
+### Artifact contract
+
+Experimental artifacts use the `parallel-experiment-<run-attempt>-<entry-id>-`
+prefix rather than production artifact names, avoiding collisions on reruns.
+Entry IDs follow configuration order
+(`entry-1`, `entry-2`, and so on). The final agent bundle contains:
+
+| File | Contract |
+|------|----------|
+| `parallel.json` | Versioned manifest: experiment and variant, configured and observed configuration, run ID, run attempt, job and matrix identity, admission, execution timestamps, step outcomes, usage, and missing evidence |
+| `aw_session.jsonl` | Redacted unified agent session, collected without running graders |
+| `staged-safe-outputs.json` | Collected safe-output intents; raw fallback records are marked as unvalidated |
+| `evidence/` | Allowlisted, redacted source evidence, including agent logs, configuration, usage, and available OpenTelemetry mirrors |
+
+The manifest distinguishes configuration and admission from execution and
+completion. Its `usage` fields use `null` for unavailable measurements.
+`missing_evidence` identifies incomplete collection; configuration evidence
+distinguishes authored settings from observed runtime resolution. An absent
+resolved model is not replaced with a claim that the requested model ran.
+Job identity is the workflow job key plus matrix entry, run ID, and run attempt;
+it is not GitHub's numeric job database ID.
+
+Collection and uploads are best effort, including after failures. Abrupt runner
+termination or cancellation can prevent final timestamps, consumption records,
+or the entire artifact from being saved. Step outcomes recorded during collection
+are not the final GitHub Actions job conclusion. Use Actions job records to
+reconcile missing artifacts and later cleanup or upload failures.
+
+### Accounting and comparability
+
+Each experimental sandbox has independent usage accounting. AI credits, token
+counts, and cache usage describe that execution, not the production agent or a
+sum of every job in the run. Partial accounting from failed executions remains
+useful but is not evidence of a complete bill. Missing provider or proxy records
+remain unavailable rather than becoming zero.
+Existing production usage summaries are not combined run-wide totals when
+parallel experiments are enabled; account for experimental bundles separately.
+
+Credit enforcement uses the existing sandbox API proxy's per-execution limit.
+It is not an atomic reservation against an organization-wide or workflow-wide
+credit balance. In-flight requests and provider reporting can affect the final
+observed consumption; proxy accounting does not replace the provider's invoice.
+Admission limits and per-job credit limits bound planned experimental spending
+without changing production limits.
+
+OpenTelemetry export and local telemetry mirrors retain their existing
+configuration. Experiment assignments identify experimental telemetry; operators
+must also retain job and run-attempt identity when grouping observations. Do not
+aggregate solely by workflow run ID, because production and experiments share it.
+
+The same Git revision and event do not freeze remote services or repository
+state. Tool responses, caches, provider load, and production writes can differ
+between agents. Treat comparisons as observational evidence rather than a
+guaranteed controlled execution environment.
+
 ### Offline evaluation
 
 Experimental execution collects evidence but does not add threat-detection,
 safe-output execution, grader, eval, or aggregation jobs. Safe-output requests are
 retained as staged intents, not delivered effects. Operators download experimental
 artifacts and run graders, BinEval, or comparative analysis separately.
+
+Download bundles through the Actions UI or
+`gh run download <run-id> --pattern 'parallel-experiment-*'`. Keep each artifact
+in its own directory. Existing `gh aw experiments analyze` across-run reports do
+not automatically merge these parallel bundles.
 
 Keep production and experimental accounting separate. Existing across-run
 experiment state and analysis are not evidence that every parallel variant ran.

@@ -9,7 +9,7 @@ const { buildWorkflowCallId, resolveParentHopId } = require("./aw_context.cjs");
 const path = require("path");
 const { nowMs } = require("./performance_now.cjs");
 const { buildWorkflowRunUrl } = require("./workflow_metadata_helpers.cjs");
-const { readExperimentAssignments, EXPERIMENT_ASSIGNMENTS_PATH } = require("./experiment_helpers.cjs");
+const { readExperimentAssignments, readParallelExperimentAssignment, EXPERIMENT_ASSIGNMENTS_PATH } = require("./experiment_helpers.cjs");
 const { countSteeringEventsInApiProxyJsonl } = require("./steering_helpers.cjs");
 const { resolveAICreditsFailureState } = require("./ai_credits_context.cjs");
 const { collectCodexMixedRecords } = require("./parse_codex_log.cjs");
@@ -36,6 +36,9 @@ const {
   OTEL_ATTR_GEN_AI_PROVIDER_NAME,
   OTEL_ATTR_GEN_AI_TOKEN_MODALITY,
   OTEL_ATTR_GEN_AI_USAGE_CACHE_WRITE_INPUT_TOKENS,
+  OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_ID,
+  OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_NAME,
+  OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_VARIANT,
   OTEL_ATTR_REPOSITORY,
   OTEL_ATTR_RUN_ID,
   OTEL_ATTR_VCS_PROVIDER_NAME,
@@ -1705,6 +1708,8 @@ async function sendJobSetupSpan(options = {}) {
   // A/B variant selected for this run (written by pick_experiment.cjs).
   const experimentAssignments = readExperimentAssignments();
   attributes.push(...buildExperimentAttributes(experimentAssignments));
+  const parallelExperiment = readParallelExperimentAssignment();
+  if (parallelExperiment?.id) attributes.push(buildAttr(OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_ID, parallelExperiment.id));
   attributes.push(...buildEpisodeAttributesFromContext(awInfo, runId, runAttempt));
   // Append user-defined custom attributes from observability.otlp.attributes.
   attributes.push(...buildCustomOTLPAttributes());
@@ -2757,6 +2762,8 @@ async function sendJobConclusionSpan(spanName, options = {}) {
   // A/B variant selected for this run (written by pick_experiment.cjs).
   const conclusionExperimentAssignments = readExperimentAssignments();
   attributes.push(...buildExperimentAttributes(conclusionExperimentAssignments));
+  const conclusionParallelExperiment = readParallelExperimentAssignment();
+  if (conclusionParallelExperiment?.id) attributes.push(buildAttr(OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_ID, conclusionParallelExperiment.id));
 
   // Append user-defined custom attributes from observability.otlp.attributes.
   attributes.push(...buildCustomOTLPAttributes());
@@ -2995,6 +3002,13 @@ async function sendJobConclusionSpan(spanName, options = {}) {
         ...(repository ? [buildAttr(OTEL_ATTR_REPOSITORY, repository)] : []),
         ...(workflowName ? [buildAttr(OTEL_ATTR_WORKFLOW_NAME, workflowName)] : []),
         ...(engineId ? [buildAttr(OTEL_ATTR_ENGINE_ID, engineId)] : []),
+        ...(conclusionParallelExperiment
+          ? [
+              buildAttr(OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_NAME, conclusionParallelExperiment.experiment),
+              buildAttr(OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_VARIANT, conclusionParallelExperiment.variant),
+              ...(conclusionParallelExperiment.id ? [buildAttr(OTEL_ATTR_GH_AW_PARALLEL_EXPERIMENT_ID, conclusionParallelExperiment.id)] : []),
+            ]
+          : []),
       ];
       const metricVersion =
         (typeof awInfo.cli_version === "string" ? awInfo.cli_version : "") ||
