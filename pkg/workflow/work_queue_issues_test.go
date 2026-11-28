@@ -176,6 +176,8 @@ func TestWorkQueueIssuesCompilationUsesExistingJobs(t *testing.T) {
 	require.NotNil(t, termination)
 	require.Equal(t, "always()", termination["if"])
 	require.Equal(t, "queue-worker", termination["env"].(map[string]any)["GH_AW_TRACKER_ID"])
+	require.Equal(t, "${{ job.check_run_id }}", termination["env"].(map[string]any)["GH_AW_JOB_CHECK_RUN_ID"])
+	require.Equal(t, "worker", termination["env"].(map[string]any)["GH_AW_WORKFLOW_ID"])
 	var policy struct {
 		Issues map[string]any `json:"issues"`
 	}

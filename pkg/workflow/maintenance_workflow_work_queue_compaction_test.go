@@ -23,6 +23,8 @@ func TestMaintenanceWorkQueueCompactionUsesSingleJob(t *testing.T) {
 	assert.Contains(t, jobs, "setupGlobals(core, github, context, exec, io, getOctokit);")
 	assert.Contains(t, jobs, "const { maintenance } = require('${{ runner.temp }}/gh-aw/actions/reconcile_work_queue_run.cjs');")
 	assert.Contains(t, jobs, "await maintenance({ projectIssues: true });")
+	assert.Contains(t, jobs, "GH_AW_JOB_CHECK_RUN_ID: ${{ job.check_run_id }}")
+	assert.Contains(t, jobs, `GH_AW_WORKFLOW_ID: "agentics-maintenance"`)
 	assert.Contains(t, jobs, `GH_AW_WORK_QUEUE_POLICY: "{\"version\":4,\"pools\":{}}"`)
 	assert.Equal(t, 1, strings.Count(jobs, "script: |"))
 	assert.Less(t, strings.Index(jobs, "GH_AW_WORK_QUEUE_POLICY"), strings.Index(jobs, "script: |"))

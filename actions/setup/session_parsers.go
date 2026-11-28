@@ -63,6 +63,10 @@ import "embed"
 //go:embed js/work_queue_graph.cjs js/work_queue_limits.cjs js/work_queue_scheduler.cjs
 //go:embed js/work_queue_issues.cjs js/work_queue_issue_api.cjs js/work_queue_issue_messages.cjs
 //go:embed js/issue_report.cjs js/report_redaction.cjs js/report_markdown.cjs js/report_size.cjs
+//go:embed js/comment_limit_helpers.cjs js/messages_footer.cjs js/missing_messages_helper.cjs js/firewall_blocked_domains.cjs js/gateway_difc_filtered.cjs js/compact_numbers.cjs js/messages_run_status.cjs
+//go:embed js/render_template.cjs js/is_truthy.cjs js/template_branch.cjs
+//go:embed js/model_aliases.cjs js/model_aliases.json js/model_attribution.cjs js/threat_detection_warning.cjs js/generate_footer.cjs
+//go:embed js/execution_provenance.cjs
 //go:embed js/mcp_server_core.cjs js/mcp_dependencies_manager.cjs js/mcp_enhanced_errors.cjs js/mcp_logger.cjs
 //go:embed js/levenshtein_distance.cjs
 //go:embed js/safe_output_names.cjs

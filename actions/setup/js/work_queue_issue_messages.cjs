@@ -3,13 +3,14 @@
 
 const { sanitizeContent } = require("./sanitize_content.cjs");
 const { buildFooterBlocks, getAgenticWorkflowMetadata } = require("./messages_footer.cjs");
+const { stripExecutionProvenance } = require("./execution_provenance.cjs");
 
 const ISSUE_MARKER = /<!-- gh-aw-work-queue-issue:([^\s>]+) -->/;
 
 /** Single-line, sanitized, backtick-free inline text. @param {unknown} value */
 function inline(value) {
   return sanitizeContent(
-    String(value)
+    stripExecutionProvenance(String(value), { stripGroupingMarkers: true })
       .replace(/[`\r\n]+/g, " ")
       .trim()
   );
@@ -57,6 +58,11 @@ function literal(value, type = "text") {
   return { type, value, agentTainted: false };
 }
 
+/** @param {string} value @param {"text"|"code"} [type] @returns {import("./report_ast.cjs").ReportInline} */
+function ledgerValue(value, type = "code") {
+  return { type, value: inline(value), agentTainted: true };
+}
+
 /** @param {import("./report_ast.cjs").ReportInline[]} children @returns {import("./report_ast.cjs").ReportBlock} */
 function paragraph(...children) {
   return { type: "paragraph", children, agentTainted: false };
@@ -70,12 +76,20 @@ function marker(name, value) {
 /** @param {any} work @param {string} repository @returns {import("./report_ast.cjs").ReportBlock[]} */
 function issueBody(work, repository) {
   const items = [
-    [paragraph(literal("Pool: "), literal(inline(work.pool), "code"))],
-    [paragraph(literal("Graph: "), literal(inline(work.graph_id), "code"))],
-    [paragraph(literal("Node: "), literal(inline(work.node_key), "code"))],
-    [paragraph(literal("Work: "), literal(work.work_id, "code"))],
+    [paragraph(literal("Pool: "), ledgerValue(work.pool))],
+    [paragraph(literal("Graph: "), ledgerValue(work.graph_id))],
+    [paragraph(literal("Node: "), ledgerValue(work.node_key))],
+    [paragraph(literal("Work: "), ledgerValue(work.work_id))],
   ];
-  if (work.subject) items.push([paragraph(literal(`Subject: ${subjectLabel(work.subject)}`))]);
+  if (work.subject) {
+    const repository = inline(work.subject.repository);
+    const number = String(work.subject.number);
+    if (/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) && /^[1-9]\d*$/.test(number)) {
+      items.push([paragraph(literal("Subject: "), ledgerValue(repository, "text"), { type: "issue_reference", number, agentTainted: true })]);
+    } else {
+      items.push([paragraph(literal("Subject: "), ledgerValue(subjectLabel(work.subject) ?? ""))]);
+    }
+  }
   return [
     paragraph(literal("This Issue tracks work queue Work.")),
     { type: "list", ordered: false, items, agentTainted: false },
@@ -90,7 +104,7 @@ function claimComment(work, claim, dispatch, repository) {
   return [
     paragraph(
       literal("Claimed by dispatch "),
-      literal(dispatch.dispatch_id, "code"),
+      ledgerValue(dispatch.dispatch_id),
       literal(` (attempt ${work.attempts + 1}); worker `),
       { type: "link", url: run, children: [literal(`run ${dispatch.run.run_id}`)], agentTainted: false },
       literal(".")
@@ -101,7 +115,7 @@ function claimComment(work, claim, dispatch, repository) {
 
 /** @param {any} work */
 function terminalComment(work) {
-  const outcome = work.state === "completed" ? paragraph(literal("Work completed.")) : paragraph(literal("Work cancelled ("), literal(work.cancellation_reason, "code"), literal(")."));
+  const outcome = work.state === "completed" ? paragraph(literal("Work completed.")) : paragraph(literal("Work cancelled ("), ledgerValue(work.cancellation_reason), literal(")."));
   return [outcome, marker("gh-aw-work-queue", `${work.work_id}:${work.state}`)];
 }
 
