@@ -6,6 +6,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,7 +27,8 @@ import (
 // "actions/" and "github/" namespaces are always exempt from the cooldown.
 //
 // The gh-aw setup action is always pinned to exactly the running compiler version (when it is
-// a release build), regardless of allowMajor or disableReleaseBump.
+// a release build), regardless of allowMajor or disableReleaseBump. Failure to resolve that
+// mandatory pin is returned; ordinary release discovery failures remain best-effort skips.
 //
 // The ActionCache helpers from pkg/workflow are used so that cached inputs and descriptions
 // for safe-outputs.actions entries are preserved when their SHA is unchanged, and cleared
@@ -63,23 +65,24 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 	var updatedActions []string
 	var failedActions []actionUpdateFailure
 	var skippedActions []string
+	var mandatoryErr error
 
 	// Snapshot entries before iteration to avoid mutating the map mid-loop.
 	type entrySnapshot struct {
-		key   string
-		entry workflow.ActionCacheEntry
+		key        string
+		entry      workflow.ActionCacheEntry
+		resolution cachedLatestRelease
 	}
-	snapshot := make([]entrySnapshot, 0, len(actionCache.Entries))
+	snapshot := make([]*entrySnapshot, 0, len(actionCache.Entries))
 	for key, entry := range actionCache.Entries {
-		snapshot = append(snapshot, entrySnapshot{key: key, entry: entry})
+		snapshot = append(snapshot, &entrySnapshot{key: key, entry: entry})
 	}
 
-	resolutions := make([]cachedLatestRelease, len(snapshot))
 	jobs := make([]func(), 0, len(snapshot))
-	for i, s := range snapshot {
+	for _, s := range snapshot {
 		jobs = append(jobs, func() {
 			allow := !disableReleaseBump || allowMajor || isCoreAction(s.entry.Repo)
-			resolutions[i].version, resolutions[i].sha, resolutions[i].err =
+			s.resolution.version, s.resolution.sha, s.resolution.err =
 				resolveActionUpdateTarget(ctx, deps, s.entry.Repo, s.entry.Version, allow, verbose)
 		})
 	}
@@ -87,7 +90,7 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		return err
 	}
 
-	for i, s := range snapshot {
+	for _, s := range snapshot {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -103,12 +106,21 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 		effectiveAllowMajor := !disableReleaseBump || allowMajor || isCoreAction(entry.Repo)
 
 		// Check for latest release using the injectable function (also used by updateActionRefsInContent)
-		latestVersion, latestSHA, err := resolutions[i].version, resolutions[i].sha, resolutions[i].err
+		latestVersion, latestSHA, err := s.resolution.version, s.resolution.sha, s.resolution.err
 		if err != nil {
 			if verbose {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to check %s: %v", entry.Repo, err)))
 			}
 			failedActions = append(failedActions, actionUpdateFailure{name: entry.Repo, err: err.Error()})
+			if compilerPinned {
+				mandatoryErr = errors.Join(mandatoryErr, fmt.Errorf("%s: %w", entry.Repo, err))
+			}
+			continue
+		}
+		if compilerPinned && latestSHA == "" {
+			message := "could not resolve SHA for compiler version " + latestVersion
+			failedActions = append(failedActions, actionUpdateFailure{name: entry.Repo, err: message})
+			mandatoryErr = errors.Join(mandatoryErr, fmt.Errorf("%s: %s", entry.Repo, message))
 			continue
 		}
 
@@ -249,6 +261,9 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 				name: entry.Repo,
 				err:  skipErr,
 			})
+			if compilerPinned {
+				mandatoryErr = errors.Join(mandatoryErr, errors.New(skipErr))
+			}
 			continue
 		}
 		// Remove the old key when the version changes, using the original map key from
@@ -289,12 +304,12 @@ func updateActions(ctx context.Context, deps actionUpdateDeps, allowMajor, verbo
 	// all entry fields (including inputs/descriptions for safe-outputs actions).
 	if len(updatedActions) > 0 {
 		if err := actionCache.Save(); err != nil {
-			return fmt.Errorf("failed to save actions lock file: %w", err)
+			return errors.Join(mandatoryErr, fmt.Errorf("failed to save actions lock file: %w", err))
 		}
 
 		updateLog.Printf("Successfully wrote updated actions-lock.json with %d updates", len(updatedActions))
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Updated actions-lock.json file"))
 	}
 
-	return nil
+	return mandatoryErr
 }

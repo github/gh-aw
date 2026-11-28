@@ -45,7 +45,7 @@ func toggleRemoteWorkflows(ctx context.Context, names []string, enable bool, rep
 	for _, name := range names {
 		target, ok := targets[name]
 		if !ok {
-			return fmt.Errorf("workflow %q not found in target repository %s", name, repo)
+			return fmt.Errorf("workflow %q not found in target repository %s; use a registered .lock.yml basename without the suffix (for example, daily-report for daily-report.lock.yml); run 'gh aw status --repo %s' to list workflows", name, repo, repo)
 		}
 		if target.ID <= 0 {
 			return fmt.Errorf("workflow %q has no valid GitHub ID", name)

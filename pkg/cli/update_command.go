@@ -270,7 +270,7 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) (runEr
 	if err := UpdateWorkflows(ctx, opts); err != nil {
 		// Preserved sources have no conflict markers, so scanning later phases
 		// cannot prevent them from rewriting a workflow whose update failed.
-		return fmt.Errorf("workflow update failed: %w", err)
+		return errors.Join(fmt.Errorf("workflow update failed: %w", err), ctx.Err())
 	}
 	if err := ctx.Err(); err != nil {
 		return err
@@ -564,7 +564,12 @@ func shallowCloneTargetRepo(ctx context.Context, repo, destination string) error
 
 // Stream checkout diagnostics while retaining them in actionable failure messages.
 func runMaintenanceCheckoutCommand(ctx context.Context, cmd *exec.Cmd) ([]byte, error) {
-	configureOrgRolloutProcess(cmd)
+	// Rollout workers already belong to the supervisor's process group.
+	// Keeping checkout in that group lets the supervisor terminate the whole tree.
+	rollout := orgRolloutFromContext(ctx)
+	configureMaintenanceCheckoutProcess(cmd, rollout != nil && rollout.worker)
+	cmd.Env = append(cmd.Environ(), "GH_PROMPT_DISABLED=1", "GIT_TERMINAL_PROMPT=0", "GCM_INTERACTIVE=Never", "SSH_ASKPASS_REQUIRE=never")
+	cmd.Stdin = nil
 	cmd.WaitDelay = 5 * time.Second
 	var output bytes.Buffer
 	writer := io.MultiWriter(os.Stderr, &output)

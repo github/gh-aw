@@ -41,7 +41,7 @@ esac
 case "$*" in
   *actions/workflows\?*)
     printf '[{"workflows":[{"id":11,"path":".github/workflows/first.lock.yml","state":"%s"},{"id":12,"path":".github/workflows/second.lock.yml","state":"active"},{"id":13,"path":".github/workflows/ci.yml","state":"active"},{"id":14,"path":".github/workflows/first.yml","state":"active"}]}]\n' "$MAINTENANCE_STATE" ;;
-  *actions/workflows/11/runs\?*)
+  *actions/workflows/11/runs\?*|*actions/workflows/14/runs\?*)
     if [ -n "$MAINTENANCE_RUNS" ]; then echo "$MAINTENANCE_RUNS"; else echo '[{"workflow_runs":[{"id":101}]},{"workflow_runs":[{"id":102}]}]'; fi ;;
   *actions/workflows/12/runs\?*) echo '[{"workflow_runs":[]}]' ;;
   *) echo "streamed gh output" ;;
@@ -104,6 +104,8 @@ func TestMaintenanceSelectionValidatedBeforeMutation(t *testing.T) {
 	logPath := fakeMaintenanceGH(t)
 	err := DisableWorkflowsByNames(context.Background(), []string{"first", "missing"}, "owner/target")
 	require.ErrorContains(t, err, "not found")
+	require.ErrorContains(t, err, "registered .lock.yml basename")
+	require.ErrorContains(t, err, "gh aw status --repo owner/target")
 	calls := maintenanceCalls(t, logPath)
 	assert.NotContains(t, calls, "run cancel")
 	assert.NotContains(t, calls, "workflow disable")
@@ -147,7 +149,7 @@ func TestMaintenanceLocalWorkflowSelection(t *testing.T) {
 	require.NoError(t, os.WriteFile(".github/workflows/first.lock.yml", []byte("name: Test"), 0o600))
 	require.NoError(t, DisableWorkflowsByNames(context.Background(), []string{"first.md"}, ""))
 	calls := maintenanceCalls(t, logPath)
-	assert.Contains(t, calls, "repos/{owner}/{repo}/actions/workflows/11/runs?status=in_progress")
+	assert.Contains(t, calls, "repos/{owner}/{repo}/actions/workflows/14/runs?status=in_progress")
 	assert.Contains(t, calls, "run cancel 101\n")
 	assert.Contains(t, calls, "workflow disable first.lock.yml\n")
 	assert.NotContains(t, calls, "--repo")

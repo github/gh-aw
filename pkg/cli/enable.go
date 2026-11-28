@@ -94,7 +94,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 
 	// Get GitHub workflows status for comparison; warn but continue if unavailable
 	enableLog.Print("Fetching GitHub workflows status for comparison")
-	githubWorkflows, err := fetchGitHubWorkflowsFiltered(ctx, repoOverride, false, true)
+	githubWorkflows, err := fetchGitHubWorkflows(ctx, repoOverride, false)
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -222,15 +222,9 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 			// Prefer enabling by ID, otherwise fall back to lock file name
 			if t.ID != 0 {
 				args := []string{"workflow", "enable", strconv.FormatInt(t.ID, 10)}
-				if repoOverride != "" {
-					args = append(args, "--repo", repoOverride)
-				}
 				cmd = workflow.ExecGHContext(ctx, args...)
 			} else {
 				args := []string{"workflow", "enable", t.LockFileBase}
-				if repoOverride != "" {
-					args = append(args, "--repo", repoOverride)
-				}
 				cmd = workflow.ExecGHContext(ctx, args...)
 			}
 		} else {
@@ -241,18 +235,12 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 				}
 				// Prefer disabling by lock file name for reliability
 				args := []string{"workflow", "disable", t.LockFileBase}
-				if repoOverride != "" {
-					args = append(args, "--repo", repoOverride)
-				}
 				cmd = workflow.ExecGHContext(ctx, args...)
 			} else {
 				if err := cancelMaintenanceWorkflowRuns(ctx, t.LockFileBase, repoOverride); err != nil {
 					return fmt.Errorf("failed to cancel runs for workflow %s: %w", t.Name, err)
 				}
 				args := []string{"workflow", "disable", t.LockFileBase}
-				if repoOverride != "" {
-					args = append(args, "--repo", repoOverride)
-				}
 				cmd = workflow.ExecGHContext(ctx, args...)
 			}
 		}

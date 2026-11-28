@@ -133,47 +133,127 @@ func TestRenamePathForUpgrade_NonExistentFile(t *testing.T) {
 	assert.Error(t, err, "renamePathForUpgrade should fail for non-existent file")
 }
 
-func TestRestoreExecutableBackup_NoNewBinary(t *testing.T) {
-	t.Parallel()
-
-	// Simulate: backup exists, new binary was NOT written (upgrade failed).
+func TestBackupAndRestoreExtensionInstallation(t *testing.T) {
 	dir := t.TempDir()
-	installPath := filepath.Join(dir, "gh-aw")
-	backup := installPath + ".99999.bak"
-
-	require.NoError(t, os.WriteFile(backup, []byte("old binary"), 0o755), "Should create backup")
-
-	restoreExecutableBackup(installPath, backup)
-
-	// Backup should be renamed back to installPath.
-	_, statErr := os.Stat(installPath)
-	require.NoError(t, statErr, "Original executable should be restored")
-
-	// Backup file should be gone.
-	_, statErr = os.Stat(backup)
-	assert.True(t, os.IsNotExist(statErr), "Backup file should have been renamed away")
+	t.Setenv("XDG_DATA_HOME", filepath.Join(dir, "data"))
+	extensionDir := filepath.Join(dir, "data", "gh", "extensions", "gh-aw")
+	require.NoError(t, os.MkdirAll(filepath.Join(extensionDir, "nested"), 0o755))
+	name := "gh-aw"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(extensionDir, name), []byte("old binary"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(extensionDir, "manifest.yml"), []byte("owner: github\nname: gh-aw\nhost: github.com\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(extensionDir, "nested", "manifest.yml"), []byte("old manifest"), 0o644))
+	if runtime.GOOS != "windows" {
+		require.NoError(t, os.Symlink("nested/manifest.yml", filepath.Join(extensionDir, "manifest-link")))
+	}
+	backup, err := backupExtensionInstallation(extensionDir)
+	require.NoError(t, err)
+	require.NoError(t, os.RemoveAll(extensionDir))
+	require.NoError(t, os.Mkdir(extensionDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(extensionDir, name), []byte("partial"), 0o755))
+	require.NoError(t, restoreExtensionInstallation(extensionDir, backup))
+	binary, err := os.ReadFile(filepath.Join(extensionDir, name))
+	require.NoError(t, err)
+	assert.Equal(t, "old binary", string(binary))
+	info, err := os.Stat(filepath.Join(extensionDir, name))
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o755), info.Mode().Perm())
+	manifest, err := os.ReadFile(filepath.Join(extensionDir, "nested", "manifest.yml"))
+	require.NoError(t, err)
+	assert.Equal(t, "old manifest", string(manifest))
+	if runtime.GOOS != "windows" {
+		target, err := os.Readlink(filepath.Join(extensionDir, "manifest-link"))
+		require.NoError(t, err)
+		assert.Equal(t, "nested/manifest.yml", target)
+	}
+	_, err = os.Stat(backup)
+	assert.True(t, os.IsNotExist(err))
 }
 
-func TestRestoreExecutableBackup_NewBinaryPresent(t *testing.T) {
+func TestBackupExtensionInstallationRejectsUnexpectedDirectory(t *testing.T) {
 	t.Parallel()
-
-	// Simulate: both backup and new binary exist (upgrade partially succeeded).
 	dir := t.TempDir()
-	installPath := filepath.Join(dir, "gh-aw")
-	backup := installPath + ".99999.bak"
+	_, err := backupExtensionInstallation(filepath.Join(dir, "other"))
+	require.ErrorContains(t, err, "unexpected extension directory")
+}
 
-	require.NoError(t, os.WriteFile(installPath, []byte("new binary"), 0o755), "Should create new binary")
-	require.NoError(t, os.WriteFile(backup, []byte("old binary"), 0o755), "Should create backup")
+func TestRestoreExtensionInstallationPreservesBackupOnError(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	backup := filepath.Join(dir, "backup")
+	require.NoError(t, os.Mkdir(backup, 0o755))
+	blocker := filepath.Join(dir, "blocker")
+	require.NoError(t, os.WriteFile(blocker, []byte("file"), 0o644))
+	err := restoreExtensionInstallation(filepath.Join(blocker, "gh-aw"), backup)
+	require.ErrorContains(t, err, backup)
+	_, err = os.Stat(backup)
+	require.NoError(t, err)
+}
 
-	restoreExecutableBackup(installPath, backup)
+func TestRestoreExtensionInstallationRejectsUnmanagedDirectory(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(dir, "data"))
+	extensionDir := filepath.Join(dir, "worktree", "gh-aw")
+	require.NoError(t, os.MkdirAll(extensionDir, 0o755))
+	sentinel := filepath.Join(extensionDir, "sentinel")
+	require.NoError(t, os.WriteFile(sentinel, []byte("untouched"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(extensionDir, "manifest.yml"), []byte("owner: github\nname: gh-aw\nhost: github.com\n"), 0o644))
+	backup := filepath.Join(dir, "backup")
+	require.NoError(t, os.Mkdir(backup, 0o755))
+	err := restoreExtensionInstallation(extensionDir, backup)
+	require.ErrorContains(t, err, backup)
+	content, err := os.ReadFile(sentinel)
+	require.NoError(t, err)
+	assert.Equal(t, "untouched", string(content))
+	_, err = os.Stat(backup)
+	require.NoError(t, err)
+}
 
-	// New binary should still be present.
-	_, statErr := os.Stat(installPath)
-	require.NoError(t, statErr, "New binary should remain intact")
+func TestRestoreExtensionInstallationKeepsCurrentOnRenameFailure(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", dir)
+	extensionDir := filepath.Join(dir, "gh", "extensions", "gh-aw")
+	require.NoError(t, os.MkdirAll(extensionDir, 0o755))
+	current := filepath.Join(extensionDir, "manifest.yml")
+	require.NoError(t, os.WriteFile(current, []byte("current"), 0o644))
+	missingBackup := filepath.Join(filepath.Dir(extensionDir), ".gh-aw-backup-missing")
+	err := restoreExtensionInstallation(extensionDir, missingBackup)
+	require.Error(t, err)
+	content, err := os.ReadFile(current)
+	require.NoError(t, err)
+	assert.Equal(t, "current", string(content))
+}
 
-	// Backup should be cleaned up.
-	_, statErr = os.Stat(backup)
-	assert.True(t, os.IsNotExist(statErr), "Backup file should be cleaned up")
+func TestRestoreExtensionInstallationRejectsSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires a symlink fixture")
+	}
+	dir := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(dir, "data"))
+	extensionDir := filepath.Join(dir, "data", "gh", "extensions", "gh-aw")
+	require.NoError(t, os.MkdirAll(extensionDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(extensionDir, "gh-aw"), []byte("binary"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(extensionDir, "manifest.yml"), []byte("owner: github\nname: gh-aw\nhost: github.com\n"), 0o644))
+	backup, err := backupExtensionInstallation(extensionDir)
+	require.NoError(t, err)
+	require.NoError(t, os.RemoveAll(extensionDir))
+	outside := filepath.Join(dir, "outside")
+	require.NoError(t, os.Mkdir(outside, 0o755))
+	sentinel := filepath.Join(outside, "sentinel")
+	require.NoError(t, os.WriteFile(sentinel, []byte("untouched"), 0o644))
+	require.NoError(t, os.Symlink(outside, extensionDir))
+	err = restoreExtensionInstallation(extensionDir, backup)
+	require.ErrorContains(t, err, backup)
+	link, err := os.Readlink(extensionDir)
+	require.NoError(t, err)
+	assert.Equal(t, outside, link)
+	content, err := os.ReadFile(sentinel)
+	require.NoError(t, err)
+	assert.Equal(t, "untouched", string(content))
+	_, err = os.Stat(backup)
+	require.NoError(t, err)
 }
 
 func TestCleanupExecutableBackup(t *testing.T) {
@@ -494,6 +574,12 @@ func TestUpgradeExtensionCancellationStopsRetry(t *testing.T) {
 	workflow.SetIsRelease(true)
 	getLatestExtensionReleaseFn = func(context.Context, bool) (string, error) { return "v0.2.0", nil }
 	dir := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", filepath.Join(dir, "data"))
+	extensionDir := filepath.Join(dir, "data", "gh", "extensions", "gh-aw")
+	require.NoError(t, os.MkdirAll(extensionDir, 0o755))
+	exe := filepath.Join(extensionDir, "gh-aw")
+	require.NoError(t, os.WriteFile(exe, []byte("old binary"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(extensionDir, "manifest.yml"), []byte("owner: github\nname: gh-aw\nhost: github.com\n"), 0o644))
 	ready, calls := filepath.Join(dir, "ready"), filepath.Join(dir, "calls")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "gh"), []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$GH_AW_EXTENSION_CALLS\"\nprintf ready > \"$GH_AW_EXTENSION_READY\"\nexec sleep 30\n"), 0o755))
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
@@ -503,7 +589,7 @@ func TestUpgradeExtensionCancellationStopsRetry(t *testing.T) {
 	defer cancel()
 	completed := make(chan error, 1)
 	go func() {
-		_, _, err := upgradeExtensionIfOutdated(ctx, false, false)
+		_, _, err := upgradeExtensionIfOutdatedAtDir(ctx, false, false, true, extensionDir)
 		completed <- err
 	}()
 	require.Eventually(t, func() bool {
@@ -520,4 +606,284 @@ func TestUpgradeExtensionCancellationStopsRetry(t *testing.T) {
 	invocations, err := os.ReadFile(calls)
 	require.NoError(t, err)
 	assert.Equal(t, "extension upgrade github/gh-aw --force\n", string(invocations), "cancellation must prevent remove/reinstall retries")
+	binary, err := os.ReadFile(exe)
+	require.NoError(t, err)
+	assert.Equal(t, "old binary", string(binary))
+}
+
+func TestUpgradeExtensionUsesGHManagedPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires a shell executable fixture")
+	}
+	beforeVersion, beforeLookup, beforeRelease := GetVersion(), getLatestExtensionReleaseFn, workflow.IsRelease()
+	t.Cleanup(func() {
+		SetVersionInfo(beforeVersion)
+		getLatestExtensionReleaseFn = beforeLookup
+		workflow.SetIsRelease(beforeRelease)
+	})
+	SetVersionInfo("v0.1.0")
+	workflow.SetIsRelease(true)
+	getLatestExtensionReleaseFn = func(context.Context, bool) (string, error) { return "v0.2.0", nil }
+	dir := t.TempDir()
+	dataDir := filepath.Join(dir, "data")
+	extensionDir := filepath.Join(dataDir, "gh", "extensions", "gh-aw")
+	require.NoError(t, os.MkdirAll(extensionDir, 0o755))
+	exe := filepath.Join(extensionDir, "gh-aw")
+	require.NoError(t, os.WriteFile(exe, []byte("old binary"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(extensionDir, "manifest.yml"), []byte("owner: github\nname: gh-aw\nhost: github.com\n"), 0o644))
+	unrelated := filepath.Join(dir, "standalone", "gh-aw")
+	require.NoError(t, os.MkdirAll(unrelated, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(unrelated, "sentinel"), []byte("untouched"), 0o644))
+	script := `#!/bin/sh
+	case "$1 $2" in
+	  "extension upgrade") printf new > "$GH_AW_TEST_DIR/gh-aw" ;;
+	  "aw version") echo 'gh-aw version v0.2.0' ;;
+	esac
+	`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755))
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("XDG_DATA_HOME", dataDir)
+	t.Setenv("GH_AW_TEST_DIR", extensionDir)
+	upgraded, installPath, err := upgradeExtensionIfOutdated(context.Background(), false, false)
+	require.NoError(t, err)
+	assert.True(t, upgraded)
+	assert.Equal(t, exe, installPath)
+	content, err := os.ReadFile(filepath.Join(unrelated, "sentinel"))
+	require.NoError(t, err)
+	assert.Equal(t, "untouched", string(content))
+}
+
+func TestManagedExtensionExecutableRejectsUnsafeInstallations(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires symlink fixtures")
+	}
+	for _, scenario := range []string{"missing", "local_symlink", "executable_symlink", "missing_manifest", "wrong_manifest", "unmanaged_directory", "symlinked_parent"} {
+		t.Run(scenario, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Setenv("XDG_DATA_HOME", dir)
+			extensionDir := filepath.Join(dir, "gh", "extensions", "gh-aw")
+			if scenario == "unmanaged_directory" {
+				extensionDir = filepath.Join(dir, "worktree", "gh-aw")
+			}
+			outside := filepath.Join(dir, "outside")
+			require.NoError(t, os.Mkdir(outside, 0o755))
+			sentinel := filepath.Join(outside, "sentinel")
+			require.NoError(t, os.WriteFile(sentinel, []byte("untouched"), 0o644))
+			if scenario == "symlinked_parent" {
+				require.NoError(t, os.Mkdir(filepath.Join(dir, "gh"), 0o755))
+				require.NoError(t, os.Symlink(outside, filepath.Join(dir, "gh", "extensions")))
+			} else {
+				require.NoError(t, os.MkdirAll(filepath.Dir(extensionDir), 0o755))
+			}
+			switch scenario {
+			case "local_symlink":
+				require.NoError(t, os.Symlink(outside, extensionDir))
+			case "missing", "symlinked_parent":
+			default:
+				require.NoError(t, os.Mkdir(extensionDir, 0o755))
+				exe := filepath.Join(extensionDir, "gh-aw")
+				if scenario == "executable_symlink" {
+					require.NoError(t, os.Symlink(sentinel, exe))
+				} else {
+					require.NoError(t, os.WriteFile(exe, []byte("binary"), 0o755))
+				}
+				if scenario != "missing_manifest" {
+					manifest := "owner: github\nname: gh-aw\nhost: github.com\n"
+					if scenario == "wrong_manifest" {
+						manifest = "owner: somebody-else\nname: gh-aw\nhost: github.com\n"
+					}
+					require.NoError(t, os.WriteFile(filepath.Join(extensionDir, "manifest.yml"), []byte(manifest), 0o644))
+				}
+			}
+			_, err := managedExtensionExecutable(extensionDir)
+			require.Error(t, err)
+			content, err := os.ReadFile(sentinel)
+			require.NoError(t, err)
+			assert.Equal(t, "untouched", string(content))
+			_, err = backupExtensionInstallation(extensionDir)
+			require.Error(t, err)
+			backups, err := filepath.Glob(filepath.Join(filepath.Dir(extensionDir), ".gh-aw-backup-*"))
+			require.NoError(t, err)
+			assert.Empty(t, backups)
+		})
+	}
+}
+
+func TestUpgradeExtensionRejectsLocalSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires a symlink fixture")
+	}
+	beforeVersion, beforeLookup, beforeRelease := GetVersion(), getLatestExtensionReleaseFn, workflow.IsRelease()
+	t.Cleanup(func() {
+		SetVersionInfo(beforeVersion)
+		getLatestExtensionReleaseFn = beforeLookup
+		workflow.SetIsRelease(beforeRelease)
+	})
+	SetVersionInfo("v0.1.0")
+	workflow.SetIsRelease(true)
+	getLatestExtensionReleaseFn = func(context.Context, bool) (string, error) { return "v0.2.0", nil }
+	dir := t.TempDir()
+	dataDir := filepath.Join(dir, "data")
+	extensionsDir := filepath.Join(dataDir, "gh", "extensions")
+	require.NoError(t, os.MkdirAll(extensionsDir, 0o755))
+	localDir := filepath.Join(dir, "local", "gh-aw")
+	require.NoError(t, os.MkdirAll(localDir, 0o755))
+	sentinel := filepath.Join(localDir, "sentinel")
+	require.NoError(t, os.WriteFile(sentinel, []byte("untouched"), 0o644))
+	link := filepath.Join(extensionsDir, "gh-aw")
+	require.NoError(t, os.Symlink(localDir, link))
+	t.Setenv("XDG_DATA_HOME", dataDir)
+	upgraded, _, err := upgradeExtensionIfOutdated(context.Background(), false, true)
+	require.ErrorContains(t, err, "local or symlinked extensions cannot be upgraded")
+	assert.False(t, upgraded)
+	target, err := os.Readlink(link)
+	require.NoError(t, err)
+	assert.Equal(t, localDir, target)
+	content, err := os.ReadFile(sentinel)
+	require.NoError(t, err)
+	assert.Equal(t, "untouched", string(content))
+	backups, err := filepath.Glob(filepath.Join(extensionsDir, ".gh-aw-backup-*"))
+	require.NoError(t, err)
+	assert.Empty(t, backups)
+}
+
+func TestUpgradeExtensionRecovery(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires a shell executable fixture")
+	}
+	beforeVersion, beforeLookup, beforeRelease := GetVersion(), getLatestExtensionReleaseFn, workflow.IsRelease()
+	t.Cleanup(func() {
+		SetVersionInfo(beforeVersion)
+		getLatestExtensionReleaseFn = beforeLookup
+		workflow.SetIsRelease(beforeRelease)
+	})
+	SetVersionInfo("v0.1.0")
+	workflow.SetIsRelease(true)
+
+	for _, channel := range []struct {
+		name       string
+		prerelease bool
+		target     string
+	}{
+		{"stable", false, "v0.2.0"},
+		{"prerelease", true, "v0.2.0-beta.1"},
+	} {
+		scenarios := []string{"remove_cancel", "install_cancel", "install_fail", "verify_cancel", "verify_fail", "success"}
+		if !channel.prerelease {
+			scenarios = append(scenarios, "first_verify_cancel", "first_verify_fail", "first_success")
+		}
+		for _, scenario := range scenarios {
+			t.Run(channel.name+"/"+scenario, func(t *testing.T) {
+				getLatestExtensionReleaseFn = func(context.Context, bool) (string, error) { return channel.target, nil }
+				dir := t.TempDir()
+				t.Setenv("XDG_DATA_HOME", filepath.Join(dir, "data"))
+				extensionDir := filepath.Join(dir, "data", "gh", "extensions", "gh-aw")
+				exe := filepath.Join(extensionDir, "gh-aw")
+				require.NoError(t, os.MkdirAll(extensionDir, 0o755))
+				require.NoError(t, os.WriteFile(exe, []byte("old binary"), 0o755))
+				oldManifest := "owner: github\nname: gh-aw\nhost: github.com\n"
+				require.NoError(t, os.WriteFile(filepath.Join(extensionDir, "manifest.yml"), []byte(oldManifest), 0o644))
+				script := `#!/bin/sh
+printf '%s\n' "$*" >> "$GH_AW_TEST_CALLS"
+case "$1 $2" in
+  "extension upgrade")
+    case "$GH_AW_TEST_CASE" in
+      first_*)
+        printf partial > "$GH_AW_TEST_DIR/gh-aw"
+        printf new > "$GH_AW_TEST_DIR/manifest.yml"
+        exit 0 ;;
+      *) exit 1 ;;
+    esac ;;
+  "extension remove")
+    rm -rf "$GH_AW_TEST_DIR"
+    if [ "$GH_AW_TEST_CASE" = remove_cancel ]; then
+      printf ready > "$GH_AW_TEST_READY"
+      exec sleep 30
+    fi ;;
+  "extension install")
+    mkdir -p "$GH_AW_TEST_DIR"
+    printf partial > "$GH_AW_TEST_DIR/gh-aw"
+    printf new > "$GH_AW_TEST_DIR/manifest.yml"
+    case "$GH_AW_TEST_CASE" in
+      install_cancel) printf ready > "$GH_AW_TEST_READY"; exec sleep 30 ;;
+      install_fail) exit 1 ;;
+    esac ;;
+  "aw version")
+    case "$GH_AW_TEST_CASE" in
+      *verify_cancel) printf ready > "$GH_AW_TEST_READY"; exec sleep 30 ;;
+      first_verify_fail) exit 1 ;;
+      verify_fail) echo 'gh-aw version v0.1.0' ;;
+      *) echo "gh-aw version $GH_AW_TEST_TARGET" ;;
+    esac ;;
+esac
+`
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755))
+				t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+				t.Setenv("GH_AW_TEST_DIR", extensionDir)
+				t.Setenv("GH_AW_TEST_CASE", scenario)
+				t.Setenv("GH_AW_TEST_TARGET", channel.target)
+				t.Setenv("GH_AW_TEST_READY", filepath.Join(dir, "ready"))
+				t.Setenv("GH_AW_TEST_CALLS", filepath.Join(dir, "calls"))
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				type result struct {
+					upgraded    bool
+					installPath string
+					err         error
+				}
+				completed := make(chan result, 1)
+				go func() {
+					upgraded, installPath, err := upgradeExtensionIfOutdatedAtDir(ctx, false, channel.prerelease, !channel.prerelease, extensionDir)
+					completed <- result{upgraded, installPath, err}
+				}()
+				if strings.HasSuffix(scenario, "_cancel") {
+					require.Eventually(t, func() bool {
+						_, err := os.Stat(filepath.Join(dir, "ready"))
+						return err == nil
+					}, 10*time.Second, 10*time.Millisecond)
+					cancel()
+				}
+				var got result
+				select {
+				case got = <-completed:
+				case <-time.After(10 * time.Second):
+					t.Fatal("extension upgrade did not finish")
+				}
+				success := scenario == "success" || scenario == "first_success"
+				if success {
+					require.NoError(t, got.err)
+					assert.True(t, got.upgraded)
+					assert.Equal(t, exe, got.installPath)
+				} else {
+					require.Error(t, got.err)
+					assert.False(t, got.upgraded)
+					assert.Empty(t, got.installPath)
+					if strings.HasSuffix(scenario, "_cancel") {
+						require.ErrorIs(t, got.err, context.Canceled)
+					}
+				}
+				binary, err := os.ReadFile(exe)
+				require.NoError(t, err)
+				manifest, err := os.ReadFile(filepath.Join(extensionDir, "manifest.yml"))
+				require.NoError(t, err)
+				if success {
+					assert.Equal(t, "partial", string(binary))
+					assert.Equal(t, "new", string(manifest))
+				} else {
+					assert.Equal(t, "old binary", string(binary))
+					assert.Equal(t, oldManifest, string(manifest))
+				}
+				backups, err := filepath.Glob(filepath.Join(filepath.Dir(extensionDir), ".gh-aw-backup-*"))
+				require.NoError(t, err)
+				assert.Empty(t, backups)
+				calls, err := os.ReadFile(filepath.Join(dir, "calls"))
+				require.NoError(t, err)
+				if scenario == "remove_cancel" || strings.HasPrefix(scenario, "first_") {
+					assert.NotContains(t, string(calls), "extension install")
+				} else {
+					assert.Contains(t, string(calls), "extension install github/gh-aw --pin "+channel.target)
+				}
+			})
+		}
+	}
 }

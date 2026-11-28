@@ -4,7 +4,9 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -315,6 +317,138 @@ func TestUpdateActions_SetupActionPinnedToCompilerVersion(t *testing.T) {
 				t.Errorf("stale entry for %s should have been replaced", tt.lockedVersion)
 			}
 		})
+	}
+}
+
+func TestUpdateActions_MandatorySetupPinFailures(t *testing.T) {
+	lookupErr := errors.New("tag lookup failed")
+	gitErr := errors.New("git lookup failed")
+	tests := []struct {
+		name        string
+		repo        string
+		release     bool
+		lookupErr   error
+		sha         string
+		gitErr      error
+		wantErr     string
+		wantCause   error
+		wantUpdated bool
+	}{
+		{name: "setup lookup failure", repo: "github/gh-aw-actions/setup", release: true, lookupErr: lookupErr, wantErr: "cannot resolve SHA for compiler version v0.68.3", wantCause: lookupErr},
+		{name: "legacy setup lookup failure", repo: "github/gh-aw/actions/setup", release: true, lookupErr: lookupErr, wantErr: "cannot resolve SHA for compiler version v0.68.3", wantCause: lookupErr},
+		{name: "empty setup SHA", repo: "github/gh-aw-actions/setup", release: true, wantErr: "could not resolve SHA for compiler version v0.68.3"},
+		{name: "authentication fallback fails", repo: "github/gh-aw-actions/setup", release: true, lookupErr: errors.New("authentication failed"), gitErr: gitErr, wantErr: "via GitHub API and git", wantCause: gitErr},
+		{name: "authentication fallback empty SHA", repo: "github/gh-aw-actions/setup", release: true, lookupErr: errors.New("authentication failed"), wantErr: "could not resolve SHA for compiler version v0.68.3"},
+		{name: "authentication fallback succeeds", repo: "github/gh-aw-actions/setup", release: true, lookupErr: errors.New("authentication failed"), sha: "fallbacksha", wantUpdated: true},
+		{name: "non-release discovery skip", repo: "github/gh-aw-actions/setup"},
+		{name: "ordinary action discovery skip", repo: "owner/action", release: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setReleaseVersionForTest(t, "v0.68.3", tt.release)
+			dir := testutil.TempDir(t, "test-*")
+			cache := workflow.NewActionCache(dir)
+			cache.Set(tt.repo, "v0.67.0", "originalsha")
+			cache.Set("actions/checkout", "v4", "checkoutold")
+			if err := cache.Save(); err != nil {
+				t.Fatal(err)
+			}
+			wd, err := os.Getwd()
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.Chdir(wd) })
+			if err := os.Chdir(dir); err != nil {
+				t.Fatal(err)
+			}
+
+			deps := newTestActionUpdateDeps()
+			deps.getLatestRelease = func(_ context.Context, repo, _ string, _, _ bool) (string, string, error) {
+				if repo == "actions/checkout" {
+					return "v5", "checkoutnew", nil
+				}
+				return "", "", lookupErr
+			}
+			deps.getActionSHAForTag = func(_ context.Context, _, _ string) (string, error) {
+				return tt.sha, tt.lookupErr
+			}
+			deps.getActionSHAForTagViaGit = func(_ context.Context, _, _ string) (string, error) {
+				return tt.sha, tt.gitErr
+			}
+
+			err = updateActions(context.Background(), deps, false, false, false, 0)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("updateActions() unexpected error: %v", err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), tt.repo) || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("updateActions() error = %v, want %s and %s", err, tt.repo, tt.wantErr)
+			}
+			if tt.wantCause != nil && !errors.Is(err, tt.wantCause) {
+				t.Errorf("updateActions() error = %v, want wrapped cause %v", err, tt.wantCause)
+			}
+			saved := workflow.NewActionCache(dir)
+			if err := saved.Load(); err != nil {
+				t.Fatal(err)
+			}
+			if entry, ok := saved.Entries["actions/checkout@v5"]; !ok || entry.SHA != "checkoutnew" {
+				t.Errorf("unrelated update not saved: %v", saved.Entries)
+			}
+			key, sha := tt.repo+"@v0.67.0", "originalsha"
+			if tt.wantUpdated {
+				key, sha = tt.repo+"@v0.68.3", tt.sha
+			}
+			if entry, ok := saved.Entries[key]; !ok || entry.SHA != sha {
+				t.Errorf("entry %s = %+v, want SHA %s", key, entry, sha)
+			}
+		})
+	}
+}
+
+func TestUpdateActions_MissingLockFileIsSkipped(t *testing.T) {
+	dir := testutil.TempDir(t, "test-*")
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(wd) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := updateActions(context.Background(), newTestActionUpdateDeps(), false, false, false, 0); err != nil {
+		t.Fatalf("updateActions() with no lock file: %v", err)
+	}
+}
+
+func TestUpdateActions_ReportsAllMandatorySetupPinFailures(t *testing.T) {
+	setReleaseVersionForTest(t, "v0.68.3", true)
+	dir := testutil.TempDir(t, "test-*")
+	cache := workflow.NewActionCache(dir)
+	for _, repo := range []string{"github/gh-aw-actions/setup", "github/gh-aw/actions/setup"} {
+		cache.Set(repo, "v0.67.0", "originalsha")
+	}
+	if err := cache.Save(); err != nil {
+		t.Fatal(err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(wd) })
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	first, second := errors.New("first tag lookup failed"), errors.New("second tag lookup failed")
+	deps := newTestActionUpdateDeps()
+	deps.getActionSHAForTag = func(_ context.Context, repo, _ string) (string, error) {
+		if repo == "github/gh-aw-actions" {
+			return "", first
+		}
+		return "", second
+	}
+	err = updateActions(context.Background(), deps, false, false, false, 0)
+	if !errors.Is(err, first) || !errors.Is(err, second) {
+		t.Errorf("updateActions() error = %v, want both lookup errors", err)
 	}
 }
 

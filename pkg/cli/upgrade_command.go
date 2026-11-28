@@ -18,6 +18,7 @@ import (
 	"github.com/github/gh-aw/pkg/logger"
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var upgradeLog = logger.New("cli:upgrade_command")
@@ -157,6 +158,7 @@ This command upgrades all Markdown files in the workflow directory (default .git
 
 			opts := upgradeOptions{
 				ctx:                  cmd.Context(),
+				relaunchFlags:        cmd.Flags(),
 				verbose:              verbose,
 				workflowDir:          dir,
 				noFix:                noFix,
@@ -175,7 +177,8 @@ This command upgrades all Markdown files in the workflow directory (default .git
 				prMessage:            prMessage,
 			}
 
-			if targetRepo != "" || targetOrg != "" {
+			rollout := orgRolloutFromContext(cmd.Context())
+			if targetRepo != "" && (rollout == nil || !rollout.worker) {
 				if err := ensureUpgradeExtension(opts); err != nil {
 					return err
 				}
@@ -277,6 +280,7 @@ func runDependencyAudit(ctx context.Context, verbose bool, jsonOutput bool) erro
 // upgradeOptions holds parameters for runUpgradeCommand.
 type upgradeOptions struct {
 	ctx                  context.Context
+	relaunchFlags        *pflag.FlagSet
 	verbose              bool
 	workflowDir          string
 	noFix                bool
@@ -315,6 +319,14 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 	if err != nil {
 		return err
 	}
+	info, err := os.Stat(workflowDir)
+	workflowDirExists := err == nil
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("failed to inspect workflow directory: %w", err)
+	}
+	if workflowDirExists && !info.IsDir() {
+		return fmt.Errorf("workflow directory %s is not a directory", workflowDir)
+	}
 	finish, err := observeUpdateChanges(opts.ctx, workflowDir)
 	if err != nil {
 		return err
@@ -344,7 +356,7 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 	}
 
 	// Step 2: Apply codemods to all workflows (unless --no-fix is specified)
-	if !opts.noFix {
+	if !opts.noFix && workflowDirExists {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Applying codemods to all workflows..."))
 		upgradeLog.Print("Applying codemods to all workflows")
 
@@ -366,14 +378,14 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 			}
 		}
 
-		if _, err := os.Stat(workflowDir); errors.Is(err, os.ErrNotExist) {
-			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflow directory found; skipping codemods."))
-		} else if err := RunFix(fixConfig); err != nil {
+		if err := RunFix(fixConfig); err != nil {
 			runErr = errors.Join(runErr, fmt.Errorf("failed to apply codemods: %w", err))
 			reportUpdateWarning(opts.ctx, "codemods", err)
 			upgradeLog.Printf("Failed to apply codemods: %v", err)
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to apply codemods: %v", err)))
 		}
+	} else if !workflowDirExists && !opts.noFix {
+		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflow directory found; skipping workflow-dependent phases."))
 	} else {
 		upgradeLog.Print("Skipping codemods (--no-fix specified)")
 		if opts.verbose {
@@ -403,12 +415,14 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 			// was successfully updated, so both files stay in sync. Compilation is
 			// deferred to Step 4.
 			upgradeLog.Print("Updating action references in workflow .md files")
-			if err := UpdateActionsInWorkflowFiles(opts.ctx, opts.workflowDir, opts.engineOverride, opts.verbose, false, true, 0, false); err != nil {
-				runErr = errors.Join(runErr, fmt.Errorf("failed to update action references: %w", err))
-				reportUpdateWarning(opts.ctx, "workflow_actions", err)
-				msg := fmt.Sprintf("Failed to update action references in workflow files: %v", err)
-				upgradeLog.Print(msg)
-				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(""+msg))
+			if workflowDirExists {
+				if err := UpdateActionsInWorkflowFiles(opts.ctx, workflowDir, opts.engineOverride, opts.verbose, false, true, 0, false); err != nil {
+					runErr = errors.Join(runErr, fmt.Errorf("failed to update action references: %w", err))
+					reportUpdateWarning(opts.ctx, "workflow_actions", err)
+					msg := fmt.Sprintf("Failed to update action references in workflow files: %v", err)
+					upgradeLog.Print(msg)
+					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(""+msg))
+				}
 			}
 		}
 	} else {
@@ -429,7 +443,7 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 	}
 
 	// Step 4: Compile all workflows (unless --no-fix or --no-compile is specified)
-	if !opts.noFix && !opts.noCompile {
+	if !opts.noFix && !opts.noCompile && workflowDirExists {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Compiling all workflows..."))
 		upgradeLog.Print("Compiling all workflows")
 
@@ -465,9 +479,9 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 	// versions are resolved in a single pass.  When --no-compile is set, the existing
 	// lock files are used as-is — pins are still pruned and refreshed against whatever
 	// lock files are currently on disk.
-	if !opts.noFix && !opts.noActions {
+	if !opts.noFix && !opts.noActions && workflowDirExists {
 		upgradeLog.Print("Updating container image digest pins")
-		newPins, err := UpdateContainerPins(opts.ctx, opts.workflowDir, opts.verbose)
+		newPins, err := UpdateContainerPins(opts.ctx, workflowDir, opts.verbose)
 		if err != nil {
 			runErr = errors.Join(runErr, fmt.Errorf("failed to update container pins: %w", err))
 			reportUpdateWarning(opts.ctx, "containers", err)
@@ -514,7 +528,7 @@ func ensureUpgradeExtension(opts upgradeOptions) error {
 	}
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Continuing upgrade with newly installed version..."))
 	// The captured install path remains valid after the running binary is renamed.
-	if err := relaunchUpgradeWithContext(opts.ctx, "--skip-extension-upgrade", installPath); err != nil {
+	if err := relaunchUpgradeWithContext(opts.ctx, "--skip-extension-upgrade", installPath, opts.relaunchFlags); err != nil {
 		return err
 	}
 	return &ExitCodeError{Code: 0}
@@ -551,7 +565,8 @@ func updateCopilotArtifacts(opts upgradeOptions, workflowDir string) (runErr err
 	// Upgrade copilot-setup-steps.yml version
 	if !opts.noMCP {
 		setupPath := filepath.Join(workflowDir, "copilot-setup-steps.yml")
-		if _, err := os.Stat(setupPath); usesCopilot || err == nil {
+		_, setupErr := os.Stat(setupPath)
+		if _, dirErr := os.Stat(workflowDir); dirErr == nil && (usesCopilot || setupErr == nil) {
 			actionMode := workflow.DetectActionMode(GetVersion())
 			if err := upgradeCopilotSetupStepsInDir(opts.ctx, opts.verbose, actionMode, GetVersion(), workflowDir); err != nil {
 				runErr = errors.Join(runErr, fmt.Errorf("failed to upgrade copilot-setup-steps.yml: %w", err))
@@ -620,7 +635,7 @@ func upgradeUsesCopilot(opts upgradeOptions, workflowDir string) bool {
 // calling os.Executable(). On Linux the caller should pass the pre-rename install
 // path because os.Executable() returns a "(deleted)"-suffixed path after the binary
 // has been renamed out of the way during the upgrade.
-func relaunchUpgradeWithContext(ctx context.Context, extraFlag string, exeOverride string) error {
+func relaunchUpgradeWithContext(ctx context.Context, extraFlag string, exeOverride string, flagSets ...*pflag.FlagSet) error {
 	allowedExtraFlags := map[string]struct{}{
 		"--skip-extension-upgrade": {},
 	}
@@ -635,10 +650,16 @@ func relaunchUpgradeWithContext(ctx context.Context, extraFlag string, exeOverri
 
 	// Explicitly copy os.Args[1:] so appending the extra flag does not modify
 	// the original slice backing array.
-	newArgs := append(append([]string(nil), os.Args[1:]...), extraFlag)
+	extraArgs := []string{extraFlag}
 	if updateReporter(ctx) != nil {
-		newArgs = append(newArgs, "--jsonl-continuation")
+		extraArgs = append(extraArgs, "--jsonl-continuation")
 	}
+	var flags *pflag.FlagSet
+	for _, flagSet := range flagSets {
+		flags = flagSet
+		break
+	}
+	newArgs := upgradeRelaunchArgs(os.Args[1:], extraArgs, flags)
 	if !validUpgradeRelaunchArgs(newArgs) {
 		return errors.New("invalid relaunch arguments: argument contains invalid control characters. Example: compile .github/workflows/example.md")
 	}
@@ -678,6 +699,49 @@ func relaunchUpgradeWithContext(ctx context.Context, extraFlag string, exeOverri
 		return runErr
 	}
 	return nil
+}
+
+func upgradeRelaunchArgs(args, extra []string, flags *pflag.FlagSet) []string {
+	insert := len(args)
+	skipValue := false
+	for i, arg := range args {
+		if flags == nil {
+			break
+		}
+		if skipValue {
+			skipValue = false
+			continue
+		}
+		if arg == "--" {
+			insert = i
+			break
+		}
+		if name, ok := strings.CutPrefix(arg, "--"); ok {
+			if strings.Contains(name, "=") {
+				continue
+			}
+			if flag := flags.Lookup(name); flag != nil && flag.NoOptDefVal == "" {
+				skipValue = true
+			}
+		} else if strings.HasPrefix(arg, "-") {
+			for j := 1; j < len(arg); j++ {
+				flag := flags.ShorthandLookup(arg[j : j+1])
+				if flag == nil {
+					break
+				}
+				if flag.NoOptDefVal == "" {
+					if j == len(arg)-1 {
+						skipValue = true
+					}
+					break
+				}
+			}
+		}
+	}
+	result := make([]string, 0, len(args)+len(extra))
+	result = append(result, args[:insert]...)
+	result = append(result, extra...)
+	return append(result, args[insert:]...)
 }
 
 func configureUpgradeRelaunchCancellation(cmd *exec.Cmd) {

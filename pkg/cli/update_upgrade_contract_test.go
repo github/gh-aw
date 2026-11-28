@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -275,6 +276,40 @@ func TestMaintenanceSubprocessHelper(t *testing.T) {
 	if mode == "failure" {
 		os.Exit(7)
 	}
+	if mode == "prompts" {
+		if os.Getenv("GH_PROMPT_DISABLED") != "1" || os.Getenv("GIT_TERMINAL_PROMPT") != "0" || os.Getenv("GCM_INTERACTIVE") != "Never" || os.Getenv("SSH_ASKPASS_REQUIRE") != "never" {
+			os.Exit(4)
+		}
+		if _, err := io.ReadAll(os.Stdin); err != nil {
+			os.Exit(5)
+		}
+		os.Exit(0)
+	}
+	if mode == "rollout-worker" {
+		ctx := context.WithValue(context.Background(), orgRolloutKey{}, &orgRolloutOptions{worker: true})
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestMaintenanceSubprocessHelper$")
+		cmd.Env = append(os.Environ(), "GH_AW_MAINTENANCE_HELPER=delayed-descendant")
+		_, err := runMaintenanceCheckoutCommand(ctx, cmd)
+		if err != nil {
+			os.Exit(2)
+		}
+		os.Exit(0)
+	}
+	if mode == "delayed-descendant" {
+		child := exec.Command(os.Args[0], "-test.run=^TestMaintenanceSubprocessHelper$")
+		child.Env = append(os.Environ(), "GH_AW_MAINTENANCE_HELPER=survivor")
+		child.Stdout, child.Stderr = os.Stdout, os.Stderr
+		if child.Run() != nil {
+			os.Exit(2)
+		}
+		os.Exit(0)
+	}
+	if mode == "survivor" {
+		_ = os.WriteFile(os.Getenv("GH_AW_MAINTENANCE_READY"), []byte("ready"), 0o600)
+		time.Sleep(1500 * time.Millisecond)
+		_ = os.WriteFile(os.Getenv("GH_AW_MAINTENANCE_SURVIVED"), []byte("survived"), 0o600)
+		os.Exit(0)
+	}
 	if mode == "descendant" {
 		child := exec.Command(os.Args[0], "-test.run=^TestMaintenanceSubprocessHelper$")
 		child.Env = append(os.Environ(), "GH_AW_MAINTENANCE_HELPER=cancellation", "GH_AW_MAINTENANCE_READY=")
@@ -392,6 +427,12 @@ func TestMaintenanceCheckoutStreamingAndCancellation(t *testing.T) {
 }
 
 func TestMaintenanceCheckoutDescendantCancellation(t *testing.T) {
+	if !maintenanceProcessGroupsSupported() {
+		t.Skip("process group cancellation is not supported on this platform")
+	}
+	before := os.Args
+	os.Args = []string{"gh-aw", "update", "--rollout-worker"}
+	t.Cleanup(func() { os.Args = before })
 	t.Setenv("GH_AW_MAINTENANCE_HELPER", "descendant")
 	ready := filepath.Join(t.TempDir(), "ready")
 	t.Setenv("GH_AW_MAINTENANCE_READY", ready)
@@ -416,4 +457,106 @@ func TestMaintenanceCheckoutDescendantCancellation(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("checkout descendants kept output pipes open after cancellation")
 	}
+}
+
+func maintenanceProcessGroupsSupported() bool {
+	switch runtime.GOOS {
+	case "aix", "darwin", "dragonfly", "freebsd", "linux", "netbsd", "openbsd", "solaris":
+		return true
+	default:
+		return false
+	}
+}
+
+func TestMaintenanceCheckoutNoninteractive(t *testing.T) {
+	t.Setenv("GH_AW_MAINTENANCE_HELPER", "prompts")
+	t.Setenv("GH_PROMPT_DISABLED", "0")
+	t.Setenv("GIT_TERMINAL_PROMPT", "1")
+	t.Setenv("GCM_INTERACTIVE", "Always")
+	t.Setenv("SSH_ASKPASS_REQUIRE", "force")
+	exe, err := os.Executable()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, exe, "-test.run=^TestMaintenanceSubprocessHelper$")
+	_, err = runMaintenanceCheckoutCommand(ctx, cmd)
+	require.NoError(t, err)
+}
+
+func TestMaintenanceCheckoutNoControllingTerminal(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("terminal integration test requires Linux script")
+	}
+	mode := os.Getenv("GH_AW_MAINTENANCE_TTY_TEST")
+	if mode == "child" {
+		tty, err := os.Open("/dev/tty")
+		if err == nil {
+			tty.Close()
+			t.Fatal("checkout retained a controlling terminal")
+		}
+		return
+	}
+	exe, err := os.Executable()
+	require.NoError(t, err)
+	if mode == "parent" {
+		tty, err := os.Open("/dev/tty")
+		require.NoError(t, err, "test requires a controlling terminal")
+		tty.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, exe, "-test.run=^TestMaintenanceCheckoutNoControllingTerminal$")
+		cmd.Env = append(os.Environ(), "GH_AW_MAINTENANCE_TTY_TEST=child")
+		_, err = runMaintenanceCheckoutCommand(ctx, cmd)
+		require.NoError(t, err)
+		return
+	}
+	script, err := exec.LookPath("script")
+	if err != nil {
+		t.Skip("script command is unavailable")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	quotedExe := "'" + strings.ReplaceAll(exe, "'", "'\\''") + "'"
+	cmd := exec.CommandContext(ctx, script, "-q", "-e", "-c", quotedExe+" -test.run=^TestMaintenanceCheckoutNoControllingTerminal$", "/dev/null")
+	cmd.Env = append(os.Environ(), "GH_AW_MAINTENANCE_TTY_TEST=parent")
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+}
+
+func TestMaintenanceCheckoutRolloutSupervisorCancellation(t *testing.T) {
+	if !maintenanceProcessGroupsSupported() {
+		t.Skip("process group cancellation is not supported on this platform")
+	}
+	dir := t.TempDir()
+	ready := filepath.Join(dir, "ready")
+	survived := filepath.Join(dir, "survived")
+	t.Setenv("GH_AW_MAINTENANCE_HELPER", "rollout-worker")
+	t.Setenv("GH_AW_MAINTENANCE_READY", ready)
+	t.Setenv("GH_AW_MAINTENANCE_SURVIVED", survived)
+	exe, err := os.Executable()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	cmd := exec.CommandContext(ctx, exe, "-test.run=^TestMaintenanceSubprocessHelper$")
+	configureOrgRolloutProcess(cmd)
+	cmd.WaitDelay = 5 * time.Second
+	require.NoError(t, cmd.Start())
+	waited := false
+	t.Cleanup(func() {
+		cancel()
+		if !waited {
+			_ = cmd.Wait()
+		}
+	})
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(ready)
+		return err == nil
+	}, 10*time.Second, 10*time.Millisecond)
+	cancel()
+	err = cmd.Wait()
+	waited = true
+	require.Error(t, err)
+	time.Sleep(2 * time.Second)
+	_, err = os.Stat(survived)
+	require.ErrorIs(t, err, os.ErrNotExist, "checkout descendant survived supervisor cancellation")
 }

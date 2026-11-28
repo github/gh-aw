@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	ghconfig "github.com/cli/go-gh/v2/pkg/config"
+	"go.yaml.in/yaml/v3"
 	"golang.org/x/mod/semver"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -38,11 +40,8 @@ const backupCleanupRetryDelay = 300 * time.Millisecond
 //
 // Returns:
 //   - upgraded: true if an upgrade was performed.
-//   - installPath: on Linux or Windows, the resolved path where the new binary
-//     was installed (captured before any rename so the caller can relaunch the
-//     new binary from the correct path; on Linux os.Executable() may return a
-//     "(deleted)"-suffixed path after the rename). Empty string on other systems
-//     or when the path cannot be determined.
+//   - installPath: the gh-managed executable path, so the caller can relaunch
+//     the installed version even when the running executable is elsewhere.
 //   - err: non-nil if the upgrade failed.
 //
 // When upgraded is true the CURRENTLY RUNNING PROCESS still has the old version
@@ -52,6 +51,14 @@ const backupCleanupRetryDelay = 300 * time.Millisecond
 //
 //nolint:largefunc // Self-upgrade checks, platform-specific backup handling, and ordered rollback share one retry lifecycle.
 func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrereleases bool) (upgraded bool, installPath string, runErr error) {
+	extensionDir, err := filepath.Abs(filepath.Join(ghconfig.DataDir(), "extensions", "gh-aw"))
+	if err != nil {
+		return false, "", fmt.Errorf("cannot locate gh-managed extension directory: %w", err)
+	}
+	return upgradeExtensionIfOutdatedAtDir(ctx, verbose, includePrereleases, needsRenameWorkaround(), extensionDir)
+}
+
+func upgradeExtensionIfOutdatedAtDir(ctx context.Context, verbose bool, includePrereleases, renameWorkaround bool, extensionDir string) (upgraded bool, installPath string, runErr error) {
 	ctx = ctxutil.OrBackground(ctx)
 	if err := ctx.Err(); err != nil {
 		return false, "", err
@@ -128,6 +135,29 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 	updateExtensionCheckLog.Printf("Upgrading extension from %s to %s", currentVersion, latestVersion)
 	fmt.Fprintln(os.Stderr, console.FormatInfoMessage(fmt.Sprintf("Upgrading gh-aw extension from %s to %s...", renderReleaseVersion(currentVersion), renderReleaseVersion(latestVersion))))
 
+	exe, err := managedExtensionExecutable(extensionDir)
+	if err != nil {
+		return false, "", fmt.Errorf("cannot safely upgrade gh-aw extension: %w", err)
+	}
+	backupDir, err := backupExtensionInstallation(extensionDir)
+	if err != nil {
+		return false, "", fmt.Errorf("failed to back up gh-aw extension: %w", err)
+	}
+	defer func() {
+		runErr = errors.Join(runErr, ctx.Err())
+		if runErr != nil || !upgraded {
+			upgraded = false
+			installPath = ""
+			if restoreErr := restoreExtensionInstallation(extensionDir, backupDir); restoreErr != nil {
+				runErr = errors.Join(runErr, restoreErr)
+			}
+			return
+		}
+		if err := os.RemoveAll(backupDir); err != nil {
+			updateExtensionCheckLog.Printf("Could not remove extension backup %s: %v", backupDir, err)
+		}
+	}()
+
 	// When targeting a prerelease version on platforms that do not lock running
 	// binaries (i.e., not Linux or Windows), gh extension upgrade --force resolves
 	// the upgrade target via /releases/latest which excludes prereleases.  On
@@ -139,7 +169,7 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 	// which already uses pin-based install; the check below is only needed for
 	// platforms (e.g. macOS) where the first attempt would "succeed" with the wrong
 	// version.
-	if includePrereleases && !needsRenameWorkaround() {
+	if includePrereleases && !renameWorkaround {
 		updateExtensionCheckLog.Printf("Prerelease upgrade on macOS: skipping gh extension upgrade (uses /releases/latest, ignores prereleases), using pin-based install for %s", latestVersion)
 		removeCmd := ghCmdForExtension(ctx, "extension", "remove", extensionRepo)
 		removeCmd.Stdout = os.Stderr
@@ -161,7 +191,7 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 			return false, "", fmt.Errorf("failed to verify gh-aw extension version after upgrade: %w", versionErr)
 		}
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("gh-aw extension upgraded to "+renderReleaseVersion(latestVersion)))
-		return true, "", nil
+		return true, exe, nil
 	}
 
 	// First attempt: run the upgrade without touching the filesystem.
@@ -184,7 +214,7 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 	}
 	if firstErr == nil {
 		// First attempt succeeded without any file manipulation.
-		if needsRenameWorkaround() {
+		if renameWorkaround {
 			// Replay the buffered output that was not shown during the attempt.
 			if _, err := io.Copy(os.Stderr, &firstAttemptBuf); err != nil {
 				return false, "", fmt.Errorf("failed to display extension upgrade output: %w", err)
@@ -197,18 +227,18 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 		if normalizeVersion(installedVersion) != normalizeVersion(latestVersion) {
 			updateExtensionCheckLog.Printf("First upgrade attempt reported success but installed version is %s (expected %s)", renderReleaseVersion(installedVersion), renderReleaseVersion(latestVersion))
 			mismatchErr := fmt.Errorf("failed to upgrade gh-aw extension: expected %s, got %s", renderReleaseVersion(latestVersion), renderReleaseVersion(installedVersion))
-			if !needsRenameWorkaround() {
+			if !renameWorkaround {
 				return false, "", mismatchErr
 			}
 			firstErr = fmt.Errorf("gh extension upgrade reported success without installing target version: %w", mismatchErr)
 		} else {
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("gh-aw extension upgraded to "+renderReleaseVersion(latestVersion)))
-			return true, "", nil
+			return true, exe, nil
 		}
 	}
 
 	// First attempt failed.
-	if !needsRenameWorkaround() {
+	if !renameWorkaround {
 		// On platforms other than Linux and Windows there is nothing more to try.
 		return false, "", fmt.Errorf("failed to upgrade gh-aw extension: %w", firstErr)
 	}
@@ -220,52 +250,50 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 	// upgrade so that gh can write the new binary at the original location.
 	updateExtensionCheckLog.Printf("First upgrade attempt failed (likely locked binary); retrying with rename workaround. First attempt output: %s", firstAttemptBuf.String())
 
-	// Resolve the current executable path before renaming; after the rename
-	// os.Executable() returns a "(deleted)"-suffixed path on Linux.
 	var backupPath string
-	if exe, exeErr := os.Executable(); exeErr == nil {
-		if resolved, resolveErr := filepath.EvalSymlinks(exe); resolveErr == nil {
-			exe = resolved
+	defer func() {
+		if backupPath != "" {
+			cleanupExecutableBackup(backupPath)
 		}
-		if iPath, bPath, renameErr := renamePathForUpgrade(exe); renameErr != nil {
-			// Rename failed; the retry will likely fail again.
-			updateExtensionCheckLog.Printf("Could not rename executable for retry (upgrade will likely fail): %v", renameErr)
-		} else {
-			installPath = iPath
-			backupPath = bPath
-			// On Windows, gh extension remove cannot delete the extension directory
-			// while it still contains a running binary (even a renamed one).  Move
-			// the backup to a location outside the extension directory so that
-			// gh extension remove can succeed.
-			//
-			// We first try os.TempDir(); if that fails because TEMP is on a
-			// different drive (common on GitHub Actions runners where the extension
-			// lives on C: but TEMP is on D:), we fall back to the parent of the
-			// extension directory which is guaranteed to be on the same drive.
-			if runtime.GOOS == "windows" {
-				extDir := filepath.Dir(backupPath)
-				moved := false
+	}()
+	if iPath, bPath, renameErr := renamePathForUpgrade(exe); renameErr != nil {
+		// Rename failed; the retry will likely fail again.
+		updateExtensionCheckLog.Printf("Could not rename executable for retry (upgrade will likely fail): %v", renameErr)
+	} else {
+		installPath = iPath
+		backupPath = bPath
+		// On Windows, gh extension remove cannot delete the extension directory
+		// while it still contains a running binary (even a renamed one).  Move
+		// the backup to a location outside the extension directory so that
+		// gh extension remove can succeed.
+		//
+		// We first try os.TempDir(); if that fails because TEMP is on a
+		// different drive (common on GitHub Actions runners where the extension
+		// lives on C: but TEMP is on D:), we fall back to the parent of the
+		// extension directory which is guaranteed to be on the same drive.
+		if runtime.GOOS == "windows" {
+			extDir := filepath.Dir(backupPath)
+			moved := false
 
-				// Attempt 1: OS temp directory
-				tmpBackup := filepath.Join(os.TempDir(), filepath.Base(backupPath))
-				if moveErr := os.Rename(backupPath, tmpBackup); moveErr == nil {
-					updateExtensionCheckLog.Printf("Moved Windows backup %s -> %s to free extension directory for removal", backupPath, tmpBackup)
-					backupPath = tmpBackup
-					moved = true
+			// Attempt 1: OS temp directory
+			tmpBackup := filepath.Join(os.TempDir(), filepath.Base(backupPath))
+			if moveErr := os.Rename(backupPath, tmpBackup); moveErr == nil {
+				updateExtensionCheckLog.Printf("Moved Windows backup %s -> %s to free extension directory for removal", backupPath, tmpBackup)
+				backupPath = tmpBackup
+				moved = true
+			} else {
+				updateExtensionCheckLog.Printf("Could not move backup to %s (cross-drive?): %v; trying same-drive fallback", tmpBackup, moveErr)
+			}
+
+			// Attempt 2: parent of the extension directory (same drive as backup)
+			if !moved {
+				sameDriveDir := filepath.Dir(extDir)
+				sameDriveTmp := filepath.Join(sameDriveDir, filepath.Base(backupPath))
+				if moveErr2 := os.Rename(backupPath, sameDriveTmp); moveErr2 == nil {
+					updateExtensionCheckLog.Printf("Moved Windows backup %s -> %s (same-drive fallback) to free extension directory for removal", backupPath, sameDriveTmp)
+					backupPath = sameDriveTmp
 				} else {
-					updateExtensionCheckLog.Printf("Could not move backup to %s (cross-drive?): %v; trying same-drive fallback", tmpBackup, moveErr)
-				}
-
-				// Attempt 2: parent of the extension directory (same drive as backup)
-				if !moved {
-					sameDriveDir := filepath.Dir(extDir)
-					sameDriveTmp := filepath.Join(sameDriveDir, filepath.Base(backupPath))
-					if moveErr2 := os.Rename(backupPath, sameDriveTmp); moveErr2 == nil {
-						updateExtensionCheckLog.Printf("Moved Windows backup %s -> %s (same-drive fallback) to free extension directory for removal", backupPath, sameDriveTmp)
-						backupPath = sameDriveTmp
-					} else {
-						updateExtensionCheckLog.Printf("Could not move backup out of extension directory (gh extension remove may fail): %v", moveErr2)
-					}
+					updateExtensionCheckLog.Printf("Could not move backup out of extension directory (gh extension remove may fail): %v", moveErr2)
 				}
 
 				// After moving our own backup out of the extension directory, try to
@@ -290,31 +318,16 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 	// manifest in place the install command takes the "already installed" code
 	// path and does nothing; removing the extension clears that guard.
 	//
-	// Note: on Linux the backup file lives inside the extension directory and is
-	// gone once the remove step succeeds (unlink frees the directory entry even
-	// though the process still holds the file open).  On Windows the backup has
-	// been moved to the OS temp directory (above) so the remove step can always
-	// succeed.  In both cases we clear backupPath after a successful remove to
-	// avoid a misleading restore attempt on subsequent failures.
 	if ctx.Err() != nil {
-		if backupPath != "" {
-			restoreExecutableBackup(installPath, backupPath)
-		}
 		return false, "", ctx.Err()
 	}
 	removeCmd := ghCmdForExtension(ctx, "extension", "remove", extensionRepo)
 	removeCmd.Stdout = os.Stderr
 	removeCmd.Stderr = os.Stderr
-	if removeErr := removeCmd.Run(); removeErr == nil {
-		// Extension directory has been deleted.
-		backupPath = ""
-	} else {
+	if removeErr := removeCmd.Run(); removeErr != nil {
 		updateExtensionCheckLog.Printf("Could not remove extension before reinstall (will attempt install anyway): %v", removeErr)
 	}
 	if ctx.Err() != nil {
-		if backupPath != "" {
-			restoreExecutableBackup(installPath, backupPath)
-		}
 		return false, "", ctx.Err()
 	}
 
@@ -322,11 +335,6 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 	retryCmd.Stdout = os.Stderr
 	retryCmd.Stderr = os.Stderr
 	if retryErr := retryCmd.Run(); retryErr != nil {
-		// Retry also failed. Restore the backup so the user still has gh-aw
-		// (only possible when the remove step above did not succeed).
-		if backupPath != "" {
-			restoreExecutableBackup(installPath, backupPath)
-		}
 		if ctx.Err() != nil {
 			return false, "", ctx.Err()
 		}
@@ -345,19 +353,90 @@ func upgradeExtensionIfOutdated(ctx context.Context, verbose bool, includePrerel
 
 	_, versionErr := verifyInstalledVersion(ctx, latestVersion)
 	if versionErr != nil {
-		// Verification failed; leave the backup in place so the user can roll
-		// back manually if needed.
 		return false, "", fmt.Errorf("failed to verify gh-aw extension version after upgrade: %w", versionErr)
 	}
 
-	// Verification passed. Clean up the backup now that it is safe to do so
-	// (it will already be gone when the remove step above succeeded).
-	if backupPath != "" {
-		cleanupExecutableBackup(backupPath)
-	}
-
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("gh-aw extension upgraded to "+renderReleaseVersion(latestVersion)))
-	return true, installPath, nil
+	return true, exe, nil
+}
+
+// managedExtensionExecutable rejects local installs and other directories that
+// gh extension remove must not replace as a published binary installation.
+func managedExtensionExecutable(extensionDir string) (string, error) {
+	if err := validateManagedExtensionPath(extensionDir); err != nil {
+		return "", err
+	}
+	info, err := os.Lstat(extensionDir)
+	if err != nil {
+		return "", fmt.Errorf("cannot access gh-managed installation %s: %w", extensionDir, err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("gh-managed installation %s is not a directory (local or symlinked extensions cannot be upgraded)", extensionDir)
+	}
+	manifestPath := filepath.Join(extensionDir, "manifest.yml")
+	info, err = os.Lstat(manifestPath)
+	if err != nil {
+		return "", fmt.Errorf("cannot access extension manifest %s: %w", manifestPath, err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("extension manifest %s is not a regular file", manifestPath)
+	}
+	content, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return "", fmt.Errorf("cannot read extension manifest %s: %w", manifestPath, err)
+	}
+	var manifest struct {
+		Owner string `yaml:"owner"`
+		Name  string `yaml:"name"`
+		Host  string `yaml:"host"`
+	}
+	if err := yaml.Unmarshal(content, &manifest); err != nil {
+		return "", fmt.Errorf("cannot parse extension manifest %s: %w", manifestPath, err)
+	}
+	if !strings.EqualFold(manifest.Owner, "github") || !strings.EqualFold(manifest.Name, "gh-aw") || !strings.EqualFold(manifest.Host, "github.com") {
+		return "", fmt.Errorf("extension manifest %s does not identify github.com/github/gh-aw", manifestPath)
+	}
+	name := "gh-aw"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	exe := filepath.Join(extensionDir, name)
+	info, err = os.Lstat(exe)
+	if err != nil {
+		return "", fmt.Errorf("cannot access extension executable %s: %w", exe, err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("extension executable %s is not a regular file", exe)
+	}
+	return exe, nil
+}
+
+func validateManagedExtensionPath(extensionDir string) error {
+	expected, err := filepath.Abs(filepath.Join(ghconfig.DataDir(), "extensions", "gh-aw"))
+	if err != nil {
+		return err
+	}
+	actual, err := filepath.Abs(extensionDir)
+	if err != nil {
+		return err
+	}
+	matches := actual == expected
+	if runtime.GOOS == "windows" {
+		matches = strings.EqualFold(actual, expected)
+	}
+	if !matches {
+		return fmt.Errorf("unexpected extension directory %s; expected gh-managed directory %s", actual, expected)
+	}
+	for _, path := range []string{filepath.Dir(filepath.Dir(expected)), filepath.Dir(expected)} {
+		info, err := os.Lstat(path)
+		if err != nil {
+			return fmt.Errorf("cannot access gh-managed directory %s: %w", path, err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("gh-managed directory %s is not a directory or is a symlink", path)
+		}
+	}
+	return nil
 }
 
 // needsRenameWorkaround reports whether the current platform requires the
@@ -398,21 +477,110 @@ func renamePathForUpgrade(exe string) (string, string, error) {
 	return exe, backup, nil
 }
 
-// restoreExecutableBackup renames backupPath back to installPath.
-// Called when the upgrade command failed and the new binary was not written.
-func restoreExecutableBackup(installPath, backupPath string) {
-	if _, statErr := os.Stat(installPath); os.IsNotExist(statErr) {
-		// New binary was not installed; restore the backup.
-		if renErr := os.Rename(backupPath, installPath); renErr != nil {
-			updateExtensionCheckLog.Printf("could not restore backup %s → %s: %v", backupPath, installPath, renErr)
-			fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("Failed to restore gh-aw backup after upgrade failure. Manually rename %s to %s to recover.", backupPath, installPath)))
-		} else {
-			updateExtensionCheckLog.Printf("Restored backup %s → %s after failed upgrade", backupPath, installPath)
-		}
-	} else {
-		// New binary is present (upgrade partially succeeded); just clean up.
-		cleanupExecutableBackup(backupPath)
+// backupExtensionInstallation saves the entire extension, including its
+// manifest, outside the directory that gh extension remove will delete.
+func backupExtensionInstallation(extensionDir string) (string, error) {
+	if _, err := managedExtensionExecutable(extensionDir); err != nil {
+		return "", err
 	}
+	info, err := os.Stat(extensionDir)
+	if err != nil {
+		return "", err
+	}
+	backupDir, err := os.MkdirTemp(filepath.Dir(extensionDir), ".gh-aw-backup-")
+	if err != nil {
+		return "", err
+	}
+	err = filepath.WalkDir(extensionDir, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(extensionDir, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		dest := filepath.Join(backupDir, rel)
+		entryInfo, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		switch {
+		case entryInfo.IsDir():
+			return os.Mkdir(dest, entryInfo.Mode().Perm())
+		case entryInfo.Mode()&os.ModeSymlink != 0:
+			target, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+			return os.Symlink(target, dest)
+		case entryInfo.Mode().IsRegular():
+			source, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			output, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, entryInfo.Mode().Perm())
+			if err != nil {
+				return errors.Join(err, source.Close())
+			}
+			_, copyErr := io.Copy(output, source)
+			return errors.Join(copyErr, output.Close(), source.Close())
+		default:
+			return fmt.Errorf("cannot back up non-regular extension entry %q", path)
+		}
+	})
+	if err == nil {
+		err = os.Chmod(backupDir, info.Mode().Perm())
+	}
+	if err != nil {
+		if cleanupErr := os.RemoveAll(backupDir); cleanupErr != nil {
+			return "", errors.Join(err, fmt.Errorf("failed to remove incomplete extension backup %s: %w", backupDir, cleanupErr))
+		}
+		return "", err
+	}
+	return backupDir, nil
+}
+
+func restoreExtensionInstallation(extensionDir, backupDir string) error {
+	if err := validateManagedExtensionPath(extensionDir); err != nil {
+		return fmt.Errorf("failed to restore gh-aw extension; backup remains at %s: %w", backupDir, err)
+	}
+	info, err := os.Lstat(extensionDir)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to restore gh-aw extension; backup remains at %s: %w", backupDir, err)
+	}
+	if err == nil && !info.IsDir() {
+		return fmt.Errorf("failed to restore gh-aw extension; refusing non-directory or symlink %s; backup remains at %s", extensionDir, backupDir)
+	}
+	var displacedDir string
+	if err == nil {
+		displacedDir, err = os.MkdirTemp(filepath.Dir(extensionDir), ".gh-aw-failed-")
+		if err == nil {
+			err = os.Remove(displacedDir)
+		}
+		if err == nil {
+			err = os.Rename(extensionDir, displacedDir)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to move current gh-aw installation aside; backup remains at %s: %w", backupDir, err)
+		}
+	}
+	if err := os.Rename(backupDir, extensionDir); err != nil {
+		if displacedDir != "" {
+			if rollbackErr := os.Rename(displacedDir, extensionDir); rollbackErr != nil {
+				return fmt.Errorf("failed to restore gh-aw extension; backup remains at %s and previous installation at %s: %w", backupDir, displacedDir, errors.Join(err, rollbackErr))
+			}
+		}
+		return fmt.Errorf("failed to restore gh-aw extension; backup remains at %s: %w", backupDir, err)
+	}
+	if displacedDir != "" {
+		if err := os.RemoveAll(displacedDir); err != nil {
+			updateExtensionCheckLog.Printf("Could not remove previous installation %s after restore: %v", displacedDir, err)
+		}
+	}
+	return nil
 }
 
 // cleanupExecutableBackup removes backupPath after a successful upgrade.
