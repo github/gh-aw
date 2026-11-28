@@ -829,6 +829,67 @@ func TestDailyModelResolutionUsesCopilotEngineWithMiniSubAgentModel(t *testing.T
 	}
 }
 
+func TestDuplicateCodeDetectorProvisionsGoValidationDependencies(t *testing.T) {
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		t.Fatalf("Failed to find repo root: %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(repoRoot, ".github", "workflows", "duplicate-code-detector.md"))
+	if err != nil {
+		t.Fatalf("Failed to read workflow file: %v", err)
+	}
+	parsed, err := parser.ExtractFrontmatterFromContent(string(content))
+	if err != nil {
+		t.Fatalf("Failed to parse workflow frontmatter: %v", err)
+	}
+	engine, ok := parsed.Frontmatter["engine"].(map[string]any)
+	if !ok {
+		t.Fatal("Expected an engine configuration")
+	}
+	env, ok := engine["env"].(map[string]any)
+	if !ok {
+		t.Fatal("Expected explicit Go cache environment variables")
+	}
+	for name, want := range map[string]string{
+		"GOCACHE":    "/tmp/gh-aw/agent/go-build-cache",
+		"GOMODCACHE": "/tmp/gh-aw/agent/go-mod-cache",
+	} {
+		if got := env[name]; got != want {
+			t.Errorf("Expected %s=%q, got %v", name, want, got)
+		}
+	}
+	steps, ok := parsed.Frontmatter["pre-agent-steps"].([]any)
+	if !ok {
+		t.Fatal("Expected a dependency provisioning step")
+	}
+	for _, step := range steps {
+		stepMap, ok := step.(map[string]any)
+		if !ok || stepMap["name"] != "Provision Go validation dependencies" {
+			continue
+		}
+		stepEnv, ok := stepMap["env"].(map[string]any)
+		if !ok || stepEnv["GOMODCACHE"] != env["GOMODCACHE"] {
+			t.Error("Expected provisioning and the agent to use the same module cache")
+		}
+		run, _ := stepMap["run"].(string)
+		if !strings.Contains(run, `mkdir -p /tmp/gh-aw/agent/go-build-cache "$GOMODCACHE"`) || !strings.Contains(run, "go mod download") {
+			t.Error("Expected Go caches to be created and module dependencies downloaded")
+		}
+		lock, err := os.ReadFile(filepath.Join(repoRoot, ".github", "workflows", "duplicate-code-detector.lock.yml"))
+		if err != nil {
+			t.Fatalf("Failed to read workflow lock: %v", err)
+		}
+		setup := strings.Index(string(lock), "- name: Setup Go")
+		provision := strings.Index(string(lock), "name: Provision Go validation dependencies")
+		gateway := strings.Index(string(lock), "- name: Start MCP Gateway")
+		if setup < 0 || provision <= setup || gateway <= provision {
+			t.Error("Expected dependency provisioning after Go setup and before MCP startup")
+		}
+		return
+	}
+	t.Fatal("Expected a dependency provisioning step")
+}
+
 func TestDailyGoTestParallelizerUsesCodexWithEconomyRouting(t *testing.T) {
 	repoRoot, err := findRepoRoot()
 	if err != nil {
