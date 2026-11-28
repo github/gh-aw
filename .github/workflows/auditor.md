@@ -325,8 +325,9 @@ jobs:
               });
               if (!Array.isArray(response.data)) throw new Error('Invalid PR listing');
               openPRs.push(...response.data.map(pr => ({
-                number: pr.number, title: pr.title, body: pr.body, url: pr.html_url,
-                head: pr.head.sha, base: pr.base.ref, draft: pr.draft
+                number: pr.number, title: pr.title, draft: pr.draft,
+                head: pr.head.ref, author: pr.user.login,
+                body: (pr.body || '').slice(0, 300)
               })));
               if (!/\brel="next"/.test(response.headers.link || '')) {
                 prsComplete = true; break;
@@ -658,53 +659,40 @@ imports:
 
 Read `/tmp/gh-aw/auditor/manifest.json` first. Call `noop` if it is missing,
 invalid, incomplete, has no **new** non-intentional failures, lacks a complete
-open-PR listing, or has `evidence_complete: false`. Collection failure is not an
-empty result; deferred failures remain checkpointed for later batches. Unfinished
-runs do not block ranking completed failures.
-
-Read `sampling_gaps` separately: a gap does not invalidate current evidence or
-prove historical coverage or recovery. Preserved `recovery/` snapshots retain
-the previous seen/backlog/pending state for separately authorized reconciliation.
+open-PR listing, or has `evidence_complete: false`. Treat `sampling_gaps` as a
+coverage limitation, not evidence against current failures. Collection and
+recovery details are collector-owned; use the manifest for their status.
 
 ## Success criteria and self-check
 
-Success is one validated, novel draft PR for the largest actionable evidenced
-cluster, or a `noop` explaining why no safe fix can be published. Before finishing,
-check the evidence and coverage limitations, confirm all required validation and
-fresh PR deduplication for any fix, and ensure the result distinguishes observed
-facts from inference. Never publish when a required check is incomplete.
+Publish one validated, novel draft PR for the largest actionable evidenced
+cluster, or `noop`. Report observed facts separately from inference and coverage;
+never publish if a required check is incomplete.
 
 ## Evidence and selection
 
-The trusted `collect` job builds `gh aw` from the checked-out source, then uses
-`gh aw health` and `gh aw logs`, caches
-attempt-specific evidence, and locally generates up to three audits. Read its
-compact reports and audit JSON before source inspection. Only the manifest's
-relative files were transferred; report audit paths refer to the collection
-runner. Do not rerun logs, download all artifacts, broaden the window, or
-perform further remote audits.
+Read compact reports and audit JSON before source inspection. Audit paths refer
+to the collection runner; only relative files were transferred. Do not rerun
+logs, download artifacts, broaden the window, or perform remote audits.
 
-Rank unresolved clusters by unique affected run count (descending), breaking
-ties with first failing boundaries before aftermath. Counts overlap: do not sum
-them. A cluster is a symptom grouping, not a proven shared cause. Compare the
-typed job/step, normalized error, failing component, engine/model, revision and
-configuration. Exclude intentional tests, this auditor, obsolete attempts,
-already-fixed default-branch behavior and self-recovered failures. Missing
-diagnostics remain unknown; do not invent a fix from metadata alone.
+Rank clusters by unique affected runs (descending), breaking ties by first
+failing boundary before aftermath; counts overlap. A cluster is a symptom group,
+not a proven cause. Compare job/step, error, component, engine/model, revision
+and configuration. Exclude intentional tests, this auditor, obsolete attempts,
+fixed behavior and self-recovered failures. Treat missing diagnostics as unknown.
 
-Inspect clusters in ranked order, first checking PR coverage. Select the largest
-unresolved cluster whose supplied audit proves an actionable root cause. Only
-the first three clusters have audit coverage; if the largest unresolved cluster
-has no audit or insufficient evidence, `noop` with the collection limitation
-rather than fix a smaller convenient cluster. Never retry, rerun or dispatch
-workflows, upload live tests, change credentials, or weaken security gates.
+Check PR coverage in ranked order. Fix only the largest unresolved cluster with
+an actionable supplied audit. Only the first three clusters have audits; if the
+largest unresolved cluster lacks evidence, `noop` rather than choosing a smaller
+cluster. Never retry or dispatch workflows, upload live tests, change credentials,
+or weaken security gates.
 
 ## Deduplicate against every open PR
 
-Read **all** `open_prs` in the manifest, including drafts, human PRs and PRs from
-other automations; do not filter by author, prefix, label or workflow marker.
-Compare titles and bodies semantically with the diagnosed cause and proposed
-repair. For plausible matches, inspect the PR diff through `gh` (at most five
+Read every projected `open_prs` entry, including drafts and all authors; do not
+filter by author, prefix, label or workflow marker. Compare titles and body
+previews semantically with the diagnosed cause and proposed repair. For plausible
+matches, fetch the full body and inspect the diff through `gh` (at most five
 PRs); if ambiguity remains, stop without creating a PR.
 
 Derive the publication fingerprint only after confirming the root cause:
@@ -717,8 +705,10 @@ AND semantically equivalent fixes without markers. If covered, skip that cluster
 and consider the next largest unresolved cluster within the audit budget.
 
 Immediately before publication refresh the entire open-PR listing with
-`gh api repos/${{ github.repository }}/pulls?state=open&per_page=100&page=N`,
-with the endpoint quoted, one page at a time, using response Link headers.
+`gh api 'repos/${{ github.repository }}/pulls?state=open&per_page=100&page=N' --jq '[.[] | {number,title,draft,head:.head.ref,author:.user.login,body:((.body//"")[0:300])}]'`,
+one page at a time, using response Link headers. Keep only the projected fields
+in context; fetch full body and diff only for plausible matches (at most five
+PRs).
 Stop after ten pages; if `rel="next"` remains, any request fails, identities
 repeat, or a possible semantic match cannot be ruled out, call `noop`.
 Reapply both fingerprint and semantic dedup to this fresh complete listing.
@@ -727,9 +717,10 @@ serializes this auditor, but cannot prevent an external author racing publicatio
 
 ## Make one focused fix
 
-Read `AGENTS.md`, `CONTRIBUTING.md` and `.github/aw/instructions.md`. Inspect the
-defective source at the failed revision (using supplied evidence and bounded
-read-only GitHub queries when unavailable locally), then confirm the same
+Read `AGENTS.md` and `.github/aw/instructions.md`. Use `grep` to find only the
+relevant format, lint and test-gate sections in `CONTRIBUTING.md`; never read it
+in full. Inspect the defective source at the failed revision (using supplied
+evidence and bounded read-only GitHub queries when unavailable locally), then confirm the same
 defect exists in this checkout. Never fetch/pull/push authenticated git remotes:
 checkout credentials are deliberately not persisted.
 
@@ -756,95 +747,3 @@ Format run references as `[§12345](https://github.com/${{ github.repository }}/
 Separate observed evidence from inference and local validation from unperformed
 live checks.
 If no safe, novel, evidenced fix is available, call `noop` with a concise reason.
-
-## Usage and collection limits
-
-Scheduled collection inventories the preceding 24 hours of default-branch,
-non-PR runs. Manual dispatch is default-branch recovery only and cannot activate
-the agent. Only revision-checked failure representatives are eligible; superseded,
-jobless, unverified, intentional and Auditor failures are excluded. `discovery`
-records fleet coverage, not a failure rate. Inventory and revision verification
-must finish before the Auditor advances its checkpoint. Missing optional job-step
-details do not block verified representatives; the logs and audit pass still
-checks evidence before activation.
-
-When health discovery times out, including a killed `gh aw health` subprocess,
-collection defers without activating the agent
-or advancing the last-successful-sample checkpoint. It uploads `health.json` and an
-explicitly incomplete manifest, preserves seen/backlog/pending state, and caches
-`health-retry.json`. The next hourly attempt increases the health budget from 300
-to 600, then at most 900 seconds, reserving roughly five minutes of the collection job for
-evidence and persistence. Continued exhaustion at the cap emits an investigation
-warning, not a healthy verdict. A deferred first-ever sample retains its validated
-initial state separately so it can retry without resetting history. A successful
-collection removes retry state and restores the normal 300-second budget.
-Other partial reasons, malformed reports and evidence errors still fail closed.
-Logs and audits bound the run-ID window to one run and use `--count 2` to avoid
-a count-limit continuation when a creation-time filter is present. They stop starting queries when they cannot fit
-(with subprocess slack) before an 18-minute script deadline, reserving time for
-artifact upload and cache saving within the 25-minute job (which also covers the
-source build). A per-run logs or audit query that times out
-(`ETIMEDOUT` or a CLI `Timeout reached` continuation) leaves that run pending for
-the next hour instead of crashing collection; other incomplete reports fail closed.
-If audits must defer, new failures remain unseen/pending and cached reports are
-reused next hour without duplicating backlog entries or activating the agent early.
-
-Gaps over 24 hours are recorded in `sampling_gaps`, with content-addressed prior
-state and compact reports retained in `recovery/` and uploaded. Gaps persist and
-warn; they are not backfilled or declared healthy. Reconciliation requires separately
-authorized complete backfill or explicit gap acceptance. Invalid, missing or changed
-snapshots fail closed. Pending/backlog IDs are refreshed only in health's
-current-revision cohorts.
-Fail closed at 1,000 selected metadata runs, 1,025 metadata requests, ten PR
-pages, incomplete evidence results, or exhausted API reserve.
-Process at most 25 new failures FIFO per hour; excess candidates are checkpointed,
-never marked seen, and proceed next hour even without newly created failures.
-
-### Explicit stale-checkpoint recovery
-
-Do not delete the cache, change its namespace, or reset the checkpoint to make a
-failed collection green. If historical backfill is required, stop: this recovery
-path does **not** implement it. Health's current-revision sample cannot establish
-historical coverage.
-
-An operator who explicitly accepts the missing history may manually dispatch
-the default-branch workflow with `acknowledge_gap: true`, `recovery_cache_key`
-equal to the exact restored key shown in the failed collection log, and
-`recovery_checkpoint` equal to the exact timestamp in that cache's
-`checkpoint.json`. Acceptance covers that checkpoint through recovery startup;
-the receipt records both timestamps, actor, run ID and source cache key. Missing,
-mismatched, already-recovered, or non-stale checkpoints are rejected. The default
-unchecked input does nothing; scheduled runs never acknowledge gaps.
-
-Recovery performs no health/log/audit queries and always leaves
-`has_new_failures` false. Before advancing, it copies the original checkpoint
-byte-for-byte and every backlog-referenced query directory (including cached
-JSONL and downloaded evidence) under `recoveries/<receipt-id>/` in the same cache.
-The active state's `seen`, `backlog`, and `pending` remain unchanged; its
-`recoveries` receipts and their archives survive subsequent ordinary pruning.
-Archive report paths are relative to the archived checkpoint's directory; any
-absolute paths embedded in reports are historical runner paths. The compact
-artifact contains only the recovery receipt, not the historical evidence.
-
-Only a successful cache save persists recovery. Verify that save before treating
-it as durable; GitHub cache expiry/eviction still applies to all cached evidence.
-The next hourly collection resumes the existing bounded 24-hour health sample,
-not a census or validation of the accepted gap. Health errors still fail closed;
-time-budget deferrals retain diagnostics and bounded retry state, not permission
-to treat incomplete failure discovery as a successful sample.
-Backlog retention uses a separate now-minus-24-hours boundary, regardless of discovery
-start. Rankings cover retained sampled failures updated in that period plus this batch;
-do not activate the agent while failures remain unprocessed. Refresh retained
-processed runs outside discovery too, preserving seen identities until retention
-expires and removing superseded attempts without needlessly re-auditing identical runs.
-When no checkpoint is restored, the collector checks all Auditor run
-history before initializing state. Any prior run or retry makes missing cache a
-recovery-required error, never a fresh bootstrap: restore the checkpoint and
-recovery files from retained cache/artifacts or reconcile the loss explicitly.
-Only the current first attempt without any earlier execution may bootstrap;
-overall workflow failure does not prove that collection saved no state.
-Recovery bundles contain compact reports, not the full original raw artifacts.
-The checkpoint records a successful **collection**, independently of whether
-the agent later fixes anything; unresolved failures stay in the backlog and
-are reconsidered only when another new failure activates the agent. Cache loss
-can cause reinspection, but complete all-author semantic PR dedup remains required.
