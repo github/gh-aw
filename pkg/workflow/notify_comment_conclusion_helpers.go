@@ -113,6 +113,32 @@ func (c *Compiler) buildConclusionSetupSteps(data *WorkflowData) []string {
 		steps = append(steps, buildDetectionArtifactDownloadSteps(artifactPrefixExprForDownstreamJob(data), c.getActionPin)...)
 	}
 	steps = append(steps, buildUsageArtifactInputDownloadSteps(artifactPrefixExprForDownstreamJob(data), data.Evals != nil && data.Evals.HasEvals(), usageExperimentArtifactName(data), c.getActionPin)...)
+	return append(steps, c.buildAzureBrokerEvidenceDownloadSteps(data)...)
+}
+
+func (c *Compiler) buildAzureBrokerEvidenceDownloadSteps(data *WorkflowData) []string {
+	const evidenceRoot = "/tmp/gh-aw/azure-broker"
+	steps := []string{
+		"      - name: Clear Azure token broker evidence directory\n",
+		"        id: clear_azure_broker_evidence\n",
+		"        if: always()\n",
+		"        shell: bash\n",
+		"        run: |\n",
+		"          test ! -L /tmp/gh-aw\n",
+		"          rm -rf -- " + evidenceRoot + "\n",
+		"          test ! -e " + evidenceRoot + " && test ! -L " + evidenceRoot + "\n",
+	}
+	for _, phase := range []string{"agent", "safe-output"} {
+		if len(c.connectorAzureBrokerSteps(data, phase, false)) == 0 {
+			continue
+		}
+		steps = append(steps, buildArtifactDownloadSteps(ArtifactDownloadConfig{
+			ArtifactName: artifactPrefixExprForDownstreamJob(data) + "azure-token-broker-" + phase,
+			DownloadPath: path.Join(evidenceRoot, phase),
+			StepName:     "Download Azure token broker " + phase + " evidence",
+			IfCondition:  "always() && steps.clear_azure_broker_evidence.outcome == 'success'",
+		}, c.getActionPin)...)
+	}
 	return steps
 }
 

@@ -339,10 +339,11 @@ func TestLogsJSONLRunMatchesFinalReportCounts(t *testing.T) {
 
 func TestLogsJSONLWorkQueueArtifactScope(t *testing.T) {
 	t.Chdir(t.TempDir())
-	originalFetch, originalRateLimit := logsFetchWorkflowRunBatch, fetchRateLimitForHostFunc
+	originalFetch, originalRateLimit, originalQuota := logsFetchWorkflowRunBatch, fetchRateLimitForHostFunc, fetchRateLimitFunc
 	originalProcess, originalBuild := processConcurrentRunDownload, buildLogsProcessedRun
 	t.Cleanup(func() {
 		logsFetchWorkflowRunBatch, fetchRateLimitForHostFunc = originalFetch, originalRateLimit
+		fetchRateLimitFunc = originalQuota
 		processConcurrentRunDownload, buildLogsProcessedRun = originalProcess, originalBuild
 	})
 	run := WorkflowRun{DatabaseID: 42, Repository: "owner/repo", WorkflowPath: ".github/workflows/test.lock.yml"}
@@ -352,6 +353,9 @@ func TestLogsJSONLWorkQueueArtifactScope(t *testing.T) {
 	}
 	fetchRateLimitForHostFunc = func(context.Context, string) (rateLimitResource, error) {
 		return rateLimitResource{}, errors.New("rate limit unavailable in test")
+	}
+	fetchRateLimitFunc = func(context.Context) (rateLimitResource, error) {
+		return rateLimitResource{Limit: 5000, Remaining: 5000}, nil
 	}
 	processConcurrentRunDownload = func(context.Context, WorkflowRun, concurrentRunDownloadParams, *atomic.Int64, *console.ProgressBar) (DownloadResult, error) {
 		return DownloadResult{RunAnalysis: RunAnalysis{Run: run, WorkQueue: queue}, Cached: true}, nil

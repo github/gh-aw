@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 
@@ -29,9 +30,31 @@ func connectorEnv(plan *connectors.Plan, config *WorkflowConnector) (map[string]
 	}
 	env := map[string]any{"GH_AW_CONNECTOR_PLAN": encoded}
 	for _, secret := range plan.Secrets() {
+		if config.azureRoute(secret) != nil {
+			env[connectorAzureSocketPrefix+secret] = path.Join(connectorAzureMount(secret), "token.sock")
+			continue
+		}
 		env["GH_AW_CONNECTOR_SECRET_"+secret] = connectorSecretExpression(config, secret)
 	}
 	return env, nil
+}
+
+func connectorAgentAdapter(config *WorkflowConnector) (map[string]any, error) {
+	env, err := connectorEnv(config.Agent, config)
+	if err != nil {
+		return nil, err
+	}
+	mounts := []string{constants.DefaultGhAwMount}
+	for _, secret := range config.Agent.Secrets() {
+		if config.azureRoute(secret) != nil {
+			mounts = append(mounts, "${{ "+connectorAzureDirectory(secret)+" }}:"+connectorAzureMount(secret)+":ro")
+		}
+	}
+	return map[string]any{
+		"type": "stdio", "container": constants.DefaultNodeAlpineLTSImage,
+		"entrypoint": "node", "entrypointArgs": []string{constants.GhAwRootDirShell + "/actions/connector_runtime.cjs", "serve"},
+		"mounts": mounts, "env": env, "allowed": config.Agent.ToolNames(),
+	}, nil
 }
 
 func (c *Compiler) expandWorkflowConnectors(frontmatter map[string]any, configs map[string]*WorkflowConnector) error {
@@ -51,16 +74,11 @@ func (c *Compiler) expandWorkflowConnectors(frontmatter map[string]any, configs 
 			if _, exists := tools[name]; exists {
 				return fmt.Errorf("mcp-servers.%s conflicts with generated connector MCP server", name)
 			}
-			env, err := connectorEnv(config.Agent, config)
+			adapter, err := connectorAgentAdapter(config)
 			if err != nil {
 				return err
 			}
-			tools[name] = map[string]any{
-				"type": "stdio", "container": constants.DefaultNodeAlpineLTSImage,
-				"entrypoint": "node", "entrypointArgs": []string{constants.GhAwRootDirShell + "/actions/connector_runtime.cjs", "serve"},
-				"mounts": []string{constants.DefaultGhAwMount},
-				"env":    env, "allowed": config.Agent.ToolNames(),
-			}
+			tools[name] = adapter
 		}
 		if config.SafeOutputs != nil {
 			if err := c.expandConnectorSafeOutputs(frontmatter, alias, config); err != nil {
@@ -119,6 +137,10 @@ func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias 
 		return fmt.Errorf("serialize connector plan environment: %w", err)
 	}
 	config.SafeOutputPlan = planJSON.String()
+	operationSecrets, err := connectorOperationSecrets(config.SafeOutputs)
+	if err != nil {
+		return err
+	}
 	for _, operation := range config.SafeOutputs.SafeOutputNames() {
 		name := connectorSafeOutputName(alias, operation)
 		if len(name) > 128 {
@@ -134,7 +156,7 @@ func (c *Compiler) expandConnectorSafeOutputs(frontmatter map[string]any, alias 
 		scripts[name] = map[string]any{
 			"description": fmt.Sprintf("Request %s/%s; validated and executed outside the agent credential boundary.", alias, operation),
 			"inputs":      connectorSafeOutputInputs(inputs),
-			"script":      connectorSafeOutputScript(planEnvName, operation, prefix, config.SafeOutputs.Secrets(), c.dryRun || c.trialMode || c.forceStaged, config.SafeOutputs.UsesStagedFile(operation)),
+			"script":      connectorSafeOutputScript(planEnvName, operation, prefix, operationSecrets[operation], c.dryRun || c.trialMode || c.forceStaged, config.SafeOutputs.UsesStagedFile(operation), config),
 		}
 	}
 	return nil
@@ -225,7 +247,7 @@ func connectorSafeOutputInputs(inputs map[string]connectors.Input) map[string]an
 	return result
 }
 
-func connectorSafeOutputScript(planEnvName, operation, prefix string, secrets []string, staged, binary bool) string {
+func connectorSafeOutputScript(planEnvName, operation, prefix string, secrets []string, staged, binary bool, config *WorkflowConnector) string {
 	var script strings.Builder
 	script.WriteString("const { spawnSync } = require('node:child_process');\n")
 	script.WriteString("const { join } = require('node:path');\n")
@@ -246,7 +268,11 @@ func connectorSafeOutputScript(planEnvName, operation, prefix string, secrets []
 	script.WriteString("const bindings = staged ? null : connectorEffectBindings(temporaryIdMap, env.GH_AW_CONNECTOR_PLAN);\n")
 	script.WriteString("if (!staged) Object.assign(env, bindings.env);\n")
 	for _, secret := range secrets {
-		fmt.Fprintf(&script, "if (!staged) env[%q] = process.env[%q];\n", "GH_AW_CONNECTOR_SECRET_"+secret, prefix+secret) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
+		childPrefix := "GH_AW_CONNECTOR_SECRET_"
+		if config != nil && config.azureRoute(secret) != nil {
+			childPrefix = connectorAzureSocketPrefix
+		}
+		fmt.Fprintf(&script, "if (!staged) env[%q] = process.env[%q];\n", childPrefix+secret, prefix+secret) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	}
 	fmt.Fprintf(&script, "const result = spawnSync(process.execPath, [join(process.env.RUNNER_TEMP, 'gh-aw', 'actions', 'connector_runtime.cjs'), 'invoke', 'safe-output', %q, staged ? '--stage' : '--allow-writes'], { input: JSON.stringify(args), encoding: 'utf8', env, timeout: 25000, maxBuffer: 2097152 });\n", operation) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
 	script.WriteString("if (result.error || result.status !== 0) throw new Error('Connector effect failed; no retry performed: ' + (result.error?.message || result.stderr));\n")

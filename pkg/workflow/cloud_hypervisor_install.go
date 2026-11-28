@@ -63,6 +63,11 @@ func appendCloudHypervisorSetupSteps(steps []GitHubActionStep, workflowData *Wor
 
 func generateAWFInstallationStepForWorkflow(version string, workflowData *WorkflowData) GitHubActionStep {
 	agentConfig := getAgentConfig(workflowData)
+	if len(connectorAzureReaderSecrets(workflowData)) > 0 && agentConfig != nil {
+		privileged := *agentConfig
+		privileged.Runtime = AgentRuntimeCloudHypervisor
+		return generateAWFInstallationStep(version, &privileged)
+	}
 	if hasCloudHypervisorEnclaves(workflowData) && agentConfig != nil && agentConfig.Command == "" {
 		// Enclave VMs require a privileged host AWF, installed on sudo's secure_path.
 		// This does not change the primary agent's Docker runtime profile.

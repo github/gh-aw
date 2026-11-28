@@ -264,7 +264,7 @@ does not make other imported content trusted.
 | `experimental` | Boolean stability marker; defaults to `false`. Selecting capabilities from an experimental connector emits a compile-time warning. All included connectors currently set `true`. |
 | `docs` | Array of unique literal HTTPS URLs for official documentation used to author the connector. Provenance only; never fetched automatically or treated as authority. |
 | `endpoints` | Named, fixed HTTPS origins. |
-| `credentials` | Header, authentication scheme, scopes, phase, and one credential route; inference also supports Azure Entra OIDC. |
+| `credentials` | Header, authentication scheme, scopes, phase, and one [credential route](#credential-routes). `azure-oidc` supports `agent`, `safe-output`, and `inference`. |
 | `resources` | Exact approved resource-ID allowlists; no wildcards. Independent lists do not establish tenant, parent, or tuple membership. |
 | `inference` | Named fixed endpoint/path/protocol profiles with inference-only credentials and model grants; selected through `engine.inference`, not tools. |
 | `triggers` | Event definitions; consumers select them through root `on`. |
@@ -379,7 +379,7 @@ cannot include writes. Owner and repository grants are literal. Omitting both li
 to the current repository, and an explicit owner requires explicit repositories. Private keys
 must be secret references.
 
-OIDC routes mint a masked JWT for a fixed literal audience, and only jobs with a selected mint
+Direct `github-oidc` routes mint a masked JWT for a fixed literal audience, and only jobs with a selected mint
 step receive `id-token: write`. The receiver must trust GitHub's issuer and validate the audience
 and workflow claims. The JWT is not a GitHub API token or a provider token exchange. Minted tokens
 are short-lived and are not refreshed during a long phase.
@@ -388,31 +388,88 @@ Only selected phases mint tokens. Write credentials are minted in the safe-outpu
 agent job, and staged writes mint nothing. Tokens never cross job outputs, and private keys and OIDC
 request credentials stay out of frozen plans. A failed route never falls back to another credential.
 
-Inference profiles use `phase: inference` and `Authorization`/`bearer`, with
-either a stored token or a separate `azure-oidc` route:
+#### Microsoft Entra workload identity federation
+
+Use `azure-oidc` for an API that accepts an **app-only** Entra access token.
+The GitHub assertion audience identifies the exchange; `azure-scope` identifies
+the provider resource. Neither field grants access.
 
 ```yaml
 credentials:
-  model-runtime:
-    phase: inference
+  logs-reader:
+    phase: agent
     header: Authorization
     scheme: bearer
-    scopes: [model runtime access]
+    scopes: [https://api.loganalytics.io/.default]
     azure-oidc:
-      azure-tenant-id: ${{ vars.AZURE_TENANT_ID }}
-      azure-client-id: ${{ vars.AZURE_CLIENT_ID }}
-      azure-scope: https://ai.gateway.azure.com/.default
+      azure-tenant-id: ${{ vars.AZURE_MONITOR_TENANT_ID }}
+      azure-client-id: ${{ vars.AZURE_MONITOR_CLIENT_ID }}
+      azure-scope: https://api.loganalytics.io/.default
 ```
 
-Unlike `github-oidc`, `azure-oidc` delegates Entra token exchange to the selected
-native engine authentication host. The tenant, client and scope are required;
-the GitHub assertion audience defaults to `api://AzureADTokenExchange`, and
-`azure-cloud` defaults to `public`. The selected OIDC route requires explicit
-`permissions.id-token: write` and the existing engine/firewall version guards.
-Importing alone adds neither permission nor a token exchange. Other connector
-phases cannot use this route, and their frozen plans never contain inference
-credentials. See [inference selection](#azure-ai-gateway) for protocol and
-engine limits.
+Configure a [federated identity credential](https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation-create-trust-github)
+on the Entra application. Match GitHub's issuer, the exact approved subject,
+and assertion audience (default `api://AzureADTokenExchange`). Bind the tenant
+and application client IDs to GUIDs; configure the documented resource
+`/.default` scope. `azure-cloud` defaults to `public`; changing it selects an
+authority, not a different provider endpoint.
+
+For `phase: agent` and `phase: safe-output`, the trusted host exchanges and
+renews tokens outside the agent. Only a job using federation needs
+`id-token: write`; importing alone does not grant it. Staging a connector
+write performs no writer exchange, but does not suppress selected reads.
+Staging does not reduce the permissions of a selected reader application;
+grant its identity only the access appropriate for reads, even in previews.
+There is no stored-token fallback on exchange or authorization failure.
+Federated readers require a built-in sandboxed engine, AWF v0.29.21 or later,
+privileged local Linux Docker/runc, and a trusted MCP gateway. AWF checks the
+actual broker directories against agent-visible mounts and fails closed if it
+cannot establish isolation. Remote Docker, ARC/DinD and unprivileged inspection
+are unsupported. The check does not isolate sockets from other same-UID host
+processes. Federated readers cannot
+share the agent job with job containers or services, authored runner steps,
+secret-masking steps, MCP scripts, enclaves, or `engine.env`. Workflow `env`
+may contain only `DEBUG`. Connector reader and live writer brokers
+do not support `windows-latest` runners. Do not
+add the Entra authority to the agent's network allowlist for a connector
+read. `gh aw connector <id> setup` describes provisioning offline;
+`connector test` does not perform a local Entra exchange.
+
+Enable GitHub Actions debug logging or set `DEBUG=connector:credential-broker` in
+the workflow environment to record bounded broker lifecycle, cache, and exchange
+events. The stop step emits these
+diagnostics; they contain no tokens, identities, scopes, URLs, or provider errors.
+If teardown does not run, the events may be unavailable.
+
+If a federated writer can run live, set `safe-outputs.environment` to a
+**literal name reserved for the `safe_outputs` job**, such as `connector-publish`.
+Conditional staging still requires it; a statically staged-only writer does
+not. The compiler keeps `conclusion` and `pre_activation` outside the writer
+environment and rejects a global `--environment` override, another job with
+the same name (case-insensitive), a dynamic job environment name, or a reusable
+workflow call whose nested environments cannot be verified. Safe-output features
+that inherit the writer environment, including asset and code-scanning uploads
+and custom safe jobs, must run in a separate workflow.
+
+Protect that GitHub environment, use a separate writer application, and trust only
+`repo:OWNER/REPO:environment:connector-publish` on the writer application.
+The compiler checks only the workflow being compiled: another workflow that
+uses the same environment, passes its protection rules, and has `id-token: write`
+can obtain the same default environment subject and exchange it for the writer
+identity. Audit all workflows that can use the environment, restrict deployment
+branches and require reviewers, and limit the writer's Azure permissions. Where
+supported, bind federation to a workflow-specific custom OIDC subject or trusted
+broker and verify the Entra trust matches it.
+
+Do not grant the agent job access to that environment. If both applications trust
+the same repository/branch subject, a job with OIDC access could request a token
+for either application by changing the client ID. Verify resolved IDs, federation
+rules, environment protection and provider ACLs outside compilation.
+
+`phase: inference` continues to delegate exchange and renewal to the native
+engine, with its existing firewall and version requirements. Selecting a
+federated profile grants `id-token: write` to the inference job; do not grant it
+workflow-wide. See [Azure AI Gateway](#azure-ai-gateway).
 
 ## Context
 
@@ -836,7 +893,15 @@ resource `499b84ac-1321-427f-aa17-267ca6975798`, commonly requested as `https://
 The hosted MCP flow may use a different audience. `vso.*` scopes are requirements, not grants. Never substitute
 a PAT or client secret for the bearer token of the
 [remote MCP server](https://learn.microsoft.com/en-us/azure/devops/mcp-server/remote-mcp-server?view=azure-devops),
-which uses Entra authentication. The declaration does not implement token renewal.
+which uses delegated Entra authentication. Keep its user token: app-only
+federation is not a substitute. To migrate a **REST** capability in a reviewed
+local declaration, replace only its credential's `secret` field with
+[`azure-oidc`](#microsoft-entra-workload-identity-federation), using
+`azure-scope: https://app.vssps.visualstudio.com/.default`. For `writer`, retain
+`phase: safe-output`, configure the exclusive `safe-outputs.environment` for
+live writes, bind a writer-specific client ID and protected environment subject,
+and grant that service principal only the approved Azure DevOps organization,
+project and resource permissions. Leave unrelated reader routes unchanged.
 
 | Surface | Current declaration |
 | --- | --- |
@@ -974,6 +1039,9 @@ Report staged or skipped, never delivered.
 Register and install the app in the approved team with resource-specific consent for
 `ChannelMessage.Read.Group`. A trusted deployment obtains a Microsoft Graph application token for
 `https://graph.microsoft.com/.default` and stores it as `TEAMS_GRAPH_READ_ACCESS_TOKEN`.
+To federate the Graph reader in a reviewed local declaration, replace only
+its `secret` route with `azure-oidc` for the same application and scope. This
+does not install the Teams app or replace team-specific consent.
 
 Separately register and install the Teams bot. Obtain a Bot Connector token for
 `https://api.botframework.com/.default` from the approved tenant's OAuth endpoint, and store it as
@@ -1125,8 +1193,10 @@ Override its **name** with `reader-secret`. Enable Entra data-plane authenticati
 and assign **Search Index Data Reader** to that identity on the Search service.
 Acquire and renew tokens through an approved trusted host; this connector neither
 logs in nor refreshes credentials. GitHub OIDC JWTs, API keys, client secrets and
-GitHub installation tokens are not substitutes. Automatic Azure OIDC token exchange
-and delegated source-authorization headers are unsupported.
+GitHub installation tokens are not substitutes. When the knowledge base permits
+application access, a reviewed local declaration can replace `reader.token`
+with `azure-oidc` for `https://search.azure.com/.default`. This does not add
+delegated source-authorization headers.
 
 The selected knowledge base controls source/model access and retrieval behavior.
 Returned grounding text is untrusted and may contain private document content.
@@ -1436,9 +1506,13 @@ service-to-service access token, not a client secret or GitHub OIDC JWT.
 uses audience `https://api.loganalytics.io` and client credentials scope
 `https://api.loganalytics.io/.default`. Workspace-scoped Azure RBAC and
 table access must authorize the query independently; delegated `Data.Read`
-is not an application permission. Token acquisition and renewal are external.
-Runtime-managed Entra client credentials are deferred to a separate change;
-the same external-token limitation currently applies to Foundry IQ and Web IQ.
+is not an application permission. Acquisition and renewal are external for
+`get-activity-count`. To opt into federation, select `get-activity-count-federated`
+instead and call `get_activity_count_federated`. Configure the
+[federated identity](#microsoft-entra-workload-identity-federation) and set
+`AZURE_MONITOR_TENANT_ID` and `AZURE_MONITOR_CLIENT_ID` as Actions variables
+(or bind `azure-tenant-id` and `azure-client-id`). The workspace grant, query
+and projection stay the same; `reader-secret` is not used by this reader.
 Approve only `api.loganalytics.azure.com` in addition to workflow infrastructure.
 
 This count is a minimal workspace activity signal, not raw logs, agent traces,
@@ -1748,12 +1822,15 @@ reasoning. Prompt injection can still influence staged proposals. Independently 
 publishing or acting on a handoff; staging is neither verification nor content isolation.
 
 [Authentication](https://learn.microsoft.com/en-us/web-iq/get-started/authentication) requires an
-externally acquired and renewed Entra app-only access token for `https://api.microsoft.ai/.default`.
+Entra app-only access token for `https://api.microsoft.ai/.default`.
 Provision a paid Azure Web IQ resource, connect it in the Web IQ portal, bind an Entra client ID to
 exactly one Web IQ AppID, and enable the selected services. Store the unprefixed token as
 `AZURE_WEB_IQ_READ_ACCESS_TOKEN`; `reader-secret` overrides only its name. Multi-AppID selection and API
 keys are unsupported: the documented `x-apikey` header differs from the contract's `X-API-Key`.
-There is no token exchange, renewal or credential fallback.
+The shipped `token` route requires external acquisition and renewal. For
+federation in a reviewed local declaration, replace `reader.token` with
+`azure-oidc` using that scope and the client ID bound to the approved AppID;
+never fall back to a different application.
 
 The [golden consumer](https://github.com/github/gh-aw/blob/main/pkg/cli/workflows/azure-web-iq-golden.md)
 stages one cited GitHub research issue from web and news passages. Staging suppresses publication,
