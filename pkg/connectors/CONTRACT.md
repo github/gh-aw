@@ -5,12 +5,15 @@ There is no required connection, definition, binding, or versioned authoring fil
 Provider declarations belong in `.github/workflows/connectors/<provider>.md`.
 `ConnectorDeclaration` in `pkg/workflow/connector_declaration.go` extends the
 existing frontmatter; it reuses this package's typed, bounded operation primitives.
+The compiler embeds these declarations in each release and resolves
+`connector:<id>` to that release's copy. Consumers can use a local declaration
+or pinned URL import when they need a customized source.
 
 Consumers reuse normal `imports` / `uses` / `with` syntax:
 
 ```yaml
 imports:
-  - uses: .github/workflows/connectors/linear.md
+  - uses: connector:linear
     with:
       reader-secret: APPROVED_LINEAR_READ_KEY
 on: workflow_dispatch

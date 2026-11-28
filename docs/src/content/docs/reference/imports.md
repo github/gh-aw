@@ -44,6 +44,14 @@ imports:
 
 `uses` is an alias for `path`; `with` is an alias for `inputs`.
 
+The compiler also embeds the connector declarations shipped with its gh-aw
+release. Import one by its short name, such as `connector:linear`; this uses
+the bundled declaration without fetching a repository file. For parameters,
+write `uses: connector:linear` with the usual `with` mapping. Importing still
+does not select capabilities, approve network access, grant resources, or
+provision credentials. Use a local path or pinned URL when a workflow needs a
+customized declaration.
+
 In nested frontmatter imports, relative paths (not starting with `.github/` or `/`; see [Path Resolution](#path-resolution)) such as `shared/graders/recurrence-determinism.md` resolve from the root workflow directory. Bare names (`common.md`) and `./` paths resolve from the importing file. Lock-file hashes follow the same rules, so changes to nested components invalidate the importing workflow's lock.
 
 Conditional frontmatter imports are not supported. To vary prompt content by experiment, keep imports unconditional and wrap an optional `{{#runtime-import? ...}}` in an `{{#if experiments.<name> ...}}` block. The optional form is not promoted to lock-file macros, so it is injected only when the condition is true at runtime.

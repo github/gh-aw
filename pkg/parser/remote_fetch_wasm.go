@@ -11,6 +11,9 @@ import (
 func ResolveIncludePath(filePath, baseDir string, cache *ImportCache) (string, error) {
 	parserLog.Printf("ResolveIncludePath: filePath=%s, baseDir=%s", filePath, baseDir)
 
+	if builtinPath, handled, err := resolveBuiltinConnectorAlias(filePath); handled {
+		return builtinPath, err
+	}
 	// Handle builtin paths - these are embedded files that bypass filesystem resolution.
 	if strings.HasPrefix(filePath, BuiltinPathPrefix) {
 		if !BuiltinVirtualFileExists(filePath) {

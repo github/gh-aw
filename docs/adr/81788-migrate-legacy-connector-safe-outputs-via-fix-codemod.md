@@ -23,7 +23,7 @@ Resource grants and credential bindings control write authority, so a mechanical
 
 Add a `legacy-connector-imports` codemod to `gh aw fix`. It is registered in `getLaterCodemods()` in `pkg/cli/fix_codemods.go` and implemented in `pkg/cli/codemod_connector_imports.go`. When run with `--write`, it:
 
-1. Adds connector import entries (`.github/workflows/connectors/{linear,jira,azure-devops}.md`) for each provider whose legacy outputs are present. It reuses an existing local or pinned remote import for that provider and supports both list-form and `imports.aw` imports.
+1. Adds short-name connector imports (`connector:linear`, `connector:jira`, and `connector:azure-devops`) for each provider whose legacy outputs are present. It reuses an existing local, pinned remote, or short-name import for that provider and supports both list-form and `imports.aw` imports.
 2. Renames supported `ado-*` safe outputs to `azure-devops-*`. It fails if the destination key already exists.
 3. Converts a single `linear-token: ${{ secrets.NAME }}` into `writer-secret: NAME` on the Linear import. It rejects literal tokens, compound expressions, and conflicting existing `writer-secret` values.
 4. For newly added Azure DevOps imports, leaves `organization`, `project`, and `project-name` empty instead of copying specimen defaults.
