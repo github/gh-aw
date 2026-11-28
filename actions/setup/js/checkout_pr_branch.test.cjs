@@ -1695,6 +1695,14 @@ If the pull request is still open, verify that:
       expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
 
+    it("accepts a hash-prefixed configured target for a direct dispatch", async () => {
+      vi.stubEnv("GH_AW_DIRECT_PR_TARGET", "#123");
+      mockContext.payload.inputs = { pull_request_number: "123" };
+      await runScript();
+      expect(mockGithub.rest.pulls.get).toHaveBeenCalledWith(expect.objectContaining({ pull_number: 123 }));
+      expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
     it.each([
       ["different target", "GH_AW_DIRECT_PR_TARGET", "456"],
       ["missing target", "GH_AW_DIRECT_PR_TARGET", ""],

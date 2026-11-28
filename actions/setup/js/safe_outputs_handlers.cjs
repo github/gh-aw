@@ -1529,8 +1529,8 @@ function createHandlers(server, appendSafeOutput, config = {}) {
       effectivePushPRNumber = pushEffectivePayload?.pull_request?.number || pushEffectivePayload?.issue?.number || undefined;
     } else {
       const targetNumber = pushTarget === "*" ? entry.pull_request_number : pushTarget;
-      if (/^[1-9]\d*$/.test(String(targetNumber))) {
-        const parsed = Number(targetNumber);
+      if (/^#?[1-9]\d*$/.test(String(targetNumber))) {
+        const parsed = Number(String(targetNumber).replace(/^#/, ""));
         if (Number.isSafeInteger(parsed)) effectivePushPRNumber = parsed;
       }
     }

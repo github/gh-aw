@@ -3,7 +3,8 @@ package workflow
 import (
 	"fmt"
 	"path"
-	"sort"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -11,6 +12,8 @@ import (
 )
 
 var prLog = logger.New("workflow:pr")
+var directPRRepoExpression = regexp.MustCompile(`^\$\{\{\s*(?:inputs\.[A-Za-z_][A-Za-z0-9_-]*|vars\.[A-Za-z_][A-Za-z0-9_]*|github\.repository)\s*\}\}$`)
+var directPRTargetExpression = regexp.MustCompile(`^\$\{\{\s*inputs(?:\.pull_request_number|\['pull_request_number'\])\s*\}\}$`)
 
 // ShouldGeneratePRCheckoutStep returns true if the checkout-pr step should be generated
 // based on the workflow permissions and checkout configuration.
@@ -113,7 +116,7 @@ func sortedUniqueStrings(values []string) []string {
 		seen[value] = struct{}{}
 		result = append(result, value)
 	}
-	sort.Strings(result)
+	slices.Sort(result)
 	return result
 }
 
@@ -215,16 +218,29 @@ func writePRReadyForReviewCheckoutAction(yaml *strings.Builder, data *WorkflowDa
 	yaml.WriteString("          GH_TOKEN: " + resolvedToken + "\n")
 	if data.SafeOutputs != nil && data.SafeOutputs.PushToPullRequestBranch != nil {
 		push := data.SafeOutputs.PushToPullRequestBranch
-		if push.Target != "" {
+		target := strings.TrimSpace(push.Target)
+		_, numericTargetErr := strconv.ParseUint(strings.TrimPrefix(target, "#"), 10, 64)
+		if directPRTargetExpression.MatchString(target) || (target != "" && numericTargetErr == nil) {
+			targetRepo := push.TargetRepoSlug
+			if targetRepo == "" && data.TrialLogicalRepo != "" {
+				targetRepo = data.TrialLogicalRepo
+			}
+			if strings.Contains(targetRepo, "${{") && !directPRRepoExpression.MatchString(targetRepo) {
+				targetRepo = "unresolved"
+			}
 			yaml.WriteString("          GH_AW_DIRECT_PR_TARGET: " + strconv.Quote(push.Target) + "\n")
-			yaml.WriteString("          GH_AW_DIRECT_PR_TARGET_REPO: " + strconv.Quote(push.TargetRepoSlug) + "\n")
+			yaml.WriteString("          GH_AW_DIRECT_PR_TARGET_REPO: " + strconv.Quote(targetRepo) + "\n")
 			if len(push.AllowedRepos) > 0 {
 				yaml.WriteString("          GH_AW_DIRECT_PR_MULTIPLE_REPOS: \"true\"\n")
 			}
-			for _, checkout := range data.CheckoutConfigs {
-				if checkout != nil && checkout.Path == "" && checkout.Repository != "" {
-					yaml.WriteString("          GH_AW_DIRECT_PR_CHECKOUT_REPO: " + strconv.Quote(checkout.Repository) + "\n")
-					break
+			if data.TrialLogicalRepo != "" {
+				yaml.WriteString("          GH_AW_DIRECT_PR_CHECKOUT_REPO: " + strconv.Quote(data.TrialLogicalRepo) + "\n")
+			} else {
+				for _, checkout := range data.CheckoutConfigs {
+					if checkout != nil && checkout.Path == "" && checkout.Repository != "" {
+						yaml.WriteString("          GH_AW_DIRECT_PR_CHECKOUT_REPO: " + strconv.Quote(checkout.Repository) + "\n")
+						break
+					}
 				}
 			}
 		}

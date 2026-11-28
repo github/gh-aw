@@ -582,6 +582,45 @@ func TestGeneratePRReadyForReviewCheckout_DirectTargetBinding(t *testing.T) {
 	assert.Contains(t, yaml.String(), `GH_AW_DIRECT_PR_CHECKOUT_REPO: "owner/root"`)
 }
 
+func TestGeneratePRReadyForReviewCheckout_DoesNotForwardUnrelatedTargetExpressions(t *testing.T) {
+	var yaml strings.Builder
+	writePRReadyForReviewCheckoutAction(&yaml, &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{PushToPullRequestBranch: &PushToPullRequestBranchConfig{Target: "${{ needs.preflight.outputs.pr_number }}"}},
+	}, true)
+	assert.NotContains(t, yaml.String(), "GH_AW_DIRECT_PR_TARGET:")
+}
+
+func TestGeneratePRReadyForReviewCheckout_BindsAlternativeDirectTargets(t *testing.T) {
+	for _, target := range []string{"${{inputs['pull_request_number']}}", "#123"} {
+		var yaml strings.Builder
+		writePRReadyForReviewCheckoutAction(&yaml, &WorkflowData{
+			SafeOutputs: &SafeOutputsConfig{PushToPullRequestBranch: &PushToPullRequestBranchConfig{Target: target}},
+		}, true)
+		assert.Contains(t, yaml.String(), "GH_AW_DIRECT_PR_TARGET:")
+	}
+}
+
+func TestGeneratePRReadyForReviewCheckout_BindsTrialRepository(t *testing.T) {
+	var yaml strings.Builder
+	writePRReadyForReviewCheckoutAction(&yaml, &WorkflowData{
+		TrialLogicalRepo: "owner/trial",
+		SafeOutputs:      &SafeOutputsConfig{PushToPullRequestBranch: &PushToPullRequestBranchConfig{Target: "${{ inputs.pull_request_number }}"}},
+	}, true)
+	assert.Contains(t, yaml.String(), `GH_AW_DIRECT_PR_TARGET_REPO: "owner/trial"`)
+	assert.Contains(t, yaml.String(), `GH_AW_DIRECT_PR_CHECKOUT_REPO: "owner/trial"`)
+}
+
+func TestGeneratePRReadyForReviewCheckout_DoesNotForwardUnrelatedRepoExpressions(t *testing.T) {
+	var yaml strings.Builder
+	writePRReadyForReviewCheckoutAction(&yaml, &WorkflowData{
+		SafeOutputs: &SafeOutputsConfig{PushToPullRequestBranch: &PushToPullRequestBranchConfig{
+			Target: "${{ inputs.pull_request_number }}", TargetRepoSlug: "${{ needs.preflight.outputs.repo }}",
+		}},
+	}, true)
+	assert.Contains(t, yaml.String(), `GH_AW_DIRECT_PR_TARGET_REPO: "unresolved"`)
+	assert.NotContains(t, yaml.String(), "needs.preflight")
+}
+
 func TestFrontmatterHasTrigger(t *testing.T) {
 	tests := []struct {
 		name     string
