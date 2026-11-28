@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -51,7 +50,7 @@ unknown-field: preserved
 		{"missing frontmatter", "# Markdown only\n"},
 		{"empty content", ""},
 		{"empty frontmatter", "---\n---\n"},
-		{"null frontmatter", "---\nnull\n---\n"},
+		{"null frontmatter is an error", "---\nnull\n---\n"},
 		{"CRLF delimiters", "---\r\nif: false\r\non: push\r\n---\r\nBody\r\n"},
 		{"no trailing newline", "---\nimports: []\non: {}\n---"},
 		{"malformed YAML", "---\non: [unclosed\n---\n"},
@@ -62,6 +61,9 @@ unknown-field: preserved
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			parsed, parseErr := parser.ExtractFrontmatterFromContent(tt.content)
+			if tt.name == "null frontmatter is an error" && parseErr == nil {
+				t.Fatal("expected top-level null frontmatter to fail")
+			}
 			for _, source := range []string{"file", "stdin"} {
 				t.Run(source, func(t *testing.T) {
 					cmd := NewParseCommand()
@@ -122,59 +124,6 @@ unknown-field: preserved
 				})
 			}
 		})
-	}
-}
-
-func TestParseCommandCommittedContent(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not available")
-	}
-	dir := t.TempDir()
-	runGit := func(args ...string) []byte {
-		t.Helper()
-		cmd := exec.Command("git", args...)
-		cmd.Dir = dir
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, output)
-		}
-		return output
-	}
-	runGit("init", "--quiet")
-	path := filepath.Join(dir, "workflow.md")
-	content := "---\nif: false\nimports: []\non:\n  workflow_dispatch:\n    inputs:\n      count:\n        default: 7\n---\nCommitted body\n"
-	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
-		t.Fatal(err)
-	}
-	runGit("add", "workflow.md")
-	runGit("-c", "user.name=Test", "-c", "user.email=test@example.com", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "fixture")
-	commit := strings.TrimSpace(string(runGit("rev-parse", "HEAD")))
-	if err := os.WriteFile(path, []byte("---\nif: true\n---\nChanged body\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	committed := runGit("show", commit+":workflow.md")
-	if string(committed) != content {
-		t.Fatal("git show did not preserve the committed Markdown")
-	}
-	parsed, err := parser.ExtractFrontmatterFromContent(content)
-	if err != nil {
-		t.Fatal(err)
-	}
-	parsed.Frontmatter["resolved-imports"] = []string{}
-	expected, err := json.Marshal(parsed.Frontmatter)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd := NewParseCommand()
-	cmd.SetArgs([]string{"-"})
-	cmd.SetIn(bytes.NewReader(committed))
-	var output bytes.Buffer
-	cmd.SetOut(&output)
-	if err := cmd.Execute(); err != nil {
-		t.Fatal(err)
-	}
-	if output.String() != string(expected)+"\n" {
-		t.Fatalf("JSON = %s, want committed frontmatter %s", &output, expected)
 	}
 }
 

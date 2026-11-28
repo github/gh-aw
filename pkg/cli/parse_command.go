@@ -34,12 +34,7 @@ Missing or empty frontmatter produces {}. Malformed frontmatter is an error.`,
 		// Parsing must not load project configuration through the root hook.
 		PersistentPreRun: func(*cobra.Command, []string) {},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var source string
-			if len(args) > 0 {
-				source = args[0]
-			} else {
-				return errors.New("a Markdown file path or '-' for stdin is required")
-			}
+			source := args[0] //nolint:uncheckedsliceindex // cobra.ExactArgs(1) guarantees one argument.
 			var content []byte
 			var err error
 			if source == "-" {

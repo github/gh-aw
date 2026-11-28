@@ -21,7 +21,6 @@ func TestCommandTreePaths(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("commandTreePaths() = %v, want %v", got, want)
 	}
-
 }
 
 func TestParseCommandRegistered(t *testing.T) {
