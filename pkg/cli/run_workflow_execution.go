@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -47,16 +48,19 @@ type RunOptions struct {
 	RepeatCount       int      // Number of times to repeat (0 = run once)
 	Inputs            []string // Workflow inputs in key=value format
 	JSON              bool     // Output results in JSON format
+	onDispatch        func(*WorkflowRunInfo)
+	onResult          func(int, *WorkflowRunInfo)
 }
 
 // WorkflowRunResult contains the result of a single workflow run trigger for JSON output
 type WorkflowRunResult struct {
-	Workflow string `json:"workflow"`
-	LockFile string `json:"lock_file"`
-	Status   string `json:"status"` // "triggered", "dry_run", "error"
-	RunID    int64  `json:"run_id,omitempty"`
-	RunURL   string `json:"run_url,omitempty"`
-	Error    string `json:"error,omitempty"`
+	Workflow    string `json:"workflow"`
+	LockFile    string `json:"lock_file"`
+	Status      string `json:"status"`       // "triggered", "dry_run", "error"
+	RunIdentity string `json:"run_identity"` // "known" or "unknown"
+	RunID       int64  `json:"run_id,omitempty"`
+	RunURL      string `json:"run_url,omitempty"`
+	Error       string `json:"error,omitempty"`
 }
 
 type workflowEnableState struct {
@@ -105,7 +109,13 @@ func RunWorkflowOnGitHub(ctx context.Context, workflowIdOrName string, opts RunO
 	if err != nil {
 		return err
 	}
+	if opts.onDispatch != nil {
+		opts.onDispatch(runResult.runInfo)
+	}
 	handleWorkflowRunInfo(runResult.runInfo, runResult.runInfoErr, opts)
+	if opts.JSON && opts.RepeatCount > 0 && runResult.runInfo == nil {
+		return errors.New("workflow was dispatched, but its identity is unknown; cannot safely repeat without waiting for it")
+	}
 	return waitForWorkflowRunCompletion(ctx, opts, runResult.runInfo, runResult.runInfoErr, workflowStartTime, ref)
 }
 
@@ -414,7 +424,7 @@ func executeWorkflowRun(ctx context.Context, lockFileName string, args []string,
 		}
 		return nil, formatWorkflowRunError(err, stderr)
 	}
-	output := strings.TrimSpace(string(stdout))
+	output := string(bytes.TrimSpace(stdout))
 	if output != "" {
 		fmt.Fprintln(os.Stderr, console.FormatInfoMessage(output))
 	}
@@ -447,6 +457,23 @@ func formatWorkflowRunError(err error, stderr []byte) error {
 }
 
 func resolveWorkflowRunInfo(lockFileName, output string, opts RunOptions) (*WorkflowRunInfo, error) {
+	if opts.JSON {
+		var runInfo *WorkflowRunInfo
+		for line := range strings.SplitSeq(output, "\n") {
+			line = strings.TrimSpace(line)
+			parsed := parseRunInfoFromOutput(line)
+			if parsed != nil && parsed.DatabaseID > 0 && line == parsed.URL {
+				if runInfo != nil && (runInfo.DatabaseID != parsed.DatabaseID || runInfo.URL != parsed.URL) {
+					return nil, errors.New("dispatch returned multiple workflow run identities")
+				}
+				runInfo = parsed
+			}
+		}
+		if runInfo != nil {
+			return runInfo, nil
+		}
+		return nil, errors.New("dispatch did not return a workflow run identity")
+	}
 	if parsedRunInfo := parseRunInfoFromOutput(output); parsedRunInfo != nil {
 		executionLog.Printf("Parsed run info from gh output: id=%d, url=%s", parsedRunInfo.DatabaseID, parsedRunInfo.URL)
 		return parsedRunInfo, nil
@@ -476,12 +503,15 @@ func waitForWorkflowRunCompletion(ctx context.Context, opts RunOptions, runInfo 
 	}
 	targetRepo := resolveWorkflowTargetRepo(opts)
 	if targetRepo == "" || runInfo == nil {
+		if opts.JSON && opts.RepeatCount > 0 {
+			return errors.New("cannot track dispatched workflow run for repeat")
+		}
 		return nil
 	}
 	printWorkflowWaitMessage(opts.AutoMergePRs)
 	runIDStr := strconv.FormatInt(runInfo.DatabaseID, 10)
 	if err := WaitForWorkflowCompletion(ctx, targetRepo, runIDStr, workflowCompletionWaitTimeoutMinutes, opts.Verbose); err != nil {
-		if ctx.Err() != nil || errors.Is(err, ErrInterrupted) {
+		if ctx.Err() != nil || errors.Is(err, ErrInterrupted) || (opts.JSON && opts.RepeatCount > 0) {
 			return err
 		}
 		printWorkflowCompletionWarning(opts.AutoMergePRs, err)
@@ -580,6 +610,9 @@ func executeAllWorkflowsOnce(ctx context.Context, workflowNames []string, opts R
 			fmt.Fprintln(os.Stderr, console.FormatProgressMessage(fmt.Sprintf("Running workflow %d/%d: %s", i+1, len(workflowNames), workflowName)))
 		}
 		workflowOpts := opts
+		if opts.onResult != nil {
+			workflowOpts.onDispatch = func(info *WorkflowRunInfo) { opts.onResult(i, info) }
+		}
 		if opts.RepeatCount > 0 {
 			workflowOpts.WaitForCompletion = true
 		}
@@ -602,7 +635,7 @@ func executeAllWorkflowsOnce(ctx context.Context, workflowNames []string, opts R
 }
 
 // wrapRunWithJSONOutput wraps a run-all function to emit a JSON summary to stdout.
-func wrapRunWithJSONOutput(inner func() error, workflowNames []string, opts RunOptions) func() error {
+func wrapRunWithJSONOutput(inner func(RunOptions) error, workflowNames []string, opts RunOptions) func() error {
 	return func() error {
 		var results []WorkflowRunResult
 		for _, workflowName := range workflowNames {
@@ -611,9 +644,16 @@ func wrapRunWithJSONOutput(inner func() error, workflowNames []string, opts RunO
 			if opts.DryRun {
 				status = "dry_run"
 			}
-			results = append(results, WorkflowRunResult{Workflow: normalizedID, LockFile: normalizedID + ".lock.yml", Status: status})
+			results = append(results, WorkflowRunResult{Workflow: normalizedID, LockFile: normalizedID + ".lock.yml", Status: status, RunIdentity: "unknown"})
 		}
-		runErr := inner()
+		opts.onResult = func(index int, info *WorkflowRunInfo) {
+			if info != nil && index >= 0 && index < len(results) {
+				results[index].RunIdentity = "known"
+				results[index].RunID = info.DatabaseID
+				results[index].RunURL = info.URL
+			}
+		}
+		runErr := inner(opts)
 		if runErr != nil {
 			for i := range results {
 				results[i].Status = "error"
@@ -643,18 +683,19 @@ func RunWorkflowsOnGitHub(ctx context.Context, workflowNames []string, opts RunO
 	if err := validateWorkflowsForRun(ctx, workflowNames, opts); err != nil {
 		return err
 	}
-	runAllWorkflows := func() error {
-		return executeAllWorkflowsOnce(ctx, workflowNames, opts)
-	}
+	runAllWorkflows := func() error { return executeAllWorkflowsOnce(ctx, workflowNames, opts) }
 	if opts.JSON {
-		runAllWorkflows = wrapRunWithJSONOutput(runAllWorkflows, workflowNames, opts)
+		runAllWorkflows = wrapRunWithJSONOutput(func(runOpts RunOptions) error {
+			return executeAllWorkflowsOnce(ctx, workflowNames, runOpts)
+		}, workflowNames, opts)
 	}
 	return ExecuteWithRepeat(RepeatOptions{
 		Ctx:           ctx,
 		RepeatCount:   opts.RepeatCount,
 		RepeatMessage: "Repeating workflow run",
 		ExecuteFunc:   runAllWorkflows,
-		UseStderr:     false,
+		UseStderr:     opts.JSON,
+		StopOnError:   opts.JSON,
 	})
 }
 

@@ -1037,7 +1037,7 @@ jobs:
         # --allow-tool github
         # --allow-tool safeoutputs
         # --allow-tool shell(cat)
-        # --allow-tool shell(cat*)
+        # --allow-tool shell(cat:*)
         # --allow-tool shell(date)
         # --allow-tool shell(echo)
         # --allow-tool shell(gh:*)
@@ -1045,19 +1045,19 @@ jobs:
         # --allow-tool shell(git log*)
         # --allow-tool shell(grep)
         # --allow-tool shell(head)
-        # --allow-tool shell(head*)
+        # --allow-tool shell(head:*)
         # --allow-tool shell(ls)
-        # --allow-tool shell(ls*)
+        # --allow-tool shell(ls:*)
         # --allow-tool shell(printf)
         # --allow-tool shell(pwd)
         # --allow-tool shell(safeoutputs:*)
         # --allow-tool shell(sort)
-        # --allow-tool shell(split*)
+        # --allow-tool shell(split:*)
         # --allow-tool shell(tail)
-        # --allow-tool shell(tail*)
+        # --allow-tool shell(tail:*)
         # --allow-tool shell(uniq)
         # --allow-tool shell(wc)
-        # --allow-tool shell(wc*)
+        # --allow-tool shell(wc:*)
         # --allow-tool shell(yq)
         # --allow-tool write
         timeout-minutes: 15
@@ -1148,8 +1148,8 @@ jobs:
           GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}
           GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
           GH_AW_COPILOT_SDK_DRIVER: 1
-          GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","github","--allow-tool","safeoutputs","--allow-tool","shell(cat)","--allow-tool","shell(cat*)","--allow-tool","shell(date)","--allow-tool","shell(echo)","--allow-tool","shell(gh:*)","--allow-tool","shell(git diff*)","--allow-tool","shell(git log*)","--allow-tool","shell(grep)","--allow-tool","shell(head)","--allow-tool","shell(head*)","--allow-tool","shell(ls)","--allow-tool","shell(ls*)","--allow-tool","shell(printf)","--allow-tool","shell(pwd)","--allow-tool","shell(safeoutputs:*)","--allow-tool","shell(sort)","--allow-tool","shell(split*)","--allow-tool","shell(tail)","--allow-tool","shell(tail*)","--allow-tool","shell(uniq)","--allow-tool","shell(wc)","--allow-tool","shell(wc*)","--allow-tool","shell(yq)","--allow-tool","write","--deny-tool","workflow","--allow-all-paths"]'
-          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"dynamicWorkflows":false,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","shell(cat)","shell(cat*)","shell(date)","shell(echo)","shell(gh:*)","shell(git diff*)","shell(git log*)","shell(grep)","shell(head)","shell(head*)","shell(ls)","shell(ls*)","shell(printf)","shell(pwd)","shell(safeoutputs:*)","shell(sort)","shell(split*)","shell(tail)","shell(tail*)","shell(uniq)","shell(wc)","shell(wc*)","shell(yq)","write"]}}'
+          GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","github","--allow-tool","safeoutputs","--allow-tool","shell(cat)","--allow-tool","shell(cat:*)","--allow-tool","shell(date)","--allow-tool","shell(echo)","--allow-tool","shell(gh:*)","--allow-tool","shell(git diff*)","--allow-tool","shell(git log*)","--allow-tool","shell(grep)","--allow-tool","shell(head)","--allow-tool","shell(head:*)","--allow-tool","shell(ls)","--allow-tool","shell(ls:*)","--allow-tool","shell(printf)","--allow-tool","shell(pwd)","--allow-tool","shell(safeoutputs:*)","--allow-tool","shell(sort)","--allow-tool","shell(split:*)","--allow-tool","shell(tail)","--allow-tool","shell(tail:*)","--allow-tool","shell(uniq)","--allow-tool","shell(wc)","--allow-tool","shell(wc:*)","--allow-tool","shell(yq)","--allow-tool","write","--deny-tool","workflow","--allow-all-paths"]'
+          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"dynamicWorkflows":false,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","shell(cat)","shell(cat:*)","shell(date)","shell(echo)","shell(gh:*)","shell(git diff*)","shell(git log*)","shell(grep)","shell(head)","shell(head:*)","shell(ls)","shell(ls:*)","shell(printf)","shell(pwd)","shell(safeoutputs:*)","shell(sort)","shell(split:*)","shell(tail)","shell(tail:*)","shell(uniq)","shell(wc)","shell(wc:*)","shell(yq)","write"]}}'
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_MAX_TOOL_DENIALS: 5
@@ -1567,6 +1567,14 @@ jobs:
           pattern: safe-outputs-items
           merge-multiple: true
           path: /tmp/gh-aw/
+      - name: Clear Azure token broker evidence directory
+        id: clear_azure_broker_evidence
+        if: always()
+        shell: bash
+        run: |
+          test ! -L /tmp/gh-aw
+          rm -rf -- /tmp/gh-aw/azure-broker
+          test ! -e /tmp/gh-aw/azure-broker && test ! -L /tmp/gh-aw/azure-broker
       - name: Process no-op messages
         id: noop
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -1742,7 +1750,7 @@ jobs:
           GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/collect_usage_artifact_files.sh"
       - name: Generate usage activity summary and unified session
-        if: always()
+        if: always() && steps.clear_azure_broker_evidence.outcome == 'success'
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

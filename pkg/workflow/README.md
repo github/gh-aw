@@ -667,6 +667,10 @@ Detects dangerous patterns in externally-sourced markdown files (e.g., from `gh 
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
+| `CanPinEngineGitHubProviderLocally` | `func(frontmatter map[string]any) bool` | Reports whether frontmatter contains a local engine ID (string form or `engine.id`), allowing a GitHub provider pin without conflicting with an imported engine or the engine schema. |
+| `AuthoredAutoModelPath` | `func(frontmatter map[string]any) ([]string, string, bool)` | Finds a statically authored bare `auto` or `copilot/auto` effective model and returns its YAML path and value, checking `engine.pi.model`, then `engine.model`, then top-level `model`. |
+| `FormatAutoModelRoutingWarning` | `func(outcome *AutoModelRoutingOutcome) string` | Formats the deprecation warning and migration guidance for the routing outcome, including routed, blocked, imported, and already-configured cases; nil returns an empty string. |
+| `InspectAutoModelRouting` | `func(content, filePath string) (*AutoModelRoutingOutcome, error)` | Runs the compiler's parse and two-stage auto-routing eligibility pipeline, resolving imports relative to `filePath`. Returns `(nil, nil)` for shared or redirect-only workflows and workflows without an eligible target; otherwise returns the outcome or parse error. |
 | `ComputeGitHubAppManifestWebhookPermissions` | `func(onValue any) map[string]string` | Derives the GitHub App permissions required to receive the selected workflow webhook events. |
 | `DefaultModelRoutingBatchNotice` | `func(count int) string` | Formats the informational notice for workflows using the implicit model-routing default in batch compilation. |
 | `GenerateWorkQueueEventWorkflow` | `func(ctx context.Context, workflowDataList []*WorkflowData, workflowDir string, repoConfig *RepoConfig, noLogo ...bool) error` | Generates trusted Issue lifecycle handlers for work queue events. |

@@ -5827,6 +5827,27 @@ Optional `issue_number` and `repo` follow the same runtime target authorization
 and repository restrictions as `set_issue_type`. `duplicate_of` identifies a
 same-repository duplicate target. Common safe-output provenance fields apply.
 
+**MCP Tool Schema**:
+
+```json
+{
+  "name": "set_issue_status",
+  "description": "Set a GitHub issue's native planning status by name or integer ID.",
+  "inputSchema": {
+    "type": "object",
+    "required": ["status"],
+    "properties": {
+      "issue_number": {"type": ["number", "string"]},
+      "status": {"type": ["string", "integer"], "minLength": 1, "maxLength": 256, "minimum": 1},
+      "duplicate_of": {"type": "integer", "minimum": 1}
+    },
+    "additionalProperties": false
+  }
+}
+```
+
+> **Note**: The schema above is abbreviated; the compiled tool definition also carries the `secrecy` and `integrity` provenance fields used by all safe output tools.
+
 **Operational Semantics**:
 
 1. The handler MUST enforce `max`, repository authorization, triggering/fixed/
@@ -5859,6 +5880,38 @@ same-repository duplicate target. Common safe-output provenance fields apply.
    successful status mutation. Verification, manifests, audit, and outcome
    evaluation MUST distinguish requested, skipped, staged, failed, and applied
    effects.
+
+**Configuration Parameters**:
+
+- `max`: Operation limit (default: 5)
+- `allowed`: Optional allowlist of planning status names or IDs
+- `allow-close`: Permit open-to-closed transitions and close-reason changes (default: false)
+- `allow-reopen`: Permit closed-to-open transitions and close-reason changes (default: false)
+- `target`: `"triggering"` (default), `"*"`, or a fixed issue number
+- `required-labels`: Labels that must all be present on the issue
+- `required-title-prefix`: Title prefix the issue must start with
+- `target-repo`: Cross-repository target
+- `allowed-repos`: Cross-repository allowlist
+
+**Security Requirements**:
+
+- The issue number MUST be derived only as described in Target Authorization for `set_issue_type` (SIT-001 to SIT-005).
+- The target repository MUST be validated against `target-repo` and `allowed-repos` before any API call.
+- Lifecycle transitions MUST be rejected with a permission error unless `allow-close` and/or `allow-reopen` authorize them.
+- Handler failures MUST carry a standardized error code prefix (`ERR_VALIDATION`, `ERR_PERMISSION`, or `ERR_API`).
+- Mutations MUST NOT be performed in staged mode.
+
+**Required Permissions**:
+
+*GitHub Actions Token*:
+
+- `issues: write` - Planning status and lifecycle mutations
+- `issues: read` - Status discovery and current-state reads
+
+*GitHub App*:
+
+- `issues: write` - Planning status and lifecycle mutations
+- `metadata: read` - Repository metadata (automatically granted)
 
 Outcome retention compares stable status IDs/categories, issue state, and close
 reason against the recorded before/after snapshots. Renaming a status alone

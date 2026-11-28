@@ -1184,12 +1184,12 @@ jobs:
         # --allow-tool github
         # --allow-tool safeoutputs
         # --allow-tool shell(cat)
-        # --allow-tool shell(cat*)
-        # --allow-tool shell(cd*)
-        # --allow-tool shell(curl*)
+        # --allow-tool shell(cat:*)
+        # --allow-tool shell(cd:*)
+        # --allow-tool shell(curl:*)
         # --allow-tool shell(date)
         # --allow-tool shell(echo)
-        # --allow-tool shell(find*)
+        # --allow-tool shell(find:*)
         # --allow-tool shell(git add:*)
         # --allow-tool shell(git branch:*)
         # --allow-tool shell(git checkout:*)
@@ -1201,13 +1201,13 @@ jobs:
         # --allow-tool shell(git:*)
         # --allow-tool shell(github:*)
         # --allow-tool shell(grep)
-        # --allow-tool shell(grep*)
+        # --allow-tool shell(grep:*)
         # --allow-tool shell(head)
-        # --allow-tool shell(head*)
-        # --allow-tool shell(kill*)
+        # --allow-tool shell(head:*)
+        # --allow-tool shell(kill:*)
         # --allow-tool shell(ls)
-        # --allow-tool shell(ls*)
-        # --allow-tool shell(lsof*)
+        # --allow-tool shell(ls:*)
+        # --allow-tool shell(lsof:*)
         # --allow-tool shell(node)
         # --allow-tool shell(npm ci*)
         # --allow-tool shell(npm install*)
@@ -1219,11 +1219,11 @@ jobs:
         # --allow-tool shell(playwright-cli:*)
         # --allow-tool shell(printf)
         # --allow-tool shell(pwd)
-        # --allow-tool shell(pwd*)
+        # --allow-tool shell(pwd:*)
         # --allow-tool shell(safeoutputs:*)
         # --allow-tool shell(sort)
         # --allow-tool shell(tail)
-        # --allow-tool shell(tail*)
+        # --allow-tool shell(tail:*)
         # --allow-tool shell(uniq)
         # --allow-tool shell(wc)
         # --allow-tool shell(yq)
@@ -1320,8 +1320,8 @@ jobs:
           GH_AW_ADMISSION_MAX_AI_CREDITS: ${{ needs.activation.outputs.admission-max-ai-credits }}
           GH_AW_ADMISSION_RESULT: ${{ needs.activation.outputs.admission-result }}
           GH_AW_COPILOT_SDK_DRIVER: 1
-          GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","github","--allow-tool","safeoutputs","--allow-tool","shell(cat)","--allow-tool","shell(cat*)","--allow-tool","shell(cd*)","--allow-tool","shell(curl*)","--allow-tool","shell(date)","--allow-tool","shell(echo)","--allow-tool","shell(find*)","--allow-tool","shell(git add:*)","--allow-tool","shell(git branch:*)","--allow-tool","shell(git checkout:*)","--allow-tool","shell(git commit:*)","--allow-tool","shell(git merge:*)","--allow-tool","shell(git rm:*)","--allow-tool","shell(git status)","--allow-tool","shell(git switch:*)","--allow-tool","shell(git:*)","--allow-tool","shell(github:*)","--allow-tool","shell(grep)","--allow-tool","shell(grep*)","--allow-tool","shell(head)","--allow-tool","shell(head*)","--allow-tool","shell(kill*)","--allow-tool","shell(ls)","--allow-tool","shell(ls*)","--allow-tool","shell(lsof*)","--allow-tool","shell(node)","--allow-tool","shell(npm ci*)","--allow-tool","shell(npm install*)","--allow-tool","shell(npm run*)","--allow-tool","shell(npm:*)","--allow-tool","shell(npx @marp-team/marp-cli*)","--allow-tool","shell(npx http-server*)","--allow-tool","shell(npx:*)","--allow-tool","shell(playwright-cli:*)","--allow-tool","shell(printf)","--allow-tool","shell(pwd)","--allow-tool","shell(pwd*)","--allow-tool","shell(safeoutputs:*)","--allow-tool","shell(sort)","--allow-tool","shell(tail)","--allow-tool","shell(tail*)","--allow-tool","shell(uniq)","--allow-tool","shell(wc)","--allow-tool","shell(yq)","--allow-tool","write","--deny-tool","workflow","--add-dir","/tmp/gh-aw/cache-memory/","--allow-all-paths"]'
-          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"dynamicWorkflows":false,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","shell(cat)","shell(cat*)","shell(cd*)","shell(curl*)","shell(date)","shell(echo)","shell(find*)","shell(git add:*)","shell(git branch:*)","shell(git checkout:*)","shell(git commit:*)","shell(git merge:*)","shell(git rm:*)","shell(git status)","shell(git switch:*)","shell(git:*)","shell(github:*)","shell(grep)","shell(grep*)","shell(head)","shell(head*)","shell(kill*)","shell(ls)","shell(ls*)","shell(lsof*)","shell(node)","shell(npm ci*)","shell(npm install*)","shell(npm run*)","shell(npm:*)","shell(npx @marp-team/marp-cli*)","shell(npx http-server*)","shell(npx:*)","shell(playwright-cli:*)","shell(printf)","shell(pwd)","shell(pwd*)","shell(safeoutputs:*)","shell(sort)","shell(tail)","shell(tail*)","shell(uniq)","shell(wc)","shell(yq)","write"]}}'
+          GH_AW_COPILOT_SDK_SERVER_ARGS: '["--headless","--no-auto-update","--port","3002","--add-dir","/tmp/gh-aw/","--log-level","all","--log-dir","/tmp/gh-aw/sandbox/agent/logs/","--disable-builtin-mcps","--no-ask-user","--allow-tool","github","--allow-tool","safeoutputs","--allow-tool","shell(cat)","--allow-tool","shell(cat:*)","--allow-tool","shell(cd:*)","--allow-tool","shell(curl:*)","--allow-tool","shell(date)","--allow-tool","shell(echo)","--allow-tool","shell(find:*)","--allow-tool","shell(git add:*)","--allow-tool","shell(git branch:*)","--allow-tool","shell(git checkout:*)","--allow-tool","shell(git commit:*)","--allow-tool","shell(git merge:*)","--allow-tool","shell(git rm:*)","--allow-tool","shell(git status)","--allow-tool","shell(git switch:*)","--allow-tool","shell(git:*)","--allow-tool","shell(github:*)","--allow-tool","shell(grep)","--allow-tool","shell(grep:*)","--allow-tool","shell(head)","--allow-tool","shell(head:*)","--allow-tool","shell(kill:*)","--allow-tool","shell(ls)","--allow-tool","shell(ls:*)","--allow-tool","shell(lsof:*)","--allow-tool","shell(node)","--allow-tool","shell(npm ci*)","--allow-tool","shell(npm install*)","--allow-tool","shell(npm run*)","--allow-tool","shell(npm:*)","--allow-tool","shell(npx @marp-team/marp-cli*)","--allow-tool","shell(npx http-server*)","--allow-tool","shell(npx:*)","--allow-tool","shell(playwright-cli:*)","--allow-tool","shell(printf)","--allow-tool","shell(pwd)","--allow-tool","shell(pwd:*)","--allow-tool","shell(safeoutputs:*)","--allow-tool","shell(sort)","--allow-tool","shell(tail)","--allow-tool","shell(tail:*)","--allow-tool","shell(uniq)","--allow-tool","shell(wc)","--allow-tool","shell(yq)","--allow-tool","write","--deny-tool","workflow","--add-dir","/tmp/gh-aw/cache-memory/","--allow-all-paths"]'
+          GH_AW_COPILOT_SDK_TOOL_CONFIG: '{"version":1,"capabilities":{"bash":true,"edit":true,"webFetch":false,"webSearch":false,"dynamicWorkflows":false,"mcp":true,"cliProxy":true},"permissions":{"allowedTools":["github","read","safeoutputs","shell(cat)","shell(cat:*)","shell(cd:*)","shell(curl:*)","shell(date)","shell(echo)","shell(find:*)","shell(git add:*)","shell(git branch:*)","shell(git checkout:*)","shell(git commit:*)","shell(git merge:*)","shell(git rm:*)","shell(git status)","shell(git switch:*)","shell(git:*)","shell(github:*)","shell(grep)","shell(grep:*)","shell(head)","shell(head:*)","shell(kill:*)","shell(ls)","shell(ls:*)","shell(lsof:*)","shell(node)","shell(npm ci*)","shell(npm install*)","shell(npm run*)","shell(npm:*)","shell(npx @marp-team/marp-cli*)","shell(npx http-server*)","shell(npx:*)","shell(playwright-cli:*)","shell(printf)","shell(pwd)","shell(pwd:*)","shell(safeoutputs:*)","shell(sort)","shell(tail)","shell(tail:*)","shell(uniq)","shell(wc)","shell(yq)","write"]}}'
           GH_AW_LLM_PROVIDER: github
           GH_AW_MAX_AI_CREDITS: ${{ vars.GH_AW_DEFAULT_MAX_AI_CREDITS || '1000' }}
           GH_AW_MAX_TOOL_DENIALS: 5
@@ -1793,6 +1793,14 @@ jobs:
           pattern: safe-outputs-items
           merge-multiple: true
           path: /tmp/gh-aw/
+      - name: Clear Azure token broker evidence directory
+        id: clear_azure_broker_evidence
+        if: always()
+        shell: bash
+        run: |
+          test ! -L /tmp/gh-aw
+          rm -rf -- /tmp/gh-aw/azure-broker
+          test ! -e /tmp/gh-aw/azure-broker && test ! -L /tmp/gh-aw/azure-broker
       - name: Process no-op messages
         id: noop
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -2011,7 +2019,7 @@ jobs:
           GH_AW_DETECTION_REASON: ${{ needs.detection.outputs.detection_reason }}
         run: bash "${RUNNER_TEMP}/gh-aw/actions/collect_usage_artifact_files.sh"
       - name: Generate usage activity summary and unified session
-        if: always()
+        if: always() && steps.clear_azure_broker_evidence.outcome == 'success'
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

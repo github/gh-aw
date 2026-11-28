@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 848 256" role="img" aria-labelledby="copilot-cloud-agent-title copilot-cloud-agent-desc">
+  <title id="copilot-cloud-agent-title">Copilot cloud agent paths</title>
+  <desc id="copilot-cloud-agent-desc">Creating an agent session creates an issue that triggers Copilot to open a pull request; assignment sends Copilot to an existing issue or pull request.</desc>
+  <defs>
+    <marker id="copilot-arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+      <path d="M 0 0 L 8 4 L 0 8 Z" fill="#59636e"/>
+    </marker>
+    <marker id="copilot-arrow-focus" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+      <path d="M 0 0 L 8 4 L 0 8 Z" fill="#0969da"/>
+    </marker>
+  </defs>
+  <rect width="848" height="256" fill="#ffffff"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="24" y="28" fill="#59636e" font-size="12" font-weight="600">NEW WORK</text>
+    <text x="24" y="152" fill="#59636e" font-size="12" font-weight="600">EXISTING WORK</text>
+    <path d="M 240 80 H 288" fill="none" stroke="#0969da" stroke-width="1" marker-end="url(#copilot-arrow-focus)"/>
+    <path d="M 432 80 H 480" fill="none" stroke="#59636e" stroke-width="1" marker-end="url(#copilot-arrow)"/>
+    <path d="M 640 80 H 688" fill="none" stroke="#59636e" stroke-width="1" marker-end="url(#copilot-arrow)"/>
+    <path d="M 240 204 H 288" fill="none" stroke="#59636e" stroke-width="1" marker-end="url(#copilot-arrow)"/>
+    <rect x="24" y="48" width="216" height="64" rx="4" fill="#f6f8fa" stroke="#0969da"/>
+    <text x="132" y="84" text-anchor="middle" fill="#1f2328" font-size="12" font-weight="600">create-agent-session</text>
+    <rect x="288" y="48" width="144" height="64" rx="4" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="360" y="84" text-anchor="middle" fill="#1f2328" font-size="16">New issue</text>
+    <rect x="480" y="48" width="160" height="64" rx="4" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="560" y="84" text-anchor="middle" fill="#1f2328" font-size="16">Copilot agent</text>
+    <rect x="688" y="48" width="136" height="64" rx="4" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="756" y="84" text-anchor="middle" fill="#1f2328" font-size="16">Pull request</text>
+    <rect x="24" y="172" width="216" height="64" rx="4" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="132" y="208" text-anchor="middle" fill="#1f2328" font-size="12" font-weight="600">assign-to-agent</text>
+    <rect x="288" y="172" width="352" height="64" rx="4" fill="#ffffff" stroke="#d0d7de"/>
+    <text x="464" y="200" text-anchor="middle" fill="#1f2328" font-size="16">Existing issue or pull request</text>
+    <text x="464" y="220" text-anchor="middle" fill="#59636e" font-size="12">assigned to Copilot</text>
+  </g>
+</svg>

@@ -37,6 +37,9 @@ func downloadIncludeFromWorkflowSpec(spec string, cache *ImportCache) (string, e
 		return "", fmt.Errorf("remote import %s is not cached; populate the import cache with a trusted compile before using --read-only", spec)
 	}
 	sha := resolveWorkflowSpecSHAForCache(owner, repo, ref, host, cache)
+	if cache != nil && cache.requireStablePaths && sha == "" {
+		return "", fmt.Errorf("cannot resolve remote import %s to a stable commit", spec)
+	}
 	if cache != nil && sha != "" {
 		if cachedPath, found := cache.Get(owner, repo, filePath, sha); found {
 			remoteLog.Printf("Using cached import: %s/%s/%s@%s (SHA: %s)", owner, repo, filePath, ref, sha)
@@ -59,6 +62,9 @@ func downloadIncludeFromWorkflowSpec(spec string, cache *ImportCache) (string, e
 	if cache != nil && sha != "" {
 		cachedPath, err := cache.Set(owner, repo, filePath, sha, content)
 		if err != nil {
+			if cache.requireStablePaths {
+				return "", fmt.Errorf("cannot cache remote import %s: %w", spec, err)
+			}
 			remoteLog.Printf("Failed to cache import: %v", err)
 		} else {
 			remoteLog.Printf("Successfully cached download at: %s", cachedPath)
