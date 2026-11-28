@@ -841,7 +841,7 @@ func TestShellcheckDifferentialNativeFindings(t *testing.T) {
 		Name: "Quote value", JobID: "agent", LockFile: "native.lock.yml",
 		Script: "#!/bin/bash\necho \"$missing\"\n",
 	}
-	output, err := runShellcheckOnScript(step, nil, false)
+	output, err := runShellcheckOnScript(context.Background(), step, nil, false)
 	require.Error(t, err, string(output))
 	var findings *scannerFindingsError
 	require.ErrorAs(t, err, &findings, string(output))
@@ -849,7 +849,7 @@ func TestShellcheckDifferentialNativeFindings(t *testing.T) {
 	assert.Equal(t, "SC2154", findings.diagnostics[0].Finding.RuleID)
 	baseline := &dryRunScannerBaseline{results: map[string]error{"shellcheck": err}}
 	step.Script = "#!/bin/bash\n# leading comment\necho \"$missing\"\n"
-	_, currentErr := runShellcheckOnScript(step, nil, false)
+	_, currentErr := runShellcheckOnScript(context.Background(), step, nil, false)
 	diff, err := baseline.filter("shellcheck", currentErr)
 	require.ErrorContains(t, err, "existing, 0 added")
 	assert.Equal(t, &DryRunScannerDifferential{

@@ -4,12 +4,15 @@ package cli
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/github/gh-aw/pkg/workflow"
 	"github.com/stretchr/testify/assert"
@@ -308,7 +311,7 @@ func TestRunShellcheckOnScriptVerboseDoesNotEmitInvocation(t *testing.T) {
 	t.Cleanup(func() { _ = os.Setenv("PATH", origPath) })
 	require.NoError(t, os.Setenv("PATH", dir))
 
-	out, err := runShellcheckOnScript(runStepInfo{
+	out, err := runShellcheckOnScript(context.Background(), runStepInfo{
 		Name:     "native step",
 		Script:   "echo hello",
 		Shell:    "bash",
@@ -316,6 +319,157 @@ func TestRunShellcheckOnScriptVerboseDoesNotEmitInvocation(t *testing.T) {
 	}, shellcheckDefaultIgnoreCodes, true)
 	require.NoError(t, err)
 	assert.Empty(t, out)
+}
+
+func TestRunShellcheckOnScriptNativeResults(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses shell script stub")
+	}
+
+	for _, tc := range []struct {
+		name     string
+		script   string
+		findings bool
+		errText  string
+	}{
+		{name: "clean", script: "#!/bin/sh\nexit 0\n"},
+		{
+			name: "findings", findings: true, errText: "shellcheck found issues",
+			script: "#!/bin/sh\nfor script do :; done\nprintf '%s:1:1: warning: quote this [SC2086]\\n' \"$script\"\nexit 1\n",
+		},
+		{
+			name: "operational error", errText: "exit status 2",
+			script: "#!/bin/sh\nprintf 'scanner unavailable\\n' >&2\nexit 2\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "shellcheck"), []byte(tc.script), 0o755))
+			t.Setenv("PATH", dir)
+			step := runStepInfo{Name: "native step", Script: "echo $value", Source: "test"}
+			out, err := runShellcheckOnScript(context.Background(), step, nil, false)
+			if tc.errText == "" {
+				require.NoError(t, err)
+				assert.Empty(t, out)
+			} else {
+				require.ErrorContains(t, err, tc.errText)
+				assert.Contains(t, string(out), "shellcheck findings in test (step: native step)")
+			}
+			var findings *scannerFindingsError
+			assert.Equal(t, tc.findings, errors.As(err, &findings))
+			if tc.findings {
+				assert.Contains(t, string(out), "script:1:1: warning: quote this [SC2086]")
+				require.Len(t, findings.diagnostics, 1)
+			}
+			var reported error
+			ctx := context.WithValue(context.Background(), compileScannerReporterKey{}, func(tool string, err error) {
+				assert.Equal(t, "shellcheck", tool)
+				reported = err
+			})
+			aggregateErr := reportShellcheckResultsWithErrors(ctx, []runStepInfo{step},
+				[]shellcheckResult{{err: err, output: out}}, false, nil)
+			if tc.errText == "" {
+				assert.NoError(t, aggregateErr)
+				assert.NoError(t, reported)
+			} else {
+				assert.Error(t, aggregateErr)
+				assert.Error(t, reported)
+				assert.Equal(t, tc.findings, errors.As(reported, &findings))
+			}
+		})
+	}
+}
+
+func TestRunShellcheckOnScriptNativeCancellation(t *testing.T) {
+	startedDir := stubBlockingNativeShellcheck(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	var err error
+	done := make(chan struct{})
+	go func() {
+		_, err = runShellcheckOnScript(ctx, runStepInfo{Script: "echo hello"}, nil, false)
+		close(done)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+	waitForNativeShellcheckStarts(t, startedDir, 1)
+	cancel()
+	select {
+	case <-done:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(2 * time.Second):
+		t.Fatal("native ShellCheck did not stop promptly after cancellation")
+	}
+}
+
+func TestRunShellcheckWorkersCancellationWhileWaiting(t *testing.T) {
+	for _, strict := range []bool{false, true} {
+		t.Run(fmt.Sprintf("strict=%t", strict), func(t *testing.T) {
+			startedDir := stubBlockingNativeShellcheck(t)
+			ctx, cancel := context.WithCancel(context.Background())
+			steps := make([]runStepInfo, shellcheckMaxConcurrency+4)
+			for i := range steps {
+				steps[i] = runStepInfo{Name: fmt.Sprintf("step %d", i), Script: "echo hello"}
+			}
+			var results []shellcheckResult
+			done := make(chan struct{})
+			go func() {
+				results = runShellcheckWorkers(ctx, steps, false, false)
+				close(done)
+			}()
+			t.Cleanup(func() {
+				cancel()
+				<-done
+			})
+			// All slots stay occupied until cancellation, leaving extra steps queued.
+			waitForNativeShellcheckStarts(t, startedDir, shellcheckMaxConcurrency)
+			cancel()
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+				t.Fatal("ShellCheck workers did not stop promptly after cancellation")
+			}
+			require.Len(t, results, len(steps))
+			for i, result := range results {
+				assert.ErrorIs(t, result.err, context.Canceled, "step %d must not be treated as clean", i)
+			}
+			var reported error
+			ctx = context.WithValue(ctx, compileScannerReporterKey{}, func(tool string, err error) {
+				assert.Equal(t, "shellcheck", tool)
+				reported = err
+			})
+			err := reportShellcheckResultsWithErrors(ctx, steps, results, strict, nil)
+			assert.ErrorIs(t, err, context.Canceled)
+			assert.ErrorIs(t, reported, context.Canceled, "the scan must not be recorded as clean")
+		})
+	}
+}
+
+func stubBlockingNativeShellcheck(t *testing.T) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("uses shell script stub")
+	}
+	sleep, err := exec.LookPath("sleep")
+	require.NoError(t, err)
+	dir := t.TempDir()
+	startedDir := filepath.Join(dir, "started")
+	require.NoError(t, os.Mkdir(startedDir, 0o700))
+	// exec avoids leaving a child process holding stdout/stderr open on cancellation.
+	script := fmt.Sprintf("#!/bin/sh\nfor script do :; done\n: > \"$SHELLCHECK_STARTED_DIR/${script##*/}\"\nexec %q 10\n", sleep)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "shellcheck"), []byte(script), 0o755))
+	t.Setenv("SHELLCHECK_STARTED_DIR", startedDir)
+	t.Setenv("PATH", dir)
+	return startedDir
+}
+
+func waitForNativeShellcheckStarts(t *testing.T, dir string, count int) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		entries, err := os.ReadDir(dir)
+		return err == nil && len(entries) == count
+	}, 5*time.Second, 10*time.Millisecond, "native ShellCheck processes must start before cancellation")
 }
 
 func TestRunShellcheckOnScriptViaDocker(t *testing.T) {

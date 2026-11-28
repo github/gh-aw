@@ -286,7 +286,7 @@ func writeTempScriptFile(script string) (string, error) {
 // non-nil error when shellcheck reports one or more issues. Callers are
 // responsible for writing the returned output to stderr so that concurrent
 // calls do not interleave their diagnostic blocks.
-func runShellcheckOnScript(info runStepInfo, ignoreCodes []string, verbose bool) ([]byte, error) {
+func runShellcheckOnScript(ctx context.Context, info runStepInfo, ignoreCodes []string, verbose bool) ([]byte, error) {
 	shellcheckLog.Printf("Running shellcheck on step %q (shell=%s)", info.Name, info.Shell)
 
 	tmpPath, err := writeTempScriptFile(info.Script)
@@ -311,7 +311,7 @@ func runShellcheckOnScript(info runStepInfo, ignoreCodes []string, verbose bool)
 	// #nosec G204 -- shellcheck is a trusted system binary; args are built
 	// from controlled values (shell name and SC codes). The temp file path is
 	// OS-generated and not user-controlled.
-	cmd := exec.Command("shellcheck", args...)
+	cmd := exec.CommandContext(ctx, "shellcheck", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -334,6 +334,9 @@ func runShellcheckOnScript(info runStepInfo, ignoreCodes []string, verbose bool)
 	}
 
 	if cmdErr != nil {
+		if err := ctx.Err(); err != nil {
+			return out.Bytes(), fmt.Errorf("shellcheck failed: %w", err)
+		}
 		var exitErr *exec.ExitError
 		if errors.As(cmdErr, &exitErr) && exitErr.ExitCode() == 1 {
 			// Exit code 1 means shellcheck found issues; already printed above.
@@ -553,6 +556,7 @@ func runShellcheckWorkers(ctx context.Context, steps []runStepInfo, verbose bool
 			select {
 			case sem <- struct{}{}:
 			case <-ctx.Done():
+				results[idx] = shellcheckResult{err: ctx.Err()}
 				return
 			}
 			defer func() { <-sem }()
@@ -561,7 +565,7 @@ func runShellcheckWorkers(ctx context.Context, steps []runStepInfo, verbose bool
 			if useDocker {
 				stepOutput, stepErr = runShellcheckOnScriptViaDocker(ctx, s, shellcheckDefaultIgnoreCodes, verbose)
 			} else {
-				stepOutput, stepErr = runShellcheckOnScript(s, shellcheckDefaultIgnoreCodes, verbose)
+				stepOutput, stepErr = runShellcheckOnScript(ctx, s, shellcheckDefaultIgnoreCodes, verbose)
 			}
 			results[idx] = shellcheckResult{err: stepErr, output: stepOutput}
 		}(i, step)
