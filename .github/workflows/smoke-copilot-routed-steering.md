@@ -61,6 +61,7 @@ post-steps:
           engine: "copilot",
           executionOutcome: process.env.SMOKE_EXECUTION,
           allowedModels: ["gpt-5.6-luna"],
+          expectedSelectionSource: "router",
           steering: { maxAiCredits: 7 },
           expectModelInventory: true,
           copilotInventory: true,

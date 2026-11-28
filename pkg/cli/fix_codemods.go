@@ -110,6 +110,7 @@ func getLaterCodemods() []Codemod {
 		getSafeOutputDispatchRepositoryKeyCodemod(), // Rename deprecated safe-outputs.dispatch_repository key
 		getSafeOutputMissingToolCodemod(),
 		getSafeOutputMissingDataCodemod(),
+		getLegacyConnectorImportsCodemod(),
 		getSafeJobRunnerCodemod(),                         // Rename deprecated safe-outputs.jobs runner fields
 		getSafeInputsToMCPScriptsCodemod(),                // Rename safe-inputs to mcp-scripts
 		getRateLimitToUserRateLimitCodemod(),              // Rename rate-limit to user-rate-limit with max key migration
@@ -139,6 +140,7 @@ func getLaterCodemods() []Codemod {
 		getMentionsAllowTeamMembersCodemod(),              // Rename allow-team-members to allowed-collaborators in safe-outputs.mentions
 		getEngineCopilotSDKDriverToDriverCodemod(),        // Rename deprecated engine.copilot-sdk-driver to engine.driver
 		getRequestReviewPolicyCodemod(),                   // Normalize legacy request_review protected-file policies
+		getModelAutoToRouterCodemod(),                     // Migrate eligible model: auto / copilot/auto to model: router
 		getPostStepsSafeOutputsGuidedErrorCodemod(),       // Detect direct safe-outputs file access in post-steps and emit guided error
 		getPullRequestTargetGuidedErrorCodemod(),          // Report remaining risky trigger configurations after automatic fixes
 	}

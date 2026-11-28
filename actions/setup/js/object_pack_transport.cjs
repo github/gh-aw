@@ -12,9 +12,9 @@ const { getObjectPackLimits } = require("./object_pack_limits.cjs");
 const { getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
 const { getExcludedFiles, WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
 const { currentClaimAssignment, currentClaimHandle } = require("./work_queue_claim_scope.cjs");
+const { OBJECT_PACK_PREVIEW_HEADER } = require("./object_pack_constants.cjs");
 
 const MAGIC = Buffer.from("GH-AW-OBJECT-PACK 1\n");
-const OBJECT_PACK_PREVIEW_HEADER = "GH-AW object-pack recovery preview v1";
 const oidPattern = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const hash = bytes => crypto.createHash("sha256").update(bytes).digest("hex");
 

@@ -19,6 +19,8 @@ For details on the alias syntax, fallback resolution algorithm, and how to defin
 
 `router` and `router/*` are reserved and are not aliases. `model: router`, `router/economy`, `router/balanced`, and `router/robust` choose [model routing](/gh-aw/reference/model-routing/) for the main agent; they can't be defined in `models:` or used in `models.allowed`, `models.blocked`, or `fallback-models`.
 
+Authored main-agent `model: auto` and `model: copilot/auto` are deprecated in favor of `model: router`. On eligible workflows with AWF v0.29.21 or newer, they route as `model: router` (and fall back deterministically to the highest-tier compatible model, such as picking `gpt-5.3-codex` over `gpt-5-nano`, when no router-known model is available). Run `gh aw fix --write` to migrate eligible workflows; the built-in `auto` alias below remains for non-routed workflows, sub-agents, threat detection, and evals, and a workflow's own `models.auto` alias is left untouched.
+
 ### Vendor Aliases
 
 Vendor aliases map a short name to one or more provider-scoped glob patterns. The Copilot gateway is always tried first.

@@ -13,7 +13,9 @@ permissions:
   pull-requests: read
   copilot-requests: write
 name: Smoke Copilot Auto
-model: auto
+model: router
+model-routing:
+  allowed-models: [claude-haiku-4.5]
 engine:
   id: copilot
   bare: true
@@ -44,6 +46,29 @@ features:
 sandbox:
   agent:
     id: awf
+post-steps:
+  - name: Assert router fallback evidence
+    if: always()
+    uses: actions/github-script@v9.0.0
+    env:
+      SMOKE_EXECUTION: ${{ steps.agentic_execution.outcome }}
+    with:
+      script: |
+        const path = require("node:path");
+        const { main } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/smoke_model_routing_assertions.cjs"));
+        await main({
+          core,
+          engine: "copilot",
+          executionOutcome: process.env.SMOKE_EXECUTION,
+          allowedModels: ["claude-haiku-4.5"],
+          mainEndpoint: "/chat/completions",
+          expectedSelectionSource: "fallback",
+          expectedFallbackReason: "no_route",
+          expectedClassifierRequests: 0,
+          expectModelInventory: true,
+          copilotInventory: true,
+          resolutionRoles: [],
+        });
 ---
 
 # Smoke Test: Auto Haiku

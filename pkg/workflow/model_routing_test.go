@@ -1047,11 +1047,11 @@ Report a finding.
 func TestCompileDefaultModelRouting_ExplicitModelUnchanged(t *testing.T) {
 	base := "---\non: workflow_dispatch\npermissions:\n  contents: read\n"
 	for name, files := range map[string]map[string]string{
-		"top-level model":  {"main.md": base + "model: claude-sonnet-5.5\nengine: copilot\n---\nReport.\n"},
-		"engine.model":     {"main.md": base + "engine:\n  id: copilot\n  model: gpt-5.6-luna\n---\nReport.\n"},
-		"alias":            {"main.md": base + "engine:\n  id: copilot\n  model: small\n---\nReport.\n"},
-		"auto":             {"main.md": base + "model: auto\nengine: copilot\n---\nReport.\n"},
-		"engine env model": {"main.md": base + "engine:\n  id: copilot\n  env:\n    COPILOT_MODEL: gpt-5.6-luna\n---\nReport.\n"},
+		"top-level model":    {"main.md": base + "model: claude-sonnet-5.5\nengine: copilot\n---\nReport.\n"},
+		"engine.model":       {"main.md": base + "engine:\n  id: copilot\n  model: gpt-5.6-luna\n---\nReport.\n"},
+		"alias":              {"main.md": base + "engine:\n  id: copilot\n  model: small\n---\nReport.\n"},
+		"parameterized auto": {"main.md": base + "model: auto?effort=high\nengine: copilot\n---\nReport.\n"},
+		"engine env model":   {"main.md": base + "engine:\n  id: copilot\n  env:\n    COPILOT_MODEL: gpt-5.6-luna\n---\nReport.\n"},
 		"imported model": {
 			"main.md":         base + "imports:\n  - shared/model.md\n---\nReport.\n",
 			"shared/model.md": "---\nengine:\n  id: copilot\n  model: gpt-5.6-luna\n---\n",

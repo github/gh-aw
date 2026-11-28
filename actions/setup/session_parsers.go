@@ -37,7 +37,7 @@ import "embed"
 //go:embed js/temporary_id.cjs
 //go:embed js/diagnostic_sanitization.cjs js/sanitize_content.cjs js/missing_info_formatter.cjs
 //go:embed js/ephemerals.cjs js/project_timezone.cjs
-//go:embed js/add_mask_redaction.cjs js/json_string_scanner.cjs js/mask_value_matcher.cjs js/redact_secrets.cjs js/object_pack_transport.cjs js/git_helpers.cjs js/git_patch_utils.cjs js/object_pack_fetch.cjs js/object_pack_limits.cjs js/workflow_file_exclusions.cjs js/safe_output_redaction.cjs js/safe_outputs_tools.json js/safe_outputs_config_redact.cjs js/safe_output_manifest.cjs js/safe_output_execution.cjs js/safe_outputs_status.cjs
+//go:embed js/add_mask_redaction.cjs js/json_string_scanner.cjs js/mask_value_matcher.cjs js/object_pack_constants.cjs js/redact_secrets.cjs js/object_pack_transport.cjs js/git_helpers.cjs js/git_patch_utils.cjs js/object_pack_fetch.cjs js/object_pack_limits.cjs js/workflow_file_exclusions.cjs js/safe_output_redaction.cjs js/safe_outputs_tools.json js/safe_outputs_config_redact.cjs js/safe_output_manifest.cjs js/safe_output_execution.cjs js/safe_outputs_status.cjs
 //go:embed js/otlp_header_helpers.cjs js/otlp.cjs js/work_queue_telemetry.cjs
 //go:embed js/work_queue_claim_scope.cjs js/work_queue_codec.cjs js/lock_file_headers.cjs js/work_queue_resource_scope.cjs
 //go:embed js/work_queue_host.cjs
