@@ -29,8 +29,11 @@ project through repository review. It is not a W3C Recommendation or evidence
 of provider certification. Version 1.5.0 specifies explicit `connector:<id>`
 imports for declarations embedded in the installed gh-aw release while
 retaining ordinary local and pinned remote import resolution, explicit
-capability selection, and existing authority boundaries. Publication does not
-establish provider authorization or operational trigger ingress.
+capability selection, Entra workload identity federation for selected reads
+and safe outputs, and existing authority boundaries. The selected inference
+alias is the Copilot request wire model. Existing token routes and inference
+transport are preserved. Publication does not establish provider authorization
+or operational trigger ingress.
 
 ## Table of Contents
 
@@ -226,12 +229,75 @@ grants. The runtime MUST use only the selected phase's host-owned resolver.
 | `token: {secret: NAME}` | A stored secret-name reference. `secret: NAME` is the legacy shorthand. Names MUST be valid and MUST NOT impersonate reserved minted-token references. |
 | `github-app` | Explicit client ID/private-key reference, installation scope, and bounded permissions. An explicit owner requires exact repositories. Agent-phase permissions MUST NOT include `write`; missing credentials MUST NOT be ignored. |
 | `github-oidc: {audience: ...}` | A nonempty bounded literal audience; requires Authorization/bearer and phase-specific GitHub OIDC plumbing. |
-| `azure-oidc` | Inference-only Entra exchange using required `azure-tenant-id`, `azure-client-id`, and explicit `azure-scope`, plus optional `audience` and `azure-cloud` (`public`, `usgovernment`, `china`). Requires Authorization/bearer and the existing engine OIDC permission, firewall and version gates. |
+| `azure-oidc` | Entra workload identity federation. Requires `Authorization`/`bearer`, `azure-tenant-id`, `azure-client-id`, and explicit `azure-scope`. `audience` selects the GitHub assertion audience (default `api://AzureADTokenExchange`); `azure-cloud` selects the authority (`public` by default, `usgovernment`, or `china`). |
 
 Exactly one source route MUST be used for an executable credential. GitHub App
 tokens are GitHub installation tokens; GitHub OIDC produces an identity JWT.
-Neither route implements a provider-token exchange. Provider consent,
-installation, token renewal, audience acceptance, and ACLs remain external.
+Neither GitHub route implements a provider-token exchange. Provider consent,
+installation, audience acceptance, and ACLs remain external.
+
+An `azure-oidc` credential identifies one application and one provider token
+scope; the assertion audience is NOT the provider scope. The trusted host
+MUST exchange the GitHub assertion only at the selected cloud's Entra
+authority for that tenant. Only the resulting access token may authenticate
+requests to the approved provider endpoint. Client-credentials federation
+does not implement delegated user login or create role assignments.
+
+For `agent` and `safe-output`, the host MUST bind acquisition and renewal to
+the selected credential and phase. Tenant and client IDs MUST be UUIDs or
+standalone Actions `vars` references resolving to UUIDs; the scope MUST be a
+single literal resource `/.default` scope. The compiler MUST derive
+`id-token: write` for jobs that require the selected exchange, not unselected
+phases. A staged writer MUST NOT request either
+token. The host MUST NOT forward assertions or token-request credentials to
+the agent or provider, persist access tokens in plans or outputs, or use a
+failed exchange or authorization denial to select another route. Renewal
+uses a fresh exchange, not a stored refresh token or replay of a denied call.
+The compiler MUST reject an active connector Azure OIDC broker when the agent
+sandbox is disabled or not enabled. Import-only and staged-only credentials do
+not start a broker.
+
+For federated readers, the agent MUST NOT receive the OIDC request credentials,
+assertion, access token, or broker socket capability. The broker supplies a
+fixed credential to the trusted connector adapter; it is not an agent-callable
+token or command API. Only selected MCP read tools may invoke credentialed
+adapter operations, and their inputs, resource grants, and fixed destinations
+MUST be checked before credential use. Unselected tools and arbitrary commands
+MUST NOT execute with connector authority. Safe-output requests are intents:
+live effects run only in the separately authorized writer job, not in the agent
+or reader adapter.
+The compiler MUST reject agent-job host access that would bypass this boundary,
+including authored runner hooks, job containers or services, MCP scripts, and
+untrusted sibling MCP servers, gateway customization, enclaves, `engine.env`,
+and workflow `env` entries other than `DEBUG`.
+For each active reader broker, the compiler MUST supply its actual host socket
+directory to AWF's `filesystem.privateHostSocketDirs` before agent execution.
+Readers require a pinned AWF release v0.29.21 or later and privileged local Linux Docker/runc;
+declared ARC/DinD MUST be rejected at compile time. Before invoking AWF, the
+runner MUST reject missing or invalid broker
+directories and socket endpoints.
+AWF MUST fail closed when it cannot verify that directory against the effective
+agent-visible mounts. The compiler MUST NOT substitute a guessed temporary path.
+
+These guarantees depend on an isolated sandbox, trusted runner, gateway, adapter,
+declarations, and provider. A process able to connect to the broker socket can
+retrieve its bearer token; the socket itself does not authorize individual
+operations. The provider receives the token and enforces the application's
+permissions. Remote MCP read-only declarations are not proof that the provider
+is read-only. Configure least-privilege provider roles and federation trust;
+other workflows with the same trusted OIDC subject are outside this compiler's
+per-workflow isolation check. Other independently granted agent tools or
+credentials are outside this connector-specific boundary.
+
+A potentially live federated writer (including conditional staging) MUST
+have a literal `safe-outputs.environment` name exclusive to the `safe_outputs`
+job. The compiler MUST keep `conclusion` and `pre_activation` outside that
+environment and reject `--environment` overrides, case-insensitive name
+collisions, and dynamic job environment names that preclude proving isolation.
+Statically staged-only writers require no such environment. The operator MUST
+protect the writer environment and restrict its separate application's
+federated credential to the exact environment subject. Client IDs alone do
+not isolate identities when their federated subject rules overlap.
 
 Inference credentials MUST use a stored token-name reference or `azure-oidc`,
 never a GitHub App or direct GitHub OIDC route. The Azure route lowers to existing
@@ -239,8 +305,9 @@ never a GitHub App or direct GitHub OIDC route. The Azure route lowers to existi
 tokens in connector tool setup. Its tenant, client and scope are bounded to 2048
 bytes and MAY reference Actions variables or secrets; they MUST NOT contain
 token values. Its audience defaults to the existing Azure engine exchange
-audience. The scope has no implicit Azure OpenAI default. Other phase routes
-retain their existing behavior.
+audience. The scope has no implicit Azure OpenAI default. Selection supplies
+the inference job's `id-token: write`; existing native engine firewall and
+version requirements continue to apply.
 
 Resource-constrained arguments MUST be required strings, or nonempty bounded
 string arrays on hosted HTTP MCP tools. Each string MUST match an exact authored
@@ -746,6 +813,8 @@ class; it is not sufficient by itself to certify a complete implementation.
 | **C-TRG-001**: Trigger fixture projection MUST NOT establish operational ingress; missing/ambiguous required evidence MUST NOT authorize a match (section 8). | Compiler, execution host | **T-CON-008** | Project matching, nonmatching, incomplete, and ambiguous fixtures with Go/Node predicate parity. Only complete matching evidence projects; fixture results remain `operational: false`. |
 | **C-INF-001**: Inference binding MUST require explicit main-workflow selection, a known profile, exact wire-model grant, selected-profile hostname approval, compatible engine metadata and no conflicting native/imported override (section 5.4). | Compiler | **T-CON-009** | Compile import-only and valid key/OIDC consumers for both protocols. Verify only the selected profile's hosts are allowed. Reject unknown profiles, ungranted/dynamic aliases, unsupported engines, conflicting overrides and missing selected OIDC prerequisites. Import-only emits no inference binding. |
 | **C-INF-002**: Inference configuration and credentials MUST remain outside reader/effect plans; the selected native engine transport MUST retain the fixed SDK base, protocol, model and credential route (sections 4, 5.4). | Compiler, execution host | **T-CON-010** | Inspect compiled native engine settings and Go/Node-decoded reader/effect plans. Only the engine receives inference configuration. Setup reads zero secret values; inference test execution rejects. Native authentication-denial evidence must be reported separately from compilation or symbolic model checks. |
+| **C-FED-001**: Entra access tokens MUST be acquired and renewed only for a selected live phase, without credential fallback (section 4). | Compiler, execution host | **T-CON-011** | Inspect import-only, reader-only, writer-only and staged consumers. Mock assertion and exchange endpoints and advance the clock; verify the audience, tenant, client and scope, reacquisition before use after expiry, and failure without credential fallback or mutation replay. |
+| **C-FED-002**: Federated reader authority MUST be accessible to the agent only through selected, validated MCP reads; broker and OIDC capabilities MUST remain outside the agent (section 4). | Compiler, execution host | **T-CON-012** | Inspect the generated sandbox and adapter mounts; reject runner hooks and untrusted host access. Attempt unselected tools, invalid inputs, and socket or OIDC access from the agent; verify no token or elevated request is available outside the selected surface. Verify selected reads remain usable. |
 
 ### 10.2 Compliance testing procedure
 
@@ -926,6 +995,42 @@ the executable examples in
 and bundled Node staging in
 [`connector_staging_parity_test.go`](https://github.com/github/gh-aw/blob/main/pkg/workflow/connector_staging_parity_test.go).
 
+#### Federated agent boundary model
+
+[`agent-boundary/AgentBoundary.tla`](https://github.com/github/gh-aw/blob/main/specs/connectors/agent-boundary/AgentBoundary.tla)
+models one adversarial attempt through MCP, a broker socket, Actions OIDC
+credentials, or runner access. It varies selected REST and remote reads,
+requested operation (including a writer and an arbitrary command), and input
+validity. `TokenIsolation` excludes token access by the agent;
+`SelectedMCPOnly` permits connector-authorized execution only for a selected,
+valid MCP read. The socket, OIDC, runner, and selection mutations deliberately
+remove individual boundary assumptions; `WitnessRead` checks that an approved
+read remains reachable. These model C-FED-002, not the implementation itself.
+
+The model assumes the sandbox, socket mounts, gateway, adapter, runner, provider,
+and Entra trust enforce the described boundary. It abstracts the token exchange,
+safe-output authorization, response contents, concrete inputs and provider side
+effects; it cannot prove isolation against a compromised host or provider, or
+establish that a remote tool is read-only. The main boundary model separately
+covers write authorization and staged effects.
+
+The broker creates its socket under `RUNNER_TEMP`, which may overlap an
+agent-visible mount even when read-only. AWF checks the declared actual broker
+directories and gates agent execution on successful mount isolation; see the
+[AWF mount policy](https://github.com/github/gh-aw-firewall/blob/v0.29.21/docs/mount-policy.md).
+This protects the sandbox boundary, not other same-UID host processes. The model
+does not prove the correctness of AWF's runtime checks.
+
+To reproduce, replace the `cd` above with `cd "$repo/specs/connectors/agent-boundary"`
+and use `AgentBoundary.tla` and `AgentBoundary.cfg` in place of
+`ConnectorBoundary.tla` and `ConnectorBoundary.cfg`. With the pinned TLA+ Tools
+v1.7.4 and Java 17, one worker and seed 1, the secure configuration exhausts
+480 generated / 320 distinct states. The socket, OIDC and runner controls
+violate `TokenIsolation`; socket execution and selection controls violate
+`SelectedMCPOnly`.
+`WitnessRead` checks `Safety` and then violates `ProbeAbsent` with a selected
+read. As above, each expected violation must be checked by name and exit status.
+
 #### Inference binding model
 
 [`inference/ConnectorInference.tla`](https://github.com/github/gh-aw/blob/main/specs/connectors/inference/ConnectorInference.tla)
@@ -1030,6 +1135,7 @@ sections 4–8; this specification defines no new public error-code registry.
 
 ### Version 1.4.0 (Experimental Working Draft) — 2026-11-26
 
+- Extended `azure-oidc` to agent and safe-output credentials, with trusted-host exchange and renewal. Connector selection derives the job's OIDC permission, including for inference. Existing inference transport and stored-token routes are unchanged.
 - Changed Copilot inference lowering to use `COPILOT_PROVIDER_WIRE_MODEL` for the granted request alias while leaving provider metadata to default to `COPILOT_MODEL`.
 - Preserved existing model catalog, exact grant, network approval, credential isolation, and native engine transport obligations.
 

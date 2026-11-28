@@ -229,6 +229,9 @@ func developmentConnectorSecrets(output io.Writer, declaration *workflow.Develop
 		if registration.OIDCTokens[name] != nil {
 			return nil, fmt.Errorf("credential %s uses GitHub Actions OIDC identity; local OIDC acquisition and token fallback are not supported; run gh aw connector <id> setup for audience/trust configuration", name)
 		}
+		if registration.AzureOIDC[name] != nil {
+			return nil, fmt.Errorf("credential %s uses Azure OIDC identity; local token exchange and token fallback are not supported; run gh aw connector <id> setup for federation configuration", name)
+		}
 	}
 	secrets := map[string]string{}
 	var missing []string

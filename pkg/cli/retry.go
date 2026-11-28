@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strings"
@@ -32,6 +33,8 @@ type RepeatOptions struct {
 	CleanupFunc func()
 	// Whether to use stderr for informational messages (default: true)
 	UseStderr bool
+	// Stop on an error during a repeat iteration
+	StopOnError bool
 }
 
 // ExecuteWithRepeat runs a function once, and optionally repeats it the specified number of times
@@ -62,7 +65,7 @@ func ExecuteWithRepeat(options RepeatOptions) error {
 	if startMsg == "" {
 		startMsg = fmt.Sprintf("Repeating %d more times. Press Ctrl+C to stop.", options.RepeatCount)
 	}
-	fmt.Fprintln(output, console.FormatInfoMessageStdout(startMsg))
+	printRepeatMessage(output, console.FormatInfoMessageStdout(startMsg))
 
 	// Use provided context or fall back to background context
 	ctx := ctxutil.OrBackground(options.Ctx)
@@ -73,6 +76,16 @@ func ExecuteWithRepeat(options RepeatOptions) error {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(sigChan)
 
+	return executeRepeatIterations(options, ctx, output, sigChan)
+}
+
+func printRepeatMessage(output io.Writer, message string) {
+	if _, err := fmt.Fprintln(output, message); err != nil {
+		retryLog.Printf("Failed to write repeat message: %v", err)
+	}
+}
+
+func executeRepeatIterations(options RepeatOptions, ctx context.Context, output io.Writer, sigChan <-chan os.Signal) error {
 	// runCleanup executes the optional cleanup function
 	runCleanup := func() {
 		if options.CleanupFunc != nil {
@@ -86,13 +99,13 @@ func ExecuteWithRepeat(options RepeatOptions) error {
 		select {
 		case <-ctx.Done():
 			retryLog.Printf("Context cancelled at iteration %d/%d", i, options.RepeatCount)
-			fmt.Fprintln(output, console.FormatInfoMessageStdout("Received interrupt signal, stopping repeat..."))
+			printRepeatMessage(output, console.FormatInfoMessageStdout("Received interrupt signal, stopping repeat..."))
 			runCleanup()
 			return ctx.Err()
 
 		case <-sigChan:
 			retryLog.Printf("Interrupt signal received at iteration %d/%d", i, options.RepeatCount)
-			fmt.Fprintln(output, console.FormatInfoMessageStdout("Received interrupt signal, stopping repeat..."))
+			printRepeatMessage(output, console.FormatInfoMessageStdout("Received interrupt signal, stopping repeat..."))
 			runCleanup()
 			return context.Canceled
 
@@ -108,11 +121,15 @@ func ExecuteWithRepeat(options RepeatOptions) error {
 					repeatMsg = fmt.Sprintf(repeatMsg, time.Now().Format("2006-01-02 15:04:05"))
 				}
 			}
-			fmt.Fprintln(output, console.FormatInfoMessageStdout(repeatMsg))
+			printRepeatMessage(output, console.FormatInfoMessageStdout(repeatMsg))
 
 			if err := options.ExecuteFunc(); err != nil {
 				retryLog.Printf("Error during iteration %d: %v", i, err)
-				fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("Error during repeat %d/%d: %v", i, options.RepeatCount, err)))
+				printRepeatMessage(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("Error during repeat %d/%d: %v", i, options.RepeatCount, err)))
+				if options.StopOnError {
+					runCleanup()
+					return err
+				}
 				// Continue running on error during repeat
 			}
 		}

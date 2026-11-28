@@ -16,10 +16,19 @@ connectors:
         scopes: [https://api.loganalytics.io/.default]
         token:
           secret: ${{ github.aw.import-inputs.reader-secret }}
+      federated-reader:
+        phase: agent
+        header: Authorization
+        scheme: bearer
+        scopes: [https://api.loganalytics.io/.default]
+        azure-oidc:
+          azure-tenant-id: ${{ github.aw.import-inputs.azure-tenant-id }}
+          azure-client-id: ${{ github.aw.import-inputs.azure-client-id }}
+          azure-scope: https://api.loganalytics.io/.default
     resources:
       workspaces: ${{ github.aw.import-inputs.workspaces }}
     tools:
-      get-activity-count:
+      get-activity-count: &activity-count
         tool: get_activity_count
         credential: reader
         inputs:
@@ -60,7 +69,19 @@ connectors:
           op: absent
         project:
           event-count: /tables/0/rows/0/0
+      get-activity-count-federated:
+        <<: *activity-count
+        tool: get_activity_count_federated
+        credential: federated-reader
 import-schema:
+  azure-tenant-id:
+    type: string
+    default: "${{ vars.AZURE_MONITOR_TENANT_ID }}"
+    description: Entra tenant ID for the federated reader only.
+  azure-client-id:
+    type: string
+    default: "${{ vars.AZURE_MONITOR_CLIENT_ID }}"
+    description: Client ID of the workspace-scoped Entra application for the federated reader only.
   workspaces:
     type: array
     items:
@@ -104,14 +125,19 @@ import-schema:
       credentials outside this declaration and the agent. A trusted external
       host must reacquire and rotate access tokens before their reported
       expiry; client credentials do not provide a refresh-token flow.
-      There is one agent-phase reader credential and no Azure writer.
-      No login, token exchange, renewal, SDK credential chain or credential
-      fallback is implemented. A GitHub App token or GitHub OIDC identity JWT
-      is not an Entra access token. Authorization denial stops the read.
-      Declarative runtime-managed Entra token acquisition and renewal are
-      deferred to a separate shared-runtime change; the token route here does
-      not implement or imply them.
+      This stored-token route performs no exchange or renewal.
     </storage>
+    <federation>
+      Alternatively select get-activity-count-federated and call
+      get_activity_count_federated. Configure the Entra application's federated
+      credential with GitHub's issuer, the exact approved repository branch or
+      environment subject, and audience api://AzureADTokenExchange. Bind
+      azure-tenant-id and azure-client-id to that identity; keep the same
+      workspace grant and query RBAC. The trusted read host uses short-lived
+      Entra access tokens for https://api.loganalytics.io/.default; it does not
+      use reader-secret. Select one reader, not both. Neither route falls back
+      on denial; there is no Azure writer.
+    </federation>
   </authentication>
   <configuration>
     Import a reviewed local declaration or pinned remote revision. Importing
