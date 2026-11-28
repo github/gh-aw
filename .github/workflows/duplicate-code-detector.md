@@ -17,6 +17,16 @@ permissions:
 model: router
 engine:
   id: pi
+  env:
+    GOCACHE: /tmp/gh-aw/agent/go-build-cache
+    GOMODCACHE: /tmp/gh-aw/agent/go-mod-cache
+pre-agent-steps:
+  - name: Provision Go validation dependencies
+    env:
+      GOMODCACHE: /tmp/gh-aw/agent/go-mod-cache
+    run: |
+      mkdir -p /tmp/gh-aw/agent/go-build-cache "$GOMODCACHE"
+      go mod download
 network:
   allowed:
     - defaults
@@ -130,6 +140,7 @@ Assess findings to identify true code duplication:
 ### 5. Implement Refactorings and Create Pull Requests
 
 Implement a separate focused refactoring for each distinct duplication pattern (maximum 3 per run), validate preserved behavior, and create one pull request per pattern.
+Use the provisioned Go caches for validation; report an incomplete result if validation cannot be completed.
 
 **When to Create Pull Requests**:
 - Only create pull requests if significant duplication is found (threshold: >10 lines of duplicated code OR 3+ instances of similar patterns)
