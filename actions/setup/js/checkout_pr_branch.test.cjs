@@ -1712,6 +1712,31 @@ If the pull request is still open, verify that:
       expect(mockCore.setFailed).not.toHaveBeenCalled();
     });
 
+    it("should not bypass malformed aw_context with a direct PR-number input", async () => {
+      mockContext.payload.inputs = { aw_context: "invalid JSON", pull_request_number: "123" };
+
+      await runScript();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("invalid aw_context"));
+      expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
+      expect(mockExec.exec).not.toHaveBeenCalled();
+    });
+
+    it.each(["fork", "router", "read-only actor"])("should retain checkout trust checks for a direct PR-number dispatch from a %s", async untrustedContext => {
+      mockContext.payload.inputs = { pull_request_number: "123" };
+      if (untrustedContext === "fork") mockContext.payload.repository.fork = true;
+      if (untrustedContext === "router") mockContext.actor = "github-actions[bot]";
+      if (untrustedContext === "read-only actor") {
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission: "read" } });
+      }
+
+      await runScript();
+
+      expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("Refusing PR checkout"));
+      expect(mockExec.getExecOutput).not.toHaveBeenCalledWith("git", expect.arrayContaining(["fetch"]), expect.anything());
+      expect(mockExec.exec).not.toHaveBeenCalledWith("git", expect.arrayContaining(["checkout"]));
+    });
+
     it("should refuse PR replay when the runtime repository is a fork", async () => {
       mockContext.payload.repository.fork = true;
 

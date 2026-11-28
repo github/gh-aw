@@ -22,6 +22,8 @@
  * 4. workflow_dispatch with aw_context or pull_request_number:
  *    - When aw_context input contains item_type=="pull_request" and item_number,
  *      the PR number is extracted and a specific head SHA is fetched
+ *    - A direct pull_request_number input selects the current PR head when
+ *      aw_context is absent; the same trust checks still apply
  *    - Mirrors the guard in the compiled workflow's if: condition
  *
  * NOTE: This handler operates within the PR context from the workflow event
