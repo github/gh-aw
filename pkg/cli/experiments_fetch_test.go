@@ -31,8 +31,21 @@ for arg in "$@"; do
 done
 case "$*" in
   *"/branches "*)
-    echo '["experiments/ci-coach"]'
-    if [ "$EXPERIMENT_GH_PAGED_BRANCHES" = "1" ]; then echo '["experiments/second"]'; fi ;;
+    if [ "$EXPERIMENT_GH_FAIL_BRANCHES" = "1" ]; then echo 'access denied' >&2; exit 1; fi
+    if [ "$EXPERIMENT_GH_PAGED_BRANCHES" = "1" ]; then
+      case "$*" in
+        *"page=1 "*)
+          printf '["other/0"'
+          for n in $(seq 1 99); do printf ',"other/%%s"' "$n"; done
+          echo ']' ;;
+        *"page=2 "*)
+          if [ "$EXPERIMENT_GH_FAIL_SECOND_PAGE" = "1" ]; then echo 'access denied' >&2; exit 1; fi
+          echo '["experiments/ci-coach","experiments/second"]' ;;
+        *) exit 1 ;;
+      esac
+    else
+      echo '["experiments/ci-coach"]'
+    fi ;;
   *"/branches/experiments%%2Fci-coach"*) echo "experiments/ci-coach" ;;
   *"contents/.github/workflows "*) echo '["ci-coach.md"]' ;;
   *"ci-coach.md"*) printf '%%s\n' "$EXPERIMENT_GH_WORKFLOW_CONTENT" ;;
@@ -47,6 +60,8 @@ esac
 	t.Setenv("GITHUB_TOKEN", "")
 	t.Setenv("GH_REPO", "unrelated/checkout")
 	t.Setenv("EXPERIMENT_GH_PAGED_BRANCHES", "")
+	t.Setenv("EXPERIMENT_GH_FAIL_BRANCHES", "")
+	t.Setenv("EXPERIMENT_GH_FAIL_SECOND_PAGE", "")
 	return argsLog
 }
 
@@ -173,7 +188,8 @@ experiments:
 			assert.Equal(t, 1, evals["quality"].Yes)
 
 			expected := [][]string{
-				{"api", "repos/octo/repo/branches", "--paginate", "--jq", `[.[] | select(.name | startswith("experiments/")) | .name]`},
+				{"api", "repos/octo/repo/branches", "--method", "GET", "--raw-field", "per_page=100", "--raw-field", "page=1", "--jq", `[.[].name]`},
+				{"api", "repos/octo/repo/branches", "--method", "GET", "--raw-field", "per_page=100", "--raw-field", "page=2", "--jq", `[.[].name]`},
 				{"api", "repos/octo/repo/contents/state.jsonl", "--method", "GET", "--raw-field", "ref=experiments/ci-coach", "--jq", ".content"},
 				{"api", "repos/octo/repo/contents/state.jsonl", "--method", "GET", "--raw-field", "ref=experiments/second", "--jq", ".content"},
 				{"api", "repos/octo/repo/contents/.github/workflows", "--jq", `[.[] | select(.name | endswith(".md")) | .name]`},
@@ -193,6 +209,22 @@ experiments:
 	}
 }
 
+func TestExperimentsListReportsRemoteFailure(t *testing.T) {
+	installExperimentFetchFakeGH(t, "", "")
+	t.Setenv("EXPERIMENT_GH_FAIL_BRANCHES", "1")
+	err := RunExperimentsList(ExperimentsListConfig{RepoOverride: "octo/repo", JSONOutput: true})
+	require.ErrorContains(t, err, "access denied")
+}
+
+func TestFetchRemoteExperimentsRejectsPartialResults(t *testing.T) {
+	installExperimentFetchFakeGH(t, "", "")
+	t.Setenv("EXPERIMENT_GH_PAGED_BRANCHES", "1")
+	t.Setenv("EXPERIMENT_GH_FAIL_SECOND_PAGE", "1")
+	experiments, err := fetchRemoteExperiments("octo/repo")
+	require.ErrorContains(t, err, "access denied")
+	assert.Empty(t, experiments)
+}
+
 func TestReadRemoteExperimentStateLegacyFallback(t *testing.T) {
 	binDir := t.TempDir()
 	argsLog := filepath.Join(binDir, "gh-args.log")
@@ -209,12 +241,24 @@ esac
 	require.NoError(t, os.WriteFile(filepath.Join(binDir, "gh"), []byte(script), 0o755))
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	state := readRemoteExperimentState("octo/repo", "experiments/legacy")
+	state, err := readRemoteExperimentState("octo/repo", "experiments/legacy")
+	require.NoError(t, err)
 	assert.Equal(t, map[string]map[string]int{"style": {"concise": 2}}, state.Counts)
 	assert.Equal(t, [][]string{
 		{"api", "repos/octo/repo/contents/state.jsonl", "--method", "GET", "--raw-field", "ref=experiments/legacy", "--jq", ".content"},
 		{"api", "repos/octo/repo/contents/state.json", "--method", "GET", "--raw-field", "ref=experiments/legacy", "--jq", ".content"},
 	}, readExperimentGHArgs(t, argsLog))
+}
+
+func TestReadRemoteExperimentStateReportsAccessFailure(t *testing.T) {
+	binDir := t.TempDir()
+	script := "#!/bin/sh\necho 'HTTP 403: access denied' >&2\nexit 1\n"
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "gh"), []byte(script), 0o755))
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	state, err := readRemoteExperimentState("octo/repo", "experiments/example")
+	require.ErrorContains(t, err, "failed to read experiment state on experiments/example")
+	assert.Nil(t, state)
 }
 
 func TestLocalExperimentsDoNotCallGitHubAPI(t *testing.T) {
