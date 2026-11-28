@@ -1343,6 +1343,8 @@ gh aw routing reset issue-triage           # Start that workflow's history afres
 
 Enable one or more workflows by ID, or all workflows if no IDs provided.
 
+With `--repo [HOST/]owner/repo`, selection uses registered `.lock.yml` workflows in that exact repository and requires no local checkout. Omitting workflow IDs selects all registered agentic workflows, not ordinary Actions YAML files. IDs match exactly; `.md` and `.lock.yml` suffixes are accepted. These operations do not prompt.
+
 ```bash wrap
 gh aw enable                                # Enable all workflows
 gh aw enable ci-doctor                      # Enable specific workflow
@@ -1356,6 +1358,8 @@ gh aw enable ci-doctor --repo owner/repo    # Enable in specific repository
 
 Disable one or more workflows and cancel any in-progress runs.
 
+Repository and workflow selection follow `enable`. All pages of targeted in-progress runs are fetched, and each cancellation must succeed before that workflow is disabled. Already-disabled workflows are checked for remaining runs too. Listing, cancellation, and disable failures return a nonzero exit status; a cancellation failure prevents the disable step for that workflow. Cancellation requests are acknowledged by GitHub, not polled until completion. Queued runs and runs started after discovery are not covered by this in-progress snapshot.
+
 ```bash wrap
 gh aw disable                               # Disable all workflows
 gh aw disable ci-doctor                     # Disable specific workflow
@@ -1364,6 +1368,20 @@ gh aw disable ci-doctor --repo owner/repo   # Disable in specific repository
 ```
 
 **Options:** `--repo/-r`
+
+#### Maintenance subprocess contracts
+
+| Operation | Noninteractive selection | Additional options |
+|---|---|---|
+| `update` | `--repo [HOST/]owner/repo`, optional exact workflow IDs or installed package URLs | `--yes`, `--create-pull-request` |
+| `upgrade` | `--repo [HOST/]owner/repo`; upgrades the repository's workflow directory | `--yes`, `--create-pull-request`, `--pre-releases` |
+| `enable`, `disable` | `--repo [HOST/]owner/repo`, optional exact workflow IDs | No confirmation flags needed |
+
+Update and upgrade already expose repository targeting and pull request creation; upgrade's prerelease option selects extension releases, not workflow source releases. Upgrade does not support selecting individual workflows or sources, and remote upgrade uses `.github/workflows` rather than a caller-local `--dir`. Remote update and upgrade require authenticated `gh` and `git`, a writable checkout workspace, and permissions to push and create pull requests when requested. Without `--create-pull-request`, remote changes remain in the maintenance checkout rather than being published.
+
+Update and upgrade propagate operation errors and prevent pull request creation after failure; upgrade no longer reports completion after failed codemods, action updates, compilation, artifact updates, or pin-file writes. Optional extension-release discovery and registry digest resolution remain best effort; update's rate-limit-only source skips are also non-fatal. A zero exit status therefore does not guarantee that every release, source, or digest refreshed. Digest and source skips appear in diagnostics or `--jsonl` events; extension-release lookup failures require `DEBUG=cli:update_extension_check`.
+
+Subprocess callers must consume stdout and stderr while the command runs, inspect the exit status, and propagate interruption or termination signals. Output already emitted and changes already applied are not rolled back on failure or cancellation. CAO remains responsible for its authorization, confirmation, and subprocess lifecycle checks; its `dashboard_actions.go` implementation is not part of this repository, so these contracts verify the available CLI and Go entry points rather than a pinned CAO revision.
 
 #### `remove`
 

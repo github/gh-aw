@@ -210,6 +210,9 @@ var enableCmd = &cobra.Command{
 	Short: "Enable agentic workflows",
 	Long: `Enable one or more workflows by ID, or all workflows if no IDs are provided.
 
+With --repo, select registered .lock.yml workflows from the exact repository;
+no local checkout is required. Workflow selection is exact, not a glob.
+
 ` + cli.WorkflowIDExplanation,
 	Example: `  ` + string(constants.CLIExtensionPrefix) + ` enable                   # Enable all workflows
   ` + string(constants.CLIExtensionPrefix) + ` enable ci-doctor         # Enable specific workflow
@@ -228,6 +231,9 @@ var disableCmd = &cobra.Command{
 	Long: `Disable one or more workflows by ID, or all workflows if no IDs are provided.
 
 Any in-progress runs will be cancelled before disabling.
+Cancellation failures stop the operation and return a nonzero exit status.
+With --repo, select registered .lock.yml workflows from the exact repository;
+no local checkout is required. Workflow selection is exact, not a glob.
 
 ` + cli.WorkflowIDExplanation,
 	Example: `  ` + string(constants.CLIExtensionPrefix) + ` disable                   # Disable all workflows

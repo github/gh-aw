@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -35,6 +37,17 @@ func DisableWorkflowsByNames(ctx context.Context, workflowNames []string, repoOv
 
 // toggleWorkflowsByNames toggles workflows by specific names, or all if no names provided
 func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable bool, repoOverride string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	normalizedNames := make([]string, 0, len(workflowNames))
+	for _, name := range workflowNames {
+		normalizedNames = append(normalizedNames, normalizeWorkflowID(name))
+	}
+	workflowNames = normalizedNames
+	if repoOverride != "" {
+		return toggleRemoteWorkflows(ctx, workflowNames, enable, repoOverride)
+	}
 	action := "enable"
 	if !enable {
 		action = "disable"
@@ -83,6 +96,9 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 	enableLog.Print("Fetching GitHub workflows status for comparison")
 	githubWorkflows, err := fetchGitHubWorkflows(ctx, repoOverride, false)
 	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		enableLog.Printf("Failed to fetch GitHub workflows: %v", err)
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Unable to fetch GitHub workflows (gh CLI may not be authenticated): %v", err)))
 		githubWorkflows = make(map[string]*GitHubWorkflow)
@@ -123,9 +139,9 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 					if _, err := os.Stat(lockFile); os.IsNotExist(err) {
 						if err := compileWorkflow(ctx, file, false, false, ""); err != nil {
 							fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to compile workflow %s to create lock file: %v", name, err)))
-							// If we can't compile and there's no GitHub entry, skip because we can't address it
+							// Without a GitHub entry, compilation must succeed before enabling.
 							if !exists {
-								continue
+								return fmt.Errorf("failed to compile workflow %s for enabling: %w", name, err)
 							}
 						}
 					}
@@ -136,11 +152,6 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 					if enable && githubWorkflow.State == "active" {
 						// Already enabled
 						fmt.Fprintf(os.Stderr, "Workflow %s is already enabled\n", name)
-						continue
-					}
-					if !enable && githubWorkflow.State == "disabled_manually" {
-						// Already disabled
-						fmt.Fprintf(os.Stderr, "Workflow %s is already disabled\n", name)
 						continue
 					}
 				}
@@ -192,7 +203,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 	if len(targets) == 0 {
 		enableLog.Printf("No workflows need to be %sd - all already in desired state", action)
 		fmt.Fprintf(os.Stderr, "All specified workflows are already %sd\n", action)
-		return nil
+		return ctx.Err()
 	}
 
 	enableLog.Printf("Proceeding to %s %d workflows", action, len(targets))
@@ -211,42 +222,38 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 			// Prefer enabling by ID, otherwise fall back to lock file name
 			if t.ID != 0 {
 				args := []string{"workflow", "enable", strconv.FormatInt(t.ID, 10)}
-				if repoOverride != "" {
-					args = append(args, "--repo", repoOverride)
-				}
-				cmd = workflow.ExecGH(args...)
+				cmd = workflow.ExecGHContext(ctx, args...)
 			} else {
 				args := []string{"workflow", "enable", t.LockFileBase}
-				if repoOverride != "" {
-					args = append(args, "--repo", repoOverride)
-				}
-				cmd = workflow.ExecGH(args...)
+				cmd = workflow.ExecGHContext(ctx, args...)
 			}
 		} else {
 			// First cancel any running workflows (by ID when available, else by lock file name)
 			if t.ID != 0 {
-				if err := cancelWorkflowRuns(t.ID); err != nil {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cancel runs for workflow %s: %v", t.Name, err)))
+				if err := cancelMaintenanceWorkflowRuns(ctx, strconv.FormatInt(t.ID, 10), repoOverride); err != nil {
+					return fmt.Errorf("failed to cancel runs for workflow %s: %w", t.Name, err)
 				}
 				// Prefer disabling by lock file name for reliability
 				args := []string{"workflow", "disable", t.LockFileBase}
-				if repoOverride != "" {
-					args = append(args, "--repo", repoOverride)
-				}
-				cmd = workflow.ExecGH(args...)
+				cmd = workflow.ExecGHContext(ctx, args...)
 			} else {
-				if err := cancelWorkflowRunsByLockFile(t.LockFileBase); err != nil {
-					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to cancel runs for workflow %s: %v", t.Name, err)))
+				if err := cancelMaintenanceWorkflowRuns(ctx, t.LockFileBase, repoOverride); err != nil {
+					return fmt.Errorf("failed to cancel runs for workflow %s: %w", t.Name, err)
 				}
 				args := []string{"workflow", "disable", t.LockFileBase}
-				if repoOverride != "" {
-					args = append(args, "--repo", repoOverride)
-				}
-				cmd = workflow.ExecGH(args...)
+				cmd = workflow.ExecGHContext(ctx, args...)
 			}
 		}
 
-		if output, err := cmd.CombinedOutput(); err != nil {
+		var outputBuffer bytes.Buffer
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = io.MultiWriter(os.Stderr, &outputBuffer)
+		err := cmd.Run()
+		output := outputBuffer.Bytes()
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			if len(output) > 0 {
 				fmt.Fprintln(os.Stderr, console.FormatErrorMessage(fmt.Sprintf("Failed to %s workflow %s: %v\n%s", action, t.Name, err, string(output))))
 				// Provide clearer hint on common permission issues
@@ -272,7 +279,7 @@ func toggleWorkflowsByNames(ctx context.Context, workflowNames []string, enable 
 		}
 	}
 
-	return nil
+	return ctx.Err()
 }
 
 // DisableAllWorkflowsExcept disables all workflows except the specified ones

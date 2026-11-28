@@ -70,7 +70,11 @@ type GitHubWorkflow struct {
 }
 
 // fetchGitHubWorkflows fetches workflow information from GitHub
-func fetchGitHubWorkflows(ctx context.Context, repoOverride string, verbose bool) (map[string]*GitHubWorkflow, error) { //nolint:largefunc // Existing workflow discovery and diagnostics remain centralized.
+func fetchGitHubWorkflows(ctx context.Context, repoOverride string, verbose bool) (map[string]*GitHubWorkflow, error) {
+	return fetchGitHubWorkflowsFiltered(ctx, repoOverride, verbose, false)
+}
+
+func fetchGitHubWorkflowsFiltered(ctx context.Context, repoOverride string, verbose, agenticOnly bool) (map[string]*GitHubWorkflow, error) { //nolint:largefunc // Shared discovery preserves pagination and diagnostics for both selection modes.
 	workflowsLog.Printf("Fetching GitHub workflows: repoOverride=%s", repoOverride)
 
 	// Start spinner for network operation (only if not in verbose mode)
@@ -147,6 +151,9 @@ func fetchGitHubWorkflows(ctx context.Context, repoOverride string, verbose bool
 	for _, page := range pages {
 		for i := range page.Workflows {
 			workflow := &page.Workflows[i]
+			if agenticOnly && !strings.HasSuffix(workflow.Path, ".lock.yml") {
+				continue
+			}
 			name := extractWorkflowNameFromPath(workflow.Path)
 			workflowMap[name] = workflow
 		}
