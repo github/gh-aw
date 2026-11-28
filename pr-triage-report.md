@@ -3,13 +3,14 @@
 - Eligible open `app/github-copilot` PRs: 0
 - Open PRs scanned: 30
 - PRs excluded by author gate or cooldown: 30
-- Recommended action: none; no eligible agent-authored PRs require immediate review.
+- Recommended action: none; no eligible Copilot-authored PRs remain open after filtering.
 
 <details>
-<summary>Open PRs excluded from triage</summary>
+<summary>Reasoning</summary>
 
-- No open PRs authored by `app/github-copilot` were present at review time.
-- The repo-wide open PR list remains blocked by the author gate and 1-hour cooldown policy.
+- The repository was scanned for open PRs.
+- Every visible PR was either authored by a human/non-eligible automation or opened/updated within the last hour.
+- The author gate and 1-hour cooldown removed all candidate PRs before any labeling or review comments were created.
 </details>
 
 ### Distribution
@@ -62,5 +63,6 @@
 
 ### Key trends and next actions
 
-- No currently eligible `app/github-copilot` PRs remain open in `github/gh-aw`.
-- Re-run this triage check once a qualifying agent PR remains open beyond the cooldown window.
+- No open `app/github-copilot` PRs currently qualify for this triage workflow.
+- The repo needs no immediate action from the Copilot triage stream at this time.
+- Re-run the check once a qualifying PR remains open beyond the cooldown window.

@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-11-28T00:36:20.258+00:00",
-  "run_id": "46088550671",
+  "generated_at": "2026-11-28T06:30:03.808010+00:00",
+  "run_id": "46116295293",
   "source": "pr-triage",
   "open_copilot_prs": 0,
-  "scanned_open_prs": 19,
+  "scanned_open_prs": 30,
   "eligible_total": 0,
-  "cooldown_skipped": 19,
+  "cooldown_skipped": 30,
   "category_counts": {
     "docs": 0,
     "test": 0,
@@ -37,7 +37,10 @@
   "review_status": "triaged",
   "notes": [
     "No open app/github-copilot pull requests were eligible for triage after applying the author gate and 1-hour cooldown.",
-    "All 19 visible open PRs were excluded because their authors were humans or non-eligible automation, or because they were opened or updated within the last hour.",
+    "The repo-wide open PR list was scanned and all visible PRs were excluded because their authors were not app/github-copilot or they were opened/updated within the last hour.",
     "No labels or comments were added to PRs because no eligible Copilot-authored PRs remained after filtering."
-  ]
+  ],
+  "report_path": "/tmp/gh-aw/repo-memory/default/pr-triage-report.md",
+  "summary_path": "/tmp/gh-aw/repo-memory/default/pr-triage-summary.md",
+  "triage_status": "no_eligible_prs"
 }
