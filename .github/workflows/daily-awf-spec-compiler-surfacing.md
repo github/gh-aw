@@ -60,8 +60,7 @@ safe-outputs:
     expires: 7d
     max: 1
     allowed-files:
-      - ".github/aw/triggers.md"
-      - ".github/aw/syntax*.md"
+      - ".github/aw/**"
       - "pkg/parser/schemas/*.json"
       - "docs/src/content/docs/**"
     protected-files:
