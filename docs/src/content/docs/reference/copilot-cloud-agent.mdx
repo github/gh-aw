@@ -6,6 +6,8 @@ sidebar:
 ---
 
 import Video from '../../../components/Video.astro';
+import { Image } from 'astro:assets';
+import copilotCloudAgentFlow from '../../../assets/diagrams/copilot-cloud-agent-2026-11-28.svg';
 
 This page covers two safe outputs for invoking the [GitHub Copilot cloud agent](https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-coding-agent) from workflows:
 
@@ -13,6 +15,8 @@ This page covers two safe outputs for invoking the [GitHub Copilot cloud agent](
 - **[`assign-to-agent`](#assign-to-agent)** — Assign Copilot to an existing issue or pull request
 
 Both safe outputs require a fine-grained PAT — see [Authentication](#authentication) below.
+
+<Image src={copilotCloudAgentFlow} alt="Create an agent session through a new issue, or assign Copilot to an existing issue or pull request." />
 
 ## Create Agent Session
 
