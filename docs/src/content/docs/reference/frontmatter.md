@@ -55,14 +55,7 @@ emoji: "🤖"
 > `skip-if-decision` is experimental. Nonempty lists emit a compile-time
 > warning; configuration and behavior may change without deprecation.
 
-An optional top-level `skip-if-decision` list of up to 64 questions evaluated inside AWF before each otherwise eligible agent invocation, including initial execution, retries, resumes, and continuations. The gate applies to all built-in engines and declarative engines, including command-based, custom-harness, and durable execution paths. Nonempty lists are incompatible with declarative `protected-session-capture`; compilation rejects this combination to preserve recorder isolation and verified session ingestion.
-
-Questions and referenced files are screened for known credential patterns and
-configured secret values before transmission. A match withholds that question
-as `unknown` with `sensitive_content_blocked`. Screening is heuristic; do not
-reference confidential files merely because they are inside an allowed path.
-Structured file evidence is still model-readable untrusted data, not an
-instruction-isolation boundary.
+An optional top-level `skip-if-decision` list of up to 64 questions that AWF evaluates before each otherwise eligible agent invocation, including retries, resumes, and continuations. It applies to all built-in and declarative engines. Compilation rejects nonempty lists combined with declarative `protected-session-capture`, which preserves recorder isolation.
 
 ```aw wrap
 skip-if-decision:
@@ -70,21 +63,15 @@ skip-if-decision:
   - Has @reports/progress.md established that further execution is unnecessary?
 ```
 
-Each question returns `deny` when its skip condition is established, `allow` when execution is recommended, or `unknown` when it abstains. Any `deny` skips the invocation; otherwise, any `allow` or all `unknown` preserves the execution path selected by the deterministic harness. An absent or empty list preserves existing behavior. Decisions cannot override retry limits, budgets, deadlines, or nonrecoverable failures.
+Each question returns `deny` (skip condition established), `allow` (execution recommended), or `unknown` (abstain). Any `deny` skips the invocation; otherwise the deterministic harness path proceeds. An absent or empty list preserves existing behavior. Decisions cannot override retry limits, budgets, deadlines, or nonrecoverable failures.
 
-Questions share one Decisions request through the existing AWF API proxy, using `gpt-6-luna-decisions` on a configured Copilot provider, or `gpt-6-luna` when only OpenAI is configured. No direct-provider fallback or additional credentials are used. Unavailable models or APIs, timeouts, malformed responses, and file-read failures abstain without decision retries. Decision requests remain subject to the proxy's model and budget policies and its existing usage accounting.
+All questions share one Decisions request through the AWF API proxy, using `gpt-6-luna-decisions` on a configured Copilot provider or `gpt-6-luna` when only OpenAI is configured, with no direct-provider fallback. Unavailable models, timeouts, malformed responses, and file-read failures abstain without retrying.
 
-Runtime `@file` references resolve relative to `engine.cwd`, or the workspace when unset. They are read afresh before each invocation using the existing guarded regular-file reader: only workspace and `/tmp/gh-aw/agent` paths are eligible; symlinks, hardlinks, sensitive paths, and oversized context are rejected. Each question's imports have a 512 KiB ceiling including question text, evidence metadata, and JSON escaping; each read receives the remaining budget.
+Questions and referenced files are screened for credential patterns and configured secret values; a match withholds that question as `unknown` with `sensitive_content_blocked`. Screening is heuristic, so do not reference confidential files merely because they sit in an allowed path. File evidence remains untrusted data.
 
-The entire serialized Decisions request is capped at 400,000 UTF-8 bytes,
-approximately 100,000 tokens at four bytes per token. This is a byte-based
-estimate, not tokenizer-exact accounting, and includes request framing,
-questions, choices, and escaped evidence. Questions that would exceed the
-remaining budget become `unknown`; smaller questions can still be evaluated.
-Unreadable context also makes only its question `unknown`. Paths use letters,
-digits, `_`, `.`, `/`, and `-`; Actions expressions are not supported in questions.
+`@file` references resolve relative to `engine.cwd` (or the workspace) and are re-read before each invocation. Only regular files under the workspace or `/tmp/gh-aw/agent` are eligible; symlinks, hardlinks, sensitive paths, and oversized context are rejected. Imports are capped at 512 KiB per question and 400,000 UTF-8 bytes per request; over-budget or unreadable questions become `unknown`. Paths may use letters, digits, `_`, `.`, `/`, and `-`; Actions expressions are not supported.
 
-Decision metadata is retained in the existing harness retry artifact and as typed `harness.decision` events in the agent's unified session. Events contain one-based question indices, outcomes, sanitized error codes, latency, the proposed attempt, and `avoidedInvocation`; they never retain file contents or raw provider diagnostics. `gh aw audit --json` exposes this history under `retries.decisions` and counts avoided invocations separately from retries. A denied invocation records a noop if no terminal safe-output exists. The gate does not apply to threat detection or evals.
+Outcomes appear in the harness retry artifact, as `harness.decision` events, and under `retries.decisions` in `gh aw audit --json`, which counts avoided invocations separately from retries. Events never contain file contents or raw provider diagnostics. A denied invocation records a noop if no terminal safe-output exists. The gate does not apply to threat detection or evals.
 
 ### Labels (`labels:`)
 
@@ -108,18 +95,11 @@ metadata:
   docs: https://docs.example.com/automation/repository-health
 ```
 
-Keys must be 1–64 characters; values are string-only, up to 1024 characters.
-`metadata.docs`, when present, must be an absolute HTTPS URL. The compiler preserves
-it in generated lock-file metadata without fetching it or changing workflow execution.
-To explicitly reuse a metadata value in OTLP custom span or resource attributes, use
-a whole-value `${{ github.aw.metadata.<key> }}` reference; it resolves against this
-root workflow's metadata at compile time. Metadata is not exported automatically.
+Keys are 1–64 characters and values are strings up to 1024 characters. `metadata.docs`, if present, must be an absolute HTTPS URL; it is kept in lock-file metadata and never fetched. Reuse a value in OTLP attributes with a whole-value `${{ github.aw.metadata.<key> }}` reference, resolved at compile time. Metadata is not exported automatically.
 
 ### Trigger Events (`on:`)
 
-The `on:` section uses standard GitHub Actions trigger syntax and adds controls for reactions, status comments, deadlines, approval, fork handling, actor filtering, search-based skipping, pre-activation steps, job dependencies, and trigger-specific authentication.
-
-See [Trigger Events](/gh-aw/reference/triggers/) for complete documentation.
+The `on:` section uses standard GitHub Actions trigger syntax, plus controls for reactions, status comments, deadlines, approval, fork handling, actor filtering, and more. See [Trigger Events](/gh-aw/reference/triggers/).
 
 ### Conditional Execution (`if:`)
 
@@ -141,7 +121,7 @@ token-broker:
   copilot-task: true
 ```
 
-Select `copilot-request`, `copilot-task`, or both independently. Brokered request authentication is supported in threat-detection and evals jobs; main agent inference remains blocked pending renewable AWF credential support. Request exchanges include the selected LLM inference provider ID. Jobs using brokered credentials run an unconditional post-step to invalidate credentials for that job. `copilot-request` cannot be combined with `permissions.copilot-requests: write`. The endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions secret at runtime, not from workflow source or the compiler environment. Missing configuration or failed credential exchange blocks the affected operation instead of falling back to existing credentials. See [enterprise token broker configuration](/gh-aw/reference/enterprise-configuration/#oidc-token-broker).
+Select `copilot-request`, `copilot-task`, or both. Brokered request authentication works in threat-detection and evals jobs; main agent inference remains blocked pending renewable AWF credential support. Exchanges include the selected LLM inference provider ID, and brokered jobs run an unconditional post-step that invalidates their credentials. `copilot-request` cannot be combined with `permissions.copilot-requests: write`. The endpoint comes from the `GH_AW_TOKEN_BROKER_URL` Actions secret at runtime. If configuration is missing or an exchange fails, the operation is blocked rather than falling back to existing credentials. See [enterprise token broker configuration](/gh-aw/reference/enterprise-configuration/#oidc-token-broker).
 
 For GitHub API authentication, add `token-broker:` under `tools.github`, `safe-outputs`, or both. An empty value means `true`; explicit `false` disables the broker for that section.
 
@@ -154,10 +134,10 @@ safe-outputs:
   add-comment:
 ```
 
-These settings independently request the `github-app` broker capability; neither requires a top-level `token-broker` setting. Do not combine a section's enabled `token-broker` with its `github-app` or `github-token`. A top-level `github-app` does not override the section's broker selection. GitHub tool authentication requires an enabled agent sandbox with AWF environment-exclusion support to keep OIDC bootstrap credentials out of the agent. The broker controls installation, repository scope, permissions, and lifetime through deployment policy, not caller-supplied scopes; GitHub tool credentials must be read-only. Each consuming job exchanges its own credential and invalidates it during cleanup. GitHub consumers receive a fixed token for that job; this does not provide automatic renewal for long-running operations.
+Each setting independently requests the `github-app` broker capability; no top-level `token-broker` is required. Don't combine a section's `token-broker` with its `github-app` or `github-token`. GitHub tool authentication needs an enabled agent sandbox with AWF environment-exclusion support, which keeps OIDC bootstrap credentials away from the agent. Deployment policy controls scope and lifetime, and GitHub tool credentials must be read-only. Each job gets a fixed token with no automatic renewal.
 
 > [!CAUTION]
-> Custom steps, jobs, and actions in a brokered job run with that job's full credential authority. This includes `pre-steps`, `steps`, `pre-agent-steps`, `post-steps`, `jobs`, and `safe-outputs.steps`. `safe-outputs.jobs` do not inherit broker authentication; they use their own configured credentials. These steps can read the brokered token. They can also use the job-wide `id-token: write` permission to request their own credentials from the broker. Cleanup only limits use after the job ends. Review this code whenever it changes. Pin third-party actions to full commit SHAs. Never let agent output or untrusted input choose code, actions, refs, or target repositories. Keep code that does not need credentials in separate jobs without `id-token: write`. See [security considerations](/gh-aw/specs/token-broker-specification/#appendix-c-security-and-privacy-considerations-normative).
+> Custom steps, jobs, and actions in a brokered job run with its full credential authority, including `pre-steps`, `steps`, `pre-agent-steps`, `post-steps`, `jobs`, and `safe-outputs.steps`. They can read the brokered token and use `id-token: write` to request their own credentials. Cleanup only limits use after the job ends, and `safe-outputs.jobs` do not inherit broker authentication. Pin third-party actions to full commit SHAs, never let untrusted input choose code or targets, and keep credential-free code in jobs without `id-token: write`. See [security considerations](/gh-aw/specs/token-broker-specification/#appendix-c-security-and-privacy-considerations-normative).
 
 ### Imports (`imports:`)
 
@@ -203,9 +183,9 @@ By default, the generated agent and detection jobs pre-pull their Docker images 
 docker-image-pull-policy: never
 ```
 
-In `never` mode, every pre-start image must be a registry-qualified `repository[:tag]@sha256:<64 lowercase hex>` reference. The download helper checks that Docker can inspect each exact reference and that its `RepoDigests` contains the exact `repository@sha256:...` entry. It validates **all** images before tagging their requested local aliases and never falls back to a pull. A versioned reference creates only its versioned alias, not `:latest`; ensure downstream consumers use that alias. Missing metadata, unpinned images, conflicting aliases, or failed inspections stop the job.
+In `never` mode, each pre-start image must be a registry-qualified `repository[:tag]@sha256:<64 lowercase hex>` reference that Docker can inspect, with a matching `repository@sha256:...` entry in its `RepoDigests`. All images are validated **before** any local alias is tagged, and the helper never falls back to a pull. A versioned reference creates only its versioned alias (not `:latest`), so downstream consumers must use that alias. Missing metadata, unpinned images, conflicting aliases, or failed inspections stop the job.
 
-Use `jobs.agent.pre-steps` and `jobs.detection.pre-steps` to restore independently verified image content on each isolated consumer runner **before** its download step; if a job depends on a separate acquisition job, configure its `needs` accordingly. Preloading with `docker save/load` is not necessarily sufficient: that transport may discard registry `RepoDigests`, which this mode refuses to fabricate. This setting only checks local Docker metadata; it does not independently verify image bytes, provenance, or scanner policy, or prevent other startup components from contacting registries. Use an isolated disposable Docker daemon and verify the full handoff and startup path separately.
+Use `jobs.agent.pre-steps` and `jobs.detection.pre-steps` to restore verified image content **before** each download step. `docker save`/`load` may discard `RepoDigests`, which this mode will not fabricate. The setting checks only local Docker metadata; it does not verify image bytes, provenance, or scanner policy.
 
 ### Cache Configuration (`cache:`)
 
@@ -225,19 +205,17 @@ For secure Go-specific cache guidance, see [FAQ: How should I configure Go cache
 
 ### Repository Checkout (`checkout:`)
 
-Configure how `actions/checkout` is invoked in the agent job. Override default checkout settings or check out multiple repositories for cross-repository workflows.
-
-Set `checkout: false` to disable the default repository checkout entirely — useful for workflows that access repositories through MCP servers or other mechanisms that do not require a local clone:
+Configures how `actions/checkout` runs in the agent job, including multi-repository checkouts. Set `checkout: false` to skip the default checkout, for example when a workflow reaches repositories only through MCP servers:
 
 ```yaml wrap
 checkout: false
 ```
 
-See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for complete documentation on checkout configuration options (including `fetch:`, `checkout: false`), merging behavior, and cross-repo examples.
+See [Cross-Repository Operations](/gh-aw/reference/cross-repository/) for `fetch:`, merging behavior, and cross-repo examples.
 
 ### Ambient Folders (`ambient-folders:`)
 
-Top-level, workspace-relative folders to bundle into the activation artifact and restore into the checkout before the agent runs. Useful for activation steps that generate reusable prompt, skill, or agent context (e.g. a `.squad/` team state directory).
+Workspace-relative folders to bundle into the activation artifact and restore into the checkout before the agent runs. Useful for generated prompt, skill, or agent context, such as a `.squad/` team state directory.
 
 ```yaml wrap
 ambient-folders:
@@ -269,9 +247,9 @@ github-app:
 
 Requires both `client-id` (or the deprecated `app-id` alias) and `private-key`. Optional fields include `owner` and `repositories` to scope the installation, and `ignore-if-missing: true` to skip token minting when the credentials resolve to empty strings at runtime.
 
-Precedence per section is: a section-specific `github-app`, then a section-specific `github-token`, then this top-level value. A section that already sets its own `github-token` keeps that token and does not receive the fallback. When the top-level `github-app` is defined in a shared workflow, importing workflows inherit it unless they declare their own.
+Precedence per section: a section-specific `github-app`, then its `github-token`, then this top-level value. A section that sets its own `github-token` does not receive the fallback. Importing workflows inherit a shared workflow's top-level `github-app` unless they declare their own.
 
-Per-skill credentials under `skills[].github-app` are independent and are not covered by this fallback. Note also that `permissions:` inside a `github-app` block only takes effect for `tools.github.github-app` and `safe-outputs.github-app`; it is ignored for `on.github-app` and for this top-level fallback.
+Per-skill credentials under `skills[].github-app` are independent of this fallback. `permissions:` inside a `github-app` block takes effect only for `tools.github.github-app` and `safe-outputs.github-app`; it is ignored for `on.github-app` and for this fallback.
 
 ### AI Engine (`engine:`)
 
@@ -305,7 +283,7 @@ model: router/economy
 
 To narrow the main agent's choices without restricting sub-agents, add a [shortlist](/gh-aw/reference/model-routing/#a-shortlist-of-models) alongside a literal router value. To opt out of [default routing](/gh-aw/reference/model-routing/#default-routing-for-workflows-without-a-model) without pinning a model, omit `model` and set top-level `model-routing: false`.
 
-To record the selected model and effort, outcome, and cost without changing the router's pick, set `learning: observe` under `model-routing` and enable `tools.repo-memory`. Set `learning: false` to override an import or repository default without disabling routing. See [Adaptive Routing](/gh-aw/reference/adaptive-routing/).
+To record outcomes and cost without changing the router's pick, set `learning: observe` under `model-routing` and enable `tools.repo-memory`; `learning: false` overrides an inherited setting. See [Adaptive Routing](/gh-aw/reference/adaptive-routing/).
 
 ```aw wrap
 model: router
@@ -317,7 +295,7 @@ tools:
 
 ### Engine Driver (`engine.driver:`)
 
-Overrides the built-in engine runtime driver for engines that support driver mode. For Copilot, setting `engine.driver` also enables SDK mode. `engine.driver` accepts either a string path/command or an inline source object with exactly one of `node:`, `python:`, `go:`, or `java:`. See [AI Engines](/gh-aw/reference/engines/copilot/#copilot-sdk-support) for driver requirements and supported formats.
+Overrides the built-in engine runtime driver for engines that support driver mode. For Copilot, it also enables SDK mode. Accepts a string path/command or an inline source object with exactly one of `node:`, `python:`, `go:`, or `java:`. See [AI Engines](/gh-aw/reference/engines/copilot/#copilot-sdk-support) for driver requirements and supported formats.
 
 ```yaml wrap
 engine:
@@ -329,7 +307,7 @@ engine:
 
 ### Engine Extensions (`engine.extensions:`)
 
-Lists engine-specific plugins to install before the agent runs. Only the Pi engine reads this field; each entry is an npm package name passed to `pi install <extension>`. Other engines ignore it. See [Pi Extensions](/gh-aw/reference/engines/pi/#pi-extensions-extensions) for details.
+Lists npm packages to install before the agent runs. Only the Pi engine reads this field, passing each entry to `pi install <extension>`; other engines ignore it. See [Pi Extensions](/gh-aw/reference/engines/pi/#pi-extensions-extensions).
 
 ```yaml wrap
 engine:
@@ -353,7 +331,7 @@ network:
 
 ### AWF Version (`sandbox.agent.version`)
 
-Selects a pinned AWF release. Installation verifies the release's checksum manifest against a trusted SHA256 pin, then verifies the downloaded bundle or binary. This applies to AWF v0.29.5 and later as well as earlier releases; installation does not query GitHub release attestations. Default AWF installation on GitHub Enterprise Cloud (`*.ghe.com`) requires no additional github.com token or version override. See [AWF checksum pins](/gh-aw/reference/sandbox/#release-integrity-sandboxagentchecksums-sha256) for custom versions.
+Selects a pinned AWF release. Installation checks the release's checksum manifest against a trusted SHA256 pin, then verifies the downloaded bundle or binary; release attestations are not queried. GitHub Enterprise Cloud (`*.ghe.com`) installs need no extra github.com token. See [AWF checksum pins](/gh-aw/reference/sandbox/#release-integrity-sandboxagentchecksums-sha256) for custom versions.
 
 ### Tools (`tools:`)
 
@@ -380,7 +358,7 @@ Supported entry formats:
 
 `github-token` and `github-app` are mutually exclusive for each object entry. `github-token` must be an expression such as `${{ secrets.NAME }}` or `${{ needs.auth.outputs.token }}`.
 
-`<ref>` may be a branch, tag, or 40-character lowercase commit SHA. Non-SHA refs are resolved and rewritten to the matching commit SHA at compile time. If resolution fails (for example, due to missing network access or authentication), the compiler keeps the original unpinned ref and emits a warning. Omitting the ref (`owner/repo@`) installs from the repository's default branch on every run and is not pinned, so the compiler warns and recommends an explicit ref.
+Refs may be a branch, tag, or 40-character lowercase commit SHA. Non-SHA refs are rewritten to commit SHAs at compile time; if resolution fails, the original ref is kept with a warning. An omitted ref (`owner/repo@`) tracks the default branch on every run, so the compiler warns.
 
 ```yaml wrap
 skills:
@@ -418,18 +396,18 @@ plugins:
   - octo-org/agent-plugins/plugins/example@main
 ```
 
-Entries use `owner/repository[/path]@ref` syntax. The ref is required and may be a branch, tag, or full 40-character lowercase commit SHA. During compilation, gh-aw resolves every branch or tag to a commit SHA. Compilation fails if a reference cannot be resolved, so generated workflows never install a plugin from a moving ref.
+Entries use `owner/repository[/path]@ref`. The ref is required and may be a branch, tag, or full 40-character lowercase commit SHA. Compilation resolves branches and tags to commit SHAs and fails on unresolvable refs, so generated workflows never install from a moving ref.
 
-The agent job checks out each pinned plugin immediately after installing the engine, then makes it available the way the engine expects: GitHub Copilot CLI runs `copilot plugin install`, Claude Code loads each plugin directory through `--plugin-dir`, and OpenAI Codex CLI registers a local, single-plugin marketplace for each checkout (reading the plugin's declared name from its `plugin.json` manifest) and runs `codex plugin marketplace add` followed by `codex plugin add`. Imported engine definitions declare their own handling with a `behaviors.plugins` block, so the shared Cursor engine stages plugins in the folder its CLI scans. The Kiro sample selects V2 and does not support V3-only Powers plugins. Using `plugins:` with an engine that has no Agent Plugins support is a compile-time error.
+The agent job checks out each pinned plugin after installing the engine, then registers it per engine: Copilot CLI runs `copilot plugin install`, Claude Code loads each directory with `--plugin-dir`, and Codex CLI registers a single-plugin local marketplace (named from `plugin.json`) and runs `codex plugin marketplace add` and `codex plugin add`. Engine definitions can declare their own handling with a `behaviors.plugins` block. The Kiro sample selects V2 and does not support V3-only Powers plugins. `plugins:` with an engine lacking Agent Plugins support is a compile-time error.
 
-Shared agentic workflows may also declare plugins. When the same plugin path is declared more than once, identical refs are deduplicated and compatible semantic versions are merged to the highest version. Incompatible major versions or conflicting non-semver refs fail compilation.
+Shared workflows may also declare plugins. A repeated plugin path deduplicates identical refs and merges compatible semantic versions to the highest one; incompatible majors or conflicting non-semver refs fail compilation.
 
 Supported entry formats:
 
 - String form with shared authentication: `owner/repo@<ref>` or `owner/repo/plugins/path@<ref>`
 - Object form with per-plugin authentication: `plugin` (required), plus optional `github-token` or `github-app`
 
-`github-token` and `github-app` are mutually exclusive for each object entry. By default (string form, or object form without either field), the checkout step uses the workflow's default `github.token`, which cannot read private repositories. Set a per-plugin `github-token` or `github-app` to install a plugin from a private repository:
+`github-token` and `github-app` are mutually exclusive per object entry. By default, the checkout step uses the workflow's `github.token`, which cannot read private repositories. Set a per-plugin `github-token` or `github-app` to install from a private repository:
 
 ```yaml wrap
 engine: copilot
@@ -456,9 +434,9 @@ plugins:
       private-key: ${{ secrets.PLUGIN_APP_PRIVATE_KEY }}
 ```
 
-Use a same-job step output or environment variable when a `pre-steps` entry retrieves the credential from a centralized secret-management service at runtime. The service and credential lifetime are not prescribed by gh-aw. Prefer step outputs when available; values exported through `$GITHUB_ENV` remain available to later steps in the same job until you clear or overwrite them.
+When a `pre-steps` entry fetches a credential at runtime, pass it through a same-job step output (preferred) or environment variable. Values exported to `$GITHUB_ENV` remain visible to later steps until cleared.
 
-Because plugin support is implemented per agentic engine, per-plugin credentials only take effect for the checkout step; whether an engine can install a plugin at all still depends on that engine's own Agent Plugins support.
+Per-plugin credentials apply only to the checkout step. Whether an engine can install plugins at all depends on its own Agent Plugins support.
 
 ### MCP Scripts (`mcp-scripts:`)
 
@@ -468,7 +446,7 @@ Enables defining custom MCP tools inline using JavaScript or shell scripts. See 
 
 Enables automatic issue creation, comment posting, and other safe outputs. See [Safe Outputs Processing](/gh-aw/reference/safe-outputs/).
 
-`safe-outputs:` also accepts workflow-level control fields that apply to safe-output processing as a whole, not just individual handlers. For example, `report-failed-jobs: false` disables the automatic failed-job reporting issue created by the framework:
+`safe-outputs:` also accepts workflow-wide control fields. For example, `report-failed-jobs: false` disables the framework's automatic failed-job reporting issue:
 
 ```yaml wrap
 safe-outputs:
@@ -479,9 +457,9 @@ safe-outputs:
 
 `report-failed-jobs` also accepts a GitHub Actions expression that resolves to a boolean. When omitted, it defaults to `true`.
 
-Failed custom prerequisites can be reported even when their failure skips the agent, provided activation succeeded and the run was not cancelled or stopped by the AI Credits API quota guardrail. The failed prerequisite still blocks agent execution; intentionally skipped or cancelled prerequisites do not trigger this reporting path.
+Failed custom prerequisites are reported even when they skip the agent, provided activation succeeded and the run was neither cancelled nor stopped by the AI Credits quota guardrail. Failed prerequisites still block the agent; skipped or cancelled ones are not reported.
 
-Custom safe-output jobs are defined under `safe-outputs.jobs:`. They run after the agent completes and can expose a custom safe-output tool to the agent. The optional `output` field is the success message returned to the agent:
+Custom safe-output jobs under `safe-outputs.jobs:` run after the agent completes and can expose a custom safe-output tool to it. The optional `output` field is the success message returned to the agent:
 
 ```yaml wrap
 safe-outputs:
@@ -498,7 +476,7 @@ See [Custom Safe Outputs](/gh-aw/reference/custom-safe-outputs/) for job inputs,
 
 ### Threat Detection Suppression (`threat-detection-suppress:`)
 
-Suppresses specific threat-detection diagnostic rules (`CTR-###` identifiers) that would otherwise block safe-output processing, with a required, auditable justification. Each entry must include a `rule` matching `CTR-###`, a non-empty `reason`, and an optional `expires` date in `YYYY-MM-DD` format; once `expires` has passed (UTC), the suppression is no longer active and the rule is enforced again.
+Suppresses specific threat-detection rules (`CTR-###`) that would otherwise block safe-output processing. Each entry requires a `rule` matching `CTR-###`, a non-empty `reason`, and an optional `expires` date (`YYYY-MM-DD`, UTC); after expiry the rule is enforced again.
 
 ```yaml wrap
 threat-detection-suppress:
@@ -520,11 +498,11 @@ runs-on-slim: ubuntu-slim            # Defaults to ubuntu-slim (framework jobs o
 timeout-minutes: 30                  # Agentic step timeout, defaults to 20 minutes
 ```
 
-`runs-on` applies to the main agent job only. `runs-on-slim` applies to all framework/generated jobs (activation, safe-outputs, unlock, etc.), accepts the same string, array, or runner-group object forms as `runs-on`, and defaults to `ubuntu-slim`. `safe-outputs.runs-on` and `safe-outputs.threat-detection.runs-on` accept the same runner forms and take precedence where applicable.
+`runs-on` applies only to the main agent job. `runs-on-slim` applies to all framework and generated jobs (activation, safe-outputs, unlock, and so on), accepts the same string, array, or runner-group forms, and defaults to `ubuntu-slim`. `safe-outputs.runs-on` and `safe-outputs.threat-detection.runs-on` take precedence where applicable.
 
-`ubuntu-slim` supports job timeouts of at most 15 minutes. A literal timeout configured by the workflow that exceeds 15 minutes switches a compiler-default framework runner to `ubuntu-latest`; an explicit `ubuntu-slim` runner with such a timeout produces a compilation error. Compiler-default timeouts do not trigger the check and are capped at 15 minutes on `ubuntu-slim`. Safe-output jobs that create or push pull requests use `ubuntu-latest` by default because they check out and publish repository code; API-only safe-output jobs remain eligible for `ubuntu-slim`. Runner and timeout expressions are not evaluated by this check.
+`ubuntu-slim` supports job timeouts of at most 15 minutes. A literal workflow timeout above 15 minutes moves a compiler-default framework runner to `ubuntu-latest`; an explicit `ubuntu-slim` runner with such a timeout is a compilation error. Safe-output jobs that create or push pull requests default to `ubuntu-latest`; API-only ones can still use `ubuntu-slim`.
 
-`timeout-minutes` accepts an integer or a GitHub Actions expression string such as `${{ inputs.timeout }}`. It bounds the `agentic_execution` step and defaults to `${{ vars.GH_AW_DEFAULT_TIMEOUT_MINUTES }}` before a 20-minute fallback. Generated jobs are bounded separately by `jobs.agent.timeout-minutes` (default `${{ vars.GH_AW_DEFAULT_AGENT_JOB_TIMEOUT_MINUTES }}` or 60 minutes) and `jobs.detection.timeout-minutes` (default `${{ vars.GH_AW_DEFAULT_DETECTION_JOB_TIMEOUT_MINUTES }}` or 10 minutes). It applies to the workflow being compiled, **not** to plain caller jobs that invoke a reusable workflow with job-level `uses:`.
+`timeout-minutes` accepts an integer or an expression such as `${{ inputs.timeout }}`. It bounds the `agentic_execution` step, defaulting to `${{ vars.GH_AW_DEFAULT_TIMEOUT_MINUTES }}` with a 20-minute fallback. Generated jobs have separate limits: `jobs.agent.timeout-minutes` (default `${{ vars.GH_AW_DEFAULT_AGENT_JOB_TIMEOUT_MINUTES }}`, else 60 minutes) and `jobs.detection.timeout-minutes` (default `${{ vars.GH_AW_DEFAULT_DETECTION_JOB_TIMEOUT_MINUTES }}`, else 10 minutes). These apply to the compiled workflow, **not** to plain caller jobs that invoke a reusable workflow with job-level `uses:`.
 
 **Supported runners for `runs-on:`**
 
@@ -538,11 +516,11 @@ timeout-minutes: 30                  # Agentic step timeout, defaults to 20 minu
 
 #### Windows runner execution
 
-For the literal `runs-on: windows-latest`, the compiler wraps POSIX steps in built-in framework jobs, including the agent job, with PowerShell launchers that execute Bash in Ubuntu WSL. Native Windows Actions remain on the host. Unrelated custom jobs and other Windows runner labels do not receive this adapter.
+For `runs-on: windows-latest`, the compiler runs POSIX steps in framework jobs (including the agent job) through PowerShell launchers that execute Bash in Ubuntu WSL. Native Windows actions stay on the host; custom jobs and other Windows labels do not get this adapter.
 
-The runner must provide working WSL2. Generated setup selects or installs Ubuntu, installs Linux tools and Docker, and installs the Linux Node.js version selected by `actions/setup-node`. Setup fails if WSL2 or the required runtime cannot be initialized. Workspace, runner temporary paths, and GitHub command files are mapped into WSL; `/tmp/gh-aw` is shared through the runner's temporary directory for artifact collection.
+The runner must provide working WSL2. Setup installs or selects Ubuntu, Linux tools, Docker, and the Node.js version chosen by `actions/setup-node`, and fails if WSL2 or the runtime cannot initialize.
 
-This adapter provides a Linux execution environment for framework commands; it does not make the agent a native Windows process. Linux remains the recommended runner, and this compiler behavior does not establish end-to-end availability for every Windows configuration.
+The adapter gives framework commands a Linux environment, not a native Windows agent. Linux remains the recommended runner, and this does not guarantee end-to-end availability for every Windows configuration.
 
 ### Workflow Concurrency Control (`concurrency:`)
 
@@ -557,7 +535,7 @@ env:
   CUSTOM_VAR: "value"
 ```
 
-Environment variables can be defined at multiple scopes (workflow, job, step, engine, safe-outputs, etc.) with clear precedence rules. See [Environment Variables](/gh-aw/reference/environment-variables/) for complete documentation on all 13 env scopes and precedence order.
+Environment variables can be set at multiple scopes (workflow, job, step, engine, safe-outputs, and others) with defined precedence. See [Environment Variables](/gh-aw/reference/environment-variables/) for all 13 scopes and the precedence order.
 
 > [!WARNING]
 > Do not use credential expressions such as `${{ secrets.* }}`, `${{ github.token }}`, or `${{ toJSON(github.*) }}` in the workflow-level `env:` section. Environment variables defined here are passed directly to the agent container, which means secret values would be visible to the AI model. In strict mode, this is a compilation error. In non-strict mode, it emits a warning.
@@ -576,17 +554,17 @@ excluded-env:
 
 ### Turn Limit (`max-turns:`)
 
-Caps the number of chat iterations (model responses and tool calls) the AWF proxy allows for a single workflow run, across all supported engines. Defaults to `500` when omitted. Accepts an integer or a GitHub Actions expression that resolves to an integer at runtime.
+Caps chat iterations (model responses and tool calls) the AWF proxy allows per workflow run, across all engines. Defaults to `500`. Accepts an integer or an expression that resolves to one at runtime.
 
 ```yaml wrap
 max-turns: 20
 ```
 
-The top-level `max-runs:` field is a **deprecated** alias for `max-turns:` and is only accepted as a fallback for backward compatibility. Migrate existing workflows with `gh aw fix`. See [Cost Management](/gh-aw/reference/cost-management/#cap-turns-per-run) for more details.
+`max-runs:` is a **deprecated** top-level alias for `max-turns:`, accepted only as a fallback. Migrate with `gh aw fix`. See [Cost Management](/gh-aw/reference/cost-management/#cap-turns-per-run) for more details.
 
 ### Turn Cache Miss Limit (`max-turn-cache-misses:`)
 
-Sets the maximum consecutive AWF cache misses allowed before the API proxy blocks further requests. The value maps to `apiProxy.maxCacheMisses`, must be a positive integer, and defaults to `5` when neither frontmatter nor the `GH_AW_DEFAULT_MAX_TURN_CACHE_MISSES` environment override provides a value. The configured value also applies to the threat-detection job, which talks to the same LLM provider.
+Sets the maximum consecutive AWF cache misses before the API proxy blocks further requests. The value maps to `apiProxy.maxCacheMisses` and must be a positive integer. It defaults to `5`, or to the `GH_AW_DEFAULT_MAX_TURN_CACHE_MISSES` environment override when set. The value also applies to the threat-detection job, which uses the same LLM provider.
 
 ```yaml wrap
 max-turn-cache-misses: 5
@@ -594,22 +572,17 @@ max-turn-cache-misses: 5
 
 ### AI Credits Guardrail (`max-ai-credits:`)
 
-Sets the AWF AI Credits budget used for cost enforcement. It is enabled by default and defaults to `1000` (`1k`) when omitted. Budget notices are on by default: AWF warns the agent at 80%, 90%, 95%, and 99% of the budget. With AWF releases after v0.29.11, each conversation in the run, sub-agents included, gets the latest notice once rather than every notice; the notice states how much budget or time is left, then says what to do, and a further notice comes when about five requests' worth of credits, or about five minutes, remain. Use plain integers or `K`/`M` suffixes such as `5K`. AWF clamps any budget above its hard cap, which is 10,000 AI credits by default (the runner operator can change it with `AWF_AI_CREDITS_HARD_CAP`; gh-aw does not set it). Set to a negative value to disable budget enforcement. With AWF releases after v0.29.11, notices continue against the agent deadline and AWF's hard cap; set [`sandbox.agent.token-steering: false`](/gh-aw/reference/sandbox/#token-steering-sandboxagenttoken-steering) to turn them off.
+Sets the AWF AI Credits budget for cost enforcement. It is enabled by default at `1000` (`1k`); plain integers and `K`/`M` suffixes such as `5K` are accepted. AWF warns the agent at 80%, 90%, 95%, and 99% of the budget. AWF clamps budgets above its hard cap, 10,000 AI credits by default (runner operators can change it with `AWF_AI_CREDITS_HARD_CAP`; gh-aw does not set it). A negative value disables enforcement. With AWF releases after v0.29.11, notices continue against the agent deadline and hard cap unless [`sandbox.agent.token-steering: false`](/gh-aw/reference/sandbox/#token-steering-sandboxagenttoken-steering) is set.
 
 ```yaml wrap
 max-ai-credits: 500
 ```
 
-```yaml wrap
-# Disable budget enforcement (with AWF releases after v0.29.11, notices continue unless token-steering is false)
-max-ai-credits: -1
-```
-
 ### Daily Per-Workflow AI Credits Guardrail (`max-daily-ai-credits:`)
 
-Sets a 24-hour AI Credits cap for a single workflow, aggregated across recent runs of the same workflow in the repository. When the activation job detects that the previous 24 hours already exceed this threshold, it warns, creates an issue, skips the agent job, and lets the conclusion job report the specialized failure context. Use plain integers or `K`/`M` suffixes such as `100000K` or `100M`.
+Sets a 24-hour AI Credits cap for one workflow, summed across its recent runs in the repository. If the previous 24 hours already exceed the cap, the activation job warns, creates an issue, skips the agent job, and lets the conclusion job report the failure. Plain integers and `K`/`M` suffixes (for example `100000K` or `100M`) are accepted.
 
-This guardrail is disabled by default when omitted, and `-1` explicitly disables it. This guardrail is skipped for `workflow_call`, `repository_dispatch`, and `workflow_dispatch` runs that carry internal `aw_context` dispatch metadata.
+The guardrail is disabled when omitted; `-1` disables it explicitly. It is skipped for `workflow_call`, `repository_dispatch`, and `workflow_dispatch` runs that carry internal `aw_context` dispatch metadata.
 
 ```yaml wrap
 max-daily-ai-credits: 10000
@@ -625,13 +598,11 @@ max-daily-ai-credits:
     private-key: ${{ secrets.APP_PRIVATE_KEY }}
 ```
 
-Accounting reads retry transient server and network/timeout failures up to three total attempts with short backoff. If a historical run's accounting remains unavailable, a positive `max-ai-credits` value supplies a conservative per-run estimate, reported separately from measured usage. Later scans reinspect estimates. Permission failures, rate limiting, quota-reserve stops, and explicit server retry restrictions do not use this fallback.
+Transient server and network/timeout failures are retried up to three attempts with short backoff. If a historical run's accounting stays unavailable, a positive `max-ai-credits` supplies a conservative per-run estimate, reported separately from measured usage and reinspected by later scans. Permission failures, rate limiting, quota-reserve stops, and explicit server retry restrictions never use this fallback.
 
-Scan snapshots from matching default-branch `issues` and `issue_comment` runs can be reused after repository, workflow, and producer validation. A fresh, complete run listing still determines which observations count toward the 24-hour total.
+A fresh, complete run listing always determines which observations count toward the 24-hour total.
 
-Activation logs report retry delays, recovery or stop reasons, and snapshot-producer validation or missing-data decisions. These diagnostics omit credentials, signed download URLs, and response bodies.
-
-By default, the activation job fails when the guardrail cannot determine the complete 24-hour AI Credits total, including when authoritative run history remains unreadable or no positive per-run fallback is available. Set `continue-on-error: true` to report the unknown total as a warning and allow the workflow to continue:
+By default, the activation job fails if the complete 24-hour total cannot be determined, including when run history is unreadable and no positive per-run fallback exists. Set `continue-on-error: true` to report the unknown total as a warning and continue:
 
 ```yaml wrap
 max-daily-ai-credits:
@@ -639,14 +610,9 @@ max-daily-ai-credits:
   continue-on-error: true
 ```
 
-```yaml wrap
-# Disable the guardrail explicitly
-max-daily-ai-credits: -1
-```
-
 ### Per-User Rate Limiting (`user-rate-limit:`)
 
-Limits how frequently a single user can trigger the workflow. When the limit is exceeded, the pre-activation job cancels the run before the agent executes. Rate limiting applies to programmatically triggered events (such as `workflow_dispatch`, `issue_comment`, and `pull_request_review`); when `events` is omitted, the applicable events are inferred from the `on:` section, falling back to all supported programmatic events if no supported triggers are found.
+Limits how often one user can trigger the workflow. When the limit is exceeded, the pre-activation job cancels the run before the agent executes. Applies to programmatic events such as `workflow_dispatch`, `issue_comment`, and `pull_request_review`. If `events` is omitted, events are inferred from `on:`, falling back to all supported programmatic events when none match.
 
 ```yaml wrap
 user-rate-limit:
@@ -658,7 +624,7 @@ user-rate-limit:
 
 `max-runs-per-window` also supports a GitHub Actions expression (for example `${{ inputs.max-runs-per-window }}`) that resolves to an integer at runtime.
 
-Users with any of the `ignored-roles` are not rate limited. The default exemptions are `admin`, `maintain`, and `write`; set `ignored-roles: []` to rate limit every user, including administrators.
+Users with any `ignored-roles` are exempt. The defaults are `admin`, `maintain`, and `write`; `ignored-roles: []` rate-limits everyone, including administrators.
 
 Legacy frontmatter that used a top-level `rate-limit:` section, or `max:`/`max-runs:` instead of `max-runs-per-window:`, must be migrated with `gh aw fix`.
 
@@ -666,7 +632,7 @@ See [Rate Limiting and Controls](/gh-aw/reference/rate-limiting-controls/) for m
 
 ### Secrets (`secrets:`)
 
-Defines secret values passed to workflow execution. Secrets are typically used to provide sensitive configuration to MCP servers or workflow components. Values must be GitHub Actions expressions that reference secrets (e.g., `${{ secrets.API_KEY }}`).
+Defines secret values passed to workflow components, such as MCP servers. Values must be GitHub Actions expressions that reference secrets, such as `${{ secrets.API_KEY }}`.
 
 ```yaml wrap
 secrets:
@@ -686,9 +652,9 @@ secrets:
     description: "Production database connection string"
 ```
 
-Always reference secrets through `${{ secrets.NAME }}` expressions, never plaintext; prefer environment-specific secrets (via the `environment:` field) and limit access to the components that need them.
+Always reference secrets through `${{ secrets.NAME }}` expressions, never plaintext. Prefer environment-specific secrets (via `environment:`) and limit access to the components that need them.
 
-**Note:** For passing secrets to reusable workflows, use the `jobs.<job_id>.secrets` field instead. The top-level `secrets:` field is for workflow-level secret configuration.
+**Note:** For reusable workflows, pass secrets with `jobs.<job_id>.secrets` instead; the top-level `secrets:` field configures workflow-level secrets.
 
 ### Environment Protection (`environment:`)
 
@@ -698,7 +664,7 @@ Specifies the environment for deployment protection rules and environment-specif
 environment: production
 ```
 
-The activation job inherits this environment, including its deployment protection rules. If [`on.manual-approval`](/gh-aw/reference/triggers/#manual-approval-gates-manual-approval) is configured, its environment name takes precedence for the activation job; settings such as `deployment` and `url` from an object environment are retained.
+The activation job inherits this environment and its protection rules. If [`on.manual-approval`](/gh-aw/reference/triggers/#manual-approval-gates-manual-approval) is configured, its environment name takes precedence, while `deployment` and `url` from an object environment are kept.
 
 The object form accepts `name`, optional `url`, and optional `deployment` (a boolean or GitHub Actions expression, such as `${{ github.ref_name == 'main' }}`). For environments that only gate secrets, set `deployment: false` to retain environment secrets and protection rules—including branch policies, required reviewers, and wait timers—without creating deployment records:
 
@@ -754,11 +720,11 @@ observability:
       X-Tenant: my-org
 ```
 
-`endpoint` accepts a string, a `{url, headers}` object, or an array of endpoint objects for fan-out; `headers` accepts a map or comma-separated `key=value` string; `if-missing` supports `error` (default), `warn`, and `ignore`; `attributes` is an optional map of custom span attributes (values support GitHub Actions expressions); and `resource-attributes` appends custom OTel resource attributes to the built-in gh-aw/GitHub set. Use static strings or GitHub Actions expressions for `resource-attributes`, but do not use `secrets.*` or `vars.*` values because resource attributes are exported to external observability backends and are not treated as secret values. See the [OpenTelemetry guide](/gh-aw/reference/open-telemetry/) for setup and the [OpenTelemetry attribute reference](/gh-aw/reference/open-telemetry-attributes/) for emitted fields.
+`endpoint` accepts a string, a `{url, headers}` object, or an array of endpoint objects for fan-out. `headers` takes a map or a comma-separated `key=value` string. `if-missing` is `error` (default), `warn`, or `ignore`. `attributes` adds custom span attributes, and `resource-attributes` appends OTel resource attributes; these are exported to external backends and are not secret-safe, so use only static strings or expressions there, never `secrets.*` or `vars.*`. See the [OpenTelemetry guide](/gh-aw/reference/open-telemetry/) and [attribute reference](/gh-aw/reference/open-telemetry-attributes/).
 
 ### Resources (`resources:`)
 
-Declares additional workflow or action files to fetch alongside this workflow when running `gh aw add`, typically when the workflow depends on companion workflows or custom actions stored in the same directory.
+Declares companion workflow or action files to fetch alongside this workflow when running `gh aw add`.
 
 ```yaml wrap
 resources:
@@ -767,13 +733,13 @@ resources:
   - shared/helper-action.yml # supporting GitHub Action
 ```
 
-Entries are relative paths from the workflow's location in the source repository (GitHub Actions expression syntax `${{` is not allowed). When `gh aw add` installs this workflow, each listed file is downloaded alongside it so dependencies are available after installation. `gh aw add` also automatically fetches workflows referenced in the [`dispatch-workflow`](/gh-aw/reference/safe-outputs/#workflow-dispatch-dispatch-workflow) safe output, even when not listed here.
+Paths are relative to the workflow's location in the source repository, and `${{` expressions are not allowed. `gh aw add` downloads each listed file alongside the workflow so dependencies are available after installation. It also fetches workflows referenced by the [`dispatch-workflow`](/gh-aw/reference/safe-outputs/#workflow-dispatch-dispatch-workflow) safe output, even when not listed here.
 
 ### Runtimes (`runtimes:`)
 
-Override default runtime versions for languages and tools used in workflows. The compiler detects required runtimes from tool configurations (for example `bash: ["node"]`) and workflow steps, then installs the specified versions. Pin versions for reproducibility, opt into preview releases, or point at custom setup actions such as forks or enterprise mirrors.
+Override default runtime versions for languages and tools. The compiler detects runtimes needed by tool configurations (for example `bash: ["node"]`) and workflow steps, then installs them. Pin versions, opt into previews, or point at custom setup actions such as forks or enterprise mirrors.
 
-Each runtime takes a required `version` string plus optional `action-repo` and `action-version` fields to override the default setup action:
+Each runtime takes a required `version` plus optional `action-repo` and `action-version` to override the default setup action:
 
 | Runtime | Default Version | Default Setup Action |
 |---------|----------------|---------------------|
@@ -803,15 +769,15 @@ runtimes:
 
 Omitted runtimes use the defaults above. Runtimes from imported shared workflows are merged with your workflow's configuration.
 
-`runtimes.node.version` also controls Node.js setup in npm-based engine installation steps. An exact version such as `"24.22.1"` is used by both shared runtime setup and those engine installation steps, including when the setting comes from an import.
+`runtimes.node.version` also sets Node.js for npm-based engine installation steps, including when the value is inherited from an import.
 
-When Go is required and `runtimes.go.version` is omitted, the generated setup step uses `go-version-file: go.mod` if the repository root contains that file and the workflow checks out the same repository at workspace root before setup without an explicit ref. Sparse checkouts qualify when they retain root files (cone mode) or include `go.mod` (non-cone mode). Unverified checkout refs, repositories, or layouts use the default version. An explicit `runtimes.go.version` takes precedence.
+If Go is required and `runtimes.go.version` is omitted, setup uses `go-version-file: go.mod` when the repository has a root `go.mod` and the workflow checks out that repository at the workspace root without an explicit ref. Otherwise the default version applies. An explicit `runtimes.go.version` takes precedence.
 
 ### `run-install-scripts`
 
 Controls whether npm pre/post-install scripts are allowed during package installation. Configure this under `runtimes.node.run-install-scripts`. The default is `false`.
 
-The shared npm installer disables lifecycle scripts for global installs through step-level `NPM_CONFIG_IGNORE_SCRIPTS: 'true'`; local installs retain `--ignore-scripts`. This keeps exact-version global commands compatible with dependency-pinning scanners without changing version pins or release-age cooldowns.
+The shared npm installer disables lifecycle scripts for global installs via step-level `NPM_CONFIG_IGNORE_SCRIPTS: 'true'`, and local installs keep `--ignore-scripts`. Version pins and release-age cooldowns are unchanged.
 
 ```yaml wrap
 runtimes:
@@ -825,7 +791,7 @@ Enabling this increases supply chain risk because install hooks from dependencie
 
 Tracks workflow origin in format `owner/repo/path@ref`. Automatically populated when using `gh aw add` to install workflows from external repositories. Optional for manually created workflows.
 
-Explicit refs are preserved so updates follow the requested branch or compatible releases. The optional `source-sha` field records the installed 40-character commit SHA separately. `gh aw add` and `gh aw update` manage this field and use it as the base for three-way merges; it does not change the tracking ref.
+Explicit refs are preserved, so updates follow the requested branch or compatible releases. The optional `source-sha` field records the installed commit SHA, which `gh aw add` and `gh aw update` use as the base for three-way merges.
 
 ```yaml wrap
 source: "githubnext/agentics/workflows/ci-doctor.md@v1.0.0"
@@ -833,22 +799,22 @@ source: "githubnext/agentics/workflows/ci-doctor.md@v1.0.0"
 
 ### Redirect (`redirect:`)
 
-Specifies a new canonical location, using the same `owner/repo/path@ref` format as `source:`, when a workflow has been moved or renamed. `gh aw add`, `gh aw add-wizard`, and `gh aw update` follow redirect chains transitively (up to a depth limit) to the resolved location, rewrite the local `source` field accordingly, and report redirect loops as errors.
+Specifies a new canonical location, using the same `owner/repo/path@ref` format as `source:`, when a workflow has been moved or renamed. `gh aw add`, `gh aw add-wizard`, and `gh aw update` follow redirect chains (up to a depth limit), rewrite the local `source` field, and report redirect loops as errors.
 
 ```yaml wrap
 redirect: "githubnext/agentics/workflows/new-workflow-name.md@main"
 ```
 
-`gh aw compile` only treats a file as a redirect-only placeholder when `redirect:` is present and `on:` is absent. In that placeholder case, compilation is skipped successfully and an informational message tells the user to run `gh aw update` to resolve the full workflow. A workflow that contains both `redirect:` and `on:` is compiled as a normal workflow; the redirect metadata remains available to `gh aw add` and `gh aw update`.
+`gh aw compile` skips placeholder files that have `redirect:` but no `on:`, printing a message to run `gh aw update`. Files with both keys compile normally, and their redirect metadata stays available to `gh aw add` and `gh aw update`.
 
-Use `gh aw update --no-redirect` to fail the update instead of following the redirect — useful for auditing or controlling exactly when redirects are applied.
+`gh aw update --no-redirect` fails the update instead of following a redirect, which is useful for auditing.
 
 > [!NOTE]
-> The `redirect` field is set by workflow *authors* to signal that a workflow has moved. It is not typically set by end-users. If you see a redirect when running `gh aw update`, it means the upstream workflow has been relocated.
+> Authors set `redirect` when a workflow moves; if `gh aw update` shows one, the upstream workflow has been relocated.
 
 ### Tracker ID (`tracker-id:`)
 
-Tags every asset (issues, pull requests, discussions, comments) the workflow creates with a hidden HTML comment — `<!-- gh-aw-tracker-id: … -->` — enabling GitHub search to find all items associated with this workflow.
+Tags every asset (issues, pull requests, discussions, comments) the workflow creates with a hidden HTML comment, `<!-- gh-aw-tracker-id: … -->`, so GitHub search can find them all.
 
 ```yaml wrap
 tracker-id: code-simplifier
@@ -872,9 +838,7 @@ Mark a workflow as private to prevent it from being installed into other reposit
 private: true
 ```
 
-Adding the workflow from another repository then fails with `workflow 'owner/repo/internal-tooling' is private and cannot be added to other repositories`. Use this for internal tooling, sensitive automation, or repository-specific workflows not intended for reuse.
-
-This only blocks installation via `gh aw add`; the visibility of the workflow file itself is controlled by your repository's access settings.
+Adding the workflow from another repository then fails with `workflow 'owner/repo/internal-tooling' is private and cannot be added to other repositories`. Use this for internal tooling, sensitive automation, or repository-specific workflows not intended for reuse. This blocks only `gh aw add`; file visibility still follows repository access settings.
 
 ### `check-for-updates`
 
@@ -902,7 +866,7 @@ strict: false  # Disable enhanced security validation for development/testing
 
 Workflows compiled with `strict: false` cannot run on public repositories. The workflow fails at runtime with an error message prompting recompilation with strict mode.
 
-To prevent workflows from opting out, set `"strict": true` at the top level of `.github/workflows/aw.json`. This enforces strict mode for every `gh aw compile` invocation in the repository. The repository setting only accepts `true`; `"strict": false` is invalid.
+To stop workflows from opting out, set `"strict": true` at the top level of `.github/workflows/aw.json`, which enforces strict mode for every `gh aw compile` in the repository. The repository setting accepts only `true`.
 
 See [Network Permissions - Strict Mode Validation](/gh-aw/reference/network/#strict-mode-validation) for details on network validation and [CLI Commands](/gh-aw/setup/cli/#compile) for compilation options.
 
