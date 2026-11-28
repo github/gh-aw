@@ -16,6 +16,8 @@ const { generateGitBundle } = require("./generate_git_bundle.cjs");
 const { getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
 const { createHandlers } = require("./safe_outputs_handlers.cjs");
 const { buildManualBranchRecoveryCommands, buildManualBranchApplyCommands } = require("./create_pull_request_helpers.cjs");
+const { applyAddMaskRedaction } = require("./add_mask_redaction.cjs");
+const { validateEnvelope } = require("./validate_recovery_envelopes.cjs");
 
 describe("object-pack packaging and application with real Git", { timeout: 60000 }, () => {
   let root, author, agent, remote, destination, repoSlug, branch, publishBranch, baseline, tip, expectedTree;
@@ -66,7 +68,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     identity(target);
   }
 
-  function fixture(shape = "missing-ref", { objectFormat = "sha1", dispatch = false, monorepo = false } = {}) {
+  function fixture(shape = "missing-ref", { objectFormat = "sha1", dispatch = false, monorepo = false, maskReference = false } = {}) {
     fs.mkdirSync(author);
     git(author, ["init", "-q", "-b", "main", `--object-format=${objectFormat}`]);
     identity(author);
@@ -97,6 +99,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     git(remote, ["config", "uploadpack.allowFilter", "true"]);
     git(remote, ["config", "uploadpack.allowAnySHA1InWant", "true"]);
     write(author, "text.txt", "first agent edit\n");
+    if (maskReference) write(author, ".github/workflows/example.lock.yml", 'run: echo "::add-mask::${MCP_GATEWAY_AGENT_ID}"\n');
     write(author, "binary.bin", Buffer.from([255, 0, 17, 0, 128]));
     write(author, "new-binary.bin", Buffer.from([0, 128, 255, 0]));
     write(author, "new-empty.txt", "");
@@ -347,7 +350,8 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     ["bundle", "am"].flatMap(format => ["allow", "deny", ...(handler === "push_to_pull_request_branch" ? ["advanced"] : [])].map(policy => ({ handler, format, policy })))
   );
   it.each(publishers)("enforces $policy while publishing recovered $format through $handler", async ({ handler, format, policy }) => {
-    fixture();
+    const maskReference = handler === "push_to_pull_request_branch" && policy === "allow";
+    fixture("missing-ref", { maskReference });
     let remoteHead = baseline;
     if (policy === "advanced") {
       git(author, ["checkout", "-q", "--detach", baseline]);
@@ -356,7 +360,16 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
       git(author, ["push", "-q", `file://${remote}`, `${remoteHead}:refs/heads/${branch}`], { online: true });
     }
     const before = state(remote);
-    packageObjects();
+    const { paths } = packageObjects({
+      beforeCapture: maskReference
+        ? paths => {
+            const preview = fs.readFileSync(paths.patchPath, "utf8");
+            expect(preview).toContain('echo "::add-mask::${MCP_GATEWAY_AGENT_ID}"');
+            fs.writeFileSync(paths.patchPath, applyAddMaskRedaction(preview, []));
+            expect(validateEnvelope(paths.bundlePath)).toBe(false);
+          }
+        : undefined,
+    });
     const fetches = redirectRecoveryFetch();
     vi.spyOn(process, "cwd").mockReturnValue(destination);
     vi.stubEnv("GITHUB_WORKSPACE", destination);
@@ -393,6 +406,7 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
       check_branch_protection: false,
       patch_format: format,
       fallback_as_pull_request: false,
+      ...(maskReference ? { allow_workflows: true } : {}),
       ...(policy === "deny" ? { allowed_files: ["not-permitted/**"] } : {}),
     });
     const result = await publish({ branch, title: pr.title, body: "Preserve validated agent changes." }, {});
@@ -407,6 +421,10 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
     expect(result, JSON.stringify(result)).toMatchObject({ success: true });
     const publishedBranch = result.branch_name;
     expect(git(remote, ["rev-parse", `refs/heads/${publishedBranch}^{tree}`])).toBe(expectedTree);
+    if (maskReference) {
+      expect(git(remote, ["show", `refs/heads/${publishedBranch}:.github/workflows/example.lock.yml`])).toBe('run: echo "::add-mask::${MCP_GATEWAY_AGENT_ID}"');
+      expect(fs.existsSync(paths.bundlePath)).toBe(true);
+    }
     expect(git(remote, ["rev-parse", "refs/heads/main"])).toBe(baseline);
     expect(global.core.info).toHaveBeenCalledWith(expect.stringContaining(`Apply transport mode: ${format === "am" ? "patch" : "bundle"}`));
     if (handler === "create_pull_request") expect(create).toHaveBeenCalledTimes(1);

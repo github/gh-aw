@@ -35,7 +35,8 @@ function unescapeWorkflowCommandValue(value) {
  * @returns {boolean}
  */
 function isAddMaskCommandLine(line) {
-  return ADD_MASK_COMMAND_RE.test(line);
+  const match = line.match(ADD_MASK_COMMAND_RE);
+  return !!match && !/^\$\{[A-Za-z_][A-Za-z0-9_]*\}["']?\s*$/.test(match[1]);
 }
 
 /**

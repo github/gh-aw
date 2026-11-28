@@ -679,10 +679,6 @@ async function main(config = {}) {
         ? ". If the bundle includes commits already merged into the current base branch, set allow-merged-base-baseline: true under safe-outputs.push-to-pull-request-branch to recognize the merged base ancestor."
         : "";
     core.info(`Apply transport mode: ${applyTransport} (patch file present: ${hasPatchFile}, bundle file present: ${hasBundleFile})`);
-    if (bundleFilePath && !hasBundleFile) {
-      core.warning(`Bundle file path was provided but file is not present on disk: ${bundleFilePath}; falling back to patch transport`);
-    }
-
     // Always require a patch file. The patch remains the preview/debug artifact and
     // the first-pass validation input; bundle transport adds an authoritative
     // pre-apply git diff check later after the bundle ref has been fetched.
@@ -709,6 +705,13 @@ async function main(config = {}) {
       patchContent = transport.read(patchFilePath).toString("utf8");
     } catch (err) {
       throw new Error(`Failed to read file ${patchFilePath}: ${getErrorMessage(err)}`, { cause: err });
+    }
+
+    if (!hasBundleFile && patchContent.startsWith("GH-AW object-pack recovery preview v1")) {
+      return { success: false, error: "Object-pack recovery envelope is missing. The preview changed after packaging, so the push cannot be applied." };
+    }
+    if (bundleFilePath && !hasBundleFile) {
+      core.warning(`Bundle file path was provided but file is not present on disk: ${bundleFilePath}; falling back to patch transport`);
     }
 
     // Check for actual error conditions

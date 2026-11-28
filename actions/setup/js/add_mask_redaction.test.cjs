@@ -148,6 +148,18 @@ describe("add_mask_redaction", () => {
       expect(isAddMaskCommandLine("2026-01-01 ::add-mask::secret")).toBe(true);
       expect(isAddMaskCommandLine("no command here")).toBe(false);
     });
+
+    it("preserves only standalone unexpanded variable references", () => {
+      for (const payload of ['${VAR}"', "${_var123}'", "${VAR}", '${VAR}"  \r']) {
+        expect(isAddMaskCommandLine(`echo "::add-mask::${payload}`)).toBe(false);
+      }
+      for (const payload of ['literal"', '${VAR}literal"', 'literal${VAR}"', '${VAR:-literal}"', '${123}"', '${VAR}" # literal']) {
+        expect(isAddMaskCommandLine(`echo "::add-mask::${payload}`)).toBe(true);
+      }
+      const text = ['echo "::add-mask::${VAR}"', 'echo "::add-mask::literal"', "after"].join("\n");
+      expect(applyAddMaskRedaction(text, [])).toBe(['echo "::add-mask::${VAR}"', "after"].join("\n"));
+      expect(applyAddMaskRedaction(text, ["${VAR}"])).toBe('echo "::add-mask::***"\nafter');
+    });
   });
 
   describe("unescapeWorkflowCommandValue", () => {

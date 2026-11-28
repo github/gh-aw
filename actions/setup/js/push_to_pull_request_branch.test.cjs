@@ -1164,6 +1164,20 @@ index 0000000..aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa4
   // ──────────────────────────────────────────────────────
 
   describe("repository state scenarios", () => {
+    it("rejects an orphaned object-pack preview without invoking git am", async () => {
+      createPatchFile("orphaned-object-pack", "GH-AW object-pack recovery preview v1\nObject preview\n");
+      const module = await loadModule();
+      const handler = await module.main({});
+      const result = await handler({ branch: "orphaned-object-pack" }, {});
+
+      expect(result).toMatchObject({
+        success: false,
+        error: "Object-pack recovery envelope is missing. The preview changed after packaging, so the push cannot be applied.",
+      });
+      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockExec.getExecOutput).not.toHaveBeenCalled();
+    });
+
     it.each(["warn", "error", "ignore"])("should handle successful normal push with %s no-change policy", async ifNoChanges => {
       const patchPath = createPatchFile("should-handle-successful-normal-push");
       mockExec.getExecOutput
