@@ -783,7 +783,7 @@ jobs:
       - name: Build CI summary for optimization analysis
         run: "jq '\ndef safe_duration:\n  if (.createdAt and .updatedAt) then\n    ((.updatedAt | fromdateiso8601) - (.createdAt | fromdateiso8601))\n  else null end;\n{\n  generated_at: now | todateiso8601,\n  total_runs: length,\n  status_counts: (group_by(.status) | map({status: .[0].status, count: length})),\n  conclusion_counts: (map(select(.conclusion != null)) | group_by(.conclusion) | map({conclusion: .[0].conclusion, count: length})),\n  branch_counts: (group_by(.headBranch) | map({branch: .[0].headBranch, count: length}) | sort_by(-.count) | .[0:10]),\n  avg_duration_seconds: ([.[] | safe_duration | select(. != null)] | if length > 0 then (add / length) else null end),\n  top_recent_failures: ([.[] | select(.conclusion == \"failure\" or .conclusion == \"cancelled\") | {id: .databaseId, run_number: .number, title: .displayTitle, branch: .headBranch, event: .event, url: .url, updated_at: .updatedAt}] | sort_by(.updated_at) | reverse | .[0:10])\n}' /tmp/gh-aw/agent/ci-runs.json > /tmp/gh-aw/agent/ci-summary.json\n\necho \"## CI Summary\" >> \"$GITHUB_STEP_SUMMARY\"\njq -r '\"- runs analyzed: \\(.total_runs)\\n- avg duration (sec): \\(.avg_duration_seconds // \"n/a\")\\n- recent failure records: \\(.top_recent_failures | length)\"' /tmp/gh-aw/agent/ci-summary.json >> \"$GITHUB_STEP_SUMMARY\"\n"
       - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           cache: true
           go-version-file: go.mod

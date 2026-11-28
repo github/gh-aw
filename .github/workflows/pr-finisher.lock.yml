@@ -695,7 +695,7 @@ jobs:
         name: Attach the validated PR branch at its pinned revision
         run: "git switch -C \"$PR_HEAD_REF\" \"$PR_HEAD_SHA\"\nprintf '%s\\n' \\\n  \"GH_AW_PR_HEAD_BASE_SHA=$PR_HEAD_SHA\" \\\n  \"GH_AW_PR_HEAD_BASE_BRANCH=$PR_HEAD_REF\" \\\n  \"GH_AW_PR_HEAD_BASE_REPO=$GITHUB_REPOSITORY\" \\\n  \"GH_AW_PR_HEAD_BASE_PR_NUMBER=$PR_NUMBER\" >> \"$GITHUB_ENV\"\n"
       - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           cache: true
           go-version-file: go.mod

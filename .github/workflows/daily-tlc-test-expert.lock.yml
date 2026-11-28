@@ -687,7 +687,7 @@ jobs:
         run: "set -euo pipefail\ntrusted=$(mktemp -d \"$RUNNER_TEMP/tla-installer.XXXXXX\")\ntrap 'rm -rf \"$trusted\"' EXIT\nmkdir -p \"$trusted/.github/scripts\" \"$trusted/actions/setup/sh\"\ncp \"$GITHUB_WORKSPACE/.github/scripts/install_tla_runtime.sh\" \"$trusted/.github/scripts/\"\ncp \"$GITHUB_WORKSPACE/actions/setup/sh/release_integrity.sh\" \"$trusted/actions/setup/sh/\"\nprintf '%s  %s\\n' \\\n  15317bc27032f3c8160cb47fb77084683e21e3c37680db90b9bb2e57adea16e2 \"$trusted/.github/scripts/install_tla_runtime.sh\" \\\n  0e8917d0574e8147fbe0255310709da2f7a5a8a8bb934ba9662bbcfdc070e28d \"$trusted/actions/setup/sh/release_integrity.sh\" | sha256sum --check --strict\nbash \"$trusted/.github/scripts/install_tla_runtime.sh\" /tmp/gh-aw/agent/tla-tools\n# runner-guard:ignore RGS-018 -- Default-branch installer and integrity helper are SHA-256 verified before execution.\n"
         shell: bash
       - name: Setup Go for implementation tests
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           cache: true
           go-version-file: go.mod
