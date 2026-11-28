@@ -14,6 +14,7 @@ const promptsSourceDir = path.resolve(path.dirname(fileURLToPath(import.meta.url
 
 const { getPatchPathForBranch, getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
 const { getBundlePathForBranch, getBundlePathForBranchInRepo } = require("./generate_git_bundle.cjs");
+const { OBJECT_PACK_PREVIEW_HEADER } = require("./object_pack_transport.cjs");
 
 // The privileged handler derives patch/bundle paths from `branch` (and `repo`)
 // via resolveTransportPaths, so tests must write transport files at the
@@ -1431,6 +1432,21 @@ index 0000000..abc1234
     expect(fallbackIssueBody).toContain("Resolves test-owner/test-repo\\#58");
     expect(fallbackIssueBody).not.toContain("Closes #57");
     expect(fallbackIssueBody).not.toContain("Resolves test-owner/test-repo#58");
+  });
+
+  it("rejects an orphaned object-pack preview without applying it as a patch", async () => {
+    const patchPath = canonicalPatchPath("autoloop/perf-comparison");
+    fs.writeFileSync(patchPath, `${OBJECT_PACK_PREVIEW_HEADER}\nObject preview\n`);
+
+    const { main } = require("./create_pull_request.cjs");
+    const handler = await main({ base_branch: "main", preserve_branch_name: true });
+    const result = await handler({ title: "Test PR", branch: "autoloop/perf-comparison" }, {});
+
+    expect(result).toMatchObject({
+      success: false,
+      error: "Object-pack recovery envelope is missing. The preview changed after packaging, so the pull request cannot be created.",
+    });
+    expect(global.exec.exec.mock.calls.some(([, args]) => Array.isArray(args) && args[0] === "am")).toBe(false);
   });
 
   it("should include original error in fallback issue patch instructions when push fails (no bundle)", async () => {

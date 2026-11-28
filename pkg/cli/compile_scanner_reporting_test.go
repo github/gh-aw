@@ -97,6 +97,48 @@ func captureScannerCompileJSON(t *testing.T, dir string, config CompileConfig) (
 	return results, compileErr
 }
 
+func TestCompilePropagatesShellcheckCancellation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test scanners use POSIX shell scripts")
+	}
+	dir := scannerJSONTestRepo(t)
+	installScannerJSONFakes(t, dir)
+	workflowDir := filepath.Join(dir, ".github", "workflows")
+	require.NoError(t, os.MkdirAll(workflowDir, 0o755))
+	file := filepath.Join(workflowDir, "test.md")
+	require.NoError(t, os.WriteFile(file, []byte(`---
+name: test
+on: workflow_dispatch
+permissions:
+  contents: read
+engine: copilot
+safe-outputs:
+  noop:
+---
+Say Done.
+`), 0o600))
+	original := runBatchShellcheckOnLockFilesAndResources
+	t.Cleanup(func() { runBatchShellcheckOnLockFilesAndResources = original })
+	for _, cancellation := range []error{context.Canceled, context.DeadlineExceeded} {
+		for _, directory := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%v/directory=%t", cancellation, directory), func(t *testing.T) {
+				called := false
+				runBatchShellcheckOnLockFilesAndResources = func(context.Context, []string, []workflow.ShellScriptResource, bool, bool) error {
+					called = true
+					return fmt.Errorf("shellcheck: %w", cancellation)
+				}
+				config := CompileConfig{Shellcheck: true}
+				if !directory {
+					config.MarkdownFiles = []string{file}
+				}
+				_, err := CompileWorkflows(context.Background(), config)
+				require.True(t, called)
+				require.ErrorIs(t, err, cancellation)
+			})
+		}
+	}
+}
+
 func TestCompileJSONOptionalScannerFindings(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("test scanners use POSIX shell scripts")
