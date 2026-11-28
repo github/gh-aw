@@ -60,6 +60,7 @@ func connectorSetupRequirements(registration workflow.ConnectorRegistration, pha
 			addReference(azure.TenantID)
 			addReference(azure.ClientID)
 			addReference(azure.Scope)
+			addReference(azure.Audience)
 		}
 	}
 	result := slices.Collect(maps.Keys(requirements))

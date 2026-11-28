@@ -3,6 +3,7 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -13,6 +14,11 @@ type ConnectorAzureOIDC struct {
 	Audience string `json:"audience,omitempty"`
 	Cloud    string `json:"azure-cloud,omitempty"`
 }
+
+var (
+	connectorAzureID    = regexp.MustCompile(`(?i)^(?:[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}|\$\{\{\s*vars\.[a-z_][a-z0-9_]*\s*\}\})$`)
+	connectorAzureScope = regexp.MustCompile(`^(?:(?:https|api)://[A-Za-z0-9.-]+(?:/[A-Za-z0-9._~-]+)*|[0-9a-fA-F-]{36})/\.default$`)
+)
 
 func (azure *ConnectorAzureOIDC) engineAuth() *EngineAuthConfig {
 	return &EngineAuthConfig{
@@ -36,15 +42,15 @@ func (azure *ConnectorAzureOIDC) loginHost() string {
 
 func validateConnectorAzureOIDC(alias string, registration ConnectorRegistration) error {
 	for name, azure := range registration.AzureOIDC {
-		if registration.Spec == nil {
+		if registration.Spec == nil || registration.Connection != "" {
 			return errors.New("azure-oidc requires an inline connector declaration")
 		}
 		credential, declared := registration.Spec.Credentials[name]
-		if azure == nil || !declared || credential.Phase != "inference" ||
+		if azure == nil || !declared || (credential.Phase != "inference" && credential.Phase != "agent" && credential.Phase != "safe-output") ||
 			credential.Header != "Authorization" || credential.Scheme != "bearer" ||
 			registration.GitHubApps[name] != nil || registration.OIDCTokens[name] != nil ||
 			registration.Credentials[name].Secret != connectorAppSecret(alias, name) {
-			return errors.New("azure-oidc requires its own inference-phase Authorization/bearer credential")
+			return errors.New("azure-oidc requires its own agent, safe-output or inference phase Authorization/bearer credential")
 		}
 		for field, value := range map[string]string{
 			"azure-tenant-id": azure.TenantID, "azure-client-id": azure.ClientID, "azure-scope": azure.Scope,
@@ -58,6 +64,17 @@ func validateConnectorAzureOIDC(alias string, registration ConnectorRegistration
 		}
 		if len(azure.Audience) > 2048 || strings.ContainsAny(azure.Audience, "\r\n\t") {
 			return errors.New("azure-oidc.audience must be a bounded audience without control characters")
+		}
+		if credential.Phase != "inference" {
+			if !connectorAzureID.MatchString(azure.TenantID) || !connectorAzureID.MatchString(azure.ClientID) {
+				return errors.New("azure-oidc agent and safe-output tenant/client IDs must be UUIDs or standalone vars references")
+			}
+			if !connectorAzureScope.MatchString(azure.Scope) {
+				return errors.New("azure-oidc agent and safe-output scope must be a single literal resource /.default scope")
+			}
+			if strings.ContainsAny(azure.Audience, " ${}\x7f") || strings.ContainsFunc(azure.Audience, func(r rune) bool { return r < 32 }) {
+				return errors.New("azure-oidc audience must be a bounded literal URI")
+			}
 		}
 	}
 	return nil

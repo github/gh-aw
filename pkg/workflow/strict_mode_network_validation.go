@@ -146,7 +146,7 @@ func validateStrictMinIntegrityTools(toolsMap map[string]any) error {
 							"tools.bash",
 							"not specified",
 							"strict mode: when 'tools.github.min-integrity' is set to 'none', 'tools.bash' must be explicitly specified so that shell access is intentional",
-							"Add an explicit bash setting to the tools section:\n\ntools:\n  bash: [\"cat\", \"ls\", \"find\", \"grep\", \"head\", \"tail\", \"wc\"]\n  github:\n    min-integrity: none",
+							"Run 'gh aw fix --write' to disable shell access and shell-backed CLI modes, or configure them explicitly. To disable shell access:\n\ntools:\n  bash: false\n  cli-proxy: false\n  github:\n    min-integrity: none\n\nAlternatively, set 'tools.bash' to a limited allowlist of commands the workflow needs.",
 						)
 					}
 				}

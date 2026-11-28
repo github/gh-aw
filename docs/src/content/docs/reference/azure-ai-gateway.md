@@ -27,7 +27,6 @@ engine:
     model: deployment-checklist
 permissions:
   contents: read
-  id-token: write
 imports:
   - uses: ".github/workflows/connectors/azure-ai-gateway.md"
     with:
@@ -47,14 +46,15 @@ The `responses` and `completions` profiles use Entra federation. Set
 `AZURE_TENANT_ID` and `AZURE_CLIENT_ID` Actions variables, configure the
 application's GitHub federated credential, and grant asset-specific runtime
 access to the selected model. The connector sets the explicit gateway scope
-`https://ai.gateway.azure.com/.default`; existing engine OIDC safeguards apply.
+`https://ai.gateway.azure.com/.default`. The compiler grants `id-token: write`
+to the job using the selected federated profile; existing engine OIDC safeguards apply.
 The tenant and client can instead be supplied with the `azure-tenant-id` and
 `azure-client-id` import bindings.
 
 For a gateway key, select `responses-key` or `completions-key` and store it as
-`AZURE_AI_GATEWAY_KEY` (or bind `key-secret` to another secret **name**). Remove
-`id-token: write` when no other feature needs Entra federation; key profiles do
-not allow `login.microsoftonline.com`. Only the selected profile's
+`AZURE_AI_GATEWAY_KEY` (or bind `key-secret` to another secret **name**). Key
+profiles request no OIDC permission or `login.microsoftonline.com` access.
+Only the selected profile's
 credential is used; there is no credential fallback.
 
 Use the protocol the deployed alias supports. `engine.model` supplies Copilot

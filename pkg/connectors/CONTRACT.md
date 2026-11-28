@@ -73,13 +73,22 @@ use a stored token or Azure OIDC. Set `model-catalog: false` when the provider
 has no live `/models` route; the selected model is then passed through verbatim.
 
 Credentials select exactly one route: `token: {secret: NAME}` (or the legacy
-`secret: NAME` spelling), `github-app`, or `github-oidc: {audience: LITERAL}`.
+`secret: NAME` spelling), `github-app`, `github-oidc: {audience: LITERAL}`,
+or `azure-oidc`.
 App tokens are minted through the existing pinned GitHub App action with explicit
-permissions and exact repository scope, and revoked by its post step. OIDC routes
+permissions and exact repository scope, and revoked by its post step. Direct GitHub OIDC routes
 mint a masked GitHub identity JWT for a fixed audience; only the consuming job
 receives `id-token: write`. Minting happens independently in the selected phase,
 never through an agent-provided endpoint or fallback credential. Static staged
 effects do not mint tokens; dynamic staging guards the mint step.
+
+`azure-oidc` exchanges a GitHub assertion for an app-only Entra bearer access
+token. The selected read or safe-output host can renew that credential; the
+native engine handles inference. The assertion audience is distinct from the
+provider scope. A potentially live writer requires a literal
+`safe-outputs.environment` exclusive to the publication job. Trust only that
+protected environment subject on the separate writer application. See the [declaration and phase
+constraints](../../docs/src/content/docs/specs/connector-specification.md#4-authentication-and-authority).
 
 Token credentials contain secret **names**, never values. GitHub App private keys
 must be secret references, not inline PEM. Agent-phase App permissions must be
@@ -125,7 +134,7 @@ Fixed `request.headers` supply reviewed nonsecret metadata such as API versions,
 Accept, and a fixed acting-user address. Authentication, authority, transport,
 credential-like headers, and expressions cannot be overridden. Content-Type must
 match the JSON body encoding.
-Multipart, pagination, arbitrary secret headers, OAuth acquisition, automatic version
+Multipart, pagination, arbitrary secret headers, custom OAuth acquisition, automatic version
 preflights and dynamic endpoints are unsupported.
 
 String input references may use `encoding: jira-adf` or
@@ -157,7 +166,8 @@ equality with the request, not just membership in a broad connection allowlist.
 GraphQL `errors` are
 always failures, including HTTP 200 responses. The runtime never retries writes.
 
-AW credentials have exactly one phase: `agent` or `safe-output`. The internal
+AW credentials have exactly one phase: `agent`, `safe-output`, or `inference`.
+Inference is engine-owned and absent from reader/effect plans. The internal
 frozen wire format retains a legacy `context` phase for compatibility fixtures;
 it is not part of the Markdown declaration interface.
 `mcp` entries are exact allowlisted REST-backed read tools. `httpMcp` entries

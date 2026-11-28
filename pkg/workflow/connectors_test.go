@@ -190,7 +190,7 @@ func TestConnectorGeneratedSafeOutputHost(t *testing.T) {
 		{"runtime-staged", false, true},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
-			source, err := json.Marshal(connectorSafeOutputScript("PLAN", "add-comment", "PREFIX_", []string{"WRITER"}, mode.compiled, false))
+			source, err := json.Marshal(connectorSafeOutputScript("PLAN", "add-comment", "PREFIX_", []string{"WRITER"}, mode.compiled, false, nil))
 			require.NoError(t, err)
 			driver := fmt.Sprintf(`
 const assert = require('node:assert/strict');

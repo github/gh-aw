@@ -51,15 +51,7 @@ type WorkflowValidationError struct {
 
 // Error implements the error interface
 func (e *WorkflowValidationError) Error() string {
-	var header string
-	if e.Line > 0 {
-		// When a source location is known, omit the timestamp so the compiler's
-		// file:line:col: prefix is not cluttered with a redundant timestamp.
-		header = fmt.Sprintf("Validation failed for field '%s'", e.Field)
-	} else {
-		header = fmt.Sprintf("[%s] Validation failed for field '%s'",
-			e.Timestamp.Format(time.RFC3339), e.Field)
-	}
+	header := fmt.Sprintf("Validation failed for field '%s'", e.Field)
 	return validationerror.Format(header, e.Payload, true)
 }
 

@@ -113,7 +113,7 @@ func writeConnectorCredentialGuidance(text *strings.Builder, registration workfl
 		case "token":
 			writeConnectorTokenGuidance(text, row.Reference)
 		case "unconfigured":
-			text.WriteString("  Configure this credential's token.secret NAME, github-app, or github-oidc route in the declaration.\n")
+			text.WriteString("  Configure this credential's token.secret NAME, github-app, github-oidc, or azure-oidc route in the declaration.\n")
 			text.WriteString("  Use its normal import-schema bindings with --input name=JSON when the route is parameterized.\n")
 		case "trusted input":
 			fmt.Fprintf(text, "  Fixed host-owned resource input, not an authentication token: gh secret set %s\n", row.Reference) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
@@ -143,8 +143,8 @@ func writeConnectorCredentialGuidance(text *strings.Builder, registration workfl
 		case "Azure OIDC":
 			azure := registration.AzureOIDC[row.Credential]
 			fmt.Fprintf(text, "  Entra tenant: %s; application client: %s; scope: %s.\n", connectorConsoleText(azure.TenantID), row.Reference, connectorConsoleText(azure.Scope)) //nolint:fprintferrorunchecked // strings.Builder cannot fail.
-			text.WriteString("  Configure GitHub Actions federation and exact model runtime RBAC; grant id-token: write.\n")
-			text.WriteString("  The existing AWF inference proxy exchanges and refreshes tokens outside the agent. No static token fallback.\n")
+			text.WriteString("  Configure GitHub Actions federation and grant the Entra application only the access required for this phase.\n")
+			text.WriteString("  Token exchange requires id-token: write on the selected job and runs outside the agent. No static token secret provisions this route.\n")
 		}
 	}
 }
