@@ -372,8 +372,8 @@ func TestRunShellcheckOnScriptNativeResults(t *testing.T) {
 				assert.NoError(t, aggregateErr)
 				assert.NoError(t, reported)
 			} else {
-				assert.Error(t, aggregateErr)
-				assert.Error(t, reported)
+				require.Error(t, aggregateErr)
+				require.Error(t, reported)
 				assert.Equal(t, tc.findings, errors.As(reported, &findings))
 			}
 		})
@@ -432,7 +432,7 @@ func TestRunShellcheckWorkersCancellationWhileWaiting(t *testing.T) {
 			}
 			require.Len(t, results, len(steps))
 			for i, result := range results {
-				assert.ErrorIs(t, result.err, context.Canceled, "step %d must not be treated as clean", i)
+				require.ErrorIs(t, result.err, context.Canceled, "step %d must not be treated as clean", i)
 			}
 			var reported error
 			ctx = context.WithValue(ctx, compileScannerReporterKey{}, func(tool string, err error) {
@@ -440,8 +440,8 @@ func TestRunShellcheckWorkersCancellationWhileWaiting(t *testing.T) {
 				reported = err
 			})
 			err := reportShellcheckResultsWithErrors(ctx, steps, results, strict, nil)
-			assert.ErrorIs(t, err, context.Canceled)
-			assert.ErrorIs(t, reported, context.Canceled, "the scan must not be recorded as clean")
+			require.ErrorIs(t, err, context.Canceled)
+			require.ErrorIs(t, reported, context.Canceled, "the scan must not be recorded as clean")
 		})
 	}
 }
