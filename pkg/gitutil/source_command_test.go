@@ -154,11 +154,16 @@ func TestSourceCommandContextFallsBackWhenGitExecPathIsUnavailable(t *testing.T)
 	tests := []struct {
 		name     string
 		probe    string
-		execPath func(string) string
+		execPath func(*testing.T, string) string
 	}{
 		{
 			name:  "probe fails",
 			probe: "exit 1",
+		},
+		{
+			name:     "probe prints valid path then fails",
+			probe:    `printf '%s\n' "$GH_AW_TEST_GIT_EXEC_PATH"; exit 1`,
+			execPath: func(_ *testing.T, root string) string { return root },
 		},
 		{
 			name:  "probe returns empty path",
@@ -167,14 +172,14 @@ func TestSourceCommandContextFallsBackWhenGitExecPathIsUnavailable(t *testing.T)
 		{
 			name:  "path does not exist",
 			probe: `printf '%s\n' "$GH_AW_TEST_GIT_EXEC_PATH"`,
-			execPath: func(root string) string {
+			execPath: func(_ *testing.T, root string) string {
 				return filepath.Join(root, "missing")
 			},
 		},
 		{
 			name:  "path is not a directory",
 			probe: `printf '%s\n' "$GH_AW_TEST_GIT_EXEC_PATH"`,
-			execPath: func(root string) string {
+			execPath: func(t *testing.T, root string) string {
 				file := filepath.Join(root, "not-a-directory")
 				if err := os.WriteFile(file, []byte("not a directory"), 0600); err != nil {
 					t.Fatal(err)
@@ -189,8 +194,10 @@ func TestSourceCommandContextFallsBackWhenGitExecPathIsUnavailable(t *testing.T)
 			root := t.TempDir()
 			gitPath := filepath.Join(root, "git")
 			argsPath := filepath.Join(root, "args")
+			probePath := filepath.Join(root, "probe")
 			script := fmt.Sprintf(`#!/bin/sh
 if [ "$1" = "--exec-path" ]; then
+  printf 'invoked\n' > "$GH_AW_TEST_GIT_PROBE"
   %s
   exit 0
 fi
@@ -199,11 +206,15 @@ printf '%%s\n' "$@" > "$GH_AW_TEST_GIT_ARGS"
 			require.NoError(t, os.WriteFile(gitPath, []byte(script), 0700))
 			t.Setenv("PATH", root)
 			t.Setenv("GH_AW_TEST_GIT_ARGS", argsPath)
+			t.Setenv("GH_AW_TEST_GIT_PROBE", probePath)
 			if tt.execPath != nil {
-				t.Setenv("GH_AW_TEST_GIT_EXEC_PATH", tt.execPath(root))
+				t.Setenv("GH_AW_TEST_GIT_EXEC_PATH", tt.execPath(t, root))
 			}
 
 			cmd := SourceCommandContext(context.Background(), "", "status")
+			probe, err := os.ReadFile(probePath)
+			require.NoError(t, err)
+			require.Equal(t, "invoked\n", string(probe))
 			require.Empty(t, envValue(cmd.Env, "GIT_EXEC_PATH"))
 			require.NoError(t, cmd.Run())
 
