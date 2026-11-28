@@ -78,6 +78,10 @@ func TestLangGraphSampleExecution(t *testing.T) {
 	assert.True(t, def.Experimental)
 	assert.False(t, engine.GetCapabilities().MCP)
 	assert.True(t, engine.GetCapabilities().MaxTurns)
+	args := strings.Join(def.Behaviors.Execution.Args, "\n")
+	assert.Contains(t, args, "A response without tool calls ends the session immediately.")
+	assert.Contains(t, args, "including any terminal safe output required by the workflow.")
+	assert.Contains(t, args, "workflow's requested incomplete output instead.")
 	var installation strings.Builder
 	for _, step := range engine.GetInstallationSteps(&WorkflowData{}) {
 		installation.WriteString(strings.Join(step, "\n") + "\n")

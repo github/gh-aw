@@ -80,10 +80,15 @@ serve as verbosity/readability proxies) the same way you would for any other dim
 
 ## Step 1 — Discover Workflows with Active Experiments
 
+The `gh aw` extension may not be installed in the CLI proxy. Build the checked-out CLI with
+`mkdir -p /tmp/gh-aw/agent && go build -o /tmp/gh-aw/agent/gh-aw ./cmd/gh-aw` and use that binary for the experiments commands
+below. Its GitHub requests still use the configured proxy. If a command fails, report the failure
+as incomplete; do not treat it as an empty experiment list.
+
 Run the `experiments` CLI command to list all experiments in the repository:
 
 ```
-gh aw experiments list --json --repo ${{ github.repository }}
+/tmp/gh-aw/agent/gh-aw experiments list --json --repo ${{ github.repository }}
 ```
 
 This returns a JSON array of experiment workflows. Each entry includes the workflow ID, branch name,
@@ -100,16 +105,16 @@ Before using that fallback message, verify whether experiment data is being writ
 1. Find at least one workflow that declares `experiments:` in frontmatter.
 2. List recent workflow runs for that workflow (latest completed runs).
 3. Inspect jobs in one recent run and confirm whether `push_experiments_state` ran.
-4. Read `state.json` from the expected `experiments/<sanitized-workflow-id>` branch (the same branch used in `GH_AW_EXPERIMENT_BRANCH`; for example, `ci-coach` maps to `experiments/cicoach`).
+4. Read `state.jsonl` (or legacy `state.json`) from the expected `experiments/<sanitized-workflow-id>` branch (the same branch used in `GH_AW_EXPERIMENT_BRANCH`; for example, `ci-coach` maps to `experiments/cicoach`).
 
-If runs exist and `state.json` contains counts/runs, treat experiments as active and continue the report.
+If runs exist and the state contains counts/runs, treat experiments as active and continue the report.
 Only emit the "No active experiments" message when this verification also confirms no usable experiment state.
 
 For each workflow in the list, run the `experiments analyze` CLI command to retrieve per-variant
 statistics and experiment configuration:
 
 ```
-gh aw experiments analyze <workflow-id> --json --repo ${{ github.repository }}
+/tmp/gh-aw/agent/gh-aw experiments analyze <workflow-id> --json --repo ${{ github.repository }}
 ```
 
 This returns a JSON object with:
@@ -173,7 +178,7 @@ list the **last 30 completed runs** (any final state: `success`, `failure`, `can
 Then correlate each run with its variant assignment using the `recent_runs` array from the
 `experiments analyze` output (which contains the last 10 run records with explicit
 `assignments` maps). For runs not covered by `recent_runs`, download the `experiment` artifact
-(`state.json`) to infer variant assignment from cumulative count differences.
+(`state.jsonl`, or legacy `state.json`) to infer variant assignment from cumulative count differences.
 
 **Edge cases for variant inference (when using artifact-based inference):**
 - **Missing artifact**: If a run has no experiment artifact, skip it and treat the count sequence as
