@@ -66,6 +66,7 @@ post-steps:
           mainEndpoint: "/v1/messages",
           routingMode: "economy",
           nativeProvider: "anthropic",
+          expectedSelectionSource: "router",
           expectRequestedEffortMatchesSelection: true,
           expectModelInventory: true,
           resolutionRoles: [],

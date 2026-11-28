@@ -6,13 +6,13 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const zlib = require("zlib");
-const { OBJECT_PACK_PREVIEW_HEADER } = require("./constants.cjs");
 const { execLocalGitSync } = require("./git_helpers.cjs");
 const { fetchRecoveryObjects } = require("./object_pack_fetch.cjs");
 const { getObjectPackLimits } = require("./object_pack_limits.cjs");
 const { getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
 const { getExcludedFiles, WORKFLOW_COMPILATION_NOTICE } = require("./workflow_file_exclusions.cjs");
 const { currentClaimAssignment, currentClaimHandle } = require("./work_queue_claim_scope.cjs");
+const { OBJECT_PACK_PREVIEW_HEADER } = require("./object_pack_constants.cjs");
 
 const MAGIC = Buffer.from("GH-AW-OBJECT-PACK 1\n");
 const oidPattern = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;

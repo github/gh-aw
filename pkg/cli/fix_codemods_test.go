@@ -71,6 +71,7 @@ func TestGetAllCodemods_ContainsExpectedCodemods(t *testing.T) {
 
 	// Verify all expected codemods are present
 	expectedIDs := []string{
+		"legacy-connector-imports",
 		"timeout-minutes-migration",
 		"network-firewall-migration",
 		"command-to-slash-command-migration",
@@ -143,6 +144,7 @@ func TestGetAllCodemods_ContainsExpectedCodemods(t *testing.T) {
 		"mentions-allow-team-members-to-allowed-collaborators",
 		"engine-copilot-sdk-driver-to-driver",
 		"request-review-policy-normalization",
+		"model-auto-to-router",
 		"post-steps-safe-outputs-guided-error",
 		"pull-request-target-guided-error",
 	}
@@ -249,6 +251,7 @@ func expectedCodemodOrder() []string {
 		"safe-output-dispatch-repository-key",
 		"safe-output-report-missing-tool",
 		"safe-output-report-missing-data",
+		"legacy-connector-imports",
 		"safe-job-runner-to-runs-on",
 		"safe-inputs-to-mcp-scripts",
 		"rate-limit-to-user-rate-limit",
@@ -278,6 +281,7 @@ func expectedCodemodOrder() []string {
 		"mentions-allow-team-members-to-allowed-collaborators",
 		"engine-copilot-sdk-driver-to-driver",
 		"request-review-policy-normalization",
+		"model-auto-to-router",
 		"post-steps-safe-outputs-guided-error",
 		"pull-request-target-guided-error",
 	}

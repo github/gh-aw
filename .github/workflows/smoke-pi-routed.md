@@ -66,6 +66,7 @@ post-steps:
           engine: "pi",
           executionOutcome: process.env.SMOKE_EXECUTION,
           allowedModels: ["gpt-5.6-luna"],
+          expectedSelectionSource: "router",
           subAgents: [
             { name: "haiku-whoami", model: "claude-haiku-4.5", endpoint: "/v1/messages" },
             { name: "mini-whoami", model: "gpt-5.3-codex", endpoint: "/responses" },

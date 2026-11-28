@@ -16,11 +16,6 @@
 const AGENT_OUTPUT_FILENAME = "agent_output.json";
 
 /**
- * Header shared by object-pack preview writers and readers.
- */
-const OBJECT_PACK_PREVIEW_HEADER = "GH-AW object-pack recovery preview v1";
-
-/**
  * Base path for temporary gh-aw files
  * @type {string}
  */
@@ -217,7 +212,6 @@ const STEP_NAME_START_MCP_GATEWAY = "Start MCP Gateway";
 
 module.exports = {
   AGENT_OUTPUT_FILENAME,
-  OBJECT_PACK_PREVIEW_HEADER,
   TMP_GH_AW_PATH,
   GITHUB_API_VERSION,
   COPILOT_REVIEWER_BOT,

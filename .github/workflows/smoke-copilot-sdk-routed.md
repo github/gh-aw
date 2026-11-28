@@ -60,6 +60,7 @@ post-steps:
           executionOutcome: process.env.SMOKE_EXECUTION,
           allowedModels: ["gpt-5.6-luna"],
           mainEndpoint: "/responses",
+          expectedSelectionSource: "router",
           subAgents: [{ name: "haiku-whoami", model: "claude-haiku-4.5", endpoint: "/chat/completions" }],
           requireDeclaredAgentNames: true,
           expectModelInventory: true,

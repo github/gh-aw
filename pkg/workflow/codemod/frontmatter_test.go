@@ -59,6 +59,24 @@ func TestFrontmatterNoOp(t *testing.T) {
 	}
 }
 
+func TestTransferInlineComment(t *testing.T) {
+	content := "---\nimports:\n  - uses: .github/workflows/connectors/linear.md\n    with:\n      writer-secret: CUSTOM\nsafe-outputs:\n  linear-token: ${{ secrets.CUSTOM }} # rotated quarterly\n---\n# Body\n"
+	updated, applied, err := Apply(content, func(f *Frontmatter) error {
+		if err := f.TransferInlineComment(
+			[]string{"safe-outputs", "linear-token"},
+			[]any{"imports", 0, "with", "writer-secret"},
+		); err != nil {
+			return err
+		}
+		return f.Remove("safe-outputs", "linear-token")
+	})
+	require.NoError(t, err)
+	assert.True(t, applied)
+	assert.Contains(t, updated, "writer-secret: CUSTOM # rotated quarterly")
+	assert.NotContains(t, updated, "linear-token:")
+	assert.Contains(t, updated, "---\n# Body\n")
+}
+
 func TestFrontmatterInvalidBodyBytes(t *testing.T) {
 	body := "\n# Body \x93quoted\x94 \xff\r\n"
 	for _, header := range []string{"", "---\nold: true\n---\n"} {
