@@ -155,7 +155,7 @@ Example body (rows reflect whatever editors were discovered in Step 0):
 ## Error Handling
 
 - If a URL is unreachable (non-200 status or connection error), skip the screenshot step for that editor but still include the editor in the PR body with its error status.
-- If a standalone URL check is denied by workflow tool permissions, do not retry command variants or treat the denial as an unreachable URL. Call `report_incomplete` with the denied operation and stop; reachability is unknown.
+- If a standalone URL check is denied by workflow tool permissions, mark that editor's reachability as unknown (permission denied). Do not retry command variants or treat the denial as an unreachable URL; continue checking the remaining editors. After all editor checks, call `report_incomplete` once with each denied operation.
 - If a screenshot cannot be taken (Playwright error), log the error and continue with the remaining editors.
 - If no screenshots were successfully taken or no documentation changes are needed (e.g., all screenshots and links are unchanged and already up to date), do **not** open a pull request. Instead, call the `noop` safe output tool explaining what was checked and why no PR was needed.
 - Always attempt all editors before deciding whether to create a PR or call `noop`.

@@ -33,8 +33,10 @@ describe("restricted workflow operation contracts", () => {
     expect(permission("python3 -c 'print(1)'")).toBe("reject");
     expect(prompt).toContain("make a separate shell tool call containing only");
     expect(prompt).toContain("Do not combine checks in a shell loop, pipeline, command substitution, or other compound command");
-    expect(prompt).toContain("do not retry command variants or treat the denial as an unreachable URL");
-    expect(prompt).toContain("`report_incomplete`");
+    expect(prompt).toContain("mark that editor's reachability as unknown (permission denied)");
+    expect(prompt).toContain("Do not retry command variants or treat the denial as an unreachable URL");
+    expect(prompt).toContain("continue checking the remaining editors");
+    expect(prompt).toContain("After all editor checks, call `report_incomplete` once");
   });
 
   it("allows focused Formal validation without granting arbitrary Go or Git commands", () => {
