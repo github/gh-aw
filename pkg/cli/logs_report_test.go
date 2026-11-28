@@ -273,6 +273,7 @@ func TestBuildToolUsageSummaryPopulatesDisplay(t *testing.T) {
 
 // TestBuildMissingToolsSummaryPopulatesDisplay tests that display fields are populated
 func TestBuildMissingToolsSummaryPopulatesDisplay(t *testing.T) {
+	t.Parallel()
 	processedRuns := []ProcessedRun{
 		{
 			Run: WorkflowRun{
@@ -309,6 +310,7 @@ func TestBuildMissingToolsSummaryPopulatesDisplay(t *testing.T) {
 
 // TestBuildMCPFailuresSummaryPopulatesDisplay tests that display fields are populated
 func TestBuildMCPFailuresSummaryPopulatesDisplay(t *testing.T) {
+	t.Parallel()
 	processedRuns := []ProcessedRun{
 		{
 			Run: WorkflowRun{
@@ -341,6 +343,7 @@ func TestBuildMCPFailuresSummaryPopulatesDisplay(t *testing.T) {
 
 // TestAddUniqueWorkflow tests the workflow deduplication helper
 func TestAddUniqueWorkflow(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		workflows []string
@@ -381,6 +384,7 @@ func TestAddUniqueWorkflow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := sliceutil.MergeUnique(tt.workflows, tt.workflow)
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected length %d, got %d", len(tt.expected), len(result))
@@ -396,6 +400,7 @@ func TestAddUniqueWorkflow(t *testing.T) {
 
 // TestBuildMissingToolsSummaryDeduplication tests that workflow deduplication works correctly
 func TestBuildMissingToolsSummaryDeduplication(t *testing.T) {
+	t.Parallel()
 	processedRuns := []ProcessedRun{
 		{
 			Run: WorkflowRun{
@@ -477,6 +482,7 @@ func TestBuildMissingToolsSummaryDeduplication(t *testing.T) {
 
 // TestBuildMCPFailuresSummaryDeduplication tests that workflow deduplication works correctly
 func TestBuildMCPFailuresSummaryDeduplication(t *testing.T) {
+	t.Parallel()
 	processedRuns := []ProcessedRun{
 		{
 			Run: WorkflowRun{
@@ -550,6 +556,7 @@ func TestBuildMCPFailuresSummaryDeduplication(t *testing.T) {
 
 // TestAggregateSummaryItems tests the generic aggregation helper function
 func TestAggregateSummaryItems(t *testing.T) {
+	t.Parallel()
 	// Test with MissingToolReport data using the generic helper
 	processedRuns := []ProcessedRun{
 		{
@@ -650,6 +657,7 @@ func TestAggregateSummaryItems(t *testing.T) {
 
 // TestAggregateDomainStats tests the shared domain aggregation helper
 func TestAggregateDomainStats(t *testing.T) {
+	t.Parallel()
 	t.Run("aggregates domains correctly", func(t *testing.T) {
 		processedRuns := []ProcessedRun{
 			{
@@ -779,6 +787,7 @@ func TestAggregateDomainStats(t *testing.T) {
 
 // TestConvertDomainsToSortedSlices tests the domain conversion helper
 func TestConvertDomainsToSortedSlices(t *testing.T) {
+	t.Parallel()
 	t.Run("converts and sorts domains", func(t *testing.T) {
 		allowedMap := map[string]struct {
 		}{
@@ -835,6 +844,7 @@ func TestConvertDomainsToSortedSlices(t *testing.T) {
 
 // TestBuildAccessLogSummaryWithSharedHelper tests access log summary with shared helper
 func TestBuildAccessLogSummaryWithSharedHelper(t *testing.T) {
+	t.Parallel()
 	processedRuns := []ProcessedRun{
 		{
 			Run: WorkflowRun{
@@ -908,6 +918,7 @@ func TestBuildAccessLogSummaryWithSharedHelper(t *testing.T) {
 }
 
 func TestAccessLogSummaryJSONUsesEmbeddedBaseFields(t *testing.T) {
+	t.Parallel()
 	summary := AccessLogSummary{
 		FirewallSummaryBase: FirewallSummaryBase{
 			TotalRequests:   3,
@@ -947,6 +958,7 @@ func TestAccessLogSummaryJSONUsesEmbeddedBaseFields(t *testing.T) {
 // a run genuinely recorded zero tokens, making "field absent" indistinguishable from
 // "no tokens recorded". Marshaling a zero-metric RunData must still surface both keys.
 func TestRunDataJSONIncludesZeroTokenUsageAndAIC(t *testing.T) {
+	t.Parallel()
 	run := RunData{
 		RunID:        1,
 		WorkflowName: "wf-1",
@@ -998,6 +1010,7 @@ func TestBuildLogsDataIncludesLedgerActivity(t *testing.T) {
 
 // TestBuildFirewallLogSummaryWithSharedHelper tests firewall log summary with shared helper
 func TestBuildFirewallLogSummaryWithSharedHelper(t *testing.T) {
+	t.Parallel()
 	processedRuns := []ProcessedRun{
 		{
 			Run: WorkflowRun{
@@ -1134,6 +1147,7 @@ func TestBuildLogsDataIncludesDateFields(t *testing.T) {
 
 // TestDeriveRunClassification tests the classification mapping helper.
 func TestDeriveRunClassification(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		comparison *AuditComparisonData
@@ -1185,6 +1199,7 @@ func TestDeriveRunClassification(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := deriveRunClassification(tt.comparison)
 			if got != tt.want {
 				t.Errorf("deriveRunClassification() = %q, want %q", got, tt.want)
@@ -1534,6 +1549,7 @@ func TestBuildLogsDataDriverExitFailureClassification(t *testing.T) {
 }
 
 func TestIsSafeOutputsFailureAfterSuccessfulAgentIgnoresCancelled(t *testing.T) {
+	t.Parallel()
 	jobDetails := []JobInfoWithDuration{
 		{JobInfo: JobInfo{Name: "agent", Conclusion: "success"}},
 		{JobInfo: JobInfo{Name: "safe_outputs", Conclusion: "cancelled"}},
