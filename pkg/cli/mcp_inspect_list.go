@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 
 	"github.com/github/gh-aw/pkg/console"
@@ -32,7 +33,7 @@ func listWorkflowsWithMCP(workflowsDir string, verbose bool) error {
 	// Scan workflows for MCP configurations
 	results, err := ScanWorkflowsForMCP(workflowsDir, "", verbose)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			errMsg := "no .github/workflows directory found"
 			fmt.Fprintln(os.Stderr, console.FormatErrorMessage(errMsg))
 			return errors.New("no .github/workflows directory found")

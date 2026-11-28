@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -189,7 +190,7 @@ func readExistingRepositoryInstructionFile(targetPath string, artifactDescriptio
 	if err == nil {
 		return string(content), true, nil
 	}
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return "", false, nil
 	}
 	return "", false, fmt.Errorf("failed to read existing %s: %w", artifactDescription, err)
