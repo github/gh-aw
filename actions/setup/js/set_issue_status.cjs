@@ -24,27 +24,28 @@ async function main(config = {}) {
   const handleSetIssueStatus = async function (message, resolvedTemporaryIds, _temporaryIdMap, forcePreview = false) {
     if (processedCount >= maxCount) return { success: false, error: `${ERR_VALIDATION}: Max count of ${maxCount} reached` };
     processedCount++;
-    const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "issue");
-    if (!repoResult.success) return { success: false, error: repoResult.error };
-    const { repo: itemRepo, repoParts } = repoResult;
-    let item = message;
-    if (targetConfig === "*") {
-      const bound = resolveRepoIssueTarget(message.issue_number, loadTemporaryIdMapFromResolved(resolvedTemporaryIds), repoParts.owner, repoParts.repo);
-      if (bound.wasTemporaryId && bound.resolved && `${bound.resolved.owner}/${bound.resolved.repo}`.toLowerCase() !== itemRepo.toLowerCase()) return { success: false, error: "Temporary issue target belongs to another repository" };
-      const explicit = resolveSafeOutputIssueTarget({ message, resolvedTemporaryIds, repoParts, handlerType: HANDLER_TYPE, aliases: ["issue_number"] });
-      if (!explicit.success) {
-        if (explicit.deferred) processedCount--;
-        return explicit;
-      }
-      if (explicit.number !== null) item = { ...message, issue_number: explicit.number };
-    }
-    const target = resolveTarget({ targetConfig, item, context, itemType: HANDLER_TYPE, supportsIssue: true });
-    if (!target.success) return { success: false, ...(target.shouldFail === false ? { skipped: true, reason: target.error } : {}), error: target.error };
-    const issueNumber = target.number;
     try {
+      const repoResult = resolveAndValidateRepo(message, defaultTargetRepo, allowedRepos, "issue");
+      if (!repoResult.success) return { success: false, error: `${ERR_VALIDATION}: ${repoResult.error}` };
+      const { repo: itemRepo, repoParts } = repoResult;
+      let item = message;
+      if (targetConfig === "*") {
+        const bound = resolveRepoIssueTarget(message.issue_number, loadTemporaryIdMapFromResolved(resolvedTemporaryIds), repoParts.owner, repoParts.repo);
+        if (bound.wasTemporaryId && bound.resolved && `${bound.resolved.owner}/${bound.resolved.repo}`.toLowerCase() !== itemRepo.toLowerCase())
+          return { success: false, error: `${ERR_VALIDATION}: Temporary issue target belongs to another repository` };
+        const explicit = resolveSafeOutputIssueTarget({ message, resolvedTemporaryIds, repoParts, handlerType: HANDLER_TYPE, aliases: ["issue_number"] });
+        if (!explicit.success) {
+          if (explicit.deferred) processedCount--;
+          return { ...explicit, error: `${ERR_VALIDATION}: ${explicit.error}` };
+        }
+        if (explicit.number !== null) item = { ...message, issue_number: explicit.number };
+      }
+      const target = resolveTarget({ targetConfig, item, context, itemType: HANDLER_TYPE, supportsIssue: true });
+      if (!target.success) return { success: false, ...(target.shouldFail === false ? { skipped: true, reason: target.error } : {}), error: `${ERR_VALIDATION}: ${target.error}` };
+      const issueNumber = target.number;
       if (config.issue_intent === true || ["suggest", "rationale", "confidence"].some(key => message[key] !== undefined)) throw new Error(`${ERR_VALIDATION}: Native planning statuses do not support issue intent or suggestions`);
       const filtered = await checkRequiredFilter(client, repoParts, issueNumber, Array.isArray(config.required_labels) ? config.required_labels : [], config.required_title_prefix || "", HANDLER_TYPE);
-      if (filtered) return filtered;
+      if (filtered) return { ...filtered, error: `${ERR_PERMISSION}: ${filtered.error}` };
       const { owner, repo } = repoParts;
       const repositoryUrl = `${(process.env.GITHUB_API_URL || context.apiUrl || "https://api.github.com").replace(/\/$/, "")}/repos/${owner}/${repo}`;
       const issueUrlPrefix = `${(process.env.GITHUB_SERVER_URL || context.serverUrl || "https://github.com").replace(/\/$/, "")}/${owner}/${repo}/issues/`;
@@ -109,7 +110,7 @@ async function main(config = {}) {
       } catch (error) {
         return {
           success: false,
-          error: `PATCH was sent to ${itemRepo}#${issueNumber} (${issueUrlPrefix}${issueNumber}); the requested status may have been applied, but verification failed: ${getErrorMessage(error)}`,
+          error: `${ERR_API}: PATCH was sent to ${itemRepo}#${issueNumber} (${issueUrlPrefix}${issueNumber}); the requested status may have been applied, but verification failed: ${getErrorMessage(error)}`,
           issue_number: issueNumber,
           repo: itemRepo,
           url: `${issueUrlPrefix}${issueNumber}`,
@@ -125,7 +126,9 @@ async function main(config = {}) {
         metadata: { planning_status: status, ...(message.duplicate_of ? { duplicate_of: message.duplicate_of } : {}) },
       };
     } catch (error) {
-      const errorMessage = getErrorMessage(error);
+      const message = getErrorMessage(error);
+      const status = error?.status ?? error?.response?.status;
+      const errorMessage = /^(ERR_VALIDATION|ERR_PERMISSION|ERR_API):/.test(message) ? message : `${status === 401 || status === 403 ? ERR_PERMISSION : ERR_API}: ${message}`;
       core.warning(`Failed to set issue planning status: ${errorMessage}`);
       return { success: false, error: errorMessage };
     }
