@@ -70,6 +70,9 @@ func processImportsWithWorkflowSpec(content string, workflow *WorkflowSpec, comm
 	// are not forced onto cross-repo references after every `gh aw update`.
 	replacements := make(map[string]string)
 	resolveOneImportPath := func(importPath string) string {
+		if strings.HasPrefix(importPath, "connector:") {
+			return importPath
+		}
 		if isWorkflowSpecFormat(importPath) {
 			importsLog.Printf("Import already in workflowspec format: %s", importPath)
 			return importPath

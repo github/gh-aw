@@ -389,10 +389,10 @@ import-schema:
   </credentials>
   <configuration>
     <imports>
-      Import a reviewed local .github/workflows/connectors/teams.md or an immutable
-      pinned remote AW import. Declarations remain editable source files, not
-      compiler-builtin definitions. No separate spec or
-      connection file is required. Imports alone select no capabilities.
+      Import connector:teams, a reviewed local .github/workflows/connectors/teams.md,
+      or an immutable pinned remote AW import. Each gh-aw release embeds a snapshot
+      of the declaration; path imports read the specified source file. No separate
+      spec or connection file is required. Imports alone select no capabilities.
       Select reads with an explicit tools.teams list and each mutation
       independently with its teams-prefixed safe-output key. Safe-output
       selections accept null or an empty mapping.
