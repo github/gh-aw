@@ -68,7 +68,8 @@ async function main(config = {}) {
         throw new Error(`${ERR_PERMISSION}: Reopening an issue or changing its closed reason requires allow-reopen: true`);
       let duplicateId;
       if (status.category === "duplicate") {
-        if (!Number.isSafeInteger(message.duplicate_of) || message.duplicate_of <= 0 || message.duplicate_of === issueNumber) throw new Error(`${ERR_VALIDATION}: Duplicate status requires duplicate_of to reference another positive issue number`);
+        if (!Number.isSafeInteger(message.duplicate_of) || message.duplicate_of <= 0 || message.duplicate_of === issueNumber)
+          throw new Error(`${ERR_VALIDATION}: Duplicate status requires duplicate_of to reference another positive issue number`);
         const { data: duplicate } = await client.rest.issues.get({ owner, repo, issue_number: message.duplicate_of, headers: PLANNING_STATUS_HEADERS, request: { redirect: "error" } });
         if (duplicate.pull_request || !Number.isSafeInteger(duplicate.id) || duplicate.id <= 0) throw new Error(`${ERR_VALIDATION}: duplicate_of must reference an accessible issue, not a pull request`);
         if (!isBoundIssue(duplicate, message.duplicate_of)) throw new Error(`${ERR_VALIDATION}: duplicate_of does not match an issue in the authorized target repository`);
