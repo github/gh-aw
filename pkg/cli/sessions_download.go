@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -51,7 +52,7 @@ func downloadSession(ctx context.Context, run *parser.GitHubURLComponents, forma
 			}
 			return formatSession(ctx, content, sessionPath, format)
 		}
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, fs.ErrNotExist) {
 			return nil, fmt.Errorf("failed to read published session: %w", err)
 		}
 	}
@@ -104,7 +105,7 @@ func reconstructSession(ctx context.Context, run *parser.GitHubURLComponents, ho
 	legacyDirectory := filepath.Join(agentDirectory, "tmp", "gh-aw")
 	if info, err := os.Stat(legacyDirectory); err == nil && info.IsDir() {
 		sourceDirectory = legacyDirectory
-	} else if err != nil && !os.IsNotExist(err) {
+	} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("failed to inspect agent artifact layout: %w", err)
 	}
 	if err := flattenArtifactTree(sourceDirectory, agentDirectory, root, "agent", verbose); err != nil {
@@ -174,7 +175,7 @@ func sessionEngine(ctx context.Context, run *parser.GitHubURLComponents, hostnam
 		if err == nil {
 			return info.EngineID, nil
 		}
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, fs.ErrNotExist) {
 			return "", fmt.Errorf("failed to read session engine metadata: %w", err)
 		}
 	}
@@ -199,7 +200,7 @@ func sessionEngine(ctx context.Context, run *parser.GitHubURLComponents, hostnam
 		if err == nil {
 			return info.EngineID, nil
 		}
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, fs.ErrNotExist) {
 			return "", fmt.Errorf("failed to read session engine metadata: %w", err)
 		}
 	}

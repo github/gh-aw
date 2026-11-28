@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -323,7 +324,7 @@ const modelResolutionNoStopEvidenceReason = "agent-stdio.log contains no harness
 // startup-stop evidence in the same run's agent-stdio.log and those without.
 func partitionModelResolutionStopEvidence(runDir string, failures []sessionModelResolutionFailure) (stopped, unproven []sessionModelResolutionFailure) {
 	logData, err := readModelAvailabilityArtifact(runDir, "agent-stdio.log", 32<<20)
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		auditReportLog.Printf("Could not read model resolution startup log: %v", err)
 	}
 	for _, failure := range failures {
