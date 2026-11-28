@@ -24,6 +24,7 @@ func TestDefaultCLIMCPVersions(t *testing.T) {
 		{"Pi CLI", DefaultPiVersion, "1.6.0"},
 		{"GitHub MCP Server", DefaultGitHubMCPServerVersion, "v2.2.0"},
 		{"Firewall", DefaultFirewallVersion, "v0.29.21"},
+		{"Model routing fallback and endpoints", AWFModelRoutingFallbackMinVersion, "v0.29.21"},
 		{"Cost-only model routing", AWFCostOnlyModelRoutingMinVersion, "v0.29.17"},
 		{"OpenAI WIF", AWFOpenAIWIFMinVersion, "v0.29.11"},
 		{"Router", DefaultRouterVersion, "0.1.3"},

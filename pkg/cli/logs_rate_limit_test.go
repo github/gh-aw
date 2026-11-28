@@ -20,6 +20,7 @@ import (
 // TestRateLimitResponseUnmarshal verifies that the rateLimitResponse struct correctly
 // unmarshals the JSON returned by `gh api rate_limit`.
 func TestRateLimitResponseUnmarshal(t *testing.T) {
+	t.Parallel()
 	now := time.Now().Add(time.Second * 30).Unix()
 	raw := []byte(`{
 		"resources": {
@@ -50,6 +51,7 @@ func TestRateLimitResponseUnmarshal(t *testing.T) {
 // TestRateLimitThresholdConstants verifies that the rate-limit constants are set to
 // sensible values so a future edit that accidentally zeroes them will be caught.
 func TestRateLimitThresholdConstants(t *testing.T) {
+	t.Parallel()
 	assert.Positive(t, RateLimitThreshold, "RateLimitThreshold must be positive")
 	assert.Positive(t, RateLimitWarningThresholdPercent, "RateLimitWarningThresholdPercent must be positive")
 	assert.Less(t, RateLimitWarningThresholdPercent, 100, "RateLimitWarningThresholdPercent must be below 100")
@@ -60,6 +62,7 @@ func TestRateLimitThresholdConstants(t *testing.T) {
 // TestRateLimitResourceIsBelowThreshold checks the boundary condition used by
 // checkAndWaitForRateLimit: remaining <= RateLimitThreshold means we should wait.
 func TestRateLimitResourceIsBelowThreshold(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		remaining int
@@ -73,6 +76,7 @@ func TestRateLimitResourceIsBelowThreshold(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			rl := rateLimitResource{
 				Limit:     5000,
 				Remaining: tt.remaining,
@@ -87,6 +91,7 @@ func TestRateLimitResourceIsBelowThreshold(t *testing.T) {
 }
 
 func TestGitHubAPIRateLimitReportJSON(t *testing.T) {
+	t.Parallel()
 	report := &GitHubAPIRateLimitReport{
 		Host:  "github.com",
 		Start: &rateLimitResource{Limit: 5000, Remaining: 100, Used: 4900, Reset: 123},
@@ -121,6 +126,7 @@ func TestGitHubAPIRateLimitReportUsesRequestedHost(t *testing.T) {
 }
 
 func TestLogsTargetRateLimitHostsDeduplicatesHosts(t *testing.T) {
+	t.Parallel()
 	hosts := logsTargetRateLimitHosts([]logsWorkflowTarget{
 		{repoOverride: "owner/repo"},
 		{repoOverride: "github.example.com/owner/repo"},
@@ -132,6 +138,7 @@ func TestLogsTargetRateLimitHostsDeduplicatesHosts(t *testing.T) {
 }
 
 func TestIsGitHubAPIRateLimitLow(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		state rateLimitResource
@@ -144,6 +151,7 @@ func TestIsGitHubAPIRateLimitLow(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(t, tt.want, isGitHubAPIRateLimitLow(tt.state))
 		})
 	}
@@ -195,6 +203,7 @@ func TestGitHubAPIRateLimitReportOmitsUnavailableSnapshots(t *testing.T) {
 }
 
 func TestResolveMaxGitHubAPIRateLimit(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		configuredMax int
@@ -211,6 +220,7 @@ func TestResolveMaxGitHubAPIRateLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := resolveMaxGitHubAPIRateLimit(tt.configuredMax, tt.apiLimit)
 			if tt.wantErr {
 				require.ErrorIs(t, err, errInvalidMaxGitHubAPIRateLimit)
