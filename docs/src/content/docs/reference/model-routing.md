@@ -80,6 +80,15 @@ Routing picks models from the live model catalogue. With [`engine.model-catalog:
 
 Copilot and Pi can route on GitHub Copilot. Claude and Codex can also route on GitHub Copilot with `model-provider: github`; Claude chooses among Claude models and Codex among GPT models. The Gemini engine does not support routing.
 
+On AWF v0.29.21 and newer (when the `apiProxy` image is also v0.29.21 or newer), `gh-aw` passes each engine's supported API endpoints in `apiProxy.routing.endpoints` so AWF excludes models the engine cannot drive before router ranking or fallback selection:
+
+- `copilot`: `/responses`, `/chat/completions`
+- `claude`: `/v1/messages`
+- `codex`: `/responses`
+- `pi`: `/v1/messages`, `/responses`, `/chat/completions`
+
+Workflows pinned to an older AWF release or an older `apiProxy` image omit `apiProxy.routing.endpoints` so older AWF strict config schemas remain compatible.
+
 ### Native Anthropic and OpenAI routing
 
 For [Claude on Anthropic](/gh-aw/reference/engines/claude/) or [Codex on OpenAI](/gh-aw/reference/engines/codex/), set a router value explicitly. Routing uses your configured provider and its billing; it does not switch accounts or providers to find a model.
