@@ -34,6 +34,11 @@ tools:
   cache-memory: true
   timeout: 600
 safe-outputs:
+  create-issue:
+    title-prefix: "[static-analysis] "
+    labels: [security, automation, cookie]
+    close-older-issues: false
+    max: 3
   create-pull-request:
     exclude-lock-yml: true
     expires: 7d
@@ -654,6 +659,15 @@ Runner-guard has performed source-to-sink vulnerability scanning as part of the 
 4. **Add to Discussion**:
    Include a "Runner-Guard Analysis" section in the Phase 5 discussion report.
 
+### Phase 7: Create Issues for Outstanding Findings
+
+After considering fixes and pull requests, create up to 3 issues with `create_issue` for the highest-priority, verified, actionable findings that remain unaddressed. Consider findings from all scanners, not just runner-guard. Do not create issues for Syft inventory, incomplete scans, suspected false positives, or findings without enough evidence to describe a concrete next step.
+
+- Group related findings with the same root cause into one issue rather than creating one issue per location or CVE. Prioritize security impact, severity, and breadth. For generated lock files, identify the relevant source or compiler change; do not propose editing generated files directly.
+- Before creating an issue, search existing open **and closed** issues and open pull requests for the same underlying problem, including equivalent findings under different titles or tools. Skip findings already covered by an issue or active pull request. If the search cannot establish whether a duplicate exists, do not create an issue.
+- Give each issue a descriptive title and include the scanner and rule or vulnerability identifiers, severity, affected source files or images, representative evidence and locations, security impact, concrete remediation or investigation steps, and the current workflow run link. Distinguish confirmed findings from decisions requiring maintainer review; do not claim a fix is available without evidence.
+- The configured safe output applies the `cookie` label. Do not create an issue solely to repeat the discussion report or to track a fix already staged as a pull request.
+
 ## Important Guidelines
 
 ### Security and Safety
@@ -694,7 +708,7 @@ Organize your persistent data in `/tmp/gh-aw/cache-memory/`:
 
 ## Output Requirements
 
-Your output must be well-structured and actionable. Publish a discussion for every scan with findings from all eight tools, and pull requests only for implemented and validated fixes.
+Your output must be well-structured and actionable. Publish a discussion for every scan with findings from all eight tools, create issues for outstanding actionable findings as described in Phase 7, and create pull requests only for implemented and validated fixes.
 
 Update cache memory with today's scan data for future reference and trend analysis.
 
@@ -710,5 +724,6 @@ A successful static analysis scan:
 - ✅ Maintains historical context for trend analysis
 - ✅ Reads and analyzes runner-guard source-to-sink findings
 - ✅ Creates up to 3 validated pull requests for Critical/High runner-guard findings (avoiding duplicates)
+- ✅ Creates up to 3 deduplicated `cookie`-labelled issues for outstanding actionable findings
 
 Read and parse `/tmp/gh-aw/agent/compile-output.txt`, analyze all eight tools, cluster findings, implement and validate selected fixes, and publish the full analysis as a discussion. Report concrete implementation blockers explicitly rather than creating empty pull requests.
