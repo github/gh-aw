@@ -1,17 +1,5 @@
 [
  {
-  "id": "microsoft/neuro-formal-verification",
-  "kind": "other",
-  "source": "discovery topic:github-agentic-workflows 2026-11-16",
-  "discovered": "2026-11-16"
- },
- {
-  "id": "rodush/grait",
-  "kind": "other",
-  "source": "discovery topic:github-agentic-workflows 2026-11-16",
-  "discovered": "2026-11-16"
- },
- {
   "id": "spiralgang/agentic-workflows",
   "kind": "other",
   "source": "discovery repo search 2026-11-17",
@@ -26,12 +14,6 @@
  {
   "id": "PlainConceptsPlatform/agentic-workflows",
   "kind": "workflow-collection",
-  "source": "discovery repo search 2026-11-18",
-  "discovered": "2026-11-18"
- },
- {
-  "id": "Dennis-Otto/issue-assistant",
-  "kind": "tool",
   "source": "discovery repo search 2026-11-18",
   "discovered": "2026-11-18"
  },
