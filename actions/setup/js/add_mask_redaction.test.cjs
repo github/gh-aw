@@ -4,6 +4,7 @@ import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 const { applyAddMaskRedaction, collectAddMaskedValues, isAddMaskCommandLine, redactArtifactMaskedValues, transformJSONStrings, unescapeWorkflowCommandValue } = require("./add_mask_redaction.cjs");
+const { OBJECT_PACK_PREVIEW_HEADER } = require("./object_pack_transport.cjs");
 const { redactMaskedValues } = require("./mask_value_matcher.cjs");
 
 describe("add_mask_redaction", () => {
@@ -148,6 +149,24 @@ describe("add_mask_redaction", () => {
       expect(isAddMaskCommandLine("2026-01-01 ::add-mask::secret")).toBe(true);
       expect(isAddMaskCommandLine("no command here")).toBe(false);
     });
+
+    it("preserves standalone unexpanded variable references only in source-only mode", () => {
+      for (const payload of ['${VAR}"', "${_var123}'", "${VAR}", '${VAR}"  \r', '$session_id"', "$_var123'"]) {
+        expect(isAddMaskCommandLine(`echo "::add-mask::${payload}`)).toBe(true);
+        expect(isAddMaskCommandLine(`echo "::add-mask::${payload}`, true)).toBe(false);
+      }
+      for (const payload of ['literal"', '${VAR}literal"', 'literal${VAR}"', '${VAR:-literal}"', '${123}"', '${VAR}" # literal']) {
+        expect(isAddMaskCommandLine(`echo "::add-mask::${payload}`)).toBe(true);
+      }
+      expect(isAddMaskCommandLine("::add-mask::${VAR}")).toBe(true);
+      expect(isAddMaskCommandLine("2026-01-01 ::add-mask::${VAR}")).toBe(true);
+      expect(isAddMaskCommandLine('literal echo "::add-mask::${VAR}"')).toBe(true);
+      const text = ['echo "::add-mask::${VAR}"', 'echo "::add-mask::literal"', "after"].join("\n");
+      expect(applyAddMaskRedaction(text, [])).toBe("after");
+      expect(applyAddMaskRedaction(text, [], undefined, true)).toBe(['echo "::add-mask::${VAR}"', "after"].join("\n"));
+      expect(applyAddMaskRedaction(text, ["${VAR}"])).toBe("after");
+      expect(applyAddMaskRedaction(text, ["${VAR}"], undefined, true)).toBe('echo "::add-mask::***"\nafter');
+    });
   });
 
   describe("unescapeWorkflowCommandValue", () => {
@@ -163,6 +182,23 @@ describe("add_mask_redaction", () => {
       expect(result).toContain("abcd1234");
       expect(result).toContain("zz");
       expect(result).toHaveLength(2);
+    });
+
+    it("collects ambiguous runtime variable masks unless source provenance is known", () => {
+      const log = ['run: echo "::add-mask::${SOURCE_VAR}"', "::add-mask::${RUNTIME_VALUE}"].join("\n");
+      expect(collectAddMaskedValues(log)).toContain('${SOURCE_VAR}"');
+      expect(collectAddMaskedValues(log)).toContain("${RUNTIME_VALUE}");
+      expect(collectAddMaskedValues(log)).toHaveLength(2);
+      expect(collectAddMaskedValues(log, { sourceOnly: true })).toEqual(["${RUNTIME_VALUE}"]);
+      const runtimeMask = collectAddMaskedValues("echo ::add-mask::${TOKEN}");
+      expect(runtimeMask).toEqual(["${TOKEN}"]);
+      expect(applyAddMaskRedaction("echo ::add-mask::${TOKEN}\nvalue=${TOKEN}", runtimeMask)).toBe("value=***");
+    });
+
+    it("removes add-mask commands in another artifact when source-only collection is empty", () => {
+      const masks = collectAddMaskedValues('run: echo "::add-mask::${SOURCE_VAR}"', { sourceOnly: true });
+      expect(masks).toEqual([]);
+      expect(redactArtifactMaskedValues("::add-mask::opaque-value\nkeep this", masks)).toBe("keep this");
     });
 
     it("expands multi-line masked values into individual lines", () => {
@@ -203,6 +239,17 @@ describe("add_mask_redaction", () => {
     });
 
     describe("redactArtifactMaskedValues", () => {
+      it("preserves braced and unbraced mask references only in a recognized object-pack preview", () => {
+        const preview = [OBJECT_PACK_PREVIEW_HEADER, 'run: echo "::add-mask::${SOURCE_VAR}"', 'run: echo "::add-mask::$session_id"', "::add-mask::runtime-secret"].join("\n");
+        const masks = collectAddMaskedValues(['run: echo "::add-mask::${SOURCE_VAR}"', 'run: echo "::add-mask::$session_id"', "::add-mask::runtime-secret"].join("\n"));
+        const redacted = redactArtifactMaskedValues(preview, masks, undefined, () => "***", {
+          textMode: true,
+          preserveUnexpandedMaskSources: true,
+        });
+
+        expect(redacted).toBe([OBJECT_PACK_PREVIEW_HEADER, 'run: echo "::add-mask::${SOURCE_VAR}"', 'run: echo "::add-mask::$session_id"'].join("\n"));
+      });
+
       it.each([
         ['{"configured":["configured",12345678],"live":"runtime","safe":42}', '{"***REDACTED***":["***REDACTED***","***REDACTED***"],"live":"***","safe":42}'],
         ['plain configured runtime "\\u0063onfigured" "\\u0072untime"', 'plain ***REDACTED*** *** "***REDACTED***" "***"'],
