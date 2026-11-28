@@ -13,7 +13,7 @@ const { iterateJsonlEvents } = require("./jsonl_helpers.cjs");
  */
 
 /** Matches an `::add-mask::` workflow command and captures its payload. */
-const ADD_MASK_COMMAND_RE = /::add-mask::(.*)$/;
+const ADD_MASK_COMMAND_RE = /::add-mask::(.*)\r?$/;
 
 const { MASK_REPLACEMENT, redactMaskedValues, maskedValueMatches, overlappingMatchGroups } = require("./mask_value_matcher.cjs");
 const { transformJSONStrings } = require("./json_string_scanner.cjs");
