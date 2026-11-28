@@ -54,6 +54,20 @@ func sanitizeCopilotShellCommand(cmdStr string) (string, bool) {
 	return strings.TrimRight(prefix, " "), true
 }
 
+func normalizeCopilotBashCommand(cmdStr string) string {
+	cmdStr, _ = normalizeBashCommand(cmdStr)
+	if !strings.HasSuffix(cmdStr, "*") || cmdStr == "*" ||
+		strings.ContainsAny(cmdStr, " \t\r\n:") {
+		return cmdStr
+	}
+
+	command := strings.TrimSuffix(cmdStr, "*")
+	if command == "" || strings.ContainsAny(command, "*?[]") {
+		return cmdStr
+	}
+	return command + ":*"
+}
+
 // computeCopilotToolArguments computes the --allow-tool arguments for Copilot CLI based on tool configurations.
 // It handles bash/shell tools, edit tools, safe outputs, mcp-scripts, and MCP server tools.
 // Returns a sorted list of arguments ready to be passed to the Copilot CLI.
@@ -101,10 +115,10 @@ func (e *CopilotEngine) computeCopilotToolArguments(tools map[string]any, safeOu
 				// Add specific shell commands
 				for _, cmd := range bashCommands {
 					if cmdStr, ok := cmd.(string); ok {
-						// Normalize trailing " *" wildcard (e.g. "jq *" → "jq") so that
-						// all engines emit the canonical prefix form (shell(jq)) regardless
-						// of whether the command was written with or without the wildcard.
-						cmdStr, _ = normalizeBashCommand(cmdStr)
+						// Normalize the documented command wildcard (e.g. "curl*") to
+						// Copilot's command/argument form (shell(curl:*)). Also strip the
+						// trailing " *" form (e.g. "jq *") to its canonical prefix form.
+						cmdStr = normalizeCopilotBashCommand(cmdStr)
 						// For stem commands (like dotnet, npm, cargo), Copilot CLI uses
 						// subcommand matching. When the user specifies just the base command
 						// (e.g., "dotnet"), append :* so "dotnet build", "dotnet test", etc.

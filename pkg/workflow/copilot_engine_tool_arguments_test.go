@@ -313,6 +313,27 @@ func TestCopilotEngineComputeToolArguments(t *testing.T) {
 			expected: []string{"--allow-tool", "shell(curl:*)", "--allow-tool", "shell(wget:*)"},
 		},
 		{
+			name: "simple command suffix wildcards use command argument syntax",
+			tools: map[string]any{
+				"bash": []any{"curl*", "cat*"},
+			},
+			expected: []string{"--allow-tool", "shell(cat:*)", "--allow-tool", "shell(curl:*)"},
+		},
+		{
+			name: "compound command suffix wildcard remains a prefix",
+			tools: map[string]any{
+				"bash": []any{"git status*"},
+			},
+			expected: []string{"--allow-tool", "shell(git status*)"},
+		},
+		{
+			name: "explicit command argument wildcard is unchanged",
+			tools: map[string]any{
+				"bash": []any{"cat:*"},
+			},
+			expected: []string{"--allow-tool", "shell(cat:*)"},
+		},
+		{
 			name: "mixed stem and non-stem commands",
 			tools: map[string]any{
 				"bash": []any{"dotnet", "echo", "npm", "curl", "git status"},
