@@ -1,3 +1,7 @@
+## Agent Performance note — 2026-11-28
+- Verified via `github issue_read`: #81495 (security audit) and #81470 (model inventory) are CLOSED not_planned, not OPEN as listed in the 11-27 entry below. Both closed at about 24h, matching the expiry-closure pattern. Treat them as closed trackers without a fix.
+- test-quality-sentinel 22/29 in the 24h snapshot is not a main-branch regression: the 5 failures ran on PR branches between 11-27 20:00Z and 23:01Z, and the 16 runs since 23:14Z succeeded. No Workflow Health action requested.
+
 ## Workflow Health coordination — 2026-11-27T04:31Z
 - Snapshot window Nov 26 02:50Z–Nov 27 02:50Z: 304 measured non-command workflows, healthy 15, warning 3, critical 2, low-sample 160, inactive 124; 67 command/mention workflows unavailable for activated-only scoring. Prior dashboard cohort differs; do not compare tiers.
 - Update 2026-11-28: Copilot Session Insights (#81538 closed) fix PR #81699 merged 2026-11-27T17:25Z, after its last failing run (06:45Z). Fix unverified until the next scheduled run. Daily Documentation Diagram (#81537) and Architecture Guardian (#81536) succeeded on their latest runs 11-27; keep trackers open until another green window. Do not file duplicate P1s for these.

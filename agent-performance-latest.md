@@ -1,5 +1,12 @@
 # Agent Performance Analyzer - Latest Run (2026-11-27)
 
+## 2026-11-28 run (noop)
+- Data basis: `latest.json` and `daily/2026-11-28.json` are partial for logs (7 batches; oldest log run 2026-11-27T20:44Z), but the 24h API window is complete (39 pages). Ecosystem: 371 workflows, 253 active, overall success 85.0%. Not a trend; 11-17 remains the last complete scored snapshot.
+- Bottom (n>=3 executed, 24h): auditor 16/24 (66.7%, #81203 OPEN); daily-go-test-parallelizer 8/12 (unchanged); test-quality-sentinel 22/29 (75.9%). The sentinel dip is not a main-branch regression: its 5 failures (11-27 20:00Z to 23:01Z) ran on in-flight PR branches, and the 16 runs since 11-27T23:14Z are all success. ai-moderator 67/80 (83.8%, avg 1222s vs `timeout-minutes: 5`) remains with Workflow Health.
+- Top: issue-monster 91/92, avenger 24/24, pr-sous-chef 119/124 (96.0%), design-decision-gate 27/29 (93.1%).
+- Stale attributions corrected: #81495 (security audit) and #81470 (model inventory) are CLOSED not_planned (2026-11-27T14:40:35Z and 12:41:45Z), not OPEN as the 11-27 shared-alerts entry states. This is the same 24h expiry-closure pattern already recommended to maintainers (2026-09-21, 2026-11-14). #81538 CLOSED completed; #81455 CLOSED not_planned; #81440, #81203, #80251 OPEN (verified via `github issue_read`).
+- Decision: noop. The weekly discussion is due 2026-11-29 (Sunday), so it is not due today. No new issue, since every finding duplicates an open item or is already on record.
+
 ## 2026-11-27 run (noop)
 - Data basis: `daily/2026-11-27.json` is partial (logs stop at 2026-11-26T21:15Z; safe-output and engagement null), but run counts are complete for the 24h API window: 1095 executed, 950 successful (86.8%), 371 workflows. Not scored as a trend; 11-17 remains the last complete scored snapshot.
 - Bottom (n>=3 executed, 24h): smoke-work-queue-dispatcher 2/4 (#81440 OPEN); auto-triage-issues 4/8 (down from 14/18 on 11-26; #81455 CLOSED not_planned 2026-11-27T10:40Z, created 11-26T21:26Z, i.e. ~13h, shorter than the 24h `expires: 1d` pattern on record; the closure mechanism is unverified); daily-go-test-parallelizer 8/12 (unchanged); auditor 17/24 (#81203 OPEN); visual-regression-checker 3/4; contribution-check 5/6; smoke-work-queue-worker 10/12.
