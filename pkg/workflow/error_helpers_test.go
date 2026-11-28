@@ -56,7 +56,8 @@ func TestValidationError(t *testing.T) {
 
 			require.Error(t, err)
 			message := err.Error()
-			assertTimestamp(t, err.Timestamp, message)
+			assert.False(t, err.Timestamp.IsZero())
+			assert.NotContains(t, message, err.Timestamp.Format(time.RFC3339))
 			for _, expected := range tt.contains {
 				assert.Contains(t, message, expected)
 			}
@@ -65,6 +66,17 @@ func TestValidationError(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidationErrorStableAcrossTimestampsAndLocations(t *testing.T) {
+	err := NewValidationError("tools.bash", "not specified", "reason", "suggestion")
+	err.Timestamp = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	message := err.Error()
+	assert.True(t, strings.HasPrefix(message, "Validation failed for field 'tools.bash'"))
+	err.Timestamp = err.Timestamp.Add(time.Hour)
+	assert.Equal(t, message, err.Error())
+	err.Line = 3
+	assert.Equal(t, message, err.Error())
 }
 
 func TestOperationError(t *testing.T) {
