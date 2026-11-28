@@ -771,6 +771,13 @@ func TestValidateStrictMinIntegrityNoneBash(t *testing.T) {
 					t.Errorf("Expected error containing '%s', got '%s'", tt.errorMsg, err.Error())
 				}
 			}
+			if tt.expectError && err != nil {
+				for _, expected := range []string{"gh aw fix --write", "bash: false", "cli-proxy: false", "allowlist"} {
+					if !strings.Contains(err.Error(), expected) {
+						t.Errorf("Expected error containing %q, got %q", expected, err.Error())
+					}
+				}
+			}
 		})
 	}
 }
