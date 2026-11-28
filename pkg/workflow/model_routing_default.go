@@ -285,6 +285,9 @@ func defaultModelRoutingIneligibility(data *WorkflowData) string {
 	if config := data.EngineConfig; config != nil && config.ModelRouting == nil && !config.ModelRoutingDisabled && data.Model != "" {
 		return "a model is configured"
 	}
+	if !apiProxySupportsRoutingFallback(data) {
+		return fmt.Sprintf("AWF version does not support router fallback (requires %s or newer)", constants.AWFModelRoutingFallbackMinVersion)
+	}
 	return modelRoutingRuntimeIneligibility(data)
 }
 

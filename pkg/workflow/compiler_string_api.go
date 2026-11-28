@@ -52,6 +52,7 @@ func (c *Compiler) CompileToYAML(workflowData *WorkflowData, markdownPath string
 	if err != nil {
 		return "", err
 	}
+	c.reportAutoModelRouting(workflowData, markdownPath)
 
 	return yamlContent, nil
 }
@@ -112,19 +113,14 @@ func (c *Compiler) parseStringFrontmatter(content, cleanPath string) (*frontmatt
 	if err := c.preprocessScheduleFields(result.Frontmatter, cleanPath, content); err != nil {
 		return nil, err
 	}
-	_, hasOnField := result.Frontmatter["on"]
-	if err := c.normalizeWorkflowConnectors(result, cleanPath, content, hasOnField || parser.HasConnectorTriggers(result.Frontmatter)); err != nil {
+	if err := c.normalizeWorkflowConnectors(result, cleanPath, content, isMainWorkflowFrontmatter(result.Frontmatter)); err != nil {
 		return nil, err
 	}
 
 	frontmatterForValidation := c.copyFrontmatterWithoutInternalMarkers(result.Frontmatter)
 
-	// Check if "on" field is missing - distinguish redirect-only placeholders from shared workflows
-	_, hasOnField = frontmatterForValidation["on"]
-	if !hasOnField && !parser.HasConnectorTriggers(frontmatterForValidation) {
-		// Check if this is a redirect-only placeholder (has redirect field but no 'on' trigger).
-		// Redirect-only files are distinct from regular shared workflows: they are placeholders
-		// pointing to a workflow's new canonical location and should not be treated as importable components.
+	// Check if "on" field is missing or contains only import-safe shared fields.
+	if !isMainWorkflowFrontmatter(frontmatterForValidation) {
 		if redirectVal, hasRedirect := frontmatterForValidation["redirect"]; hasRedirect {
 			if redirectStr, ok := redirectVal.(string); ok {
 				if redirectTarget := strings.TrimSpace(redirectStr); redirectTarget != "" {
@@ -133,7 +129,7 @@ func (c *Compiler) parseStringFrontmatter(content, cleanPath string) (*frontmatt
 				}
 			}
 		}
-		compilerStringAPILog.Printf("ParseWorkflowString: no 'on' field, treating as shared workflow: %s", cleanPath)
+		compilerStringAPILog.Printf("ParseWorkflowString: no runnable 'on' trigger, treating as shared workflow: %s", cleanPath)
 		return nil, &SharedWorkflowError{Path: cleanPath}
 	}
 
@@ -154,6 +150,14 @@ func (c *Compiler) parseStringFrontmatter(content, cleanPath string) (*frontmatt
 	parsed := createFrontmatterParseResult(cleanPath, []byte(content), result, frontmatterForValidation)
 	parsed.document = document
 	return parsed, nil
+}
+
+func isMainWorkflowFrontmatter(frontmatter map[string]any) bool {
+	if parser.HasConnectorTriggers(frontmatter) {
+		return true
+	}
+	onValue, hasOnField := frontmatter["on"]
+	return hasOnField && !parser.IsImportSafeSharedWorkflowOn(onValue)
 }
 
 func (c *Compiler) validateStringWorkflowData(workflowData *WorkflowData, cleanPath string) error {

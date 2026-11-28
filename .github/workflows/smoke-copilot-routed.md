@@ -77,6 +77,7 @@ post-steps:
           engine: "copilot",
           executionOutcome: process.env.SMOKE_EXECUTION,
           allowedModels: ["gpt-5.6-luna", "claude-haiku-4.5"],
+          expectedSelectionSource: "router",
           expectModelInventory: true,
           copilotInventory: true,
           resolutionRoles: [],

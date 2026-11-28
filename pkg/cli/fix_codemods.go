@@ -139,6 +139,7 @@ func getLaterCodemods() []Codemod {
 		getMentionsAllowTeamMembersCodemod(),              // Rename allow-team-members to allowed-collaborators in safe-outputs.mentions
 		getEngineCopilotSDKDriverToDriverCodemod(),        // Rename deprecated engine.copilot-sdk-driver to engine.driver
 		getRequestReviewPolicyCodemod(),                   // Normalize legacy request_review protected-file policies
+		getModelAutoToRouterCodemod(),                     // Migrate eligible model: auto / copilot/auto to model: router
 		getPostStepsSafeOutputsGuidedErrorCodemod(),       // Detect direct safe-outputs file access in post-steps and emit guided error
 		getPullRequestTargetGuidedErrorCodemod(),          // Report remaining risky trigger configurations after automatic fixes
 	}

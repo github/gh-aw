@@ -385,13 +385,14 @@ Inspect the repository.`,
 			wantPresent: true,
 		},
 		{
-			name: "implicit default routing on older v0.29.20",
+			name: "explicit router on older v0.29.20",
 			frontmatter: `---
 on: workflow_dispatch
 permissions:
   contents: read
   copilot-requests: write
 engine: copilot
+model: router
 sandbox:
   agent:
     version: v0.29.20

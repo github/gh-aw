@@ -1,16 +1,20 @@
 ---
 private: true
 name: Smoke Codex Auto
-description: Smoke test for Codex inference using the Copilot auto model.
-intent: Detect whether Codex can complete inference using copilot/auto.
+description: Smoke test for Codex router fallback on GitHub Copilot inference.
+intent: Detect whether Codex falls back cleanly to an eligible router-unknown Copilot model with no_route and zero classifier requests.
 on:
   schedule: every 2 days
   workflow_dispatch:
 permissions:
   contents: read
   copilot-requests: write
-engine: codex
-model: copilot/auto
+engine:
+  id: codex
+  model-provider: github
+model: router
+model-routing:
+  allowed-models: [gpt-5.3-codex]
 checkout: false
 tools:
   github: false
@@ -23,6 +27,29 @@ safe-outputs:
   noop:
   threat-detection: false
 timeout-minutes: 5
+post-steps:
+  - name: Assert router fallback evidence
+    if: always()
+    uses: actions/github-script@v9.0.0
+    env:
+      SMOKE_EXECUTION: ${{ steps.agentic_execution.outcome }}
+    with:
+      script: |
+        const path = require("node:path");
+        const { main } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/smoke_model_routing_assertions.cjs"));
+        await main({
+          core,
+          engine: "codex",
+          executionOutcome: process.env.SMOKE_EXECUTION,
+          allowedModels: ["gpt-5.3-codex"],
+          mainEndpoint: "/responses",
+          expectedSelectionSource: "fallback",
+          expectedFallbackReason: "no_route",
+          expectedClassifierRequests: 0,
+          expectModelInventory: true,
+          copilotInventory: true,
+          resolutionRoles: [],
+        });
 ---
 
 # Codex Auto Smoke Test

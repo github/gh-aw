@@ -1137,7 +1137,7 @@ model: copilot/auto
 	assert.Contains(t, lock, "COPILOT_GITHUB_TOKEN: ${{ github.token }}")
 	assert.Contains(t, lock, constants.CopilotBYOKDummyAPIKeyEnvVar+": "+constants.CopilotBYOKDummyAPIKey)
 	assert.Contains(t, lock, `export CODEX_API_KEY="$`+constants.CopilotBYOKDummyAPIKeyEnvVar+`"`)
-	assert.Contains(t, lock, "GH_AW_MODEL_AGENT_CODEX: auto")
+	assert.Contains(t, lock, "GH_AW_MODEL_ROUTING: 1")
 	assert.NotContains(t, lock, "secrets.CODEX_API_KEY")
 	assert.NotContains(t, lock, "secrets.OPENAI_API_KEY")
 }
