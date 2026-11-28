@@ -24,7 +24,7 @@ safe-outputs:
   dispatch-workflow:
     workflows: [eslint-miner, eslint-refiner, eslint-monster]
     target-ref: ${{ github.event.repository.default_branch }}
-    max: 3
+    max: 24
   noop:
 steps:
   - name: Prepare the UTC ESLint factory cohort
@@ -33,19 +33,29 @@ steps:
       script: |
         const fs = require("node:fs");
         const path = require("node:path");
-        const { buildESLintFactoryPlan } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/eslint_factory_portfolio.cjs"));
+        const { buildESLintFactoryPlan, parseESLintRuleIds } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/eslint_factory_portfolio.cjs"));
         const { stagePlanIntents } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/work_queue_intents.cjs"));
         const { data: run } = await github.rest.actions.getWorkflowRun({ ...context.repo, run_id: context.runId });
         const { data: repository } = await github.rest.repos.get(context.repo);
+        const date = new Date(run.created_at).toISOString().slice(0, 10);
+        const cutoff = new Date(Date.parse(`${date}T00:00:00.000Z`) - 1).toISOString();
+        const { data: commits } = await github.rest.repos.listCommits({ ...context.repo, path: "eslint-factory/src/index.ts", sha: repository.default_branch, until: cutoff, per_page: 1 });
+        if (!Array.isArray(commits) || !commits[0]?.sha) throw new Error("ESLint registry revision before the UTC cohort date was not found");
+        const registryRevision = commits[0].sha;
+        const { data: registry } = await github.rest.repos.getContent({ ...context.repo, path: "eslint-factory/src/index.ts", ref: registryRevision });
+        if (registry.type !== "file" || registry.encoding !== "base64" || !registry.content) throw new Error("ESLint rule registry must be readable as a base64 file");
+        const rules = parseESLintRuleIds(Buffer.from(registry.content, "base64").toString("utf8"));
         const plan = buildESLintFactoryPlan({
-          date: new Date(run.created_at).toISOString().slice(0, 10),
+          date,
           repository: repository.full_name,
           repositoryId: String(repository.id),
+          registryRevision,
+          rules,
         });
         fs.mkdirSync("/tmp/gh-aw/agent", { recursive: true });
         fs.writeFileSync("/tmp/gh-aw/agent/eslint-factory-plan.json", JSON.stringify(plan));
         stagePlanIntents(path.join(process.env.RUNNER_TEMP, "gh-aw/safeoutputs/work-queue/work-queue.intents.jsonl"), plan);
-        core.info(`ESLint factory cohort ${plan.date}: ${plan.nodes.length} tasks`);
+        core.info(`ESLint factory cohort ${plan.date}: ${plan.nodes.length} tasks for rules ${plan.rules.join(", ")}`);
 timeout-minutes: 15
 strict: true
 ---
@@ -53,12 +63,15 @@ strict: true
 # ESLint Factory Dispatcher
 
 Read `/tmp/gh-aw/agent/eslint-factory-plan.json`. The trusted preparation step
-defines one independent task for each approved worker: miner, refiner, and
-monster. Use the exact stored UTC date, nodes, profiles, contracts, and budgets.
+pins the rule registry to the latest commit before the cohort's UTC date and
+defines one miner task plus one refiner task and one monster task for each of
+the day's three rotating rules (`plan.rules`). Use the exact stored UTC date,
+registry revision, nodes, profiles, contracts, and budgets.
 Do not invent additional tasks or broaden resource scopes.
 
 Read the activation snapshot first with `work_queue_read`, using
-`{"pool":"default","limit":32}`. A null `snapshot_sha` means the queue branch
+`{"pool":"eslint-factory","limit":32}`. Also inspect `{"pool":"default","limit":32}`
+for legacy ESLint Work. A null `snapshot_sha` means the queue branch
 does not exist yet.
 Treat it as an empty backlog; the first trusted producer submission
 creates the branch with its Work. Surface read/tool errors explicitly; never
@@ -68,6 +81,7 @@ When `<mcp-clis>` advertises the wrappers, invoke their subcommands with one JSO
 argument through the shell tool:
 
 ```bash
+work-queue work_queue_read '{"pool":"eslint-factory","limit":32}'
 work-queue work_queue_read '{"pool":"default","limit":32}'
 ```
 
@@ -75,20 +89,20 @@ Use the advertised MCP tools directly when wrappers are not available.
 
 The trusted preparation step has already staged the prepared cohort, whether
 the queue is initialized or absent, with `{"nodes": <the plan.nodes array>}`
-before its dispatch request. Do not call `work_queue_submit` or
+before its dispatch requests. Do not call `work_queue_submit` or
 `work_queue_dispatch_next` again; read and explain the snapshot and staged plan
-only. Date-keyed
-graph/node identities make repeated submissions on the same UTC day idempotent,
-including manual runs and reruns. Do not change stored task payloads on retries
-or replace admitted Work. AW authorizes trusted participants; the compiled queue
-policy controls scheduling for pool `default`, priority `3`, and accounting key
-`""`. A failed admission is not permission to bypass scheduling bounds.
+only. The pinned registry revision and date-keyed graph/node identities make
+same-day preparations idempotent, including manual runs and reruns. Do not
+change stored task payloads on retries or replace admitted Work. AW authorizes
+trusted participants; the compiled queue policy controls scheduling for pool
+`eslint-factory`, priority `3`, and accounting key `""`. A failed admission is
+not permission to bypass scheduling bounds.
 Submission is a staged intent, not proof of durable admission.
 
 The following request is already staged from `plan.dispatch`:
 
 ```json
-{"pool":"default","max_claims":3,"max_dispatches":3}
+{"pool":"eslint-factory","max_claims":21,"max_dispatches":21}
 ```
 
 Keep the request within the compiled pool limits and this workflow's dispatch
@@ -98,9 +112,15 @@ an `intent_id` is not proof of Claims, native launches, or completed Work. Repor
 only that the request was staged, not that workers ran or that the live queue is
 empty.
 
+The prepared plan also stages a `default` pool request capped at three claims to
+drain legacy ESLint Work. Keep both requests within compiled pool limits and this
+workflow's dispatch budget.
+
 Do not select Work IDs, workers, revisions, or targets from a queue snapshot.
 The scheduler selects eligible Work in priority, then FIFO order and launches
-the compatible worker profile from the compiled policy. This workflow's
+the compatible worker profile from the compiled policy. The legacy request is
+limited to the three ESLint worker workflows, which accept old payloads without
+`rule.id` using their earlier broad scope. This workflow's
 `safe-outputs.dispatch-workflow.workflows` list is the compiler-approved
 worker-name allowlist; it does not replace the compiled profiles or Claim/run
 ownership. Do not call ordinary `dispatch_workflow` or typed per-worker dispatch

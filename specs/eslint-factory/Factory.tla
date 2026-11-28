@@ -54,12 +54,15 @@ Dispatch ==
   /\ UNCHANGED <<admitted, queueBranch, proposed, scoped, applied, completedAtWrite, verified,
                  scan, lintClean, quality>>
 
+\* scan values describe the assigned rule's diagnostics after a completed scan;
+\* "clean" means none. The "warning" fault wrongly treats warning-only rule
+\* diagnostics as clean.
 Precheck(s) ==
   /\ \E k \in original : Profile(k) = "monster"
   /\ scan = "unrun"
   /\ s \in {"clean", "warnings", "errors", "installFailed", "buildFailed", "toolFailed"}
   /\ scan' = s
-  /\ lintClean' = (s = "clean" \/ (s = "warnings" /\ Fault # "warning"))
+  /\ lintClean' = (s = "clean" \/ (s = "warnings" /\ Fault = "warning"))
   /\ UNCHANGED <<phase, admitted, queueBranch, original, birth, requested, proposed, scoped, applied,
                  completedAtWrite, verified, quality>>
 
@@ -161,12 +164,12 @@ EffectRequiresCompletion == \A k \in Works : applied[k] > 0 => completedAtWrite[
 ResultRequiresReadback == \A k \in Works : phase[k] = "result" => verified[k]
 ResultCardinality == \A k \in Works : phase[k] = "result" =>
                      (NoWrites \/ proposed[k] \in OutputMin..OutputMax)
-WarningExitZero == scan # "unrun" => (lintClean = (scan \in {"clean", "warnings"}))
+RuleDiagnosticsGate == scan # "unrun" => (lintClean = (scan = "clean"))
 NoAutomaticDAG == admitted = {k \in Works : phase[k] # "absent"}
 BoundedAssignment == Cardinality(birth) <= 3
 
 WitnessReached ==
-  CASE Witness = "warning-clean" -> scan = "warnings" /\ lintClean
+  CASE Witness = "warning-actionable" -> scan = "warnings" /\ ~lintClean
     [] Witness = "completion-only" -> \E k \in birth : phase[k] = "completed" /\ ~verified[k]
     [] Witness = "three-outputs" -> \E k \in birth : applied[k] = 3
     [] Witness = "quality-not-gate" -> quality = "failed" /\ (\E k \in birth : phase[k] = "result")

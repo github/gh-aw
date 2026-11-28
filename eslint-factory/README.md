@@ -14,6 +14,8 @@ This project hosts custom ESLint linters for `/actions/setup/js`.
 - `npm run lint:setup-js` — build and lint all `../actions/setup/js/**/*.cjs` files.
 - `npm run lint:setup-js:changed` — build and lint `../actions/setup/js/*.cjs` files.
 
+Append `-- --format json` to either lint command for structured diagnostics. The monster pre-check uses JSON to select the assigned rule's diagnostics.
+
 ## Factory lifecycle and formal validation
 
 The [bounded TLA+ model and executable code comparison](../specs/eslint-factory/README.md)
