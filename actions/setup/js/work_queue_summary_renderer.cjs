@@ -6,9 +6,12 @@ const { BUILT_IN_PATTERNS } = require("./redact_secrets.cjs");
 const MAX_SUMMARY_ROWS = 32;
 const MAX_SUMMARY_BYTES = 32 * 1024;
 const MAX_UPDATE_SUMMARIES = 8;
+/** @type {WeakMap<object, number>} */
 const updateCounts = new WeakMap();
 
 /** @typedef {{summary?: {addRaw(content: string): {write(): Promise<unknown>}}, warning?: (message: string) => void}} SummaryCore */
+/** @typedef {{request: {kind: string}, id: string, operations: Array<Record<string, any>>}} QueueCommit */
+/** @typedef {{works: Map<string, any>, claims: Map<string, any>, dispatches: Map<string, any>}} QueueState */
 
 function code(value, limit = 48) {
   let text = String(value);
@@ -20,6 +23,10 @@ function code(value, limit = 48) {
   return `<code>${escaped}</code>`;
 }
 
+/**
+ * @param {QueueState} state
+ * @param {QueueCommit | undefined} commit
+ */
 function focusedWorks(state, commit) {
   const selected = new Map();
   const select = id => {
@@ -44,6 +51,7 @@ function focusedWorks(state, commit) {
   return selected;
 }
 
+/** @param {{depends_on: Array<{kind: string, work_id?: string}>}} work */
 function dependencies(work) {
   if (!work.depends_on.length) return "none";
   const shown = work.depends_on.slice(0, 4).map(edge => (edge.kind === "work" ? code(edge.work_id, 16) : `${code(edge.kind)} gate`));
@@ -53,7 +61,9 @@ function dependencies(work) {
 
 /**
  * Render only metadata from a validated projection, never Work payloads or receipts.
- * @param {{request: {kind: string}, id: string, operations: Array<Record<string, unknown>>} | undefined} [commit]
+ * @param {QueueState} state
+ * @param {QueueCommit | undefined} [commit]
+ * @returns {string}
  */
 function renderWorkQueue(state, commit = undefined) {
   const works = focusedWorks(state, commit);
@@ -123,6 +133,8 @@ function renderWorkQueue(state, commit = undefined) {
 /**
  * Summary failures must not change a successful CAS outcome or launch fencing.
  * @param {SummaryCore | undefined} coreApi
+ * @param {QueueState} state
+ * @param {QueueCommit | undefined} commit
  */
 async function writeWorkQueueUpdateSummary(coreApi, state, commit) {
   if (!coreApi?.summary) return;

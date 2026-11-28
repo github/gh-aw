@@ -73,6 +73,24 @@ describe("bounded work queue metadata renderer", () => {
     expect(summary.indexOf(last.work_id.slice(0, 16))).toBeLessThan(summary.indexOf([...state.works.keys()][0].slice(0, 16)));
   });
 
+  it("renders gate dependencies, no dependencies and the default accounting key", () => {
+    const state = structuredClone(queue(2).state);
+    const [first, second] = [...state.works.values()];
+    first.fairness_key = "";
+    first.depends_on = [{ kind: "approval" }, { kind: "work", work_id: "dep-work" }];
+    second.depends_on = [];
+    const summary = renderWorkQueue(state);
+    expect(summary).toContain("(default)");
+    expect(summary).toContain("<code>approval</code> gate, <code>dep-work</code>");
+    expect(summary).toContain("| none |");
+  });
+
+  it("uses the submit summary heading only for submit commits", () => {
+    const { state } = queue(1);
+    expect(renderWorkQueue(state, { id: "c1", request: { kind: "submit" }, operations: [] })).toContain("<summary>Work queue admission</summary>");
+    expect(renderWorkQueue(state, { id: "c1", request: { kind: "cancel_work" }, operations: [] })).toContain("Checked update: <code>cancel_work</code> at <code>c1</code>.");
+  });
+
   it("renders an empty queue", () => {
     const summary = renderWorkQueue(newState());
     expect(summary).toContain("0 Work nodes; 0 open Claims; 0 active Dispatches");
@@ -105,6 +123,17 @@ describe("publication summary writer", () => {
     expect(core.warning).toHaveBeenCalledWith(expect.stringContaining("Queue update committed"));
     expect(core.warning.mock.calls[0][0]).not.toContain("private credential");
     expect(serializeProjection(state)).toEqual(before);
+  });
+
+  it("falls back to console.warn when core.warning is absent", async () => {
+    const { log, state } = queue();
+    const core = summaryCore();
+    delete core.warning;
+    core.summary.write.mockRejectedValue(new Error("boom"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await writeWorkQueueUpdateSummary(core, state, log.at(-1));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Queue update committed"));
+    warn.mockRestore();
   });
 
   it("caps repeated intermediate views", async () => {
