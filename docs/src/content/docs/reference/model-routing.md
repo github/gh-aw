@@ -44,7 +44,9 @@ If your workflow already pins a model under `engine`, remove that pin so the top
 | `router/balanced` | Use a consistent middle ground for general work, such as reviewing issues for missing information. |
 | `router/robust` | Aim for a higher chance of success when a missed finding or a second attempt would be costly. |
 
-These are levels, not model names. Two runs at the same level need not use the same model. `model: auto` is different: it leaves model selection to the engine or provider rather than the gh-aw router.
+These are levels, not model names. Two runs at the same level need not use the same model.
+
+An authored main-agent `model: auto` or `model: copilot/auto` is deprecated: on eligible workflows using AWF v0.29.21 or newer, it routes the same way as `model: router` (preserving GitHub Copilot inference for `copilot/auto` on Claude and Codex). Where routing does not apply (for example with `model-routing: false`, `engine.fallback-models`, `engine.model-catalog: false`, an incompatible model policy, a custom engine, or an older AWF pin), `auto` keeps its existing behavior cleanly with a deprecation warning. Run `gh aw fix --write` to rewrite eligible workflows to `model: router`.
 
 The deprecated nested `engine.model-routing.goal: cost-speed` requires an AWF pin older than v0.29.17. With the default firewall, choose a cost-routing level explicitly; `cost-speed` is not an alias for `cost`.
 
@@ -64,7 +66,7 @@ The shortlist does **not** restrict sub-agents. For example, a Claude sub-agent 
 
 ## Default routing for workflows without a model
 
-Eligible workflows using GitHub Copilot inference already route when no model is set. To keep your usual model overrides and engine default **without** routing, omit `model` and set:
+Eligible workflows using GitHub Copilot inference on AWF v0.29.21 or newer already route when no model is set. Workflows pinned to an older AWF release without router fallback keep their non-routed default when `model` is omitted (while expression-driven dynamic routing continues to work on older routing-capable AWF pins). To keep your usual model overrides and engine default **without** routing, omit `model` and set:
 
 ```aw wrap
 model-routing: false
@@ -95,7 +97,7 @@ For [Claude on Anthropic](/gh-aw/reference/engines/claude/) or [Codex on OpenAI]
 
 ## Which models does the router support?
 
-The [routing tables in Agent Workflow Firewall (AWF) v0.29.17](https://github.com/github/gh-aw-firewall/tree/v0.29.17/containers/router/routing), the version gh-aw uses by default, include these GitHub Copilot model IDs:
+The [routing tables in Agent Workflow Firewall (AWF) v0.29.21](https://github.com/github/gh-aw-firewall/tree/v0.29.21/containers/router/routing), the version gh-aw uses by default, include these GitHub Copilot model IDs:
 
 <!-- When DefaultFirewallVersion changes, check this list against the new AWF routing tables. -->
 
@@ -105,12 +107,13 @@ The [routing tables in Agent Workflow Firewall (AWF) v0.29.17](https://github.co
 | GPT 5.6 | `gpt-5.6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra` |
 | GPT 6 | `gpt-6-astra`, `gpt-6-luna`, `gpt-6-sol` |
 | GPT 6.1 | `gpt-6.1-sol`, `gpt-6.1-terra` |
-| Gemini | `gemini-3.8-flash`, `gemini-4-argon` |
-| MAI | `mai-code-1.1-flash` |
+| GPT 6.2 | `gpt-6.2-sol` |
+| Gemini | `gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen` |
+| MAI | `mai-code-1.1-flash`, `mai-code-2`, `mai-code-2-flash` |
 
 For native OpenAI, the tables use the same GPT IDs. For native Anthropic, they use `claude-haiku-5-5`, `claude-sonnet-5`, `claude-sonnet-5-5`, and `claude-opus-5-5`.
 
-At least one supported model must be enabled for the workflow's provider account and eligible for its engine, model policy, and shortlist. A model also needs a compatible API endpoint and reasoning effort. **If no model qualifies, the run fails before the main agent starts.** If the workflow pins a different AWF version, check that version's routing tables.
+At least one model must be enabled for the workflow's provider account and compatible with its engine endpoints, model policy, and shortlist. On AWF v0.29.21 and newer, if none of the eligible models is in the router tables (or if the router cannot choose), AWF falls back deterministically to the highest-tier eligible model available instead of failing before the agent starts. For example, if an account or shortlist only enables `gpt-5.3-codex` and `gpt-5-nano` (neither of which is in the router tables), AWF skips the classifier call and selects `gpt-5.3-codex` over `gpt-5-nano` because standard coding models outrank lightweight models, recording `selection_source=fallback` and `fallback_reason=no_route` in the unified session. The run only fails before the main agent starts when no compatible model at all exists in the account, policy, and shortlist (or on AWF pins older than v0.29.21, which do not support fallback). If the workflow pins a different AWF version, check that version's routing tables.
 
 ## Check which model was used
 

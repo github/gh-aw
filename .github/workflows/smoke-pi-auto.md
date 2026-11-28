@@ -1,8 +1,8 @@
 ---
 private: true
 name: Smoke Pi Auto
-description: Smoke test for Pi inference using the bare auto model.
-intent: Detect whether Pi can complete inference and emit a safe output using auto.
+description: Smoke test for Pi router fallback using a router-unknown Copilot model.
+intent: Detect whether Pi falls back cleanly to an eligible router-unknown Copilot model with no_route and zero classifier requests.
 on:
   schedule: every 2 days
   workflow_dispatch:
@@ -10,7 +10,9 @@ permissions:
   contents: read
   copilot-requests: write
 engine: pi
-model: auto
+model: router
+model-routing:
+  allowed-models: [claude-haiku-4.5]
 checkout: false
 tools:
   github: false
@@ -23,6 +25,28 @@ safe-outputs:
   noop:
   threat-detection: false
 timeout-minutes: 5
+post-steps:
+  - name: Assert router fallback evidence
+    if: always()
+    uses: actions/github-script@v9.0.0
+    env:
+      SMOKE_EXECUTION: ${{ steps.agentic_execution.outcome }}
+    with:
+      script: |
+        const path = require("node:path");
+        const { main } = require(path.join(process.env.RUNNER_TEMP, "gh-aw/actions/smoke_model_routing_assertions.cjs"));
+        await main({
+          core,
+          engine: "pi",
+          executionOutcome: process.env.SMOKE_EXECUTION,
+          allowedModels: ["claude-haiku-4.5"],
+          expectedSelectionSource: "fallback",
+          expectedFallbackReason: "no_route",
+          expectedClassifierRequests: 0,
+          expectModelInventory: true,
+          copilotInventory: true,
+          resolutionRoles: [],
+        });
 ---
 
 # Pi Auto Smoke Test

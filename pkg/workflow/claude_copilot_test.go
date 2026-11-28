@@ -110,12 +110,29 @@ func TestCopilotAutoModelCompilation(t *testing.T) {
 				assert.Contains(t, agent, "COPILOT_GITHUB_TOKEN: ${{ github.token }}")
 				assert.NotContains(t, agent, "secrets.ANTHROPIC_API_KEY")
 				assert.NotContains(t, agent, "secrets.OPENAI_API_KEY")
+				assert.Contains(t, agent, "GH_AW_MODEL_ROUTING: 1")
+				assert.Equal(t, 1, compiler.GetWarningCount())
+			})
+			t.Run(engine+"/"+model+"/model-routing-false", func(t *testing.T) {
+				compiler := NewCompiler()
+				compiler.SetSkipValidation(true)
+				workflowPath := filepath.Join(t.TempDir(), "copilot-auto-non-routed.md")
+				source := "---\non: workflow_dispatch\nengine:\n  id: " + engine + "\n  model-provider: github\nmodel: " + model + "\nmodel-routing: false\npermissions:\n  contents: read\n  copilot-requests: write\ncheckout: false\ntools:\n  github: false\nsafe-outputs:\n  noop:\n  threat-detection: false\n---\nCall noop once."
+				require.NoError(t, os.WriteFile(workflowPath, []byte(source), 0600))
+				require.NoError(t, compiler.CompileWorkflow(workflowPath))
+				lock, err := os.ReadFile(stringutil.MarkdownToLockFile(workflowPath))
+				require.NoError(t, err)
+				agent := extractJobSection(string(lock), "agent")
+				assert.Contains(t, agent, "GH_AW_LLM_PROVIDER: github")
+				assert.Contains(t, agent, "COPILOT_GITHUB_TOKEN: ${{ github.token }}")
+				assert.NotContains(t, agent, "secrets.ANTHROPIC_API_KEY")
+				assert.NotContains(t, agent, "secrets.OPENAI_API_KEY")
 				if engine == "claude" {
 					assert.Contains(t, agent, "ANTHROPIC_MODEL: auto")
 				} else {
 					assert.Contains(t, agent, "GH_AW_MODEL_AGENT_CODEX: auto")
-					assert.Zero(t, compiler.GetWarningCount())
 				}
+				assert.Equal(t, 1, compiler.GetWarningCount())
 			})
 		}
 	}

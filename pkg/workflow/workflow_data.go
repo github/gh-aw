@@ -186,6 +186,7 @@ type WorkflowData struct {
 	CommentMemoryConfig            *CommentMemoryConfig            // parsed tools.comment-memory configuration
 	RepoMemoryConfig               *RepoMemoryConfig               // parsed repo-memory configuration
 	RoutingLearningMode            string                          // "observe" when push_routing_history records the run in the routing history, else ""
+	AutoModelRouting               *AutoModelRoutingOutcome        // outcome of normalizing an authored main-agent model: auto / copilot/auto value
 	Runtimes                       map[string]any                  // runtime version overrides from frontmatter
 	ToolsTimeout                   string                          // timeout for tool/MCP operations: numeric string (seconds) or GitHub Actions expression (empty = use engine default)
 	ToolsStartupTimeout            string                          // timeout for MCP server startup: numeric string (seconds) or GitHub Actions expression (empty = use engine default)
