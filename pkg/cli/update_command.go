@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -221,7 +223,7 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 	cmd.Flags().Bool("auto-merge", false, "Enable auto-merge on the created pull request (requires --create-pull-request)")
 	addPRMessageFlag(cmd)
 	cmd.Flags().Bool("create-issue", false, "Open a GitHub issue in each org repository that has pending workflow updates (requires --org)")
-	cmd.Flags().BoolP("yes", "y", false, "Auto-accept org-mode update confirmations (required in CI)")
+	cmd.Flags().BoolP("yes", "y", false, "Auto-accept update confirmations (required in CI for org mode)")
 	cmd.Flags().String("cool-down", "7d", coolDownFlagUsage)
 	_ = cmd.Flags().MarkHidden("pr") // Hide the short alias from help output
 
@@ -237,6 +239,10 @@ Note: In GitHub Enterprise repos, shorthand source specs resolve on your enterpr
 // RunUpdateWorkflows updates workflows from their source repositories.
 // Each workflow is compiled immediately after update.
 func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) (runErr error) { //nolint:largefunc
+	ctx = ctxutil.OrBackground(ctx)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	var snapshotTargets []string
 	if updateReporter(ctx) != nil {
 		var err error
@@ -265,6 +271,9 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) (runEr
 		// cannot prevent them from rewriting a workflow whose update failed.
 		return fmt.Errorf("workflow update failed: %w", err)
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	// Update GitHub Actions versions in actions-lock.json.
 	// By default all actions are updated to the latest major version.
@@ -274,6 +283,9 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) (runEr
 		reportUpdateWarning(ctx, "actions", err)
 		// Non-fatal: warn but don't fail the update
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update actions-lock.json: %v", err)))
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	// Update action references in user-provided steps within workflow .md files.
@@ -302,6 +314,9 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) (runEr
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update action references in workflow files: %v", err)))
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return errors.Join(firstErr, err)
+	}
 
 	// Resolve and store SHA-256 digest pins for container images referenced in lock files.
 	// This runs after compilation (via UpdateActionsInWorkflowFiles) so that the lock files
@@ -323,6 +338,9 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) (runEr
 		reportUpdateWarning(ctx, "containers", err)
 		// Non-fatal: Docker may not be available in all environments.
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Could not update container pins: %v", err)))
+	}
+	if err := ctx.Err(); err != nil {
+		return errors.Join(firstErr, err)
 	}
 
 	// Recompile all workflows when new container pins were added so that the
@@ -356,7 +374,7 @@ func RunUpdateWorkflows(ctx context.Context, opts UpdateWorkflowsOptions) (runEr
 	}
 
 	updateLog.Printf("Update process complete: had_error=%v", firstErr != nil)
-	return firstErr
+	return errors.Join(firstErr, ctx.Err())
 }
 
 // recompileAllWorkflows recompiles all .md workflow files in the given directory.
@@ -511,6 +529,9 @@ func ensureUpdateTargetRepoGitignore(gitRoot string) (string, error) {
 }
 
 func shallowCloneTargetRepo(ctx context.Context, repo, destination string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := os.RemoveAll(destination); err != nil {
 		return fmt.Errorf("failed to clean previous checkout %s: %w", destination, err)
 	}
@@ -518,7 +539,7 @@ func shallowCloneTargetRepo(ctx context.Context, repo, destination string) error
 	// Use a sparse shallow clone to minimize bandwidth and disk usage when update mode
 	// needs a temporary checkout solely for workflow and agent files.
 	cmd := exec.CommandContext(ctx, "gh", "repo", "clone", repo, destination, "--", "--depth=1", "--filter=blob:none", "--sparse")
-	output, err := cmd.CombinedOutput()
+	output, err := runMaintenanceCheckoutCommand(ctx, cmd)
 	if err != nil {
 		trimmed := strings.TrimSpace(string(output))
 		if trimmed == "" {
@@ -529,7 +550,7 @@ func shallowCloneTargetRepo(ctx context.Context, repo, destination string) error
 
 	sparseArgs := []string{"-C", destination, "sparse-checkout", "set", ".github"}
 	sparseCmd := exec.CommandContext(ctx, "git", sparseArgs...)
-	output, err = sparseCmd.CombinedOutput()
+	output, err = runMaintenanceCheckoutCommand(ctx, sparseCmd)
 	if err != nil {
 		trimmed := strings.TrimSpace(string(output))
 		if trimmed == "" {
@@ -538,6 +559,16 @@ func shallowCloneTargetRepo(ctx context.Context, repo, destination string) error
 		return fmt.Errorf("failed to configure sparse checkout for %s: %w: %s", repo, err, trimmed)
 	}
 	return nil
+}
+
+// Stream checkout diagnostics while retaining them in actionable failure messages.
+func runMaintenanceCheckoutCommand(ctx context.Context, cmd *exec.Cmd) ([]byte, error) {
+	var output bytes.Buffer
+	writer := io.MultiWriter(os.Stderr, &output)
+	cmd.Stdout = writer
+	cmd.Stderr = writer
+	err := cmd.Run()
+	return output.Bytes(), errors.Join(err, ctx.Err())
 }
 
 func sanitizeRepoPath(repo string) string {

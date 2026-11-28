@@ -224,7 +224,7 @@ This command upgrades all Markdown files in the workflow directory (default .git
 	addPRMessageFlag(cmd)
 	_ = cmd.Flags().MarkHidden("pr") // Hide the short alias from help output
 	cmd.Flags().Bool("create-issue", false, "Open a GitHub issue in each org repository with agentic workflows (requires --org)")
-	cmd.Flags().BoolP("yes", "y", false, "Auto-accept org-mode upgrade confirmations (required in CI)")
+	cmd.Flags().BoolP("yes", "y", false, "Auto-accept upgrade confirmations (required in CI for org mode)")
 	cmd.Flags().Bool("audit", false, "Check dependency health without performing upgrades")
 	cmd.Flags().Bool("pre-releases", false, "Include pre-release versions when checking for extension upgrades; pre-releases are installed by exact tag")
 	cmd.Flags().Bool("approve", false, "Approve all safe update changes. When strict mode is active (the default), the compiler emits warnings for new restricted secrets or unapproved action additions/removals not present in the existing gh-aw-manifest. Use this flag to approve and skip safe update enforcement")
@@ -288,6 +288,10 @@ type upgradeOptions struct {
 //
 //nolint:largefunc // Upgrade side effects require ordered progress reporting and independent failure handling.
 func runUpgradeCommand(opts upgradeOptions) (runErr error) {
+	opts.ctx = ctxutil.OrBackground(opts.ctx)
+	if err := opts.ctx.Err(); err != nil {
+		return err
+	}
 	upgradeLog.Printf("Running upgrade command: verbose=%v, workflowDir=%s, noFix=%v, noCompile=%v, noActions=%v, disabledCodemodIDs=%v, skipExtensionUpgrade=%v",
 		opts.verbose, opts.workflowDir, opts.noFix, opts.noCompile, opts.noActions, opts.disabledCodemodIDs, opts.skipExtensionUpgrade)
 
@@ -335,6 +339,9 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 		upgradeLog.Printf("Failed to update dispatcher skill: %v", err)
 		return fmt.Errorf("failed to update dispatcher skill: %w", err)
 	}
+	if err := opts.ctx.Err(); err != nil {
+		return err
+	}
 
 	if opts.verbose {
 		fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated dispatcher skill"))
@@ -363,10 +370,12 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 			}
 		}
 
-		if err := RunFix(fixConfig); err != nil {
+		if _, err := os.Stat(workflowDir); errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("No workflow directory found; skipping codemods."))
+		} else if err := RunFix(fixConfig); err != nil {
+			runErr = errors.Join(runErr, fmt.Errorf("failed to apply codemods: %w", err))
 			reportUpdateWarning(opts.ctx, "codemods", err)
 			upgradeLog.Printf("Failed to apply codemods: %v", err)
-			// Don't fail the upgrade if fix fails - this is non-critical
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to apply codemods: %v", err)))
 		}
 	} else {
@@ -375,6 +384,9 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Skipping codemods (--no-fix specified)"))
 		}
 	}
+	if err := opts.ctx.Err(); err != nil {
+		return errors.Join(runErr, err)
+	}
 
 	// Step 3: Update GitHub Actions versions (unless --no-fix or --no-actions is specified)
 	if !opts.noFix && !opts.noActions {
@@ -382,9 +394,9 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 		upgradeLog.Print("Updating GitHub Actions versions")
 
 		if err := UpdateActions(opts.ctx, false, opts.verbose, false, 0); err != nil {
+			runErr = errors.Join(runErr, fmt.Errorf("failed to update actions: %w", err))
 			reportUpdateWarning(opts.ctx, "actions", err)
 			upgradeLog.Printf("Failed to update actions: %v", err)
-			// Don't fail the upgrade if action updates fail - this is non-critical
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update actions: %v", err)))
 		} else {
 			if opts.verbose {
@@ -396,10 +408,10 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 			// deferred to Step 4.
 			upgradeLog.Print("Updating action references in workflow .md files")
 			if err := UpdateActionsInWorkflowFiles(opts.ctx, opts.workflowDir, opts.engineOverride, opts.verbose, false, true, 0, false); err != nil {
+				runErr = errors.Join(runErr, fmt.Errorf("failed to update action references: %w", err))
 				reportUpdateWarning(opts.ctx, "workflow_actions", err)
 				msg := fmt.Sprintf("Failed to update action references in workflow files: %v", err)
 				upgradeLog.Print(msg)
-				// Non-critical: warn but don't fail the upgrade
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(""+msg))
 			}
 		}
@@ -416,6 +428,9 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 			}
 		}
 	}
+	if err := opts.ctx.Err(); err != nil {
+		return errors.Join(runErr, err)
+	}
 
 	// Step 4: Compile all workflows (unless --no-fix or --no-compile is specified)
 	if !opts.noFix && !opts.noCompile {
@@ -425,10 +440,13 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 		// Use the shared directory compile pipeline so post-processing, including
 		// maintenance workflow generation and implicit expiry reconciliation, runs.
 		if compileErr := compileWorkflowsForUpdate(opts.ctx, nil, opts.workflowDir, opts.engineOverride, opts.verbose, opts.approve); compileErr != nil {
+			runErr = errors.Join(runErr, fmt.Errorf("failed to compile workflows: %w", compileErr))
 			reportUpdateWarning(opts.ctx, "compilation", compileErr)
 			upgradeLog.Printf("Failed to compile workflows: %v", compileErr)
-			// Don't fail the upgrade if compilation fails - this is non-critical
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to compile workflows: %v", compileErr)))
+		}
+		if err := opts.ctx.Err(); err != nil {
+			return errors.Join(runErr, err)
 		}
 	} else {
 		if opts.noFix {
@@ -455,21 +473,30 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 		upgradeLog.Print("Updating container image digest pins")
 		newPins, err := UpdateContainerPins(opts.ctx, opts.workflowDir, opts.verbose)
 		if err != nil {
+			runErr = errors.Join(runErr, fmt.Errorf("failed to update container pins: %w", err))
 			reportUpdateWarning(opts.ctx, "containers", err)
 			upgradeLog.Printf("Failed to update container pins: %v", err)
-			// Non-critical — Docker may not be available in all environments.
 			fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to update container pins: %v", err)))
 		} else if opts.verbose {
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Updated container image pins"))
+		}
+		if err := opts.ctx.Err(); err != nil {
+			return errors.Join(runErr, err)
 		}
 		if newPins && !opts.noCompile {
 			upgradeLog.Print("Recompiling workflows to embed new container digest pins")
 			fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Recompiling workflows to embed container digest pins..."))
 			if recompileErr := recompileAllWorkflows(opts.ctx, opts.workflowDir, opts.engineOverride, opts.verbose, opts.approve); recompileErr != nil {
+				runErr = errors.Join(runErr, fmt.Errorf("failed to recompile after container pin update: %w", recompileErr))
 				reportUpdateWarning(opts.ctx, "compilation", recompileErr)
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to recompile after container pin update: %v", recompileErr)))
 			}
 		}
+	}
+
+	runErr = errors.Join(runErr, opts.ctx.Err())
+	if runErr != nil {
+		return runErr
 	}
 
 	// Print success message
@@ -480,7 +507,7 @@ func runUpgradeCommand(opts upgradeOptions) (runErr error) {
 }
 
 // updateCopilotArtifacts updates the dispatcher skill and related Copilot setup artifacts.
-func updateCopilotArtifacts(opts upgradeOptions, workflowDir string) error {
+func updateCopilotArtifacts(opts upgradeOptions, workflowDir string) (runErr error) {
 	// Update dispatcher skill
 	if err := ensureAgenticWorkflowsDispatcher(ctxutil.OrBackground(opts.ctx), opts.verbose, opts.noSkill, true); err != nil {
 		upgradeLog.Printf("Failed to update dispatcher skill: %v", err)
@@ -500,6 +527,7 @@ func updateCopilotArtifacts(opts upgradeOptions, workflowDir string) error {
 				return fmt.Errorf("failed to update Agentic Workflows custom agent: %w", err)
 			}
 			if err := deleteLegacyAgentFiles(opts.verbose); err != nil {
+				runErr = errors.Join(runErr, fmt.Errorf("failed to delete legacy agent files: %w", err))
 				upgradeLog.Printf("Failed to delete legacy agent files: %v", err)
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to delete legacy agent files: %v", err)))
 			}
@@ -512,14 +540,14 @@ func updateCopilotArtifacts(opts upgradeOptions, workflowDir string) error {
 		if _, err := os.Stat(setupPath); usesCopilot || err == nil {
 			actionMode := workflow.DetectActionMode(GetVersion())
 			if err := upgradeCopilotSetupStepsInDir(opts.ctx, opts.verbose, actionMode, GetVersion(), workflowDir); err != nil {
+				runErr = errors.Join(runErr, fmt.Errorf("failed to upgrade copilot-setup-steps.yml: %w", err))
 				upgradeLog.Printf("Failed to upgrade copilot-setup-steps.yml: %v", err)
-				// Don't fail the upgrade if copilot-setup-steps upgrade fails - this is non-critical
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to upgrade copilot-setup-steps.yml: %v", err)))
 			}
 		}
 	}
 
-	return nil
+	return runErr
 }
 
 func resolveUpgradeWorkflowDir(workflowDir string) (string, error) {
@@ -618,16 +646,20 @@ func relaunchUpgradeWithContext(ctx context.Context, extraFlag string, exeOverri
 	}
 
 	runErr := cmd.Run()
+	runErr = errors.Join(runErr, ctx.Err())
 	if forwarder != nil {
 		if err := forwarder.finish(); err != nil {
-			return errors.Join(runErr, err)
+			runErr = errors.Join(runErr, err)
 		}
+	}
+	if ctx.Err() != nil {
+		return runErr
 	}
 	if runErr != nil {
 		var exitErr *exec.ExitError
 		if errors.As(runErr, &exitErr) {
 			// Preserve the child's exit code so the entry-point can propagate it.
-			return &ExitCodeError{Code: exitErr.ExitCode()}
+			return errors.Join(&ExitCodeError{Code: exitErr.ExitCode()}, runErr)
 		}
 		return runErr
 	}

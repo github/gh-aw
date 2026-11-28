@@ -256,7 +256,7 @@ func runUpgradeForTargetRepo(ctx context.Context, repo string, opts upgradeOptio
 	// Extend sparse checkout to include .github/skills; upgrade also updates
 	// the dispatcher skill (ensureAgenticWorkflowsDispatcher) and needs that path present.
 	sparseAddCmd := exec.CommandContext(ctx, "git", "-C", checkoutDir, "sparse-checkout", "add", orgUpgradeSkillsDir)
-	if output, err := sparseAddCmd.CombinedOutput(); err != nil {
+	if output, err := runMaintenanceCheckoutCommand(ctx, sparseAddCmd); err != nil {
 		trimmed := strings.TrimSpace(string(output))
 		if trimmed == "" {
 			return fmt.Errorf("failed to extend sparse checkout for %s: %w", repo, err)
