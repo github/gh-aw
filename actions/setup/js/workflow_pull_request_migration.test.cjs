@@ -33,7 +33,13 @@ describe("code-producing issue workflow migration", () => {
   it.each(migrated)("%s delivers protected implementation pull requests (issue #%i -> merged PR #%i)", (id, _issue, _pullRequest) => {
     const { config } = readWorkflow(id);
     expect(config.source).toBeUndefined();
-    expect(config["safe-outputs"]["create-issue"]).toBeUndefined();
+    const createIssue = config["safe-outputs"]["create-issue"];
+    if (id === "static-analysis-report" && createIssue !== undefined) {
+      expect(createIssue.labels).toContain("cookie");
+      expect(createIssue["close-older-issues"]).toBe(false);
+    } else {
+      expect(createIssue).toBeUndefined();
+    }
     expect(config["safe-outputs"]["create-pull-request"]["exclude-lock-yml"]).toBe(true);
     expect(config.imports).toContain("shared/lock-safe-pull-request.md");
     expect(JSON.stringify(config.imports)).not.toContain("shared/daily-issue-base.md");
