@@ -16,6 +16,7 @@
 | `Frontmatter.Edit` | Applies semantic edits to an independent document and preserves the Markdown body. |
 | `Frontmatter.Set`, `Remove`, `Rename`, `PruneEmpty` | Updates authored mapping paths while retaining source syntax when possible. |
 | `Frontmatter.Comment` | Adds a single-line annotation to a mapping field without replacing existing comments. |
+| `Frontmatter.TransferInlineComment` | Preserves inline comments from a source mapping path's key and value by appending them to a destination mapping field under a sequence. The source path contains keys; the destination path contains keys and sequence indexes. It returns nil when the source has no inline comment, and errors for empty paths, missing entries, invalid destination paths, or source-syntax failures. |
 | `Frontmatter.RewriteText` | Applies a lexical transformation to frontmatter while keeping the Markdown body outside the edit. |
 
 When `Rename` finds that the destination already exists, that destination remains authoritative. Edits that fail validation leave the original content unchanged.
