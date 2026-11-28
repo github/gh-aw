@@ -21,11 +21,7 @@ func TestParseCommandParserParity(t *testing.T) {
 	}{
 		{"structures and scalar types", `---
 if: "${{ github.event_name == 'workflow_dispatch' }}"
-imports:
-  - missing-local.md
-  - path: owner/repo/workflow.md@commit
-    inputs:
-      enabled: false
+imports: []
 on:
   workflow_dispatch:
     inputs:
@@ -96,6 +92,9 @@ unknown-field: preserved
 					if err != nil {
 						t.Fatal(err)
 					}
+					if _, exists := parsed.Frontmatter["imports"]; exists {
+						parsed.Frontmatter["resolved-imports"] = []string{}
+					}
 					expected, err := json.Marshal(parsed.Frontmatter)
 					if err != nil {
 						t.Fatal(err)
@@ -161,6 +160,7 @@ func TestParseCommandCommittedContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	parsed.Frontmatter["resolved-imports"] = []string{}
 	expected, err := json.Marshal(parsed.Frontmatter)
 	if err != nil {
 		t.Fatal(err)
@@ -175,6 +175,74 @@ func TestParseCommandCommittedContent(t *testing.T) {
 	}
 	if output.String() != string(expected)+"\n" {
 		t.Fatalf("JSON = %s, want committed frontmatter %s", &output, expected)
+	}
+}
+
+func TestParseCommandResolvedImports(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"root.md":   "---\nname: root\nimports: [parent.md, leaf.md]\n---\n",
+		"parent.md": "---\nimports: [leaf.md, deep.md]\n---\n",
+		"leaf.md":   "---\nname: leaf\n---\n",
+		"deep.md":   "---\nname: deep\n---\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, args := range [][]string{
+		{filepath.Join(dir, "root.md")},
+		{"-", "--base-dir", dir},
+	} {
+		cmd := NewParseCommand()
+		cmd.SetArgs(args)
+		cmd.SetIn(strings.NewReader(files["root.md"]))
+		var output bytes.Buffer
+		cmd.SetOut(&output)
+		if err := cmd.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		var got struct {
+			Name     string   `json:"name"`
+			Imports  []string `json:"imports"`
+			Resolved []string `json:"resolved-imports"`
+		}
+		if err := json.Unmarshal(output.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		resolved := strings.Join(got.Resolved, ",")
+		if got.Name != "root" || strings.Join(got.Imports, ",") != "parent.md,leaf.md" ||
+			(resolved != "leaf.md,deep.md,parent.md" && resolved != "deep.md,leaf.md,parent.md") {
+			t.Fatalf("unexpected output for %v: %s", args, &output)
+		}
+	}
+}
+
+func TestParseCommandImportErrors(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "cycle.md"), []byte("---\nimports: [cycle.md]\n---\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "broken.md"), []byte("---\nimports: [unclosed\n---\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, content := range []string{
+		"---\nimports: [missing.md]\n---\n",
+		"---\nimports: [cycle.md]\n---\n",
+		"---\nimports: [broken.md]\n---\n",
+		"---\nimports: [owner/repo@main]\n---\n",
+		"---\nimports: []\nresolved-imports: keep\n---\n",
+	} {
+		cmd := NewParseCommand()
+		cmd.SetArgs([]string{"-", "--base-dir", dir})
+		cmd.SetIn(strings.NewReader(content))
+		cmd.SilenceErrors = true
+		var output bytes.Buffer
+		cmd.SetOut(&output)
+		if err := cmd.Execute(); err == nil || output.Len() != 0 {
+			t.Fatalf("expected error and no output for %q: error = %v, output = %s", content, err, &output)
+		}
 	}
 }
 

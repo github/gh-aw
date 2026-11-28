@@ -16,12 +16,12 @@ Add a parse-only subcommand, `gh aw parse <file|->`, that reuses the existing pa
 
 1. The command is implemented in `pkg/cli/parse_command.go` and registered from `cmd/gh-aw/frontmatter_parse_command.go` in the `utilities` group.
 2. `-` reads exact Markdown content from stdin. This lets callers pipe committed content, for example `git show <commit>:path | gh aw parse -`. The command does not invoke Git itself.
-3. The output contract is the parser's frontmatter map with no envelope and no Markdown body. Missing, empty, or null frontmatter yields `{}`. Nested values and scalar types are preserved, and unknown fields are retained.
+3. The output contract is the parser's frontmatter map with no envelope and no Markdown body. When `imports` is present, `resolved-imports` contains the dependency-first transitive import paths. Missing, empty, or null frontmatter yields `{}`. Nested values and scalar types are preserved, and unknown fields are retained.
 4. The command overrides the root `PersistentPreRun` so it does not load project configuration.
-5. Malformed YAML, unclosed frontmatter, unreadable input, and JSON write errors exit nonzero, with diagnostics on stderr and no JSON on stdout.
-6. The command does not validate the workflow schema, resolve imports, evaluate expressions, compile, install, or execute anything.
+5. Malformed YAML, unclosed frontmatter, unreadable input, unresolved or cyclic imports, and JSON write errors exit nonzero.
+6. The command resolves imports using the compiler's resolver, but does not validate the workflow schema, compile, install, or execute workflows. For stdin, imports resolve from the current directory or `--base-dir`, not from the source Git revision.
 
-Parity with the parser is enforced by tests in `pkg/cli/parse_command_test.go` that compare file and stdin output against `parser.ExtractFrontmatterFromContent` for the same inputs.
+Tests in `pkg/cli/parse_command_test.go` cover parser parity and the resolved import closure for file and stdin input.
 
 ## Alternatives Considered
 
@@ -35,7 +35,7 @@ Parity with the parser is enforced by tests in `pkg/cli/parse_command_test.go` t
 
 - Consumers get a stable, scriptable JSON interface with no Go dependency and no compilation step.
 - Reusing `parser.ExtractFrontmatterFromContent` and the parity tests keeps the CLI output aligned with the parser the compiler uses.
-- The stdin form lets callers read a specific committed revision without the command depending on Git or GitHub authentication.
+- The stdin form lets callers read a specific committed root document; local imports are read from the filesystem.
 
 **Negative**
 

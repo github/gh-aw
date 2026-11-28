@@ -1759,13 +1759,14 @@ Includes all frontmatter fields, imported workflow frontmatter (BFS traversal), 
 gh aw parse /path/to/repo/.github/workflows/example.md
 gh aw parse - < /path/to/repo/.github/workflows/example.md
 git -C /path/to/repo show <commit>:.github/workflows/example.md | gh aw parse -
+git -C /path/to/repo show <commit>:.github/workflows/example.md | gh aw parse - --base-dir /path/to/repo/.github/workflows
 ```
 
-On success, stdout contains one JSON object followed by a newline: the existing Markdown parser's frontmatter, without an envelope or Markdown body. Nested objects and arrays, including `if`, `imports`, and `on.workflow_dispatch.inputs`, are preserved. Strings, booleans, numbers, and null remain their corresponding JSON scalar types; quoted YAML strings remain strings. Object key order is not part of the contract.
+On success, stdout contains one JSON object followed by a newline: the existing Markdown parser's frontmatter, without an envelope or Markdown body. Nested objects and arrays, including `if`, `imports`, and `on.workflow_dispatch.inputs`, are preserved. When `imports` is present, `resolved-imports` is an array of the transitive import paths in dependency-first order, with duplicates removed. It is empty when there are no workflow imports. Strings, booleans, numbers, and null remain their corresponding JSON scalar types; quoted YAML strings remain strings. Object key order is not part of the contract.
 
-Missing fields remain absent. Missing, empty, or null frontmatter returns `{}`. Malformed YAML, unclosed frontmatter, unreadable input, and JSON output errors exit nonzero, with diagnostics on stderr. Parse and input errors produce no JSON on stdout.
+Missing fields remain absent. Missing, empty, or null frontmatter returns `{}`. Malformed YAML, unclosed frontmatter, unreadable input, unresolved imports, import cycles, a conflicting `resolved-imports` field, and JSON output errors exit nonzero, with diagnostics on stderr. Parse, input, and import errors produce no JSON on stdout.
 
-This command parses only the supplied content. It does not validate the workflow schema, resolve or fetch imports or includes, evaluate expressions, load project configuration, compile lock files, install, or execute workflows. Unknown frontmatter fields are retained. To read a specific Git revision, supply its content through stdin as above; the command itself does not invoke Git or require GitHub authentication.
+Imports use the compiler's resolver, including remote fetches, import-input substitution, and import processing rules. Remote references must resolve to a commit and are cached temporarily for this invocation. Repository-only imports are not supported. Local imports are resolved relative to the file's directory, or the current directory for stdin; `--base-dir` overrides this base. Stdin supplies only the root content: local imports come from the current filesystem, not the supplied Git revision. The command does not validate the workflow schema, load project configuration, compile lock files, install, or execute workflows. Unknown frontmatter fields are retained.
 
 #### `json-schema`
 
