@@ -67,6 +67,58 @@ func TestConnectorGoldenWorkflows(t *testing.T) {
 	}
 }
 
+func TestConnectorShortNameGoldenWorkflows(t *testing.T) {
+	entries, err := builtinConnectorFS.ReadDir("data/connectors")
+	require.NoError(t, err)
+	var embedded, scenarios []string
+	for _, entry := range entries {
+		embedded = append(embedded, strings.TrimSuffix(entry.Name(), ".md"))
+	}
+	for _, scenario := range connectorCompilerScenarios {
+		scenarios = append(scenarios, scenario.provider)
+	}
+	require.ElementsMatch(t, embedded, scenarios, "every bundled connector needs a workflow scenario")
+
+	for _, scenario := range connectorCompilerScenarios {
+		t.Run(scenario.provider, func(t *testing.T) {
+			sourcePath := filepath.Join("../..", connectorGoldenWorkflowDirectory, scenario.provider+"-golden.md")
+			source, err := os.ReadFile(sourcePath)
+			require.NoError(t, err)
+			localImport := ".github/workflows/connectors/" + scenario.provider + ".md"
+			text := string(source)
+			matches := 0
+			for _, quote := range []string{"", `"`} {
+				old := "uses: " + quote + localImport
+				matches += strings.Count(text, old)
+				text = strings.Replace(text, old, "uses: "+quote+"connector:"+scenario.provider, 1)
+			}
+			require.Equal(t, 1, matches)
+			source = []byte(text)
+
+			root := t.TempDir()
+			path := filepath.Join(root, ".github", "workflows", scenario.provider+"-golden.md")
+			require.NoError(t, os.MkdirAll(filepath.Dir(path), 0700))
+			require.NoError(t, os.WriteFile(path, source, 0600))
+			require.NoFileExists(t, filepath.Join(root, localImport))
+
+			compiler := NewCompiler(WithVersion("v0.0.0"))
+			compiler.gitRoot = root
+			compiler.SetActionMode(ActionModeDev)
+			compiler.SetNoEmit(true)
+			compiler.SetReadOnly(true)
+			require.NoError(t, compiler.CompileWorkflow(path))
+			data, err := compiler.ParseWorkflowFile(path)
+			require.NoError(t, err)
+			assertConnectorScenarioAuthority(t, data, scenario)
+			output, err := compiler.CompileToYAML(data, path)
+			require.NoError(t, err)
+			require.Contains(t, output, "workflow_dispatch:")
+			assertConnectorScenarioEmission(t, compiler, data, scenario, output)
+			require.NoFileExists(t, strings.TrimSuffix(path, ".md")+".lock.yml")
+		})
+	}
+}
+
 func validateGoldenWorkflowSource(t *testing.T, provider string, frontmatter map[string]any) {
 	t.Helper()
 	require.NotEmpty(t, frontmatter["name"], "golden workflows name their concrete scenario")
