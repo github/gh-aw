@@ -23,6 +23,25 @@ func mustParseRemoteOrigin(t *testing.T, spec string) *remoteImportOrigin {
 	return origin
 }
 
+func TestStableRemoteImportPathsDetectCycles(t *testing.T) {
+	dir := t.TempDir()
+	cache := NewImportCache(dir)
+	cache.SetRequireStablePaths(true)
+	sha := strings.Repeat("a", 40)
+	for name, content := range map[string]string{
+		"path/a.md": "---\nimports: [b.md]\n---\n",
+		"path/b.md": "---\nimports: [a.md]\n---\n",
+	} {
+		_, err := cache.Set("owner", "repo", name, sha, []byte(content))
+		require.NoError(t, err)
+	}
+	_, err := ProcessImportsFromFrontmatterWithSource(
+		map[string]any{"imports": []string{"owner/repo/path/a.md@" + sha}}, dir, cache, "", "",
+	)
+	var cycle *ImportCycleError
+	require.ErrorAs(t, err, &cycle)
+}
+
 func TestParseRemoteOrigin(t *testing.T) {
 	tests := []struct {
 		name        string
