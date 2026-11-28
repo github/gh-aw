@@ -123,6 +123,15 @@ func TestAutoModelRouting_EligibleEnginesRouteAsRouter(t *testing.T) {
 			wantEndpoints:       []any{"/responses", "/chat/completions"},
 			equivalentRouterSrc: autoModelFixture("engine:\n  id: copilot\n  model: router", "", ""),
 		},
+		{
+			name:                "engine.pi.model: auto on pi",
+			engineYAML:          "engine:\n  pi:\n    model: auto",
+			modelLine:           "",
+			wantProvider:        "",
+			wantAddedProvider:   false,
+			wantEndpoints:       []any{"/v1/messages", "/responses", "/chat/completions"},
+			equivalentRouterSrc: autoModelFixture("engine:\n  pi:\n    model: router", "", ""),
+		},
 	}
 
 	for _, tc := range cases {
@@ -139,9 +148,13 @@ func TestAutoModelRouting_EligibleEnginesRouteAsRouter(t *testing.T) {
 
 			require.NotNil(t, compiled.data.AutoModelRouting)
 			require.True(t, compiled.data.AutoModelRouting.Routed)
+			require.False(t, compiled.data.AutoModelRouting.FromImport)
+			require.True(t, compiled.data.AutoModelRouting.CanAutoFix, "locally declared engine and model must be auto-fixable")
 			require.Equal(t, tc.wantAddedProvider, compiled.data.AutoModelRouting.AddedGitHubProvider)
 			require.Positive(t, compiled.warnings, "deprecation warning must be counted")
 			require.Contains(t, compiled.stderr, "is deprecated and now routes as model: router")
+			require.Contains(t, compiled.stderr, "gh aw fix --write")
+			require.NotContains(t, compiled.stderr, "inherited from an import")
 			require.NotContains(t, compiled.stderr, defaultRoutingNoticeMarker, "must not emit omitted-model default notice")
 			if tc.wantAddedProvider {
 				require.Contains(t, compiled.stderr, "engine.model-provider: github")
@@ -261,7 +274,7 @@ func TestAutoModelRouting_IneligibleKeepsAutoWithWarning(t *testing.T) {
 			extra:          "models:\n  allowed: [gpt-5.6-luna]",
 			wantModel:      "copilot/auto",
 			wantProvider:   "",
-			wantReasonPart: "excluded by models.allowed",
+			wantReasonPart: "violate model policy",
 		},
 		{
 			name:           "stage-2 rollback on codex copilot/auto with incompatible models.blocked",
@@ -270,7 +283,7 @@ func TestAutoModelRouting_IneligibleKeepsAutoWithWarning(t *testing.T) {
 			extra:          "models:\n  blocked: [\"github-copilot/gpt-*\"]",
 			wantModel:      "copilot/auto",
 			wantProvider:   "",
-			wantReasonPart: "excluded by models.allowed",
+			wantReasonPart: "violate model policy",
 		},
 	}
 
@@ -285,6 +298,8 @@ func TestAutoModelRouting_IneligibleKeepsAutoWithWarning(t *testing.T) {
 			require.NotNil(t, compiled.data.AutoModelRouting)
 			require.False(t, compiled.data.AutoModelRouting.Routed)
 			require.Contains(t, compiled.data.AutoModelRouting.Reason, tc.wantReasonPart)
+			require.NotContains(t, compiled.data.AutoModelRouting.Reason, "\n", "rollback reason must be single-line")
+			require.NotContains(t, compiled.data.AutoModelRouting.Reason, "Validation failed for field", "rollback reason must be timestamp-free and concise")
 			require.Positive(t, compiled.warnings, "deprecation warning must still be emitted")
 			require.Contains(t, compiled.stderr, "kept existing auto behavior because")
 			require.Contains(t, compiled.stderr, tc.wantReasonPart)

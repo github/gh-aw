@@ -142,9 +142,16 @@ func (c *Compiler) applyAutoModelRouting(ctx *workflowBuildContext) {
 		modelRoutingAutoLog.Printf("Preserving custom models.auto alias in %s", filepath.Base(ctx.cleanPath))
 		return
 	}
-	_, _, authoredLocally := AuthoredAutoModelPath(ctx.frontmatter.Frontmatter)
+	// Read the unmutated authored frontmatter (ctx.document.Frontmatter) when
+	// available because built-in engine import injection can remove string-form
+	// `engine: claude`/`codex` from ctx.frontmatter.Frontmatter during setup.
+	authoredFM := ctx.frontmatter.Frontmatter
+	if ctx.document != nil && ctx.document.Frontmatter != nil {
+		authoredFM = ctx.document.Frontmatter
+	}
+	_, _, authoredLocally := AuthoredAutoModelPath(authoredFM)
 	fromImport := !authoredLocally
-	canPinLocalProvider := CanPinEngineGitHubProviderLocally(ctx.frontmatter.Frontmatter)
+	canPinLocalProvider := CanPinEngineGitHubProviderLocally(authoredFM)
 	if data.EngineConfig == nil {
 		data.AutoModelRouting = keepAutoModelOutcome(authored, "", fromImport, "no engine configuration")
 		return
@@ -191,7 +198,7 @@ func (c *Compiler) resolveAutoModelRouting(data *WorkflowData, authored string, 
 		Mode:      defaultModelRoutingMode,
 		requested: "router",
 	}
-	if reason := defaultModelRoutingValidationFailure(c, data); reason != "" {
+	if reason := autoModelRoutingValidationFailure(c, data); reason != "" {
 		data.Model = prevModel
 		data.EngineConfig.ModelRouting = nil
 		data.EngineConfig.LLMProvider = prevProvider
@@ -229,6 +236,36 @@ func autoModelRoutingStage1Ineligibility(data *WorkflowData, authored string) st
 		return fmt.Sprintf("AWF version does not support router fallback (requires %s or newer)", constants.AWFModelRoutingFallbackMinVersion)
 	}
 	return autoModelThreatDetectionProviderChange(data, authored)
+}
+
+// autoModelRoutingValidationFailure runs the same explicit-routing validators
+// as defaultModelRoutingValidationFailure, returning a concise, timestamp-free
+// single-line reason suitable for deterministic compiler warnings.
+func autoModelRoutingValidationFailure(c *Compiler, data *WorkflowData) string {
+	engineID := data.EngineConfig.ID
+	for _, err := range []error{
+		validateModelRouting(data, engineID),
+		validateSandboxAgentImages(data),
+		c.validatePiEngineConfig(data),
+		validateEngineFallbackModels(data),
+	} {
+		if err != nil {
+			return conciseValidationReason(err)
+		}
+	}
+	if warnings := modelRoutingCompileWarnings(data); len(warnings) > 0 {
+		return strings.Join(warnings, "; ")
+	}
+	return ""
+}
+
+func conciseValidationReason(err error) string {
+	var validationErr *WorkflowValidationError
+	if errors.As(err, &validationErr) && strings.TrimSpace(validationErr.Reason) != "" {
+		return strings.TrimSpace(validationErr.Reason)
+	}
+	firstLine, _, _ := strings.Cut(strings.TrimSpace(err.Error()), "\n")
+	return firstLine
 }
 
 // autoModelThreatDetectionProviderChange reports when clearing an authored

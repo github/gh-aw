@@ -148,6 +148,22 @@ Do work.
 			wantContains:   []string{"id: copilot", "model: router"},
 			wantNotContain: []string{"model: auto"},
 		},
+		{
+			name: "engine.pi.model: auto on pi",
+			input: `---
+on: workflow_dispatch
+permissions:
+  contents: read
+  copilot-requests: write
+engine:
+  pi:
+    model: auto
+---
+Do work.
+`,
+			wantContains:   []string{"pi:", "model: router"},
+			wantNotContain: []string{"model: auto", "model-provider:"},
+		},
 	}
 
 	for _, tc := range cases {
@@ -256,7 +272,7 @@ models:
 ---
 Do work.
 `,
-			wantReasonPart: "excluded by models.allowed",
+			wantReasonPart: "violate model policy",
 		},
 		{
 			name: "native claude without model-provider: github",

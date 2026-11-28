@@ -63,7 +63,7 @@ func applyModelAutoToRouter(content string, frontmatter map[string]any, filePath
 			outcome.AuthoredModel, outcome.Reason))
 		return content, false, nil
 	}
-	if outcome.AddedGitHubProvider && !workflow.CanPinEngineGitHubProviderLocally(frontmatter) {
+	if outcome.AddedGitHubProvider && !outcome.CanAutoFix {
 		warnModelAutoUnchanged(filePath, fmt.Sprintf(
 			"left model: %s unchanged because engine %q is inherited from an import and adding engine.model-provider: github locally would conflict with or invalidate the engine config. Set engine.model-provider: github alongside the imported engine (or define engine locally) and switch to model: router. See https://github.github.com/gh-aw/reference/model-routing/",
 			outcome.AuthoredModel, outcome.EngineID))
