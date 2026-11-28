@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"slices"
 )
 
 // tryLoadCachedRunResult attempts to return a pre-built DownloadResult from the on-disk
@@ -59,6 +60,9 @@ func tryLoadCachedRunResult(
 // continuation evidence and artifacts the current request needs. Stale continuation
 // evidence is invalidated so the fresh download replaces it.
 func cachedRunArtifactsUsable(run WorkflowRun, runOutputDir string, cachedRun WorkflowRun, artifactFilter []string) bool {
+	if slices.Contains(artifactFilter, parallelExperimentArtifactPrefix) {
+		return false
+	}
 	if continuationEvidenceIdentityChanged(cachedRun, run) {
 		logsOrchestratorLog.Printf("Cache bypass for run %d: continuation evidence belongs to a different attempt or run revision", run.DatabaseID)
 		if err := invalidateContinuationArtifactEvidence(runOutputDir); err != nil {

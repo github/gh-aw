@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -262,6 +263,18 @@ func planArtifactDownload(ctx context.Context, opts downloadArtifactsOptions, sh
 	// extract (they are not zip archives). When found, skip them and download the
 	// remaining artifacts individually so the bulk download never encounters them.
 	downloadableNames, dockerBuildCount, listErr := enumerateDownloadableArtifacts(ctx, opts)
+	if slices.Contains(opts.artifactFilter, parallelExperimentArtifactPrefix) {
+		if listErr != nil {
+			return nil, false, false, fmt.Errorf("cannot enumerate parallel experiment artifacts: %w", listErr)
+		}
+		if len(downloadableNames) > 0 {
+			missing := missingParallelDownloadNames(downloadableNames, opts.outputDir)
+			if len(missing) == 0 {
+				return nil, false, true, nil
+			}
+			downloadableNames = missing
+		}
+	}
 
 	// Incremental download: when the output directory already holds some artifacts but
 	// lacks the complete-download marker, check which artifacts are actually missing and
@@ -322,6 +335,9 @@ func finalizeArtifactDownload(ctx context.Context, opts downloadArtifactsOptions
 // download can be skipped entirely (done=true) or narrowed to the artifacts that are
 // still missing (returned as the new artifact filter).
 func resolveCachedArtifacts(ctx context.Context, opts downloadArtifactsOptions, shouldLogProgress bool) ([]string, bool) {
+	if slices.Contains(opts.artifactFilter, parallelExperimentArtifactPrefix) {
+		return opts.artifactFilter, false
+	}
 	if len(opts.artifactFilter) > 0 {
 		if isInfoOnlyArtifactFilter(opts.artifactFilter) && fileutil.FileExists(filepath.Join(opts.outputDir, "aw_info.json")) {
 			return opts.artifactFilter, true

@@ -111,7 +111,7 @@ var artifactSetArtifacts = map[ArtifactSet][]string{
 	ArtifactSetGitHubAPI: {constants.ActivationArtifactName.String(), constants.AgentArtifactName.String()},
 	// experiment: A/B experiment state uploaded by the activation job; the usage artifact
 	// also carries a copy of the state and assignments staged by the conclusion job.
-	ArtifactSetExperiment: {constants.ExperimentArtifactName.String(), constants.UsageArtifactName.String()},
+	ArtifactSetExperiment: {constants.ExperimentArtifactName.String(), constants.UsageArtifactName.String(), parallelExperimentArtifactPrefix},
 	// usage: compact conclusion artifact for lightweight reporting/forecasting.
 	ArtifactSetUsage:    {constants.UsageArtifactName.String()},
 	ArtifactSetOutcomes: {constants.SafeOutputItemsArtifactName.String(), constants.AgentOutputFallbackArtifactName.String(), constants.UsageArtifactName.String()},
@@ -272,6 +272,12 @@ func artifactMatchesFilter(name string, filter []string) bool {
 		return true
 	}
 	for _, f := range filter {
+		if isParallelExperimentArtifact(name) {
+			if f == parallelExperimentArtifactPrefix || f == name {
+				return true
+			}
+			continue
+		}
 		if name == f || strings.HasSuffix(name, "-"+f) {
 			return true
 		}
@@ -320,6 +326,11 @@ func findMissingFilterEntries(filter []string, outputDir string) []string {
 	var missing []string
 	for _, f := range filter {
 		found := false
+		if f == parallelExperimentArtifactPrefix {
+			// A single downloaded entry cannot establish that all matrix artifacts are present.
+			missing = append(missing, f)
+			continue
+		}
 		for _, d := range dirs {
 			// Mirror the artifactMatchesFilter logic: accept exact match or any directory
 			// ending in "-{f}", which covers the workflow_call prefix pattern where GitHub
@@ -327,7 +338,7 @@ func findMissingFilterEntries(filter []string, outputDir string) []string {
 			// hypothetical directory named "super-agent" would satisfy filter entry "agent",
 			// but in practice artifact directories in a run folder only come from GitHub
 			// Actions downloads and follow the "{hash}-{base}" or exact-base patterns.
-			if d == f || strings.HasSuffix(d, "-"+f) || agentOutputTransportAlternates(f, d) {
+			if artifactMatchesFilter(d, []string{f}) || agentOutputTransportAlternates(f, d) {
 				found = true
 				break
 			}
@@ -358,7 +369,28 @@ func artifactNameMatchesBase(name, base string) bool {
 	if base == "" {
 		return false
 	}
-	return name == base || strings.HasSuffix(name, "-"+base)
+	return !isParallelExperimentArtifact(name) && (name == base || strings.HasSuffix(name, "-"+base))
+}
+
+const parallelExperimentArtifactPrefix = "parallel-experiment-"
+
+func isParallelExperimentArtifact(name string) bool {
+	return strings.HasPrefix(name, parallelExperimentArtifactPrefix)
+}
+
+func missingParallelDownloadNames(names []string, outputDir string) []string {
+	var missing []string
+	for _, name := range names {
+		if isParallelExperimentArtifact(name) {
+			info, err := os.Stat(filepath.Join(outputDir, downloadedArtifactsMarkerDir, name))
+			if err != nil || !info.Mode().IsRegular() {
+				missing = append(missing, name)
+			}
+		} else if len(findMissingFilterEntries([]string{name}, outputDir)) > 0 {
+			missing = append(missing, name)
+		}
+	}
+	return missing
 }
 
 func markArtifactDownloaded(outputDir, artifactName string) error {

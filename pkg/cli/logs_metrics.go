@@ -228,7 +228,7 @@ func aggregateLogFileMetrics(logDir string, metrics *LogMetrics, detectedEngine 
 		// the same agent session output appears in both the agent artifact
 		// (e.g. agent-stdio.log) and the workflow run logs (workflow-logs/).
 		if d.IsDir() {
-			if d.Name() == "workflow-logs" {
+			if d.Name() == "workflow-logs" || (path != logDir && isParallelExperimentArtifact(d.Name())) {
 				logsMetricsLog.Printf("Skipping workflow-logs directory (GHA runner logs, not agent metrics): %s", path)
 				return filepath.SkipDir
 			}
@@ -576,6 +576,9 @@ func extractMCPFailuresFromRun(runDir string, run WorkflowRun, verbose bool, exp
 
 		// Skip directories
 		if d.IsDir() {
+			if path != runDir && isParallelExperimentArtifact(d.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 
@@ -894,6 +897,9 @@ func extractSkillActivationsFromLogFiles(runDir string, run WorkflowRun, verbose
 			return err
 		}
 		if d.IsDir() {
+			if path != runDir && isParallelExperimentArtifact(d.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 

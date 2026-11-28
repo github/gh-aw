@@ -952,7 +952,11 @@ func compactLogsData(data LogsData) LogsData {
 		data.Runs[i].TaskDomain = nil
 		data.Runs[i].AgenticAssessments = nil
 		data.Runs[i].TokenUsageSummary = nil
-		data.Runs[i].Experiments = nil
+		if exp := data.Runs[i].Experiments; exp != nil && len(exp.Parallel) > 0 {
+			data.Runs[i].Experiments = &ExperimentData{Parallel: exp.Parallel}
+		} else {
+			data.Runs[i].Experiments = nil
+		}
 		data.Runs[i].AmbientContext = nil
 		data.Runs[i].AwContext = nil
 	}

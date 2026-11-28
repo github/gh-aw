@@ -132,6 +132,9 @@ func findEventsJSONLFile(logDir string) string {
 		if info == nil {
 			return nil
 		}
+		if path != logDir && info.IsDir() && isParallelExperimentArtifact(info.Name()) {
+			return filepath.SkipDir
+		}
 		if !info.IsDir() && info.Name() == "events.jsonl" && foundPath == "" {
 			foundPath = path
 			return errWalkStop

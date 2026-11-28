@@ -52,6 +52,9 @@ func findTokenUsageFile(runDir string) string {
 			tokenUsageLog.Printf("walk error at %s: %v", path, err)
 			return nil
 		}
+		if path != runDir && info != nil && info.IsDir() && isParallelExperimentArtifact(info.Name()) {
+			return filepath.SkipDir
+		}
 		if info == nil || info.IsDir() {
 			return nil
 		}
@@ -92,6 +95,9 @@ func findAgentUsageFile(runDir string) string {
 		if err != nil {
 			tokenUsageLog.Printf("walk error at %s: %v", path, err)
 			return nil
+		}
+		if path != runDir && info != nil && info.IsDir() && isParallelExperimentArtifact(info.Name()) {
+			return filepath.SkipDir
 		}
 		if info == nil || info.IsDir() {
 			return nil

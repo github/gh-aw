@@ -164,10 +164,14 @@ safe-output execution, grader, eval, or aggregation jobs. Safe-output requests a
 retained as staged intents, not delivered effects. Operators download experimental
 artifacts and run graders, BinEval, or comparative analysis separately.
 
-Download bundles through the Actions UI or
-`gh run download <run-id> --pattern 'parallel-experiment-*'`. Keep each artifact
-in its own directory. Existing `gh aw experiments analyze` across-run reports do
-not automatically merge these parallel bundles.
+Use `gh aw audit <run-id> --artifacts experiment` or
+`gh aw logs --artifacts experiment` to download parallel bundles alongside
+production experiment evidence. Audit and logs JSON reports include each available
+manifest separately under `experiments.parallel`. Keep each artifact in its own
+directory, and inspect downloaded bundles with
+`gh aw experiments parallel <download-directory> --json`. This local report does
+not establish complete job coverage or evaluate the results. Existing
+`gh aw experiments analyze` across-run reports do not merge parallel bundles.
 
 Keep production and experimental accounting separate. Existing across-run
 experiment state and analysis are not evidence that every parallel variant ran.

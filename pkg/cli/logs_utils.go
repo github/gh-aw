@@ -101,6 +101,9 @@ func findAgentOutputFile(logDir string) (string, bool) {
 		if info == nil {
 			return nil
 		}
+		if path != logDir && info.IsDir() && isParallelExperimentArtifact(info.Name()) {
+			return filepath.SkipDir
+		}
 		if !info.IsDir() && strings.EqualFold(info.Name(), constants.AgentOutputArtifactName.String()) {
 			foundPath = path
 			return errWalkStop
@@ -219,6 +222,9 @@ func findAgentLogFile(logDir string, engine workflow.CodingAgentEngine) (string,
 				if info == nil {
 					return nil
 				}
+				if path != logDir && info.IsDir() && isParallelExperimentArtifact(info.Name()) {
+					return filepath.SkipDir
+				}
 				if !info.IsDir() && info.Name() == targetBase && foundByBase == "" {
 					foundByBase = path
 					return errWalkStop
@@ -245,6 +251,9 @@ func findAgentLogFile(logDir string, engine workflow.CodingAgentEngine) (string,
 			}
 			if info == nil {
 				return nil
+			}
+			if path != logDir && info.IsDir() && isParallelExperimentArtifact(info.Name()) {
+				return filepath.SkipDir
 			}
 			fileName := info.Name()
 			if !info.IsDir() {
@@ -284,6 +293,9 @@ func findAgentLogFile(logDir string, engine workflow.CodingAgentEngine) (string,
 		}
 		if info == nil {
 			return nil
+		}
+		if path != logDir && info.IsDir() && isParallelExperimentArtifact(info.Name()) {
+			return filepath.SkipDir
 		}
 		if !info.IsDir() && info.Name() == "agent-stdio.log" {
 			foundPath = path

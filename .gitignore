@@ -25,6 +25,7 @@ go.work
 dist/
 build/
 run-*/
+/.cache/
 
 # IDE files
 .idea/

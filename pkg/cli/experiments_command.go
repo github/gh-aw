@@ -43,7 +43,8 @@ run history.
 
 Available subcommands:
   - list    - List all experiment workflow branches (default)
-  - analyze - Analyze a specific experiment workflow in detail`,
+  - analyze - Analyze a specific experiment workflow in detail
+  - parallel - Inspect locally downloaded parallel experiment evidence`,
 		Example: `  ` + string(constants.CLIExtensionPrefix) + ` experiments                        # List all experiments (default)
   ` + string(constants.CLIExtensionPrefix) + ` experiments list                   # List all experiments
   ` + string(constants.CLIExtensionPrefix) + ` experiments list --json            # Output in JSON format
@@ -64,6 +65,7 @@ Available subcommands:
 
 	cmd.AddCommand(NewExperimentsListSubcommand())
 	cmd.AddCommand(NewExperimentsAnalyzeSubcommand())
+	cmd.AddCommand(newExperimentsParallelSubcommand())
 
 	return cmd
 }

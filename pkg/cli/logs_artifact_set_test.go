@@ -167,9 +167,9 @@ func TestResolveArtifactFilter(t *testing.T) {
 			expected: []string{"activation", "agent"},
 		},
 		{
-			name:     "experiment resolves to experiment and usage artifacts",
+			name:     "experiment resolves to production and parallel artifacts",
 			sets:     []string{"experiment"},
-			expected: []string{constants.ExperimentArtifactName.String(), constants.UsageArtifactName.String()},
+			expected: []string{constants.ExperimentArtifactName.String(), constants.UsageArtifactName.String(), parallelExperimentArtifactPrefix},
 		},
 		{
 			name:     "usage resolves to usage artifact",

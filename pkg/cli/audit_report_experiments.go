@@ -6,7 +6,10 @@
 package cli
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +31,64 @@ type ExperimentData struct {
 	// CumulativeCounts maps each experiment name to a per-variant invocation counter.
 	// e.g. {"caveman": {"yes": 3, "no": 2}}
 	CumulativeCounts map[string]map[string]int `json:"cumulative_counts,omitempty"`
+
+	// Parallel contains independent matrix evidence, never production assignments.
+	Parallel []ParallelExperiment `json:"parallel,omitempty"`
+}
+
+// ParallelExperiment retains the complete manifest within its artifact namespace.
+type ParallelExperiment struct {
+	Artifact string          `json:"artifact"`
+	Manifest json.RawMessage `json:"manifest,omitempty"`
+	Error    string          `json:"error,omitempty"`
+}
+
+func extractParallelExperiments(logsPath string) []ParallelExperiment {
+	entries, err := os.ReadDir(logsPath)
+	if err != nil {
+		return nil
+	}
+	var result []ParallelExperiment
+	for _, entry := range entries {
+		if !entry.IsDir() || !isParallelExperimentArtifact(entry.Name()) {
+			continue
+		}
+		result = append(result, readParallelExperiment(logsPath, entry.Name()))
+	}
+	return result
+}
+
+func readParallelExperiment(parent, name string) ParallelExperiment {
+	item := ParallelExperiment{Artifact: name}
+	manifestPath := filepath.Join(parent, name, "parallel.json")
+	info, err := os.Lstat(manifestPath)
+	if err != nil || !info.Mode().IsRegular() {
+		item.Error = "parallel manifest unavailable"
+	} else if info.Size() > 1024*1024 {
+		item.Error = "parallel manifest exceeds size limit"
+	} else {
+		raw, readErr := readParallelManifest(manifestPath)
+		raw = bytes.TrimSpace(raw)
+		if readErr != nil || len(raw) > 1024*1024 || !json.Valid(raw) || !bytes.HasPrefix(raw, []byte("{")) {
+			item.Error = "invalid parallel manifest"
+		} else {
+			item.Manifest = raw
+		}
+	}
+	return item
+}
+
+func readParallelManifest(path string) ([]byte, error) {
+	file, err := os.Open(path) // #nosec G304 -- path is an artifact directory entry and fixed manifest filename.
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			experimentDataLog.Printf("Failed to close parallel manifest: %v", err)
+		}
+	}()
+	return io.ReadAll(io.LimitReader(file, 1024*1024+1))
 }
 
 // experimentStateDirCandidates returns the directories that may contain experiment state
@@ -97,7 +158,19 @@ func extractExperimentData(logsPath string) *ExperimentData {
 	if logsPath == "" {
 		return nil
 	}
+	production := extractProductionExperimentData(logsPath)
+	parallel := extractParallelExperiments(logsPath)
+	if len(parallel) == 0 {
+		return production
+	}
+	if production == nil {
+		production = &ExperimentData{}
+	}
+	production.Parallel = parallel
+	return production
+}
 
+func extractProductionExperimentData(logsPath string) *ExperimentData {
 	experimentDataLog.Printf("Extracting experiment data from: %s", logsPath)
 
 	statePath := findExperimentStatePath(logsPath)
