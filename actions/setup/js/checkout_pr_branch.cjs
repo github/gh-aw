@@ -564,8 +564,13 @@ async function main() {
         core.setFailed(`${ERR_PERMISSION}: Refusing PR checkout: pull_request_number must identify a canonical positive PR number`);
         return;
       }
-      pullRequest = { number: prNumber, state: "open" };
-      core.info(`Detected workflow_dispatch event for PR #${prNumber} via pull_request_number, will fetch PR ref`);
+      const currentRepo = `${context.repo.owner}/${context.repo.repo}`.toLowerCase();
+      const targetRepo = (process.env.GH_AW_DIRECT_PR_TARGET_REPO || process.env.GH_AW_TARGET_REPO_SLUG || currentRepo).toLowerCase();
+      const checkoutRepo = (process.env.GH_AW_DIRECT_PR_CHECKOUT_REPO || currentRepo).toLowerCase();
+      if (parsePullRequestNumber(process.env.GH_AW_DIRECT_PR_TARGET) === prNumber && targetRepo === currentRepo && checkoutRepo === currentRepo && process.env.GH_AW_DIRECT_PR_MULTIPLE_REPOS !== "true") {
+        pullRequest = { number: prNumber, state: "open" };
+        core.info(`Detected workflow_dispatch event for PR #${prNumber} via pull_request_number, will fetch PR ref`);
+      }
     }
   }
 

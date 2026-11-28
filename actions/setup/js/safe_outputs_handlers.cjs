@@ -1521,11 +1521,18 @@ function createHandlers(server, appendSafeOutput, config = {}) {
     // Resolve the effective target PR number so a recorded PR-head baseline can be
     // validated against it: branch name + repo alone don't uniquely identify a fork PR
     // (two forks can open identically-named branches against the same base repo).
-    let effectivePushPRNumber = entry.pull_request_number != null ? parseInt(String(entry.pull_request_number), 10) : undefined;
-    if (effectivePushPRNumber == null || Number.isNaN(effectivePushPRNumber)) {
+    const pushTarget = String(pushConfig.target || "triggering");
+    let effectivePushPRNumber;
+    if (pushTarget === "triggering") {
       const pushInvocationContext = resolveInvocationContext(context);
       const { effectivePayload: pushEffectivePayload } = resolveEffectiveContext(pushInvocationContext, context);
       effectivePushPRNumber = pushEffectivePayload?.pull_request?.number || pushEffectivePayload?.issue?.number || undefined;
+    } else {
+      const targetNumber = pushTarget === "*" ? entry.pull_request_number : pushTarget;
+      if (/^[1-9]\d*$/.test(String(targetNumber))) {
+        const parsed = Number(targetNumber);
+        if (Number.isSafeInteger(parsed)) effectivePushPRNumber = parsed;
+      }
     }
 
     const prHeadBaseline = resolvePRHeadBaselineForPush(entry.branch, itemRepo, effectivePushPRNumber, server);

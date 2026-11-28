@@ -18,19 +18,14 @@ function getCurrentBranch(customCwd) {
   // branch changes made during the workflow execution
   const cwd = customCwd || process.env.GITHUB_WORKSPACE || process.cwd();
   try {
-    const branch = execSync("git rev-parse --abbrev-ref HEAD", {
+    const ref = execSync("git symbolic-ref --quiet HEAD", {
       encoding: "utf8",
       cwd: cwd,
       stdio: ["pipe", "pipe", "pipe"],
       timeout: GIT_BRANCH_TIMEOUT_MS,
     }).trim();
-    // "HEAD" means the repo is in a detached-HEAD state (common with the
-    // default actions/checkout behaviour).  It is not a valid branch name;
-    // fall through to the GITHUB_HEAD_REF / GITHUB_REF_NAME env-var
-    // fallbacks so callers get a real ref rather than the literal "HEAD",
-    // which would later produce a misleading "remote ref not present" error.
-    if (branch && branch !== "HEAD") {
-      return branch;
+    if (ref.startsWith("refs/heads/")) {
+      return ref.slice("refs/heads/".length);
     }
   } catch (error) {
     // Ignore error and try fallback

@@ -407,6 +407,9 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
   it.each(["checked-out PR", "tracking ref"])("stages an incremental update on the pre-agent head from a %s", async baselineSource => {
     const workspace = makeTempDir("gh-aw-prestage-incremental-");
     initRepo(workspace, "main");
+    fs.writeFileSync(path.join(workspace, "AGENTS.md"), "PR config\n");
+    git(["add", "AGENTS.md"], workspace);
+    git(["commit", "-m", "config"], workspace);
     const headRef = "feat/incremental-sample";
     git(["checkout", "-b", headRef], workspace);
     fs.writeFileSync(path.join(workspace, "README.md"), "# existing PR change\n");
@@ -417,9 +420,11 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
       git(["update-ref", `refs/remotes/origin/${headRef}`, baselineSha], workspace);
       git(["checkout", "main"], workspace);
       git(["branch", "-D", headRef], workspace);
+      git(["tag", headRef], workspace);
     } else {
       git(["update-ref", "refs/remotes/origin/pr-head", baselineSha], workspace);
     }
+    fs.writeFileSync(path.join(workspace, "AGENTS.md"), "trusted config\n");
 
     const eventPath = path.join(os.tmpdir(), `gh-aw-event-${path.basename(workspace)}.json`);
     fs.writeFileSync(eventPath, JSON.stringify({ inputs: { pull_request_number: "123" } }));
@@ -442,6 +447,10 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
       await stagePatch({ tool: "push_to_pull_request_branch", arguments: { message: "Sample update" }, sidecars: { patch } }, 0, workspace);
 
       expect(git(["rev-parse", "HEAD^"], workspace).trim()).toBe(baselineSha);
+      expect(git(["symbolic-ref", "HEAD"], workspace).trim()).toBe(`refs/heads/${headRef}`);
+      expect(require("./get_current_branch.cjs").getCurrentBranch(workspace)).toBe(headRef);
+      expect(git(["show", "--format=", "--name-only", "HEAD"], workspace)).not.toContain("AGENTS.md");
+      expect(git(["show", "HEAD:AGENTS.md"], workspace)).toBe("PR config\n");
       expect(fs.readFileSync(path.join(workspace, "README.md"), "utf8")).toBe("# sample update\n");
       const { generateGitPatch } = require("./generate_git_patch.cjs");
       const transport = await generateGitPatch(headRef, "main", {
@@ -454,11 +463,30 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
       expect(incrementalPatch).toContain("-# existing PR change");
       expect(incrementalPatch).toContain("+# sample update");
       expect(incrementalPatch).not.toContain("-# seed");
+      const { generateGitBundle } = require("./generate_git_bundle.cjs");
+      const bundle = await generateGitBundle(headRef, "main", { cwd: workspace, mode: "incremental", incrementalBaseSha: baselineSha });
+      expect(bundle.success).toBe(true);
+      expect(git(["bundle", "list-heads", bundle.bundlePath], workspace)).toContain(`refs/heads/${headRef}`);
     } finally {
       require.cache[modulePath] = cachedModule;
       fetchSpy.mockRestore();
       vi.unstubAllEnvs();
       fs.rmSync(eventPath, { force: true });
+      fs.rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when no prepared PR-head branch exists", async () => {
+    const workspace = makeTempDir("gh-aw-prestage-missing-head-");
+    initRepo(workspace, "main");
+    const eventPath = path.join(workspace, "event.json");
+    fs.writeFileSync(eventPath, JSON.stringify({ pull_request: { head: { ref: "missing-head" } } }));
+    vi.stubEnv("GITHUB_EVENT_PATH", eventPath);
+    try {
+      await expect(preStagePatch({ tool: "push_to_pull_request_branch", arguments: {}, sidecars: { patch: newFileDiff("sample.txt", "sample\n") } }, 0, workspace)).rejects.toThrow("missing prepared PR-head branch");
+      expect(git(["branch", "--list", "missing-head"], workspace).trim()).toBe("");
+    } finally {
+      vi.unstubAllEnvs();
       fs.rmSync(workspace, { recursive: true, force: true });
     }
   });
@@ -596,6 +624,7 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
     initRepo(workspace, "main");
 
     const headRef = "feat/copilot-push-branch";
+    git(["branch", headRef], workspace);
     const eventPath = path.join(workspace, "event.json");
     fs.writeFileSync(
       eventPath,
@@ -636,6 +665,7 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
     initRepo(workspace, "main");
 
     const headRef = "feat/issue-comment-branch";
+    git(["branch", headRef], workspace);
     const eventPath = path.join(workspace, "event.json");
     fs.writeFileSync(
       eventPath,
@@ -701,6 +731,7 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
     initRepo(workspace, "main");
 
     const headRef = "feat/dispatch-pr-number";
+    git(["branch", headRef], workspace);
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -749,6 +780,7 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
     initRepo(workspace, "main");
 
     const headRef = "feat/explicit-pr-number";
+    git(["branch", headRef], workspace);
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -785,6 +817,7 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
     initRepo(workspace, "main");
 
     const headRef = "feat/explicit-repo-pr";
+    git(["branch", headRef], workspace);
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -842,6 +875,7 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
     initRepo(workspace, "main");
 
     const headRef = "feat/siderepo-pr-branch";
+    git(["branch", headRef], workspace);
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -893,6 +927,7 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
     initRepo(workspace, "main");
 
     const headRef = "feat/issue-side-repo";
+    git(["branch", headRef], workspace);
     const eventPath = path.join(workspace, "event.json");
     fs.writeFileSync(
       eventPath,

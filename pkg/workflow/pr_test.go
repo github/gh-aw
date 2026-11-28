@@ -568,6 +568,20 @@ func TestGeneratePRReadyForReviewCheckout_PassesAllowedBots(t *testing.T) {
 	assert.Contains(t, yaml.String(), `GH_AW_ALLOWED_BOTS: "my-app[bot],other-app"`)
 }
 
+func TestGeneratePRReadyForReviewCheckout_DirectTargetBinding(t *testing.T) {
+	var yaml strings.Builder
+	writePRReadyForReviewCheckoutAction(&yaml, &WorkflowData{
+		Permissions: "contents: read",
+		SafeOutputs: &SafeOutputsConfig{PushToPullRequestBranch: &PushToPullRequestBranchConfig{
+			Target: "${{ inputs.pull_request_number }}", TargetRepoSlug: "${{ inputs.target_repo }}",
+		}},
+		CheckoutConfigs: []*CheckoutConfig{{Repository: "owner/root"}},
+	}, true)
+	assert.Contains(t, yaml.String(), `GH_AW_DIRECT_PR_TARGET: "${{ inputs.pull_request_number }}"`)
+	assert.Contains(t, yaml.String(), `GH_AW_DIRECT_PR_TARGET_REPO: "${{ inputs.target_repo }}"`)
+	assert.Contains(t, yaml.String(), `GH_AW_DIRECT_PR_CHECKOUT_REPO: "owner/root"`)
+}
+
 func TestFrontmatterHasTrigger(t *testing.T) {
 	tests := []struct {
 		name     string

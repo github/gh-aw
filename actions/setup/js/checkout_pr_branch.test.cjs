@@ -134,6 +134,7 @@ describe("checkout_pr_branch.cjs", () => {
     process.env.GITHUB_SERVER_URL = "https://github.com";
     delete process.env.GH_AW_ALLOWED_BOTS;
     delete process.env.GH_AW_PULL_REQUEST_FLOATING_HEAD;
+    vi.unstubAllEnvs();
   });
 
   afterEach(() => {
@@ -1652,6 +1653,7 @@ If the pull request is still open, verify that:
 
   describe("workflow_dispatch events with aw_context", () => {
     beforeEach(() => {
+      vi.stubEnv("GH_AW_DIRECT_PR_TARGET", "123");
       mockContext.eventName = "workflow_dispatch";
       mockContext.payload = {
         repository: { fork: false },
@@ -1691,6 +1693,22 @@ If the pull request is still open, verify that:
       expect(mockCore.exportVariable).toHaveBeenCalledWith("GH_AW_PR_HEAD_BASE_PR_NUMBER", "123");
       expect(mockCore.setOutput).toHaveBeenCalledWith("checked_out", "true");
       expect(mockCore.setFailed).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["different target", "GH_AW_DIRECT_PR_TARGET", "456"],
+      ["missing target", "GH_AW_DIRECT_PR_TARGET", ""],
+      ["side repository", "GH_AW_DIRECT_PR_TARGET_REPO", "other/repo"],
+      ["side checkout", "GH_AW_DIRECT_PR_CHECKOUT_REPO", "other/repo"],
+      ["environment target", "GH_AW_TARGET_REPO_SLUG", "other/repo"],
+      ["multiple allowed repositories", "GH_AW_DIRECT_PR_MULTIPLE_REPOS", "true"],
+    ])("should skip direct dispatch for %s", async (_name, variable, value) => {
+      mockContext.payload.inputs = { pull_request_number: "123" };
+      vi.stubEnv(variable, value);
+      await runScript();
+      expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
+      expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
     });
 
     it.each(["0", "-1", "1e3", "123.0", " 123", "9007199254740992"])("should reject invalid direct PR-number dispatch %s before API or checkout operations", async pullRequestNumber => {

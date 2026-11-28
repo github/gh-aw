@@ -514,14 +514,20 @@ async function preStagePatch(entry, index, workspace) {
     }
   } else {
     try {
-      runGit(["checkout", branch], repoCwd);
+      runGit(["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], repoCwd);
     } catch {
-      // Same-repository PRs may only have a pre-fetched tracking ref.
       try {
-        runGit(["checkout", "-b", branch, `refs/remotes/origin/${branch}`], repoCwd);
+        runGit(["show-ref", "--verify", "--quiet", `refs/remotes/origin/${branch}`], repoCwd);
       } catch {
-        runGit(["checkout", "-b", branch], repoCwd);
+        throw new Error(`${ERR_VALIDATION}: apply_samples: missing prepared PR-head branch '${branch}'. Configure checkout to provide the PR head or its origin tracking ref before replaying samples.`);
       }
+      runGit(["checkout", "-b", branch, `refs/remotes/origin/${branch}`], repoCwd);
+    }
+    runGit(["switch", "--", branch], repoCwd);
+    try {
+      runGit(["diff", "--cached", "--quiet"], repoCwd);
+    } catch {
+      throw new Error(`${ERR_VALIDATION}: apply_samples: cannot replay a push sample with existing staged changes.`);
     }
   }
 
@@ -533,14 +539,16 @@ async function preStagePatch(entry, index, workspace) {
     throw new Error(`${ERR_SYSTEM}: Failed to write file ${tmpPatch}: ${getErrorMessage(err)}`, { cause: err });
   }
   try {
-    runGit(["apply", "--whitespace=nowarn", tmpPatch], repoCwd);
+    runGit(["apply", ...(entry.tool === "push_to_pull_request_branch" ? ["--index"] : []), "--whitespace=nowarn", tmpPatch], repoCwd);
   } catch (err) {
     // Fall back to --3way for patches that don't apply cleanly on top of an
     // empty working tree (uncommon but possible for synthetic samples).
     runGit(["apply", "--3way", "--whitespace=nowarn", tmpPatch], repoCwd);
   }
 
-  runGit(["add", "-A"], repoCwd);
+  if (entry.tool !== "push_to_pull_request_branch") {
+    runGit(["add", "-A"], repoCwd);
+  }
   runGit(["commit", "-m", `gh-aw sample ${index + 1}: ${entry.tool}`, "--allow-empty"], repoCwd);
 }
 

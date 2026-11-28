@@ -213,6 +213,22 @@ func writePRReadyForReviewCheckoutAction(yaml *strings.Builder, data *WorkflowDa
 	prLog.Print("PR checkout step configured with GitHub token")
 	yaml.WriteString("        env:\n")
 	yaml.WriteString("          GH_TOKEN: " + resolvedToken + "\n")
+	if data.SafeOutputs != nil && data.SafeOutputs.PushToPullRequestBranch != nil {
+		push := data.SafeOutputs.PushToPullRequestBranch
+		if push.Target != "" {
+			yaml.WriteString("          GH_AW_DIRECT_PR_TARGET: " + strconv.Quote(push.Target) + "\n")
+			yaml.WriteString("          GH_AW_DIRECT_PR_TARGET_REPO: " + strconv.Quote(push.TargetRepoSlug) + "\n")
+			if len(push.AllowedRepos) > 0 {
+				yaml.WriteString("          GH_AW_DIRECT_PR_MULTIPLE_REPOS: \"true\"\n")
+			}
+			for _, checkout := range data.CheckoutConfigs {
+				if checkout != nil && checkout.Path == "" && checkout.Repository != "" {
+					yaml.WriteString("          GH_AW_DIRECT_PR_CHECKOUT_REPO: " + strconv.Quote(checkout.Repository) + "\n")
+					break
+				}
+			}
+		}
+	}
 	for _, checkout := range data.CheckoutConfigs {
 		if checkout != nil && checkout.PullRequestFloatingHead {
 			yaml.WriteString("          GH_AW_PULL_REQUEST_FLOATING_HEAD: \"true\"\n")
