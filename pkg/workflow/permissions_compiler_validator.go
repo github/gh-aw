@@ -44,6 +44,7 @@
 package workflow
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -253,7 +254,7 @@ func (c *Compiler) repositoryOwnerIsIndividualUser() bool {
 			c.ownerTypeCache[owner] = ""
 			return false
 		}
-		ownerType = strings.TrimSpace(string(output))
+		ownerType = string(bytes.TrimSpace(output))
 		c.ownerTypeCache[owner] = ownerType
 		workflowLog.Printf("Owner type for %q: %s", owner, ownerType)
 	} else {
