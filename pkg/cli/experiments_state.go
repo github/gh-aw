@@ -2,6 +2,9 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
 	"os/exec"
 	"slices"
 	"strings"
@@ -78,15 +81,18 @@ func readLocalExperimentState(ref string) *ExperimentState {
 }
 
 // readRemoteExperimentState reads state.jsonl or state.json from a remote experiment branch.
-// Returns an empty state when neither file can be read or parsed.
-func readRemoteExperimentState(repoOverride, branchName string) *ExperimentState {
+// Returns an empty state when neither file exists.
+func readRemoteExperimentState(repoOverride, branchName string) (*ExperimentState, error) {
 	for _, fileName := range experimentStateFilenames() {
 		decoded, err := readRemoteRepoBranchFile(repoOverride, branchName, fileName, "")
 		if err == nil {
-			return parseExperimentState(decoded)
+			return parseExperimentState(decoded), nil
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("failed to read experiment state on %s: %w", branchName, err)
 		}
 	}
-	return emptyExperimentState()
+	return emptyExperimentState(), nil
 }
 
 func appendExperimentRun(state *ExperimentState, run ExperimentRunRecord) {

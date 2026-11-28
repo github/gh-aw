@@ -19,6 +19,27 @@ const { sessionMessageTimestamp } = require("./unified_session_order.cjs");
 const ERROR_SOURCES = new Set(["upstream", "awf"]);
 const SELECTION_SOURCES = new Set(["router", "fallback"]);
 const FALLBACK_TIERS = new Set(["standard", "premium", "unclassified", "lightweight", "none"]);
+const AZURE_BROKER_EVENTS = [
+  "broker.ready",
+  "broker.request",
+  "broker.request.failed",
+  "broker.audit.truncated",
+  "token.cache.hit",
+  "token.renew.start",
+  "token.renew.join",
+  "token.renew.success",
+  "token.renew.failed",
+  "azure.assertion.start",
+  "azure.assertion.success",
+  "azure.exchange.start",
+  "azure.exchange.success",
+  "azure.exchange.failed",
+];
+
+/** @param {unknown} event @returns {string | undefined} */
+function azureBrokerEvent(event) {
+  return AZURE_BROKER_EVENTS.find(allowed => allowed === event);
+}
 
 const SCOPED_AGENT_TYPES = new Set([
   "session.init",
@@ -725,6 +746,11 @@ function sanitizeModelRoutingFallbackFields(target) {
 function normalizeUnifiedSessionEvent(event, phase, copilotSource) {
   /** @type {any} */
   const source = event.data;
+  if (event.type === "connector.azure_token_broker") {
+    const name = azureBrokerEvent(source?.event);
+    if (!name) throw new Error(`${ERR_VALIDATION}: Invalid Azure token broker event`);
+    return { type: "connector.azure_token_broker", timestamp: event.timestamp, data: { event: name } };
+  }
   if (event.type === "session.result") {
     const retry =
       source.engineRetry && typeof source.engineRetry === "object" && !Array.isArray(source.engineRetry)
@@ -975,4 +1001,4 @@ function normalizeUnifiedSessionEvent(event, phase, copilotSource) {
   };
 }
 
-module.exports = { normalizeUnifiedSessionEvent, normalizeModelInventoryData, evalResultRunId };
+module.exports = { normalizeUnifiedSessionEvent, normalizeModelInventoryData, evalResultRunId, azureBrokerEvent };

@@ -101,6 +101,9 @@ func validateConnectorGitHubApps(alias string, registration ConnectorRegistratio
 }
 
 func connectorSecretExpression(config *WorkflowConnector, secret string) string {
+	if config.azureRoute(secret) != nil {
+		return "${{ format('{0}/token.sock', " + connectorAzureDirectory(secret) + ") }}"
+	}
 	for name := range config.GitHubApps {
 		if connectorAppSecret(config.Alias, name) == secret {
 			return "${{ steps." + connectorAppStepID(secret) + ".outputs.token }}"
@@ -156,5 +159,6 @@ func (c *Compiler) connectorGitHubAppSteps(data *WorkflowData, phase string) []s
 			steps = append(steps, mint...)
 		}
 	}
-	return append(steps, c.connectorOIDCSteps(data, phase)...)
+	steps = append(steps, c.connectorOIDCSteps(data, phase)...)
+	return append(steps, c.connectorAzureBrokerSteps(data, phase, false)...)
 }

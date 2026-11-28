@@ -46,6 +46,102 @@ describe("Unified conclusion session", () => {
     return target;
   }
 
+  it("collects allowlisted Azure broker events from both phases in chronological order", () => {
+    const names = [
+      "broker.ready",
+      "broker.request",
+      "broker.request.failed",
+      "token.cache.hit",
+      "token.renew.start",
+      "token.renew.join",
+      "token.renew.success",
+      "token.renew.failed",
+      "azure.assertion.start",
+      "azure.assertion.success",
+      "azure.exchange.start",
+      "azure.exchange.success",
+      "azure.exchange.failed",
+    ];
+    const timestamp = index => `2026-11-08T12:00:${String(index).padStart(2, "0")}.123Z`;
+    write(
+      "azure-broker/agent/azure_token_broker.jsonl",
+      names.filter((_, index) => index % 2 === 0).map((event, index) => ({ event, timestamp: timestamp(index * 2) }))
+    );
+    write(
+      "azure-broker/safe-output/azure_token_broker.jsonl",
+      names.filter((_, index) => index % 2 === 1).map((event, index) => ({ event, timestamp: timestamp(index * 2 + 1) }))
+    );
+    write("agent-session.jsonl", [{ type: "assistant.message", timestamp: "2026-11-08T12:00:02.500Z", data: { content: "ok" } }]);
+    const output = path.join(root, "usage/aw_session.jsonl");
+    const events = writeUnifiedSession({ rootDir: root, outputPath: output });
+    const broker = events.filter(event => event.type === "connector.azure_token_broker");
+    expect(broker.map(event => event.data.event)).toEqual(names);
+    for (const [index, event] of broker.entries()) {
+      const phase = index % 2 === 0 ? "agent" : "safe-output";
+      expect(event).toEqual({
+        type: "connector.azure_token_broker",
+        timestamp: timestamp(index),
+        data: { event: names[index] },
+        provenance: { component: "connector", phase, path: `azure-broker/${phase}/azure_token_broker.jsonl`, index: Math.floor(index / 2), timestampMs: Date.parse(timestamp(index)) },
+      });
+    }
+    const message = events.findIndex(event => event.type === "assistant.message");
+    expect(events.indexOf(broker[2])).toBeLessThan(message);
+    expect(message).toBeLessThan(events.indexOf(broker[3]));
+    expect(validateSession(fs.readFileSync(output, "utf8"))).toBe(events.length);
+  });
+
+  it("rejects malformed or tampered Azure broker records independently without leaking secrets or allowing source spoofing", () => {
+    const valid = { event: "broker.ready", timestamp: "2026-11-08T12:00:00.123Z" };
+    const invalid = [
+      null,
+      [],
+      "PRIVATE_RAW",
+      { ...valid, secret: "PRIVATE_EXTRA" },
+      { ...valid, provenance: { component: "PRIVATE_PROVENANCE" } },
+      { ...valid, event: "broker.ready PRIVATE_EVENT" },
+      { ...valid, event: "__proto__" },
+      { ...valid, event: { secret: "PRIVATE_OBJECT" } },
+      { ...valid, timestamp: "PRIVATE_TIMESTAMP" },
+      { ...valid, timestamp: "2026-02-30T12:00:00.123Z" },
+      { ...valid, timestamp: "2026-11-08T24:00:00.000Z" },
+      { ...valid, timestamp: "2026-11-08T12:00:00Z" },
+      { ...valid, timestamp: "2026-11-08T12:00:00.123+00:00" },
+      { ...valid, timestamp: "2026-11-08T12:00:00.123Z\n" },
+      { ...valid, timestamp: 123 },
+      { event: "broker.ready" },
+      { timestamp: valid.timestamp },
+    ];
+    const file = "azure-broker/agent/azure_token_broker.jsonl";
+    write(file, `${JSON.stringify(valid)}\nnot-json-PRIVATE\n${invalid.map(entry => JSON.stringify(entry)).join("\n")}\n${JSON.stringify({ event: "broker.request", timestamp: "2026-11-08T12:00:01.123Z" })}\n`);
+    write("azure-broker/safe-output/azure_token_broker.jsonl", [{ ...valid, secret: "PRIVATE_SAFE_OUTPUT" }, valid]);
+    write("agent-session.jsonl", [{ type: "connector.azure_token_broker", timestamp: valid.timestamp, data: { event: "broker.ready", secret: "PRIVATE_SPOOF" }, provenance: { component: "connector" } }]);
+    const warn = vi.fn();
+    const output = path.join(root, "usage/aw_session.jsonl");
+    const events = writeUnifiedSession({ rootDir: root, outputPath: output, warn });
+    const broker = events.filter(event => event.type === "connector.azure_token_broker");
+    expect(broker).toHaveLength(3);
+    expect(broker.map(event => event.provenance.index)).toEqual([0, 1, invalid.length + 2]);
+    expect(events.filter(event => event.type === "session.collection_warning" && event.data.code === "invalid_azure_token_broker")).toHaveLength(invalid.length + 1);
+    expect(events).toContainEqual(expect.objectContaining({ type: "session.collection_warning", data: expect.objectContaining({ code: "malformed_jsonl", line: 2 }) }));
+    expect(JSON.stringify(events)).not.toContain("PRIVATE");
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("PRIVATE");
+    const content = fs.readFileSync(output, "utf8");
+    expect(content).not.toContain("PRIVATE");
+    expect(validateSession(content)).toBe(events.length);
+  });
+
+  it("projects Azure broker payloads without copying untrusted metadata", () => {
+    const event = normalizeUnifiedSessionEvent({
+      type: "connector.azure_token_broker",
+      timestamp: "2026-11-08T12:00:00.123Z",
+      id: "PRIVATE_ID",
+      data: { event: "token.cache.hit", token: "PRIVATE_TOKEN" },
+    });
+    expect(event).toEqual({ type: "connector.azure_token_broker", timestamp: "2026-11-08T12:00:00.123Z", data: { event: "token.cache.hit" } });
+    expect(() => normalizeUnifiedSessionEvent({ type: "connector.azure_token_broker", data: { event: "PRIVATE_EVENT" } })).toThrow("Invalid Azure token broker event");
+  });
+
   it.each(["file_reference_failed", "sensitive_content_blocked"])("publishes typed skip decisions with %s in the agent unified session without model inputs", error => {
     const decision = {
       proposedAttempt: 1,
