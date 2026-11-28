@@ -55,54 +55,8 @@ Missing or empty frontmatter produces {}. Malformed frontmatter is an error.`,
 			if err != nil {
 				return err
 			}
-			if _, exists := result.Frontmatter["imports"]; exists {
-				if _, exists := result.Frontmatter["resolved-imports"]; exists {
-					return errors.New("frontmatter field 'resolved-imports' conflicts with parse output")
-				}
-				importBase := baseDir
-				if importBase == "" {
-					importBase = "."
-					if source != "-" {
-						importBase = filepath.Dir(source)
-					}
-				}
-				importBase, err = filepath.Abs(importBase)
-				if err != nil {
-					return fmt.Errorf("failed to resolve import base directory: %w", err)
-				}
-				cacheDir, err := os.MkdirTemp("", "gh-aw-parse-imports-")
-				if err != nil {
-					return fmt.Errorf("failed to create import cache: %w", err)
-				}
-				defer os.RemoveAll(cacheDir)
-				cache := parser.NewImportCache(cacheDir)
-				cache.SetRequireStablePaths(true)
-				imports, err := parser.ProcessImportsFromFrontmatterWithSource(result.Frontmatter, importBase, cache, "", "")
-				if err != nil {
-					var cycle *parser.ImportCycleError
-					if errors.As(err, &cycle) {
-						return parser.FormatImportCycleError(cycle)
-					}
-					return err
-				}
-				if len(imports.RepositoryImports) > 0 {
-					return fmt.Errorf("cannot resolve repository imports in parse: %v", imports.RepositoryImports)
-				}
-				for path, content := range imports.MetadataDocuments {
-					if strings.HasPrefix(path, parser.BuiltinPathPrefix) {
-						_, err = parser.ExtractFrontmatterFromBuiltinFile(path, []byte(content))
-					} else {
-						_, err = parser.ExtractFrontmatterFromContent(content)
-					}
-					if err != nil {
-						return fmt.Errorf("failed to parse imported file %q: %w", path, err)
-					}
-				}
-				resolved := imports.ImportedFiles
-				if resolved == nil {
-					resolved = []string{}
-				}
-				result.Frontmatter["resolved-imports"] = resolved
+			if err := resolveParseImports(result.Frontmatter, source, baseDir); err != nil {
+				return err
 			}
 			if err := json.NewEncoder(cmd.OutOrStdout()).Encode(result.Frontmatter); err != nil {
 				return fmt.Errorf("failed to write frontmatter JSON: %w", err)
@@ -113,4 +67,57 @@ Missing or empty frontmatter produces {}. Malformed frontmatter is an error.`,
 	cmd.Flags().StringVar(&baseDir, "base-dir", "", "Base directory for resolving imports (default: file directory or current directory for stdin)")
 	cmd.SetOut(os.Stdout)
 	return cmd
+}
+
+func resolveParseImports(frontmatter map[string]any, source, baseDir string) error {
+	if _, exists := frontmatter["imports"]; !exists {
+		return nil
+	}
+	if _, exists := frontmatter["resolved-imports"]; exists {
+		return errors.New("frontmatter field 'resolved-imports' conflicts with parse output")
+	}
+	if baseDir == "" {
+		baseDir = "."
+		if source != "-" {
+			baseDir = filepath.Dir(source)
+		}
+	}
+	baseDir, err := filepath.Abs(baseDir)
+	if err != nil {
+		return fmt.Errorf("failed to resolve import base directory: %w", err)
+	}
+	cacheDir, err := os.MkdirTemp("", "gh-aw-parse-imports-")
+	if err != nil {
+		return fmt.Errorf("failed to create import cache: %w", err)
+	}
+	defer os.RemoveAll(cacheDir)
+	cache := parser.NewImportCache(cacheDir)
+	cache.SetRequireStablePaths(true)
+	imports, err := parser.ProcessImportsFromFrontmatterWithSource(frontmatter, baseDir, cache, "", "")
+	if err != nil {
+		var cycle *parser.ImportCycleError
+		if errors.As(err, &cycle) {
+			return parser.FormatImportCycleError(cycle)
+		}
+		return err
+	}
+	if len(imports.RepositoryImports) > 0 {
+		return fmt.Errorf("cannot resolve repository imports in parse: %v", imports.RepositoryImports)
+	}
+	for path, content := range imports.MetadataDocuments {
+		if strings.HasPrefix(path, parser.BuiltinPathPrefix) {
+			_, err = parser.ExtractFrontmatterFromBuiltinFile(path, []byte(content))
+		} else {
+			_, err = parser.ExtractFrontmatterFromContent(content)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to parse imported file %q: %w", path, err)
+		}
+	}
+	resolved := imports.ImportedFiles
+	if resolved == nil {
+		resolved = []string{}
+	}
+	frontmatter["resolved-imports"] = resolved
+	return nil
 }
