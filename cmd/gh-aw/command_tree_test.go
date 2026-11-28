@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"reflect"
 	"testing"
 
@@ -19,6 +20,20 @@ func TestCommandTreePaths(t *testing.T) {
 	want := []string{"visible", "visible nested"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("commandTreePaths() = %v, want %v", got, want)
+	}
+
+}
+
+func TestParseCommandRegistered(t *testing.T) {
+	cmd, args, err := rootCmd.Find([]string{"parse", "-"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cmd.Name() != "parse" || cmd.GroupID != "utilities" || !reflect.DeepEqual(args, []string{"-"}) {
+		t.Fatalf("parse command lookup: command=%s, group=%s, args=%v", cmd.Name(), cmd.GroupID, args)
+	}
+	if cmd.OutOrStdout() != os.Stdout {
+		t.Fatal("parse JSON must not inherit the root command's stderr output")
 	}
 }
 

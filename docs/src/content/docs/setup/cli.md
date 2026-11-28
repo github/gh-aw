@@ -61,6 +61,7 @@ Other commands describe their own preview behavior in their help.
 | Command | Description | When to use |
 |---------|-------------|-------------|
 | [`gh aw skill`](#skill) | Print the bundled agentic-workflows skill | Loading instructions into an agent without adding repository files |
+| [`gh aw parse`](#parse) | Return parsed workflow frontmatter as JSON | Reading authored configuration from a file or stdin without compiling |
 | [`gh aw work-queue`](#work-queue) | Experimental Git-backed priority-FIFO work queue with dependencies | Inspecting queue state and operator recovery |
 
 ## Installation
@@ -1749,6 +1750,22 @@ gh aw hash-frontmatter .github/workflows/audit-workflows.md
 ```
 
 Includes all frontmatter fields, imported workflow frontmatter (BFS traversal), template expressions containing `env.` or `vars.`, and version information (gh-aw, awf, agents).
+
+#### `parse`
+
+`gh aw parse <file|->` accepts one local Markdown file path, or `-` to read exact Markdown content from stdin. File paths are used literally; workflow names are not resolved.
+
+```bash wrap
+gh aw parse /path/to/repo/.github/workflows/example.md
+gh aw parse - < /path/to/repo/.github/workflows/example.md
+git -C /path/to/repo show <commit>:.github/workflows/example.md | gh aw parse -
+```
+
+On success, stdout contains one JSON object followed by a newline: the existing Markdown parser's frontmatter, without an envelope or Markdown body. Nested objects and arrays, including `if`, `imports`, and `on.workflow_dispatch.inputs`, are preserved. Strings, booleans, numbers, and null remain their corresponding JSON scalar types; quoted YAML strings remain strings. Object key order is not part of the contract.
+
+Missing fields remain absent. Missing, empty, or null frontmatter returns `{}`. Malformed YAML, unclosed frontmatter, unreadable input, and JSON output errors exit nonzero, with diagnostics on stderr. Parse and input errors produce no JSON on stdout.
+
+This command parses only the supplied content. It does not validate the workflow schema, resolve or fetch imports or includes, evaluate expressions, load project configuration, compile lock files, install, or execute workflows. Unknown frontmatter fields are retained. To read a specific Git revision, supply its content through stdin as above; the command itself does not invoke Git or require GitHub authentication.
 
 #### `json-schema`
 
