@@ -179,8 +179,9 @@ attrs==26.1.0 \
     --hash=sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309
 boto3==1.44.5 \
     --hash=sha256:70c3e0409794b29ec1900bcaff0695b73234a2d32ffaed35045b94caa26212a5
-botocore==1.44.5 \
-    --hash=sha256:8f16a56d1dff125dd65322ae021efa7ba5195a6db5102b96862566055b748921
+botocore==1.44.9 \
+    --hash=sha256:1f783e0b31f0053f41f4239b7a7e2e73957f25cdc6b2f45d113f1b575a4db10b \
+    --hash=sha256:6966752d38514a8e457ea062ea171b2b320c55bad23c8ae4f74f88296e00890d
 certifi==2026.10.23 \
     --hash=sha256:e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1
 cffi==2.1.1 ; platform_python_implementation != 'PyPy' \
