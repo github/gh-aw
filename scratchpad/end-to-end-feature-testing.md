@@ -111,8 +111,7 @@ Based on the results:
 - Review Dev Hawk's analysis in the PR comment
 - Examine the specific error messages and recommendations
 - Instruct the GitHub Copilot coding agent to fix the issues:
-  ```
-  @copilot the dev workflow failed with [error]. Please fix the dev.md workflow to address this issue.
+  ```text  @copilot the dev workflow failed with [error]. Please fix the dev.md workflow to address this issue.
   ```
 - After fixes are committed, re-trigger the Dev workflow (repeat from Step 2)
 
@@ -172,15 +171,15 @@ Create multiple instances of the new output type to verify rate limiting and tar
 
 ## Best Practices
 
-### For Effective Testing
+### For Test Design
 
 1. **Single feature focus**: Test one feature at a time in dev.md
 2. **Clear success criteria**: Define what success looks like for the test
 3. **Include validation**: Add steps to verify the feature works correctly
-4. **Use appropriate timeouts**: Set reasonable timeout-minutes for your test
+4. **Set timeout-minutes**: Set `timeout-minutes` to at least the expected run duration of your test
 5. **Clean up between tests**: Revert dev.md changes after testing is complete
 
-### For Better Iteration
+### For Iteration
 
 1. **Read Dev Hawk's analysis carefully**: It often identifies the exact issue
 2. **Check workflow logs directly**: Sometimes additional context is in the full logs
@@ -241,7 +240,7 @@ Create multiple instances of the new output type to verify rate limiting and tar
 
 ## Integration with CI/CD
 
-While this manual testing approach is useful for rapid iteration during development, features should also have:
+While this manual testing approach supports iteration during development, features should also have:
 
 - **Unit tests**: In `pkg/*/` test files
 - **Integration tests**: Testing the feature in isolation

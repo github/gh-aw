@@ -658,17 +658,24 @@ If the pull request is still open, verify that:
         expect(mockCore.setFailed).toHaveBeenCalledWith(expect.stringContaining("requires write or higher"));
       });
 
-      it("should allow checkout for Bot actor only after repository permission verification", async () => {
+      it.each(["write", "maintain", "admin"])("should allow checkout for Bot actor with %s permission only after repository permission verification", async permission => {
         mockContext.actor = "Copilot";
         mockContext.payload.sender = { login: "Copilot", type: "Bot" };
+        mockGithub.rest.repos.getCollaboratorPermissionLevel.mockResolvedValue({ data: { permission } });
 
         await runScript();
 
-        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith(expect.objectContaining({ username: "Copilot" }));
-        expect(mockCore.info).toHaveBeenCalledWith("Runtime safety check passed for actor 'Copilot' with 'write' permission");
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel).toHaveBeenCalledWith({
+          owner: "test-owner",
+          repo: "test-repo",
+          username: "Copilot",
+        });
+        expect(mockGithub.rest.repos.getCollaboratorPermissionLevel.mock.invocationCallOrder[0]).toBeLessThan(mockFetch.mock.invocationCallOrder[0]);
+        expect(mockCore.info).toHaveBeenCalledWith(`Runtime safety check passed for actor 'Copilot' with '${permission}' permission`);
         expect(mockCore.setFailed).not.toHaveBeenCalled();
         expect(mockExec.getExecOutput).toHaveBeenCalledWith("git", ["fetch", "origin", "+1111111111111111111111111111111111111111:refs/remotes/origin/pr-head", "--depth=2"], { silent: true, ignoreReturnCode: true });
         expect(mockExec.exec).toHaveBeenCalledWith("git", ["checkout", "-B", "feature-branch", "refs/remotes/origin/pr-head"]);
+        expect(mockCore.setOutput).toHaveBeenCalledWith("checkout_pr_success", "true");
       });
 
       it.each([null, undefined])("should preserve collaborator fallback when the bot event repository is %s", async repository => {

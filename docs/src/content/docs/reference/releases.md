@@ -118,7 +118,18 @@ Both CLI and SDK use the built-in MCP server inside AWF. Fetching follows `netwo
 
 Strict mode requires an explicit `tools.bash` setting when `tools.github.min-integrity` is `none`, so shell access is intentional when processing untrusted content.
 
-`gh aw fix --write` inserts `tools.bash: false` when the setting is absent. Keep this value if shell access is unnecessary. If the workflow needs shell commands, declare a limited allowlist instead:
+`gh aw fix --write` inserts `tools.bash: false` when the setting is absent and disables shell-backed CLI modes. Keep this value if shell access is unnecessary. In strict mode, disabling Bash also requires `tools.cli-proxy: false` and an MCP-backed GitHub mode rather than `gh-proxy`:
+
+```aw
+tools:
+  bash: false
+  cli-proxy: false
+  github:
+    mode: local
+    min-integrity: none
+```
+
+If the workflow needs shell commands, declare a limited allowlist instead:
 
 ```aw
 tools:
