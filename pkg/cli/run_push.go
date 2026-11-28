@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -78,7 +79,7 @@ func collectWorkflowFiles(ctx context.Context, workflowPath string, verbose bool
 				fmt.Fprintln(os.Stderr, console.FormatInfoMessage("Recompiling workflow..."))
 			}
 		}
-	} else if os.IsNotExist(err) {
+	} else if errors.Is(err, fs.ErrNotExist) {
 		// Lock file doesn't exist
 		runPushLog.Printf("Lock file not found: %s", lockFilePath)
 		if verbose {
