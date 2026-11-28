@@ -156,6 +156,9 @@ describe("add_mask_redaction", () => {
       for (const payload of ['literal"', '${VAR}literal"', 'literal${VAR}"', '${VAR:-literal}"', '${123}"', '${VAR}" # literal']) {
         expect(isAddMaskCommandLine(`echo "::add-mask::${payload}`)).toBe(true);
       }
+      expect(isAddMaskCommandLine("::add-mask::${VAR}")).toBe(true);
+      expect(isAddMaskCommandLine("2026-01-01 ::add-mask::${VAR}")).toBe(true);
+      expect(isAddMaskCommandLine('literal echo "::add-mask::${VAR}"')).toBe(true);
       const text = ['echo "::add-mask::${VAR}"', 'echo "::add-mask::literal"', "after"].join("\n");
       expect(applyAddMaskRedaction(text, [])).toBe(['echo "::add-mask::${VAR}"', "after"].join("\n"));
       expect(applyAddMaskRedaction(text, ["${VAR}"])).toBe('echo "::add-mask::***"\nafter');
@@ -175,6 +178,12 @@ describe("add_mask_redaction", () => {
       expect(result).toContain("abcd1234");
       expect(result).toContain("zz");
       expect(result).toHaveLength(2);
+    });
+
+    it("ignores shell source references while collecting literal runtime masks", () => {
+      const log = ['run: echo "::add-mask::${SOURCE_VAR}"', "::add-mask::${RUNTIME_VALUE}"].join("\n");
+      expect(collectAddMaskedValues(log)).toEqual(["${RUNTIME_VALUE}"]);
+      expect(applyAddMaskRedaction(log, collectAddMaskedValues(log))).toBe('run: echo "::add-mask::${SOURCE_VAR}"');
     });
 
     it("expands multi-line masked values into individual lines", () => {

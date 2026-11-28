@@ -36,7 +36,16 @@ function unescapeWorkflowCommandValue(value) {
  */
 function isAddMaskCommandLine(line) {
   const match = line.match(ADD_MASK_COMMAND_RE);
-  return !!match && !/^\$\{[A-Za-z_][A-Za-z0-9_]*\}["']?\s*$/.test(match[1]);
+  return !!match && !isUnexpandedMaskSource(line, match);
+}
+
+/**
+ * @param {string} line
+ * @param {RegExpMatchArray} match
+ * @returns {boolean}
+ */
+function isUnexpandedMaskSource(line, match) {
+  return /^\s*[+-]?\s*(?:run:\s*)?echo\s+["']?$/.test(line.slice(0, match.index)) && /^\$\{[A-Za-z_][A-Za-z0-9_]*\}["']?\s*$/.test(match[1]);
 }
 
 /**
@@ -54,7 +63,7 @@ function collectAddMaskedValues(logContent) {
   if (!logContent) return [];
   for (const line of logContent.split("\n")) {
     const match = line.match(ADD_MASK_COMMAND_RE);
-    if (!match) continue;
+    if (!match || isUnexpandedMaskSource(line, match)) continue;
     const decoded = unescapeWorkflowCommandValue(match[1]);
     for (const candidate of decoded.split(/\r\n|\r|\n/)) {
       if (!candidate.trim()) continue;

@@ -16,7 +16,7 @@ const { generateGitBundle } = require("./generate_git_bundle.cjs");
 const { getPatchPathForBranchInRepo } = require("./git_patch_utils.cjs");
 const { createHandlers } = require("./safe_outputs_handlers.cjs");
 const { buildManualBranchRecoveryCommands, buildManualBranchApplyCommands } = require("./create_pull_request_helpers.cjs");
-const { applyAddMaskRedaction } = require("./add_mask_redaction.cjs");
+const { applyAddMaskRedaction, collectAddMaskedValues } = require("./add_mask_redaction.cjs");
 const { validateEnvelope } = require("./validate_recovery_envelopes.cjs");
 
 describe("object-pack packaging and application with real Git", { timeout: 60000 }, () => {
@@ -365,7 +365,8 @@ describe("object-pack packaging and application with real Git", { timeout: 60000
         ? paths => {
             const preview = fs.readFileSync(paths.patchPath, "utf8");
             expect(preview).toContain('echo "::add-mask::${MCP_GATEWAY_AGENT_ID}"');
-            fs.writeFileSync(paths.patchPath, applyAddMaskRedaction(preview, []));
+            const masks = collectAddMaskedValues('run: echo "::add-mask::${MCP_GATEWAY_AGENT_ID}"\n::add-mask::unrelated-runtime-value');
+            fs.writeFileSync(paths.patchPath, applyAddMaskRedaction(preview, masks));
             expect(validateEnvelope(paths.bundlePath)).toBe(false);
           }
         : undefined,
