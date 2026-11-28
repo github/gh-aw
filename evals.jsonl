@@ -156,3 +156,5 @@
 {"id":"forecast_report_created","question":"Did the agent create a report with spending projections and supporting evidence?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-26T10:22:35.824Z","runid":"45793645901"}
 {"id":"spending_forecast_analyzed","question":"Did the agent analyze the agentic workflow spending forecast and its data quality?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-27T10:11:05.514Z","runid":"45975278966"}
 {"id":"forecast_report_created","question":"Did the agent create a report with spending projections and supporting evidence?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-27T10:11:05.514Z","runid":"45975278966"}
+{"id":"spending_forecast_analyzed","question":"Did the agent analyze the agentic workflow spending forecast and its data quality?","answer":"YES","model":"gpt-6-luna","timestamp":"2026-11-28T10:10:28.737Z","runid":"46131280683"}
+{"id":"forecast_report_created","question":"Did the agent create a report with spending projections and supporting evidence?","answer":"NO","model":"gpt-6-luna","timestamp":"2026-11-28T10:10:28.737Z","runid":"46131280683"}
