@@ -118,8 +118,8 @@ sanitizeContent("&amp;#64;pelikhan")
 
 - **Risk Level**: MEDIUM → **RESOLVED**
 - **Attack Surface**: Entity-encoded @ symbols could bypass mention detection
-- **Fix**: All HTML entity encoding variants now decoded before @mention processing
-- **Coverage**: Universal - applies to both `sanitizeContent()` and `sanitizeIncomingText()`
+- **Fix**: The listed HTML entity encoding variants are decoded before @mention processing
+- **Coverage**: Applies to both `sanitizeContent()` and `sanitizeIncomingText()`
 
 ## Files Modified
 
@@ -131,7 +131,7 @@ sanitizeContent("&amp;#64;pelikhan")
 
 This fix follows defense-in-depth principles:
 1. **Early decoding**: Entities decoded at Step 2 of Unicode hardening
-2. **Coverage**: Handles all entity types and double-encoding  
+2. **Coverage**: Handles the named, decimal, and hexadecimal entity forms, including double-encoding  
 3. **Validation**: Rejects invalid Unicode code points
-4. **Universal application**: Applies to all content sanitization flows
-5. **Test coverage**: Test suite validates all attack vectors
+4. **Application scope**: Applies to all content sanitization flows
+5. **Test coverage**: Test suite covers the attack vectors listed in this document
