@@ -16423,8 +16423,8 @@
             },
             "detection-engine": {
               "type": "string",
-              "enum": ["copilot", "claude", "codex"],
-              "description": "Built-in engine used to run threat detection for workflows using this engine. Required for custom engines because the threat detection analyzer only supports built-in engines; defaults to 'copilot' when omitted."
+              "pattern": "^[a-zA-Z0-9_-]+$",
+              "description": "Built-in replacement (copilot, claude or codex), or this engine's own id to run its declared harness with bundled threat detection."
             },
             "auth": {
               "type": "array",

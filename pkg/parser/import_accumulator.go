@@ -32,6 +32,7 @@ type importAccumulator struct {
 	envSources               map[string]string // env var name → source import path (for conflict detection and header listing)
 	observabilityConfigs     []string          // observability config JSON blobs from all imports (merged into endpoint array)
 	engines                  []string
+	enginePrerequisites      map[string]EnginePrerequisites
 	plugins                  []string
 	pluginObjects            []map[string]any
 	safeOutputs              []string
@@ -142,6 +143,7 @@ func (acc *importAccumulator) buildImportsResult() *ImportsResult {
 		MergedTools:                   acc.toolsBuilder.String(),
 		MergedMCPServers:              acc.mcpServersBuilder.String(),
 		MergedEngines:                 acc.engines,
+		EnginePrerequisites:           acc.enginePrerequisites,
 		MergedPlugins:                 acc.plugins,
 		MergedPluginObjects:           acc.pluginObjects,
 		MergedSafeOutputs:             acc.safeOutputs,

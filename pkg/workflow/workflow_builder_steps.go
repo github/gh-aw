@@ -114,6 +114,17 @@ func (c *Compiler) processAndMergePreSteps(frontmatter map[string]any, workflowD
 // processAndMergePreAgentSteps handles processing and merging of pre-agent-steps with action pinning.
 // Imported pre-agent-steps are prepended so main workflow pre-agent-steps run last.
 func (c *Compiler) processAndMergePreAgentSteps(frontmatter map[string]any, workflowData *WorkflowData, importsResult *parser.ImportsResult) error {
+	if len(importsResult.EnginePrerequisites) > 0 {
+		workflowData.enginePrerequisites = make(map[string]parser.EnginePrerequisites, len(importsResult.EnginePrerequisites))
+		for id, prereqs := range importsResult.EnginePrerequisites {
+			var pinned string
+			if err := c.processAndMergePreStepSection(nil, workflowData, "pre-agent-steps", prereqs.PreAgentSteps, &pinned); err != nil {
+				return fmt.Errorf("engine %q prerequisites: %w", id, err)
+			}
+			prereqs.PreAgentSteps = pinned
+			workflowData.enginePrerequisites[id] = prereqs
+		}
+	}
 	return c.processAndMergePreStepSection(frontmatter, workflowData, "pre-agent-steps", importsResult.MergedPreAgentSteps, &workflowData.PreAgentSteps)
 }
 

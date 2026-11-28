@@ -122,7 +122,7 @@ function supervise({ launch, args, env, prompt, sink, timeoutMs, signal }) {
     };
     const abort = () => stop("cancelled");
     const timer = timeoutMs > 0 ? setTimeout(() => stop("timeout"), timeoutMs) : undefined;
-    const poll = sink ? setInterval(() => resultReady(sink) && stop("reported"), 250) : undefined;
+    const poll = sink && launch.convention !== "imported" ? setInterval(() => resultReady(sink) && stop("reported"), 250) : undefined;
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) abort();
     control.on("data", chunk => {
@@ -152,11 +152,11 @@ function supervise({ launch, args, env, prompt, sink, timeoutMs, signal }) {
       // Only the trusted subreaper owns fd 3. AWF needs the startup marker
       // on nonzero exits too (a finding exits 1); never relay engine output.
       if (startedSeen) {
-        if (["copilot", "claude", "codex"].includes(launch.convention)) process.stderr.write(`[${launch.convention}-harness] Detection harness started\n`);
+        if (["copilot", "claude", "codex", "imported"].includes(launch.convention)) process.stderr.write(`[${launch.convention}-harness] Detection harness started\n`);
       }
       if (spawnError) error ??= Object.assign(new Error(`engine launch failed: ${spawnError}`), { code: spawnError });
       if (timedOut || cancelled) error ??= new Error(timedOut ? "engine timed out" : "engine cancelled");
-      if (!reason && exitCode !== 0 && !resultReady(sink)) error ??= new Error(`engine exited with ${exitSignal || `code ${exitCode}`}`);
+      if (!reason && exitCode !== 0 && (launch.convention === "imported" || !resultReady(sink))) error ??= new Error(`engine exited with ${exitSignal || `code ${exitCode}`}`);
       resolve({ timedOut, cancelled, exitCode, error });
     });
   });

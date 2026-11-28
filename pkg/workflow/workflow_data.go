@@ -98,10 +98,11 @@ type WorkflowData struct {
 	If                             string
 	TimeoutMinutes                 string
 	CustomSteps                    string
-	PreSteps                       string // authored/imported steps to run at the very start of the agent job, before checkout
-	GeneratedPreSteps              string // compiler-owned pre-steps, kept separate from authored/imported steps for effect validation
-	PreAgentSteps                  string // steps to run immediately before the agent execution step
-	PostSteps                      string // steps to run after AI execution
+	PreSteps                       string                                // authored/imported steps to run at the very start of the agent job, before checkout
+	GeneratedPreSteps              string                                // compiler-owned pre-steps, kept separate from authored/imported steps for effect validation
+	PreAgentSteps                  string                                // steps to run immediately before the agent execution step
+	enginePrerequisites            map[string]parser.EnginePrerequisites // definition-local runtimes and pinned pre-agent-steps
+	PostSteps                      string                                // steps to run after AI execution
 	RunsOn                         string
 	RunsOnSlim                     string // rendered runs-on snippet for framework/generated jobs (activation, safe-outputs, unlock, etc.)
 	Environment                    string // environment setting for the main job

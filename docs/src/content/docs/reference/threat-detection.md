@@ -281,9 +281,11 @@ safe-outputs:
 
 ### Workflows Using a Custom Engine
 
-Threat detection only runs on the built-in engines. When a workflow uses a custom engine, detection runs on `copilot` by default (so it needs Copilot credentials) and the compiler emits a warning. Set `safe-outputs.threat-detection.engine` to another built-in engine, or to `false` to skip AI analysis.
+An imported engine can run bundled threat detection itself. Set `detection-engine` to the definition's own `id` and declare `behaviors.harness-script` and `behaviors.execution.command-name`. Without an opt-in or a declared replacement, custom engines fall back to `copilot` and need Copilot credentials.
 
-Custom engine definitions can ship their own default with the `detection-engine` key (`copilot`, `claude`, or `codex`), which removes the warning for every workflow using that engine:
+The harness receives its normal executable and arguments, reads the assessment from the file named by `GH_AW_PROMPT`, and records a verdict with `threat_detection_result` on `PATH`. The detection job installs the selected engine's prerequisites; it doesn't rerun the consuming workflow's `pre-agent-steps`. The legacy inline detector does not use this opt-in.
+
+Alternatively, a definition can delegate detection to `copilot`, `claude`, or `codex`:
 
 ```yaml wrap
 engine:
@@ -293,7 +295,7 @@ engine:
     # ...
 ```
 
-An explicit `safe-outputs.threat-detection.engine` in a workflow always wins over `detection-engine`.
+An explicit `safe-outputs.threat-detection.engine` selects which engine to resolve. If that engine is replaced, the compiler warns with both IDs.
 
 ## Custom Detection Steps
 

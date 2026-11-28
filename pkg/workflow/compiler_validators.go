@@ -494,13 +494,18 @@ func (c *Compiler) emitCustomEngineThreatDetectionWarning(workflowData *Workflow
 	if threatDetection.EngineDisabled {
 		return
 	}
-	// An explicit safe-outputs.threat-detection.engine is the author's own choice.
+	detectionEngineID := c.getThreatDetectionEngineID(workflowData)
 	if threatDetection.EngineConfig != nil && threatDetection.EngineConfig.ID != "" {
+		if requested := threatDetection.EngineConfig.ID; requested != detectionEngineID {
+			message := fmt.Sprintf("Requested safe-outputs.threat-detection.engine %q will run on %q. Check that the detection job has the effective engine's credentials.", requested, detectionEngineID)
+			fmt.Fprintln(os.Stderr, formatCompilerMessage(markdownPath, "warning", message))
+			c.IncrementWarningCount()
+		}
 		return
 	}
 
 	configuredEngineID := ResolveEngineID(workflowData)
-	if configuredEngineID == "" || configuredEngineID == "pi" || isThreatDetectionCapableEngineID(configuredEngineID) {
+	if configuredEngineID == "" || configuredEngineID == detectionEngineID || configuredEngineID == "pi" || isThreatDetectionCapableEngineID(configuredEngineID) {
 		return
 	}
 	// An engine definition that declares its own detection engine ships a working default.
@@ -509,7 +514,6 @@ func (c *Compiler) emitCustomEngineThreatDetectionWarning(workflowData *Workflow
 		return
 	}
 
-	detectionEngineID := c.getThreatDetectionEngineID(workflowData)
 	message := fmt.Sprintf(
 		"Threat detection does not support the custom engine %q, so it runs on the built-in %q engine instead, which requires that engine's credentials. "+
 			"Set safe-outputs.threat-detection.engine to a built-in engine (or false to skip AI analysis), or declare detection-engine in the engine definition.",

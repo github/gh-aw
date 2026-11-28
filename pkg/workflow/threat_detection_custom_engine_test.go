@@ -93,6 +93,7 @@ func TestCustomEngineDetectionEngineFrontmatter(t *testing.T) {
 // both the inline and external detection paths.
 func TestGetThreatDetectionEngineIDNormalization(t *testing.T) {
 	compiler := NewCompiler()
+	compiler.engineCatalog.Register(&EngineDefinition{ID: "python-agent", DetectionEngine: "python-agent", Behaviors: &EngineBehaviorDefinition{HarnessScript: "/* fixture */", Execution: &EngineExecutionDefinition{CommandName: "python3"}}})
 	compiler.engineCatalog.Register(&EngineDefinition{ID: "custom-declared", DetectionEngine: "codex"})
 	compiler.engineCatalog.Register(&EngineDefinition{ID: "custom-invalid", DetectionEngine: "harness-engine"})
 
@@ -105,6 +106,8 @@ func TestGetThreatDetectionEngineIDNormalization(t *testing.T) {
 		{name: "pi normalized to copilot", data: &WorkflowData{AI: "pi"}, expected: "copilot"},
 		{name: "embedded unsupported engine falls back", data: &WorkflowData{AI: "gemini"}, expected: defaultThreatDetectionEngineID},
 		{name: "unknown custom engine falls back", data: &WorkflowData{AI: "harness-engine"}, expected: defaultThreatDetectionEngineID},
+		{name: "self opt-in with bundled detector", data: &WorkflowData{AI: "python-agent"}, expected: "python-agent"},
+		{name: "self opt-in leaves legacy inline unchanged", data: &WorkflowData{AI: "python-agent", Features: map[string]any{"gh-aw-detection": false}}, expected: defaultThreatDetectionEngineID},
 		{name: "declared detection engine wins", data: &WorkflowData{AI: "custom-declared"}, expected: "codex"},
 		{name: "unsupported declared engine falls back", data: &WorkflowData{AI: "custom-invalid"}, expected: defaultThreatDetectionEngineID},
 		{
@@ -139,5 +142,26 @@ func TestCustomEngineThreatDetectionWarning(t *testing.T) {
 	if !strings.Contains(stderr, "safe-outputs.threat-detection.engine") ||
 		!strings.Contains(stderr, "harness-engine") {
 		t.Errorf("expected a threat detection warning naming the custom engine and the override key, got:\n%s", stderr)
+	}
+}
+
+func TestExplicitCustomDetectorRewrite(t *testing.T) {
+	workflowPath := writeCustomEngineWorkflow(t, "  detection-engine: claude\n")
+	source, err := os.ReadFile(workflowPath)
+	require.NoError(t, err)
+	content := strings.Replace(string(source), "  create-issue:", "  threat-detection:\n    engine:\n      id: harness-engine\n  create-issue:", 1)
+	require.NoError(t, os.WriteFile(workflowPath, []byte(content), 0644))
+	stderr := testutil.CaptureStderr(t, func() {
+		require.NoError(t, NewCompiler().CompileWorkflow(workflowPath))
+	})
+	assert.Contains(t, stderr, `safe-outputs.threat-detection.engine "harness-engine" will run on "claude"`)
+}
+
+func TestImportedDetectionRequiresMatchingIDAndHarness(t *testing.T) {
+	for _, field := range []string{"other-engine", "harness-engine"} {
+		t.Run(field, func(t *testing.T) {
+			workflow := writeCustomEngineWorkflow(t, "  detection-engine: "+field+"\n")
+			require.ErrorContains(t, NewCompiler().CompileWorkflow(workflow), "definition's own id with behaviors.execution.command-name and behaviors.harness-script")
+		})
 	}
 }

@@ -2,6 +2,8 @@ package parser
 
 import (
 	"encoding/json"
+	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -71,6 +73,36 @@ func (acc *importAccumulator) extractEngineConfig(fm map[string]any, fullPath st
 			acc.engines = append(acc.engines, string(engineJSON))
 		}
 	}
+}
+
+func (acc *importAccumulator) extractDetectionPrerequisites(fm map[string]any) error {
+	engine, ok := fm["engine"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	id, ok := engine["id"].(string)
+	if !ok || id == "" || engine["detection-engine"] != id || engine["behaviors"] == nil {
+		return nil
+	}
+	steps, err := extractYAMLFieldFromMap(fm, "pre-agent-steps")
+	if err != nil {
+		return err
+	}
+	prereqs := EnginePrerequisites{PreAgentSteps: steps}
+	if runtimes, ok := fm["runtimes"].(map[string]any); ok {
+		prereqs.Runtimes = runtimes
+	}
+	if acc.enginePrerequisites == nil {
+		acc.enginePrerequisites = make(map[string]EnginePrerequisites)
+	}
+	if existing, exists := acc.enginePrerequisites[id]; exists {
+		if !reflect.DeepEqual(existing, prereqs) {
+			return fmt.Errorf("conflicting detection prerequisites for imported engine %q", id)
+		}
+		return nil
+	}
+	acc.enginePrerequisites[id] = prereqs
+	return nil
 }
 
 func (acc *importAccumulator) extractTopLevelRouting(fm map[string]any, fullPath string) {
