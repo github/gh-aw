@@ -619,7 +619,7 @@ jobs:
       - name: Find candidate workflows
         run: "mkdir -p /tmp/gh-aw/agent\nmkdir -p /tmp/gh-aw/agent/candidates\nfind .github/workflows -name '*.md' -type f ! -name 'daily-*.md' ! -name '*-test.md' \\\n  | shuf -n 5 \\\n  > /tmp/gh-aw/agent/candidates.txt\nwhile IFS= read -r workflow; do\n  cp \"$workflow\" /tmp/gh-aw/agent/candidates/\ndone < /tmp/gh-aw/agent/candidates.txt\necho \"Pre-selected $(wc -l < /tmp/gh-aw/agent/candidates.txt) candidate workflows\"\n"
       - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           cache: true
           go-version-file: go.mod
