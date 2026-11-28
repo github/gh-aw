@@ -245,6 +245,16 @@ describe("workflow native MCP permission alignment", () => {
     expect(workflow.tools.bash).not.toContain("jq *");
   });
 
+  it("allows AWF surfacing guidance while retaining protected-file review", () => {
+    const { workflow, steps } = readWorkflow("daily-awf-spec-compiler-surfacing");
+    const allowedFiles = [".github/aw/**", "pkg/parser/schemas/*.json", "docs/src/content/docs/**"];
+    const config = JSON.parse(steps.find(step => step.env?.GH_AW_SAFE_OUTPUTS_CONFIG).env.GH_AW_SAFE_OUTPUTS_CONFIG);
+    expect(workflow["safe-outputs"]["create-pull-request"]["allowed-files"]).toEqual(allowedFiles);
+    expect(workflow["safe-outputs"]["create-pull-request"]["protected-files"].policy).toBe("request-review");
+    expect(config.create_pull_request.allowed_files).toEqual(allowedFiles);
+    expect(config.create_pull_request.protected_files_policy).toBe("request-review");
+  });
+
   it("exposes concurrency script and raw ledger append with real compiled SDK permissions", () => {
     const { workflow, sdkConfig, manifest, steps, prompt } = readWorkflow("daily-mcp-concurrency-analysis");
     expect(workflow["max-tool-denials"]).toBe(3);
