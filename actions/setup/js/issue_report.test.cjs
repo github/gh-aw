@@ -260,12 +260,35 @@ describe("issue report publication boundary", () => {
   });
 
   it("renders queue Issue creation through the AST publisher while keeping labels and the Work marker", async () => {
+    vi.stubEnv("GITHUB_REPOSITORY", "o/r");
+    vi.stubEnv("GITHUB_REPOSITORY_ID", "77");
+    vi.stubEnv("GITHUB_SERVER_URL", "https://github.com");
+    vi.stubEnv("GITHUB_RUN_ID", "100");
+    vi.stubEnv("GITHUB_RUN_ATTEMPT", "2");
+    vi.stubEnv("GITHUB_JOB", "projector");
+    vi.stubEnv("GH_AW_JOB_CHECK_RUN_ID", "7");
+    vi.stubEnv("GH_AW_WORKFLOW_ID", "queue");
     const create = vi.fn().mockResolvedValue({ data: { id: 1, number: 2 } });
     const github = { rest: { issues: { create } } };
-    const issue = await createIssue(github, { owner: "o", repo: "r" }, { title: " Work\n title ", body: "<img src=x>\n\n<!-- gh-aw-work-queue-issue:w_abc -->", label: "work" });
+    const body = parseReportMarkdown("<img src=x>\n\n<!-- gh-aw-work-queue-issue:w_abc -->", { allowMetadata: true, agentTainted: false });
+    const issue = await createIssue(github, { owner: "o", repo: "r" }, { title: " Work\n title ", body, label: "work", workflowName: "Queue" });
     expect(issue).toEqual({ id: 1, number: 2 });
     expect(create).toHaveBeenCalledTimes(1);
-    expect(create.mock.calls[0][0]).toEqual({ owner: "o", repo: "r", labels: ["work"], title: "Work title", body: "&lt;img src=x&gt;\n\n<!-- gh-aw-work-queue-issue:w_abc -->" });
+    const published = create.mock.calls[0][0];
+    expect(published).toMatchObject({ owner: "o", repo: "r", labels: ["work"], title: "Work title" });
+    expect(published.body).toContain("&lt;img src=x&gt;\n\n<!-- gh-aw-work-queue-issue:w_abc -->");
+    const execution = /<!-- gh-aw-execution: (.*?) -->/.exec(published.body);
+    expect(execution).not.toBeNull();
+    expect(JSON.parse(execution[1])).toEqual({
+      version: 1,
+      repo_id: "77",
+      repository: "o/r",
+      aw_workflow_id: "queue",
+      run_id: "100",
+      run_attempt: "2",
+      run_url: "https://github.com/o/r/actions/runs/100",
+      publishing_job: { key: "projector", check_run_id: "7" },
+    });
   });
 });
 
