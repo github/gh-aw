@@ -22,6 +22,21 @@ const readWorkflow = name => {
 };
 
 describe("restricted workflow operation contracts", () => {
+  it("checks editor URLs using standalone permitted curl calls", () => {
+    const { workflow, prompt, config, permission } = readWorkflow("weekly-editors-health-check");
+    expect(workflow.tools.bash).toEqual(["curl:*", "cat:*"]);
+    expect(config.permissions.allowedTools).not.toContain("shell");
+    expect(config.permissions.allowedTools).toContain("shell(curl:*)");
+    expect(permission("cat docs/src/content/docs/reference/editors.mdx")).toBe("approve-once");
+    expect(permission("curl -sS -o /dev/null -w '%{http_code}' --max-time 30 'https://github.github.com/gh-aw/editor/'")).toBe("approve-once");
+    expect(permission('for u in https://github.github.com/gh-aw/editor/; do echo "$u -> $(curl -sS -o /dev/null -w \'%{http_code}\' --max-time 30 "$u" 2>&1)"; done')).toBe("reject");
+    expect(permission("python3 -c 'print(1)'")).toBe("reject");
+    expect(prompt).toContain("make a separate shell tool call containing only");
+    expect(prompt).toContain("Do not combine checks in a shell loop, pipeline, command substitution, or other compound command");
+    expect(prompt).toContain("do not retry command variants or treat the denial as an unreachable URL");
+    expect(prompt).toContain("`report_incomplete`");
+  });
+
   it("allows focused Formal validation without granting arbitrary Go or Git commands", () => {
     const { workflow, prompt, config, permission } = readWorkflow("daily-formal-spec-verifier");
     expect(workflow.tools.bash).toContain("go test:*");
