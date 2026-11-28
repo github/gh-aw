@@ -1,5 +1,15 @@
-# Workflow Health Manager — 2026-11-27T04:31Z
+# Workflow Health Manager — 2026-11-28 (snapshot 03:08Z)
 
+- Snapshot: 2026-11-28T03:08Z; window 2026-11-27T02:52Z–2026-11-28T02:52Z. Collection partial: run counts from GitHub API fallback; logs, safe outputs, cost and tokens unavailable.
+- Copilot Session Insights: 8 consecutive scheduled failures Nov 20–27 (last 06:45Z, SHA ca7ccb770f). Tracker #81538 closed. Fix PR #81699 merged 2026-11-27T17:25Z, after the last failing run. Fix unverified until the next scheduled run. No new P1 filed; comment on dashboard #81539.
+- Architecture Guardian (#81536): latest run succeeded 11-27 14:14Z after 5 failures. Keep open until another green window.
+- Daily Documentation Diagram (#81537): latest run succeeded 11-27 04:54Z after 7 failures. Keep open.
+- smoke-work-queue-dispatcher (#81440): 3 consecutive successes since 11-27 12:31Z. Keep open.
+- Expiry: `[aw]` failure trackers (e.g. #81495) auto-close NOT_PLANNED at 24h expiry. This is not a fix; maintainer decision pending.
+- Stale attributions removed: #81205, #81181, #81201, #80956, #79686 are closed; do not cite as open fixes.
+- Labels `priority-p1` and `type-failure` exist (earlier note was wrong).
+
+## Prior run (2026-11-27T04:31Z), superseded
 - Snapshot: 2026-11-27T02:53:28Z; 24h window 2026-11-26T02:50:11Z–2026-11-27T02:50:11Z. Collection partial: run counts use full-window paginated Actions API fallback; logs, safe outputs, engagement, cost and tokens are incomplete or unavailable.
 - Inventory: 371 executable workflows, 371 corresponding locks, no missing locks. `compile-validate.txt` only reports installation; compilation success and warnings are unavailable, not inferred from locks.
 - Measured non-command workflows: 304. Healthy 15, Warning 3, Critical 2, Low-sample 160, Inactive 124 (sum 304). Command/mention workflows: 67 unavailable for activated-run scoring; raw runs include expected command gating and do not identify activated runs. Prior dashboard is non-comparable because the measured cohort differs.

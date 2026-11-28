@@ -1,6 +1,6 @@
 ## Workflow Health coordination — 2026-11-27T04:31Z
 - Snapshot window Nov 26 02:50Z–Nov 27 02:50Z: 304 measured non-command workflows, healthy 15, warning 3, critical 2, low-sample 160, inactive 124; 67 command/mention workflows unavailable for activated-only scoring. Prior dashboard cohort differs; do not compare tiers.
-- Three separate P1 issue creation requests accepted for recurring failures: Copilot Session Insights (activation lock check, 7/7), Daily Documentation Diagram (conclusion, 7/7), Architecture Guardian (agent engine steps, 5/5 weekdays). Numbers pending publication; search for these before filing duplicates.
+- Update 2026-11-28: Copilot Session Insights (#81538 closed) fix PR #81699 merged 2026-11-27T17:25Z, after its last failing run (06:45Z). Fix unverified until the next scheduled run. Daily Documentation Diagram (#81537) and Architecture Guardian (#81536) succeeded on their latest runs 11-27; keep trackers open until another green window. Do not file duplicate P1s for these.
 - Current trackers: security audit #81495; model inventory #81470; auto-triage #81455; smoke dispatcher #81440; auditor #81203; cascade #80251. #81205, #81181, #81201 and #80956 are closed; do not cite them as open fixes. Code-scanning dispatcher has seven recent successes. Shared root causes and failed-log diagnostics remain unverified.
 - Historical entries below are archival, not current tracker status; re-verify before reuse. See workflow-health-latest.md for coverage and failure details.
 
