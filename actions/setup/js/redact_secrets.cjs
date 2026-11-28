@@ -18,7 +18,7 @@ const { redactSafeOutputContent } = require("./safe_output_redaction.cjs");
 const { redactPiSessionHTML } = require("./pi_session_redaction.cjs");
 const { getOTLPSecretValues } = require("./otlp_header_helpers.cjs");
 const { isSensitiveConfigKey, redactSensitiveConfig } = require("./safe_outputs_config_redact.cjs");
-const { OBJECT_PACK_PREVIEW_HEADER } = require("./object_pack_transport.cjs");
+const { OBJECT_PACK_PREVIEW_HEADER } = require("./constants.cjs");
 
 /**
  * Heuristic screening, not a guarantee that arbitrary text is secret-free.
