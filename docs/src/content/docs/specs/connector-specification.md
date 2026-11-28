@@ -8,9 +8,9 @@ sidebar:
 
 # Connector Specification
 
-**Version**: 1.4.0<br>
+**Version**: 1.5.0<br>
 **Status**: Experimental Working Draft<br>
-**Publication Date**: 2026-11-26<br>
+**Publication Date**: 2026-11-28<br>
 **Editor**: GitHub Agentic Workflows Team
 
 ## Abstract
@@ -26,10 +26,11 @@ TLA+ models of selected authority boundaries.
 
 This Experimental Working Draft is maintained by the GitHub Agentic Workflows
 project through repository review. It is not a W3C Recommendation or evidence
-of provider certification. Version 1.4.0 specifies the selected inference alias
-as the Copilot request wire model while retaining the existing inference transport
-and authority boundaries. Publication does not establish provider authorization
-or operational trigger ingress.
+of provider certification. Version 1.5.0 specifies explicit `connector:<id>`
+imports for declarations embedded in the installed gh-aw release while
+retaining ordinary local and pinned remote import resolution, explicit
+capability selection, and existing authority boundaries. Publication does not
+establish provider authorization or operational trigger ingress.
 
 ## Table of Contents
 
@@ -105,13 +106,31 @@ A connector is an ordinary Markdown file with YAML frontmatter, conventionally
 `connectors.<id>`. Connector IDs and capability names MUST match
 `^[a-z][a-z0-9-]{0,62}$`. A connector MUST declare at least one capability.
 
-Consumers use normal `imports` entries with `uses` and optional typed `with`
-bindings. Local imports follow the compiler's `.github/` confinement rules.
-Remote imports use `owner/repo/path@ref`; deployments SHOULD pin a reviewed
-commit. Imported declarations MUST NOT be silently replaced by built-in
-definitions, remote fallbacks, or a provider inferred from its name.
-Duplicate definitions and generated tool/configuration name collisions MUST
-fail rather than overwrite another capability.
+Consumers MAY use ordinary `imports` entries with `uses` and optional typed
+`with` bindings. A `uses` value beginning with the exact prefix `connector:` is
+an explicit embedded-connector import. The remainder MUST be a connector ID
+matching `^[a-z][a-z0-9-]{0,62}$` (C-IMP-001). The compiler MUST resolve such
+an import only against declarations embedded in the installed gh-aw release
+(C-IMP-002). It MUST reject an invalid connector ID or an unknown embedded
+connector ID; it MUST NOT fall back to a local file, remote import, built-in
+inference, provider-by-name lookup, or any other declaration (C-IMP-003).
+
+The `connector:<id>` form takes precedence over ordinary local and remote
+import resolution only because its explicit prefix selects the embedded
+namespace. It MUST NOT alter resolution of imports without that prefix. Local
+imports continue to follow the compiler's `.github/` confinement rules. Remote
+imports continue to use `owner/repo/path@ref`; deployments SHOULD pin a
+reviewed commit. Imported declarations MUST NOT be silently replaced by
+built-in definitions, remote fallbacks, or a provider inferred from their name
+(C-IMP-004).
+
+An embedded import and its optional typed `with` bindings have the same binding
+semantics as an ordinary imported declaration. Importing any declaration,
+including an embedded declaration, selects no capability, endpoint, grant,
+credential, engine, or network approval. Capabilities MUST be selected
+independently as specified in section 3 (C-IMP-005). Duplicate definitions and
+generated tool/configuration name collisions MUST fail rather than overwrite
+another capability.
 
 `import-schema` is the ordinary workflow import-binding schema, not the
 operation argument schema. It MAY provide resource arrays, reviewed endpoint
@@ -998,6 +1017,16 @@ separate redaction and privacy controls. Errors are described semantically in
 sections 4–8; this specification defines no new public error-code registry.
 
 ## 14. Change Log
+
+### Version 1.5.0 (Experimental Working Draft) — 2026-11-28
+
+- Added the explicit `connector:<id>` import form for declarations embedded in
+  the installed gh-aw release.
+- Required connector-ID validation and fail-closed rejection of unknown
+  embedded IDs, with no silent local, remote, built-in, or provider-name
+  fallback.
+- Clarified that embedded imports preserve ordinary `with` bindings and select
+  no capabilities until explicitly selected under section 3.
 
 ### Version 1.4.0 (Experimental Working Draft) — 2026-11-26
 
