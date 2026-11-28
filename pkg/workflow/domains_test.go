@@ -1340,7 +1340,7 @@ func TestDefaultSafeOutputsEcosystem(t *testing.T) {
 	// From github ecosystem
 	githubSamples := []string{"github.com", "docs.github.com", "github.blog", "*.githubusercontent.com"}
 	// From local ecosystem
-	localSamples := []string{"localhost", "127.0.0.1", "::1"}
+	localSamples := []string{"localhost", "127.0.0.1"}
 
 	for _, d := range append(append(append(defaultsSamples, devToolsSamples...), githubSamples...), localSamples...) {
 		if !strings.Contains(joined, d) {
@@ -1513,4 +1513,21 @@ func TestExtractProviderFromModel(t *testing.T) {
 		require.Error(t, err, "Leading slash (empty provider prefix) must return an error")
 		require.ErrorContains(t, err, "provider prefix is empty")
 	})
+}
+
+// TestEcosystemDomainsAreFirewallDomainEntries guards against entries the firewall
+// rejects at startup: AWF treats any ':' as a port, so IPv6 literals such as ::1 fail
+// validation and abort every workflow that allows the ecosystem.
+func TestEcosystemDomainsAreFirewallDomainEntries(t *testing.T) {
+	sets, err := loadDomainSets()
+	if err != nil {
+		t.Fatalf("load domain sets: %v", err)
+	}
+	for ecosystem, domains := range sets.Ecosystems {
+		for _, domain := range domains {
+			if strings.Contains(domain, ":") {
+				t.Errorf("ecosystem %q domain %q contains ':', which the firewall rejects as a port", ecosystem, domain)
+			}
+		}
+	}
 }

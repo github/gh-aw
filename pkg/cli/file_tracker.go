@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/github/gh-aw/pkg/constants"
@@ -59,11 +60,25 @@ func (ft *FileTracker) TrackCreated(filePath string) {
 	ft.CreatedFiles = append(ft.CreatedFiles, absPath)
 }
 
+func (ft *FileTracker) tracks(filePath string) bool {
+	if ft == nil {
+		return false
+	}
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		absPath = filePath
+	}
+	return slices.Contains(ft.CreatedFiles, absPath) || slices.Contains(ft.ModifiedFiles, absPath)
+}
+
 // TrackModified adds a file to the modified files list and stores its original content
 func (ft *FileTracker) TrackModified(filePath string) {
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
 		absPath = filePath
+	}
+	if slices.Contains(ft.CreatedFiles, absPath) {
+		return
 	}
 
 	// Store original content if not already stored

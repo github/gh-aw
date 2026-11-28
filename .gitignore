@@ -221,3 +221,9 @@ test-script-mode.lock.yml
 
 # Playwright CLI output (screenshots, console logs captured during agent runs)
 .playwright-cli/
+
+# Local agent and Node caches
+.task-cache/
+.worktmp/
+.review-*-tmp/
+node-compile-cache/

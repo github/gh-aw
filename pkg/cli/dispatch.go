@@ -136,7 +136,9 @@ func newRemoteDispatchWorkflowFetch(ctx context.Context, content string, spec *W
 		remoteWorkflowLog.Printf("Failed to resolve absolute path for target directory %s: %v", targetDir, err)
 		return nil, false
 	}
-	downloader := fileDownloadFn(parser.DownloadFileFromGitHub)
+	downloader := fileDownloadFn(func(ctx context.Context, owner, repo, filePath, ref string) ([]byte, error) {
+		return downloadFileFromGitHubForHost(ctx, owner, repo, filePath, ref, spec.Host)
+	})
 	if len(downloaders) > 0 && downloaders[0] != nil {
 		downloader = downloaders[0]
 	}
@@ -169,7 +171,13 @@ func (config *remoteDispatchWorkflowFetch) fetch(workflowName string) error {
 	}
 	workflowContent, err := config.downloader(config.ctx, config.owner, config.repo, remoteFilePath, config.ref)
 	if err != nil {
+		if config.ctx.Value(programWorkersOnlyKey{}) == true {
+			return nil
+		}
 		return config.saveYMLFallback(workflowName, remoteFilePath, err)
+	}
+	if skip, err := skipNonProgramWorker(config.ctx, workflowContent); err != nil || skip {
+		return err
 	}
 	return config.saveMarkdown(workflowContent, remoteFilePath, targetPath, fileExists)
 }
@@ -239,6 +247,18 @@ func (config *remoteDispatchWorkflowFetch) saveYMLFallback(workflowName, remoteF
 }
 
 func (config *remoteDispatchWorkflowFetch) saveMarkdown(workflowContent []byte, remoteFilePath, targetPath string, fileExists bool) error {
+	if err := validateWorkerUpdate(config.ctx, config.targetDir, targetPath, remoteFilePath, workflowContent, config.downloader); err != nil {
+		return err
+	}
+	depSpec := *config.spec
+	depSpec.Version = config.ref
+	rel, err := filepath.Rel(config.targetDir, targetPath)
+	if err != nil {
+		return err
+	}
+	if err := fetchWorkflowProgram(config.ctx, string(workflowContent), &depSpec, remoteFilePath, config.targetDir, rel, config.force, config.tracker, config.downloader); err != nil {
+		return err
+	}
 	depSourceString := path.Join(config.spec.RepoSlug, remoteFilePath) + "@" + config.ref
 	if updated, err := addSourceToWorkflow(string(workflowContent), depSourceString); err == nil {
 		workflowContent = []byte(updated)
@@ -291,11 +311,11 @@ func fetchDownloadedWorkflowFrontmatterImports(ctx context.Context, workflowCont
 // frontmatter inspection alone — they only become visible after the compiler processes all
 // imports and merges the safe-outputs configuration.
 //
-// All early returns (empty RepoSlug, invalid slug, parse failure, no dispatch workflows) are
-// intentional no-ops: this function is best-effort and must never block the add workflow flow.
+// Early returns for missing repository metadata, parse failures, or no workers are
+// best-effort. Program dependency errors are returned to prevent incomplete installs.
 // Parse failures are logged at debug level so they can be investigated when needed.
 // Source conflicts are reported as warnings (not errors) because the main file is already written.
-func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile string, spec *WorkflowSpec, targetDir string, verbose bool, force bool, tracker *FileTracker) {
+func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile string, spec *WorkflowSpec, targetDir string, verbose bool, force bool, tracker *FileTracker) (programErr error) {
 	remoteWorkflowLog.Printf("Fetching import-derived dispatch workflows from parsed file: %s, repo=%s", destFile, spec.RepoSlug)
 	if spec.RepoSlug == "" {
 		return
@@ -367,6 +387,9 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 
 		localRelPath := filepath.Clean(workflowName + ".md")
 		targetPath := filepath.Join(targetDir, localRelPath)
+		if tracker.tracks(targetPath) || tracker.tracks(filepath.Join(targetDir, filepath.Clean(workflowName+".yml"))) {
+			continue
+		}
 
 		absTargetPath, absErr2 := filepath.Abs(targetPath)
 		if absErr2 != nil {
@@ -402,13 +425,16 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 		}
 
 		// Download from source repository — try .md first, then .yml as fallback
-		workflowContent, err := parser.DownloadFileFromGitHub(ctx, owner, repo, remoteFilePath, ref)
+		workflowContent, err := downloadFileFromGitHubForHost(ctx, owner, repo, remoteFilePath, ref, spec.Host)
 		if err != nil {
+			if ctx.Value(programWorkersOnlyKey{}) == true {
+				continue
+			}
 			// .md not found — try .yml fallback
 			ymlRemotePath := path.Clean(strings.TrimSuffix(remoteFilePath, ".md") + ".yml")
 			ymlLocalPath := filepath.Join(targetDir, filepath.Clean(workflowName+".yml"))
 
-			ymlContent, ymlErr := parser.DownloadFileFromGitHub(ctx, owner, repo, ymlRemotePath, ref)
+			ymlContent, ymlErr := downloadFileFromGitHubForHost(ctx, owner, repo, ymlRemotePath, ref, spec.Host)
 			if ymlErr != nil {
 				if verbose {
 					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch dispatch workflow %s: %v", remoteFilePath, err)))
@@ -424,6 +450,13 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 			// Capture whether file exists before writing (for correct tracker classification).
 			_, ymlFileExistsErr := os.Stat(ymlLocalPath)
 			ymlFileExists := ymlFileExistsErr == nil
+			if tracker != nil {
+				if ymlFileExists {
+					tracker.TrackModified(ymlLocalPath)
+				} else {
+					tracker.TrackCreated(ymlLocalPath)
+				}
+			}
 			if writeErr := os.WriteFile(ymlLocalPath, ymlContent, constants.FilePermSensitive); writeErr != nil {
 				if verbose {
 					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write dispatch workflow %s: %v", ymlRemotePath, writeErr)))
@@ -433,16 +466,29 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 			if verbose {
 				fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched dispatch workflow (.yml, from import): "+ymlLocalPath))
 			}
-			if tracker != nil {
-				if ymlFileExists {
-					tracker.TrackModified(ymlLocalPath)
-				} else {
-					tracker.TrackCreated(ymlLocalPath)
-				}
-			}
 			continue
 		}
 
+		if skip, err := skipNonProgramWorker(ctx, workflowContent); err != nil {
+			programErr = err
+			return
+		} else if skip {
+			continue
+		}
+		depSpec := *spec
+		depSpec.Version = ref
+		if err := validateWorkerUpdate(ctx, targetDir, targetPath, remoteFilePath, workflowContent, func(ctx context.Context, owner, repo, filePath, ref string) ([]byte, error) {
+			return downloadFileFromGitHubForHost(ctx, owner, repo, filePath, ref, spec.Host)
+		}); err != nil {
+			programErr = err
+			return
+		}
+		if err := fetchWorkflowProgram(ctx, string(workflowContent), &depSpec, remoteFilePath, targetDir, localRelPath, force, tracker, func(ctx context.Context, owner, repo, filePath, ref string) ([]byte, error) {
+			return downloadFileFromGitHubForHost(ctx, owner, repo, filePath, ref, spec.Host)
+		}); err != nil {
+			programErr = err
+			return
+		}
 		// Embed the source field for future conflict detection.
 		depSourceString := spec.RepoSlug + "/" + remoteFilePath + "@" + ref
 		if updated, srcErr := addSourceToWorkflow(string(workflowContent), depSourceString); srcErr == nil {
@@ -456,6 +502,13 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 			continue
 		}
 
+		if tracker != nil {
+			if fileExists {
+				tracker.TrackModified(targetPath)
+			} else {
+				tracker.TrackCreated(targetPath)
+			}
+		}
 		if err := os.WriteFile(targetPath, workflowContent, constants.FilePermSensitive); err != nil {
 			if verbose {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to write dispatch workflow %s: %v", remoteFilePath, err)))
@@ -467,16 +520,9 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched dispatch workflow (from import): "+targetPath))
 		}
 
-		if tracker != nil {
-			if fileExists {
-				tracker.TrackModified(targetPath)
-			} else {
-				tracker.TrackCreated(targetPath)
-			}
-		}
-
 		fetchDownloadedWorkflowFrontmatterImports(ctx, workflowContent, spec, remoteFilePath, targetDir, verbose, force, tracker)
 	}
+	return nil
 }
 
 // fetchAndSaveRemoteCallWorkflows fetches and saves the worker workflow files referenced in the
@@ -495,7 +541,9 @@ func fetchAndSaveDispatchWorkflowsFromParsedFile(ctx context.Context, destFile s
 // parser.DownloadFileFromGitHub implementation (used in tests to avoid real network calls).
 func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *WorkflowSpec, targetDir string, verbose bool, force bool, tracker *FileTracker, downloaders ...fileDownloadFn) error {
 	remoteWorkflowLog.Printf("Fetching remote call-workflow workers: repo=%s, targetDir=%s, force=%v", spec.RepoSlug, targetDir, force)
-	downloader := fileDownloadFn(parser.DownloadFileFromGitHub)
+	downloader := fileDownloadFn(func(ctx context.Context, owner, repo, filePath, ref string) ([]byte, error) {
+		return downloadFileFromGitHubForHost(ctx, owner, repo, filePath, ref, spec.Host)
+	})
 	if len(downloaders) > 0 && downloaders[0] != nil {
 		downloader = downloaders[0]
 	}
@@ -546,6 +594,9 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 
 		localRelPath := filepath.Clean(workflowName + ".md")
 		targetPath := filepath.Join(targetDir, localRelPath)
+		if tracker.tracks(targetPath) || tracker.tracks(filepath.Join(targetDir, filepath.Clean(workflowName+".yml"))) {
+			continue
+		}
 
 		absTargetPath, absErr := filepath.Abs(targetPath)
 		if absErr != nil {
@@ -585,6 +636,9 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 		// (the call-workflow validator accepts either .md or .yml files locally).
 		workflowContent, err := downloader(ctx, owner, repo, remoteFilePath, ref)
 		if err != nil {
+			if ctx.Value(programWorkersOnlyKey{}) == true {
+				continue
+			}
 			remoteWorkflowLog.Printf(".md fetch failed for call-workflow worker %s, trying .yml fallback", workflowName)
 			// .md not found — try .yml fallback (e.g. plain GitHub Actions reusable workflow)
 			ymlRemotePath := path.Clean(strings.TrimSuffix(remoteFilePath, ".md") + ".yml")
@@ -627,6 +681,19 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 			continue
 		}
 
+		if skip, err := skipNonProgramWorker(ctx, workflowContent); err != nil {
+			return err
+		} else if skip {
+			continue
+		}
+		depSpec := *spec
+		depSpec.Version = ref
+		if err := validateWorkerUpdate(ctx, targetDir, targetPath, remoteFilePath, workflowContent, downloader); err != nil {
+			return err
+		}
+		if err := fetchWorkflowProgram(ctx, string(workflowContent), &depSpec, remoteFilePath, targetDir, localRelPath, force, tracker, downloader); err != nil {
+			return err
+		}
 		if updated, srcErr := addSourceToWorkflow(string(workflowContent), expectedSource); srcErr == nil {
 			workflowContent = []byte(updated)
 		}
@@ -673,9 +740,9 @@ func fetchAndSaveRemoteCallWorkflows(ctx context.Context, content string, spec *
 // frontmatter inspection alone — they only become visible after the compiler processes all
 // imports and merges the safe-outputs configuration.
 //
-// All early returns (empty RepoSlug, invalid slug, parse failure, no call workflows) are
-// intentional no-ops: this function is best-effort and must never block the add workflow flow.
-func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile string, spec *WorkflowSpec, targetDir string, verbose bool, force bool, tracker *FileTracker) {
+// Early returns for missing repository metadata, parse failures, or no workers are
+// best-effort. Program dependency errors are returned to prevent incomplete installs.
+func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile string, spec *WorkflowSpec, targetDir string, verbose bool, force bool, tracker *FileTracker) (programErr error) {
 	remoteWorkflowLog.Printf("Fetching import-derived call-workflow workers from parsed file: %s, repo=%s", destFile, spec.RepoSlug)
 	if spec.RepoSlug == "" {
 		return
@@ -750,6 +817,9 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 			remoteWorkflowLog.Printf("Failed to resolve absolute path for call-workflow worker %s: %v", workflowName, absErr2)
 			continue
 		}
+		if tracker.tracks(targetPath) || tracker.tracks(filepath.Join(targetDir, filepath.Clean(workflowName+".yml"))) {
+			continue
+		}
 		if rel, relErr := filepath.Rel(absTargetDir, absTargetPath); relErr != nil || strings.HasPrefix(rel, "..") {
 			if verbose {
 				fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Refusing to write call-workflow worker outside target directory: %q", workflowName)))
@@ -782,13 +852,16 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 		}
 
 		// Download from source repository — try .md first, then .yml as fallback
-		workflowContent, err := parser.DownloadFileFromGitHub(ctx, owner, repo, remoteFilePath, ref)
+		workflowContent, err := downloadFileFromGitHubForHost(ctx, owner, repo, remoteFilePath, ref, spec.Host)
 		if err != nil {
+			if ctx.Value(programWorkersOnlyKey{}) == true {
+				continue
+			}
 			// .md not found — try .yml fallback (e.g. plain GitHub Actions reusable workflow)
 			ymlRemotePath := path.Clean(strings.TrimSuffix(remoteFilePath, ".md") + ".yml")
 			ymlLocalPath := filepath.Join(targetDir, filepath.Clean(workflowName+".yml"))
 
-			ymlContent, ymlErr := parser.DownloadFileFromGitHub(ctx, owner, repo, ymlRemotePath, ref)
+			ymlContent, ymlErr := downloadFileFromGitHubForHost(ctx, owner, repo, ymlRemotePath, ref, spec.Host)
 			if ymlErr != nil {
 				if verbose {
 					fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to fetch call-workflow worker %s: %v", remoteFilePath, err)))
@@ -823,6 +896,26 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 			continue
 		}
 
+		if skip, err := skipNonProgramWorker(ctx, workflowContent); err != nil {
+			programErr = err
+			return
+		} else if skip {
+			continue
+		}
+		depSpec := *spec
+		depSpec.Version = ref
+		if err := validateWorkerUpdate(ctx, targetDir, targetPath, remoteFilePath, workflowContent, func(ctx context.Context, owner, repo, filePath, ref string) ([]byte, error) {
+			return downloadFileFromGitHubForHost(ctx, owner, repo, filePath, ref, spec.Host)
+		}); err != nil {
+			programErr = err
+			return
+		}
+		if err := fetchWorkflowProgram(ctx, string(workflowContent), &depSpec, remoteFilePath, targetDir, localRelPath, force, tracker, func(ctx context.Context, owner, repo, filePath, ref string) ([]byte, error) {
+			return downloadFileFromGitHubForHost(ctx, owner, repo, filePath, ref, spec.Host)
+		}); err != nil {
+			programErr = err
+			return
+		}
 		if updated, srcErr := addSourceToWorkflow(string(workflowContent), expectedSource); srcErr == nil {
 			workflowContent = []byte(updated)
 		}
@@ -856,4 +949,5 @@ func fetchAndSaveCallWorkflowsFromParsedFile(ctx context.Context, destFile strin
 
 		fetchDownloadedWorkflowFrontmatterImports(ctx, workflowContent, spec, remoteFilePath, targetDir, verbose, force, tracker)
 	}
+	return nil
 }

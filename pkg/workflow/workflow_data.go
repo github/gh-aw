@@ -47,6 +47,7 @@ type WorkflowData struct {
 	TrialMode                      bool              // whether the workflow is running in trial mode
 	TrialLogicalRepo               string            // target repository slug for trial mode (owner/repo)
 	UseSamples                     bool              // whether the agentic step should be replaced by a deterministic samples replay driver (hidden feature)
+	Program                        string            // deterministic program path relative to the workflow directory (engine: none); replaces the agent with a program job
 	FrontmatterName                string            // name field from frontmatter (for code scanning alert driver default)
 	FrontmatterEmoji               string            // emoji field from frontmatter (for display in footers and UI)
 	FrontmatterYAML                string            // raw frontmatter YAML content (rendered as comment in lock file for reference)

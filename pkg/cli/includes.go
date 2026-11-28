@@ -130,15 +130,15 @@ func fetchRemoteRuntimeImportsRecursive(ctx context.Context, content, currentBas
 		if err := os.MkdirAll(filepath.Dir(targetPath), constants.DirPermPublic); err != nil {
 			return fmt.Errorf("failed to create directory for runtime import %s: %w", remoteFilePath, err)
 		}
-		if err := os.WriteFile(targetPath, importContent, constants.FilePermSensitive); err != nil {
-			return fmt.Errorf("failed to write runtime import %s: %w", remoteFilePath, err)
-		}
 		if opts.tracker != nil {
 			if fileExists {
 				opts.tracker.TrackModified(targetPath)
 			} else {
 				opts.tracker.TrackCreated(targetPath)
 			}
+		}
+		if err := os.WriteFile(targetPath, importContent, constants.FilePermSensitive); err != nil {
+			return fmt.Errorf("failed to write runtime import %s: %w", remoteFilePath, err)
 		}
 
 		if err := fetchRemoteRuntimeImportsRecursive(ctx, string(importContent), path.Dir(remoteFilePath), opts); err != nil {
@@ -591,6 +591,13 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 			continue
 		}
 
+		if opts.tracker != nil {
+			if fileExists {
+				opts.tracker.TrackModified(resolvedTargetPath)
+			} else {
+				opts.tracker.TrackCreated(resolvedTargetPath)
+			}
+		}
 		// Write the file
 		if err := root.WriteFile(repoRelPath, importContent, constants.FilePermSensitive); err != nil {
 			if opts.strict {
@@ -604,15 +611,6 @@ func fetchFrontmatterImportsRecursive(ctx context.Context, content, currentBaseD
 
 		if opts.verbose {
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched import: "+targetPath))
-		}
-
-		// Track the file for git staging and potential rollback
-		if opts.tracker != nil {
-			if fileExists {
-				opts.tracker.TrackModified(resolvedTargetPath)
-			} else {
-				opts.tracker.TrackCreated(resolvedTargetPath)
-			}
 		}
 
 		// Recurse into the imported file's imports. Use the imported file's directory as
@@ -743,6 +741,13 @@ func fetchAndSaveRemoteIncludesWithOptions(ctx context.Context, content string, 
 			}
 		}
 
+		if opts.tracker != nil {
+			if fileExists {
+				opts.tracker.TrackModified(targetPath)
+			} else {
+				opts.tracker.TrackCreated(targetPath)
+			}
+		}
 		// Write the include file
 		if err := os.WriteFile(targetPath, includeContent, constants.FilePermSensitive); err != nil {
 			return fmt.Errorf("failed to write include file %s: %w", targetPath, err)
@@ -750,15 +755,6 @@ func fetchAndSaveRemoteIncludesWithOptions(ctx context.Context, content string, 
 
 		if opts.verbose {
 			fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Fetched include: "+targetPath))
-		}
-
-		// Track the file
-		if opts.tracker != nil {
-			if fileExists {
-				opts.tracker.TrackModified(targetPath)
-			} else {
-				opts.tracker.TrackCreated(targetPath)
-			}
 		}
 
 		// Recursively fetch includes from the fetched file
@@ -882,22 +878,31 @@ func runRemoteDependencySteps(steps []remoteDependencyStep, strict, verbose bool
 func fetchAllRemoteDependenciesWithOptions(ctx context.Context, content string, spec *WorkflowSpec, targetDir string, verbose bool, force bool, tracker *FileTracker, strict bool) error {
 	remoteWorkflowLog.Printf("Fetching all remote dependencies: spec=%s, targetDir=%s, force=%v", spec.String(), targetDir, force)
 
+	if err := fetchWorkflowProgram(ctx, content, spec, spec.WorkflowPath, targetDir, "workflow.md", force, tracker, func(ctx context.Context, owner, repo, filePath, ref string) ([]byte, error) {
+		return downloadFileFromGitHubForHost(ctx, owner, repo, filePath, ref, spec.Host)
+	}); err != nil {
+		return fmt.Errorf("failed to fetch program dependency: %w", err)
+	}
+
+	// Manifest-managed imports must be refreshed even when programs and
+	// worker files are protected against overwriting existing local files.
+	forceImports := force || strict
 	fetchers := remoteDependencyFetchers{
 		includes: func() error {
 			return fetchAndSaveRemoteIncludesWithOptions(ctx, content, includesFetchOptions{
 				spec:      spec,
 				targetDir: targetDir,
 				verbose:   verbose,
-				force:     force,
+				force:     forceImports,
 				tracker:   tracker,
 				strict:    strict,
 			})
 		},
 		frontmatter: func() error {
-			return fetchAndSaveRemoteFrontmatterImportsWithOptions(ctx, content, spec, targetDir, verbose, force, tracker, strict)
+			return fetchAndSaveRemoteFrontmatterImportsWithOptions(ctx, content, spec, targetDir, verbose, forceImports, tracker, strict)
 		},
 		runtimeImports: func() error {
-			return fetchAndSaveRemoteRuntimeImports(ctx, content, spec, targetDir, verbose, force, tracker)
+			return fetchAndSaveRemoteRuntimeImports(ctx, content, spec, targetDir, verbose, forceImports, tracker)
 		},
 		dispatch: func() error {
 			return fetchAndSaveRemoteDispatchWorkflows(ctx, content, spec, targetDir, verbose, force, tracker)

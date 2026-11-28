@@ -861,15 +861,7 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 		c.generateLogParsing(yaml, data, engine)
 	}
 
-	if isWorkQueueEnabled(data) {
-		yaml.WriteString("      - name: Collect work queue intents\n")
-		yaml.WriteString("        if: always()\n")
-		fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/github-script")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
-		yaml.WriteString("        with:\n")
-		yaml.WriteString("          script: |\n")
-		yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/collect_work_queue_intents.cjs');\n")
-		yaml.WriteString("            main({ core });\n")
-	}
+	c.generateCollectWorkQueueIntentsStep(yaml, data)
 
 	// Add secret redaction step BEFORE any artifact uploads
 	// This ensures all artifacts are scanned for secrets before being uploaded
@@ -893,4 +885,19 @@ func (c *Compiler) generateAgentRunSteps(yaml *strings.Builder, data *WorkflowDa
 	}
 
 	return artifactPaths, logFileFull, nil
+}
+
+// generateCollectWorkQueueIntentsStep copies staged queue intents and the finish intent
+// into /tmp/gh-aw/ so the agent artifact carries them to the safe_outputs job.
+func (c *Compiler) generateCollectWorkQueueIntentsStep(yaml *strings.Builder, data *WorkflowData) {
+	if !isWorkQueueEnabled(data) {
+		return
+	}
+	yaml.WriteString("      - name: Collect work queue intents\n")
+	yaml.WriteString("        if: always()\n")
+	fmt.Fprintf(yaml, "        uses: %s\n", c.getActionPin("actions/github-script")) //nolint:fprintferrorunchecked // strings.Builder writes cannot fail.
+	yaml.WriteString("        with:\n")
+	yaml.WriteString("          script: |\n")
+	yaml.WriteString("            const { main } = require('${{ runner.temp }}/gh-aw/actions/collect_work_queue_intents.cjs');\n")
+	yaml.WriteString("            main({ core });\n")
 }

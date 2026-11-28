@@ -30,7 +30,7 @@ type manifestManagedWorkflowUpdate struct {
 	manifestSource string
 }
 
-func fetchManifestManagedDependencies(ctx context.Context, content []byte, repo, workflowPath, ref, targetDir string, verbose bool) error {
+func fetchManifestManagedDependencies(ctx context.Context, content []byte, repo, workflowPath, ref, targetDir string, verbose, force bool, tracker *FileTracker) error {
 	spec := &WorkflowSpec{
 		RepoSpec: RepoSpec{
 			RepoSlug: repo,
@@ -38,7 +38,7 @@ func fetchManifestManagedDependencies(ctx context.Context, content []byte, repo,
 		},
 		WorkflowPath: workflowPath,
 	}
-	return fetchAllRemoteDependenciesStrict(ctx, string(content), spec, targetDir, verbose, true, nil)
+	return fetchAllRemoteDependenciesStrict(ctx, string(content), spec, targetDir, verbose, force, tracker)
 }
 
 func parseManifestSourceSpec(source string) (*RepoSpec, bool, error) {
@@ -564,7 +564,7 @@ func removeManifestManagedWorkflow(workflowPath string) error {
 	return nil
 }
 
-func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWorkflowUpdate, opts UpdateWorkflowsOptions) error { //nolint:largefunc
+func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWorkflowUpdate, opts UpdateWorkflowsOptions) (runErr error) { //nolint:largefunc
 	if IsCommitSHA(update.wf.SourceSHA) {
 		update.currentRef = update.wf.SourceSHA
 	}
@@ -662,8 +662,32 @@ func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWo
 		return errManifestWorkflowConflictSkipped
 	}
 
-	if err := fetchManifestManagedDependencies(ctx, newContent, update.repo, update.latestPath, update.latestRef, filepath.Dir(update.wf.Path), opts.Verbose); err != nil {
-		return fmt.Errorf("unable to update workflow dependencies: %w", err)
+	var tracker *FileTracker
+	if !hasConflicts {
+		upstreamProgram, err := workflowProgramPath(string(newContent))
+		if err != nil {
+			return err
+		}
+		finalProgram, err := workflowProgramPath(finalContent)
+		if err != nil {
+			return err
+		}
+		if finalProgram != upstreamProgram {
+			return errors.New("locally modified program path cannot be fetched from the updated source")
+		}
+		tracker = NewFileTracker()
+		defer func() {
+			if runErr != nil {
+				if err := tracker.RollbackAllFiles(opts.Verbose); err != nil {
+					runErr = errors.Join(runErr, err)
+				}
+			}
+		}()
+		ctx = withProgramUpdateBaseline(ctx, update.repo, update.currentPath, update.latestPath, update.currentRef, opts.NoMerge)
+		if err := fetchManifestManagedDependencies(ctx, newContent, update.repo, update.latestPath, update.latestRef, filepath.Dir(update.wf.Path), opts.Verbose, true, tracker); err != nil {
+			return fmt.Errorf("unable to update workflow dependencies: %w", err)
+		}
+		tracker.TrackModified(update.wf.Path)
 	}
 	if err := os.WriteFile(update.wf.Path, []byte(finalContent), constants.FilePermPublic); err != nil {
 		return fmt.Errorf("unable to write updated workflow: %w", err)
@@ -672,8 +696,18 @@ func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWo
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Updated %s from %s to %s with CONFLICTS - please review and resolve manually", update.wf.Name, shortRef(update.currentRef), shortRef(update.latestRef))))
 		return errManifestWorkflowConflictSkipped
 	}
+	dependencySpec := &WorkflowSpec{RepoSpec: RepoSpec{RepoSlug: update.repo, Version: update.latestRef}, WorkflowPath: update.latestPath}
+	if err := fetchAndSaveDispatchWorkflowsFromParsedFile(ctx, update.wf.Path, dependencySpec, filepath.Dir(update.wf.Path), opts.Verbose, true, tracker); err != nil {
+		return fmt.Errorf("unable to update workflow dependencies: %w", err)
+	}
+	if err := fetchAndSaveCallWorkflowsFromParsedFile(ctx, update.wf.Path, dependencySpec, filepath.Dir(update.wf.Path), opts.Verbose, true, tracker); err != nil {
+		return fmt.Errorf("unable to update workflow dependencies: %w", err)
+	}
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage(fmt.Sprintf("Updated %s from %s to %s", update.wf.Name, shortRef(update.currentRef), shortRef(update.latestRef))))
 	if !opts.NoCompile {
+		if err := compileUpdatedProgramWorkers(ctx, update.wf.Path, tracker, opts); err != nil {
+			return err
+		}
 		if err := compileWorkflowsForUpdate(ctx, []string{update.wf.Path}, opts.WorkflowsDir, opts.EngineOverride, opts.Verbose, opts.Approve); err != nil {
 			return fmt.Errorf("unable to compile updated workflow: %w", err)
 		}
@@ -681,7 +715,7 @@ func updateManifestManagedWorkflow(ctx context.Context, update manifestManagedWo
 	return nil
 }
 
-func addManifestManagedWorkflow(ctx context.Context, targetDir, name, repo, latestPath, latestRef, manifestSource string, opts UpdateWorkflowsOptions) error {
+func addManifestManagedWorkflow(ctx context.Context, targetDir, name, repo, latestPath, latestRef, manifestSource string, opts UpdateWorkflowsOptions) (runErr error) {
 	updateManifestLog.Printf("Adding new manifest-managed workflow %s from %s/%s@%s", name, repo, latestPath, latestRef)
 	newContent, err := downloadWorkflowContentFn(ctx, repo, latestPath, latestRef, opts.Verbose)
 	if err != nil {
@@ -716,14 +750,37 @@ func addManifestManagedWorkflow(ctx context.Context, targetDir, name, repo, late
 	}
 
 	destPath := filepath.Join(targetDir, name+".md")
-	if err := fetchManifestManagedDependencies(ctx, []byte(content), repo, latestPath, latestRef, targetDir, opts.Verbose); err != nil {
+	tracker := NewFileTracker()
+	defer func() {
+		if runErr != nil {
+			if err := tracker.RollbackAllFiles(opts.Verbose); err != nil {
+				runErr = errors.Join(runErr, err)
+			}
+		}
+	}()
+	if err := fetchManifestManagedDependencies(ctx, []byte(content), repo, latestPath, latestRef, targetDir, opts.Verbose, false, tracker); err != nil {
 		return fmt.Errorf("unable to install workflow dependencies: %w", err)
+	}
+	if fileutil.FileExists(destPath) {
+		tracker.TrackModified(destPath)
+	} else {
+		tracker.TrackCreated(destPath)
 	}
 	if err := os.WriteFile(destPath, []byte(content), constants.FilePermPublic); err != nil {
 		return fmt.Errorf("unable to write new manifest workflow %s: %w", destPath, err)
 	}
+	dependencySpec := &WorkflowSpec{RepoSpec: RepoSpec{RepoSlug: repo, Version: latestRef}, WorkflowPath: latestPath}
+	if err := fetchAndSaveDispatchWorkflowsFromParsedFile(ctx, destPath, dependencySpec, targetDir, opts.Verbose, false, tracker); err != nil {
+		return fmt.Errorf("unable to install workflow dependencies: %w", err)
+	}
+	if err := fetchAndSaveCallWorkflowsFromParsedFile(ctx, destPath, dependencySpec, targetDir, opts.Verbose, false, tracker); err != nil {
+		return fmt.Errorf("unable to install workflow dependencies: %w", err)
+	}
 	fmt.Fprintln(os.Stderr, console.FormatSuccessMessage("Added new workflow from manifest: "+filepath.Base(destPath)))
 	if !opts.NoCompile {
+		if err := compileUpdatedProgramWorkers(ctx, destPath, tracker, opts); err != nil {
+			return err
+		}
 		if err := compileWorkflowsForUpdate(ctx, []string{destPath}, opts.WorkflowsDir, opts.EngineOverride, opts.Verbose, opts.Approve); err != nil {
 			return fmt.Errorf("unable to compile new manifest workflow: %w", err)
 		}

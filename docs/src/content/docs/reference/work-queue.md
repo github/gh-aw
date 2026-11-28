@@ -67,6 +67,8 @@ tools:
 
 Dispatchers also declare the worker workflows in `safe-outputs.dispatch-workflow.workflows` and bound launches per run with `max`. The [deployment example](/gh-aw/patterns/workqueue-ops/#deploy-a-native-queue) combines these declarations. Standalone `tools.repo-memory` persistence is unsupported in native queue workers; memory-backed queues are separate [alternative patterns](/gh-aw/patterns/workqueue-ops/).
 
+A dispatcher, producer or worker that needs no model can be a deterministic [program](/gh-aw/reference/programs/) (`engine: none`). A program with `tools.work-queue: true` commits its submissions and dispatches directly from the program job instead of staging intents, so no agent or `safe_outputs` job runs.
+
 | Role | Agent tools |
 | --- | --- |
 | Observer | `work_queue_read` only. |

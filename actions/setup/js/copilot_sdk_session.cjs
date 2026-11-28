@@ -157,6 +157,7 @@ function parseSubagentModelsJson(value) {
  *   toolConfig?: import("./copilot_sdk_tool_config.cjs").CopilotSDKToolConfig,
  *   mcpServers?: Record<string, import("@microsoft/copilot-sdk").MCPServerConfig>,
  *   mcpOnly?: boolean,
+ *   isURLAllowed?: (url: unknown) => boolean,
  *   webFetchOptions?: {fetchImpl?: typeof fetch, timeoutMs?: number, maxRedirects?: number},
  *   coreLogger?: import("./copilot_sdk_permissions.cjs").CopilotSDKCoreLogger,
  *   sdkModule?: {
@@ -204,6 +205,7 @@ async function runCopilotSDKSession({
   toolConfig,
   mcpServers,
   mcpOnly = false,
+  isURLAllowed,
   webFetchOptions,
   coreLogger,
   sdkModule,
@@ -397,6 +399,7 @@ async function runCopilotSDKSession({
       onDenied: requestSummary => recordToolDenial(`permission denied: ${requestSummary}`),
       workspaceRoot: workingDirectory,
       mcpOnly,
+      isURLAllowed,
     });
     const toolCallBudget = buildCopilotSDKToolCallBudget(toolConfig?.maxToolCalls, event => {
       writeDriverEvent(event.exhausted ? "guard.tool_call_budget_exceeded" : "guard.tool_call_budget_debit", event);

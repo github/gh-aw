@@ -18,6 +18,12 @@ var consolidatedSafeOutputsJobLog = logger.New("workflow:compiler_safe_outputs_j
 // 2. Generates a "Setup JavaScript files" step to write them to /tmp/gh-aw/scripts/
 // 3. Each safe output step requires from the local filesystem
 func (c *Compiler) buildConsolidatedSafeOutputsJob(data *WorkflowData, mainJobName, markdownPath string) (*Job, []string, error) {
+	// Publisher programs commit and launch from the program job and cannot emit
+	// worker safe outputs (an unassigned dispatcher has no Claim), so there is nothing left to apply.
+	if isProgramPublisher(data) {
+		consolidatedSafeOutputsJobLog.Print("Program publisher commits queue controls itself, skipping consolidated job")
+		return nil, nil, nil
+	}
 	if data.SafeOutputs == nil {
 		if !isWorkQueueParticipant(data) {
 			consolidatedSafeOutputsJobLog.Print("No safe outputs configured, skipping consolidated job")

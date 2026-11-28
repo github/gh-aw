@@ -85,7 +85,7 @@ func validateAddedWorkflowDestination(baseDir, name, extension string) error {
 	return nil
 }
 
-func compileAddedWorkflow(ctx context.Context, destFile string, workflowSpec *WorkflowSpec, githubWorkflowsDir string, tracker *FileTracker, opts AddOptions) {
+func compileAddedWorkflow(ctx context.Context, destFile string, workflowSpec *WorkflowSpec, githubWorkflowsDir string, tracker *FileTracker, opts AddOptions) error {
 	if tracker == nil {
 		tracker = NewFileTracker()
 	}
@@ -95,8 +95,12 @@ func compileAddedWorkflow(ctx context.Context, destFile string, workflowSpec *Wo
 	// call-workflow workers that originate from imported shared workflows (not visible
 	// in the raw frontmatter).
 	if !isLocalWorkflowPath(workflowSpec.WorkflowPath) {
-		fetchAndSaveDispatchWorkflowsFromParsedFile(ctx, destFile, workflowSpec, githubWorkflowsDir, opts.Verbose, opts.Force, tracker)
-		fetchAndSaveCallWorkflowsFromParsedFile(ctx, destFile, workflowSpec, githubWorkflowsDir, opts.Verbose, opts.Force, tracker)
+		if err := fetchAndSaveDispatchWorkflowsFromParsedFile(ctx, destFile, workflowSpec, githubWorkflowsDir, opts.Verbose, opts.Force, tracker); err != nil {
+			return err
+		}
+		if err := fetchAndSaveCallWorkflowsFromParsedFile(ctx, destFile, workflowSpec, githubWorkflowsDir, opts.Verbose, opts.Force, tracker); err != nil {
+			return err
+		}
 	}
 	// Compile any dispatch-workflow .md dependencies that were just fetched and lack a
 	// .lock.yml. The dispatch-workflow validator requires every .md dispatch target to be
@@ -114,7 +118,7 @@ func compileAddedWorkflow(ctx context.Context, destFile string, workflowSpec *Wo
 	compileDeps.propagateErrors = true
 	if err := compileCallWorkflowDependenciesWithOptions(ctx, destFile, compileDeps); err != nil {
 		printCompilationError(err, opts.Quiet)
-		return
+		return nil
 	}
 	// Compile the workflow
 	if err := compileWorkflowWithTrackingAndOptions(ctx, destFile, trackedWorkflowCompileOptions{
@@ -123,6 +127,7 @@ func compileAddedWorkflow(ctx context.Context, destFile string, workflowSpec *Wo
 	}); err != nil {
 		printCompilationError(err, opts.Quiet)
 	}
+	return nil
 }
 
 func validateWorkflowSecurity(resolved *ResolvedWorkflow, opts AddOptions) error {
@@ -180,12 +185,19 @@ func fetchWorkflowDependencies(ctx context.Context, workflowSpec *WorkflowSpec, 
 	if workflowSpec.RawURL != "" {
 		// Generic URL imports carry no GitHub repo context; dependency fetching is skipped.
 		addLog.Print("Skipping dependency fetch: raw URL workflow spec")
+		program, err := workflowProgramPath(string(sourceContent))
+		if err != nil {
+			return err
+		}
+		if program != "" {
+			return fmt.Errorf("cannot fetch program %q from a generic URL workflow; use a GitHub repository source", program)
+		}
 		return nil
 	}
 	if !isLocalWorkflowPath(workflowSpec.WorkflowPath) {
 		addLog.Printf("Fetching remote dependencies for %s", workflowSpec.WorkflowPath)
 		// Pin dependencies to the fetched workflow without changing its tracking ref.
-		dependencySpec := *workflowSpec
+		dependencySpec := *resolvedWorkflowSpec(workflowSpec, sourceInfo)
 		if sourceInfo != nil && sourceInfo.CommitSHA != "" {
 			dependencySpec.Version = sourceInfo.CommitSHA
 		}
@@ -198,6 +210,9 @@ func fetchWorkflowDependencies(ctx context.Context, workflowSpec *WorkflowSpec, 
 	// For local workflows, collect and copy include dependencies from local paths
 	// The source directory is derived from the workflow's path
 	sourceDir := filepath.Dir(workflowSpec.WorkflowPath)
+	if err := copyLocalWorkflowProgram(string(sourceContent), sourceDir, githubWorkflowsDir, opts.Force, tracker); err != nil {
+		return err
+	}
 	includeDeps, err := collectLocalIncludeDependencies(string(sourceContent), sourceDir, opts.Verbose)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, console.FormatWarningMessage(fmt.Sprintf("Failed to collect include dependencies: %v", err)))

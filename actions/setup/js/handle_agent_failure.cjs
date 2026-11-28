@@ -4529,6 +4529,9 @@ async function main() {
       core.warning(`Unable to read queue-scoped agent output for failure diagnostics: ${getErrorMessage(error)}`);
       agentOutputResult = { success: false, items: [] };
     }
+    const engineId = String(process.env.GH_AW_ENGINE_ID || "")
+      .trim()
+      .toLowerCase();
     const taskCompleteRegistrationIssueOnlyReportIncomplete = agentOutputResult.success && shouldIgnoreTaskCompleteRegistrationReports(agentOutputResult.items);
     const collectorEmptyOutputCause = agentOutputResult.success ? agentOutputResult.collectorEmptyOutputCause : undefined;
     let failureDiagnostics;
@@ -4544,8 +4547,10 @@ async function main() {
 
     if (agentConclusion === "success") {
       if (!agentOutputResult.success || !agentOutputResult.items || agentOutputResult.items.length === 0) {
-        hasMissingSafeOutputs = true;
-        core.info("Agent succeeded but produced no safe outputs");
+        if (engineId !== "none" || !agentOutputResult.success) {
+          hasMissingSafeOutputs = true;
+          core.info("Agent succeeded but produced no safe outputs");
+        }
       } else {
         const hasNoopOutput = agentOutputResult.items.some(item => item.type === "noop");
         const taskOutputItems = agentOutputResult.items.filter(item => item.type !== "noop" && item.type !== "request_continuation");
@@ -4554,7 +4559,7 @@ async function main() {
           core.info("Agent succeeded with only noop outputs - this is not a failure");
         }
       }
-    } else if (agentConclusion === "failure") {
+    } else if (agentConclusion === "failure" && engineId !== "none") {
       // The agent may have called noop successfully but the AI model server subsequently
       // returned a transient error (e.g. "Response was interrupted due to a server error"),
       // causing exit code 1. In that case we should not report a failure issue since the
@@ -4622,9 +4627,6 @@ async function main() {
       core.info("Missing data report-as-failure is disabled - missing_data signals will not trigger failure handling");
     }
 
-    const engineId = String(process.env.GH_AW_ENGINE_ID || "")
-      .trim()
-      .toLowerCase();
     const toolDenialsExceededEvents = engineId === "copilot" ? loadToolDenialsExceededEvents() : [];
     const hasToolDenialsExceeded = toolDenialsExceededEvents.length > 0;
     if (hasToolDenialsExceeded) {

@@ -67,7 +67,10 @@ func (c *Compiler) applyDefaults(data *WorkflowData, markdownPath string) error 
 		bashExplicitlyFalse = false
 		delete(data.ExplicitlyDisabledTools, "bash")
 	}
-	data.Tools = c.applyDefaultTools(data.Tools, data.SafeOutputs, data.SandboxConfig, data.NetworkPermissions)
+	// A program has no agent: never add default agent tools (GitHub MCP, edit, bash).
+	if data.Program == "" {
+		data.Tools = c.applyDefaultTools(data.Tools, data.SafeOutputs, data.SandboxConfig, data.NetworkPermissions)
+	}
 	data.BashDisabled = isBashFullyDisabled(data.Tools, bashExplicitlyFalse)
 	data.ParsedTools = NewTools(data.Tools)
 	if err := data.ParsedTools.ParseError(); err != nil {

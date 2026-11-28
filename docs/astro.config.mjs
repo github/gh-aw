@@ -585,6 +585,7 @@ export default defineConfig({
             { label: "Workflows (Custom Steps and Jobs)", link: "/reference/steps-jobs/" },
             { label: "Workflows (Feature Flags)", link: "/reference/feature-flags/" },
             { label: "Workflows (MCP Scripts)", link: "/reference/mcp-scripts/" },
+            { label: "Workflows (Programs)", link: "/reference/programs/" },
             { label: "Workflows (Templating)", link: "/reference/templating/" },
             { label: "Workflows (Full)", link: "/reference/frontmatter-full/" },
           ],

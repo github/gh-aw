@@ -336,3 +336,59 @@ func TestCheckoutDataOnlyPreservesCheckoutSteps(t *testing.T) {
 	after := NewCheckoutManager([]*CheckoutConfig{cfg}).GenerateAdditionalCheckoutSteps(resolveAction)
 	assert.Equal(t, before, after)
 }
+
+func TestProgramCheckoutRefWarning(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		ref  string
+		warn bool
+	}{
+		{name: "input", ref: "${{ inputs.branch }}", warn: true},
+		{name: "planner output", ref: "${{ needs.plan.outputs.branch }}", warn: true},
+		{name: "trusted base", ref: "${{ github.event.pull_request.base.sha }}"},
+		{name: "literal", ref: "main"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			output := captureStderrOutput(t, func() {
+				compiler.warnCheckoutRefWithSteps(&WorkflowData{
+					Program:         "program.ts",
+					CheckoutConfigs: []*CheckoutConfig{{Ref: tt.ref, DataOnly: true}},
+				}, "workflow.md")
+			})
+			assert.Equal(t, tt.warn, compiler.GetWarningCount() > 0)
+			if tt.warn {
+				assert.Contains(t, output, "Programs, imported")
+				assert.Contains(t, output, tt.ref)
+			}
+		})
+	}
+}
+
+func TestProgramImplicitPullRequestCheckoutWarning(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		on      string
+		configs []*CheckoutConfig
+		warn    bool
+	}{
+		{name: "implicit pull request ref", on: "on: pull_request", warn: true},
+		{name: "empty explicit ref", on: "on: pull_request", configs: []*CheckoutConfig{{}}, warn: true},
+		{name: "trusted explicit ref", on: "on: pull_request", configs: []*CheckoutConfig{{Ref: "main"}}},
+		{name: "dispatch", on: "on: workflow_dispatch"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			compiler := NewCompiler()
+			output := captureStderrOutput(t, func() {
+				compiler.warnCheckoutRefWithSteps(&WorkflowData{
+					Program: "program.ts", On: tt.on, CheckoutConfigs: tt.configs,
+				}, "workflow.md")
+			})
+			assert.Equal(t, tt.warn, compiler.GetWarningCount() > 0)
+			if tt.warn {
+				assert.Contains(t, output, "${{ github.ref }}")
+				assert.Contains(t, output, "without agent-config restoration")
+			}
+		})
+	}
+}

@@ -210,6 +210,13 @@ func fetchAndSaveRemoteResourcesWithDownloader(ctx context.Context, content stri
 			continue
 		}
 
+		if tracker != nil {
+			if fileExists {
+				tracker.TrackModified(targetPath)
+			} else {
+				tracker.TrackCreated(targetPath)
+			}
+		}
 		// Write the file
 		if err := os.WriteFile(targetPath, fileContent, constants.FilePermSensitive); err != nil {
 			if verbose {
@@ -223,13 +230,6 @@ func fetchAndSaveRemoteResourcesWithDownloader(ctx context.Context, content stri
 		}
 
 		// Track the file
-		if tracker != nil {
-			if fileExists {
-				tracker.TrackModified(targetPath)
-			} else {
-				tracker.TrackCreated(targetPath)
-			}
-		}
 	}
 
 	return nil

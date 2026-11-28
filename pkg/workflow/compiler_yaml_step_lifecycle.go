@@ -429,6 +429,10 @@ func (c *Compiler) generateOutputCollectionStep(yaml *strings.Builder, data *Wor
 	if protectedSessionCapture {
 		yaml.WriteString("          GH_AW_PROTECTED_SESSION_CAPTURE: 1\n")
 	}
+	if data.Program != "" {
+		// A program that emits nothing is a successful deterministic run, not an incomplete agent.
+		yaml.WriteString("          GH_AW_PROGRAM_RUN: \"true\"\n")
+	}
 
 	// Config is written to file, not passed as env var
 

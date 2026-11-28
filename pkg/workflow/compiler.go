@@ -569,7 +569,7 @@ func (c *Compiler) CompileWorkflowData(workflowData *WorkflowData, markdownPath 
 	// strict-mode sandbox restriction here rather than relying on the
 	// orchestrator path to validate it.
 	if err := c.withEffectiveStrictMode(workflowData.RawFrontmatter, func() error {
-		return c.validateStrictFirewall("", nil, workflowData.SandboxConfig)
+		return c.validateStrictFirewall(workflowData.AI, nil, workflowData.SandboxConfig)
 	}); err != nil {
 		return formatCompilerError(markdownPath, "error", err.Error(), err)
 	}

@@ -110,12 +110,12 @@ function createCompilerDependencyResolver(options) {
 }
 
 /**
- * Compiler entry point of the "Process trusted work queue controls" step: build the
- * queue client (GH_AW_WORK_QUEUE_TOKEN), the dispatch client (`github-token` of the
- * dispatch-workflow config) and the dependency resolver, then run the controls.
+ * Build the trusted control options: the queue client (GH_AW_WORK_QUEUE_TOKEN), the
+ * dispatch client (`github-token` of the dispatch-workflow config) and the dependency
+ * resolver. Shared by the controls step and publisher programs.
  * @param {CompilerControlOptions} [options]
  */
-async function main(options = {}) {
+async function configureControls(options = {}) {
   const env = options.env || process.env;
   /** @type {CompilerControlOptions & {githubClient: object, context: {repo: {owner: string, repo: string}}}} */
   const configured = { ...options, githubClient: options.githubClient || options.github || global.github, context: options.context || global.context };
@@ -134,7 +134,17 @@ async function main(options = {}) {
     configured.dispatchClient = credentialSource === "unknown" ? await factory(token) : await factory(token, { credentialSource });
   }
   if (!preview) configured.dependencyResolver = createCompilerDependencyResolver(configured);
+  return configured;
+}
+
+/**
+ * Compiler entry point of the "Process trusted work queue controls" step: configure the
+ * trusted clients, then run the controls over the staged intents.
+ * @param {CompilerControlOptions} [options]
+ */
+async function main(options = {}) {
+  const configured = await configureControls(options);
   return require("./work_queue_dispatch.cjs").main(/** @type {any} */ configured);
 }
 
-module.exports = { createCompilerDependencyResolver, credentialBindings, main, readOnlyRepositoryClient };
+module.exports = { configureControls, createCompilerDependencyResolver, credentialBindings, main, readOnlyRepositoryClient };

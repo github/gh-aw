@@ -20,6 +20,9 @@ func isBuiltinJobName(jobName string) bool {
 // The bulk of the construction is delegated to focused helpers in compiler_main_job_helpers.go.
 func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (*Job, error) {
 	workflowLog.Printf("Building main job for workflow: %s", data.Name)
+	if err := validateProgramPublisher(data); err != nil {
+		return nil, err
+	}
 	hasDependencyCaches := false
 	if data.Cache != "" {
 		caches, err := parseCacheStepConfigs(data.Cache)
@@ -65,7 +68,7 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	if err != nil {
 		return nil, err
 	}
-	if usesTokenBrokerGitHubTool(data) {
+	if usesTokenBrokerGitHubTool(data) || (isProgramPublisher(data) && usesTokenBrokerSafeOutputs(data)) {
 		perms := NewPermissionsParser(permissions).ToPermissions()
 		perms.Set(PermissionIdToken, PermissionWrite)
 		permissions = perms.RenderToYAML()
@@ -86,11 +89,15 @@ func (c *Compiler) buildMainJob(data *WorkflowData, activationJobCreated bool) (
 	}
 
 	compilerMainJobLog.Printf("Built main job: steps=%d, needs=%v, outputs=%d", len(steps), depends, len(outputs))
+	environment := data.Environment
+	if isProgramPublisher(data) {
+		environment = resolveSafeOutputsEnvironment(data)
+	}
 	return &Job{
 		Name:                     string(constants.AgentJobName),
 		If:                       jobCondition,
 		RunsOn:                   c.indentYAMLLines(data.RunsOn, "    "),
-		Environment:              c.indentYAMLLines(data.Environment, "    "),
+		Environment:              c.indentYAMLLines(environment, "    "),
 		Container:                c.indentYAMLLines(data.Container, "    "),
 		Services:                 c.indentYAMLLines(data.Services, "    "),
 		Permissions:              c.indentYAMLLines(permissions, "    "),

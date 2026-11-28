@@ -94,7 +94,7 @@ Mix ecosystem identifiers with specific domains for fine-grained control:
 |------------|----------|
 | `defaults` | Certificate validation, JSON schema, and stock Ubuntu archive/keyserver hosts ([complete list](#defaults-baseline)) |
 | `github` | GitHub domains (`github.com`, `docs.github.com`, `github.blog`, `*.githubusercontent.com`, and related) |
-| `local` | Loopback addresses (`localhost`, `127.0.0.1`, `::1`) |
+| `local` | Loopback addresses (`localhost`, `127.0.0.1`). The firewall rejects IPv6 literals such as `::1`, because any `:` in a domain entry is treated as a port. |
 | `dev-tools` | Popular CI/CD and developer tool services (Codecov, Shields.io, Snyk, Renovate, CircleCI, etc.) |
 | `default-safe-outputs` | Compound: `defaults` + `dev-tools` + `github` + `local` — recommended baseline for `safe-outputs.allowed-domains` |
 | `containers` | Docker Hub, GitHub Container Registry, Quay, GCR, MCR |

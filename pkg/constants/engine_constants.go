@@ -26,6 +26,10 @@ const (
 	AgyEngine EngineName = "agy"
 	// PiEngine is the Pi engine identifier
 	PiEngine EngineName = "pi"
+	// NoneEngine selects no agentic engine. It requires a top-level `program:`; the
+	// compiler then emits a deterministic program job instead of an agent job.
+	// It is not a registered engine and is excluded from AgenticEngines.
+	NoneEngine EngineName = "none"
 
 	// DefaultEngine is the default agentic engine used when no engine is explicitly specified.
 	// Currently defaults to CopilotEngine.

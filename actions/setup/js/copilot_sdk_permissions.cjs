@@ -215,7 +215,7 @@ function isReadPathAllowedByShellRules(requestedPath, allowedPathPatterns, works
  *
  * @param {CopilotSDKPermissionConfig | undefined} permissionConfig
  * @param {import("@microsoft/copilot-sdk").PermissionHandler} approveAll
- * @param {{coreLogger?: CopilotSDKCoreLogger, logger?: (msg: string) => void, onDenied?: (requestSummary: string) => void, workspaceRoot?: string, mcpOnly?: boolean}=} logOptions
+ * @param {{coreLogger?: CopilotSDKCoreLogger, logger?: (msg: string) => void, onDenied?: (requestSummary: string) => void, workspaceRoot?: string, mcpOnly?: boolean, isURLAllowed?: (url: unknown) => boolean}=} logOptions
  * @returns {import("@microsoft/copilot-sdk").PermissionHandler}
  */
 function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptions) {
@@ -391,7 +391,10 @@ function buildCopilotSDKPermissionHandler(permissionConfig, approveAll, logOptio
         }
         return hasReadGrant || allowedToolEntries.has("shell") || isReadPathAllowedByShellRules(request.path, readablePathPatterns, logOptions?.workspaceRoot);
       case "url":
-        return allowedToolEntries.has("web_fetch");
+        // Shell commands that name a URL (for example `curl http://localhost:4321/`) request URL
+        // approval in addition to the shell grant. Approve the AWF network scope, as the CLI
+        // engine does with --allow-url; the firewall still enforces it.
+        return allowedToolEntries.has("web_fetch") || logOptions?.isURLAllowed?.(request.url) === true;
       case "mcp":
         // Server-only entries (for example: "github") allow all tools from that server.
         // Server+tool entries (for example: "github(get_file_contents)") allow only that tool.

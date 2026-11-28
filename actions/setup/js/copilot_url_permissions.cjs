@@ -63,14 +63,14 @@ function domainURLPatterns(domains, { block = false } = {}) {
 }
 
 /**
- * The compiler copies the finalized config after expanding network_allowed.
- * Read it at startup, not at compilation, without changing shell permissions.
- * @param {string[]} args
- * @param {{env?: NodeJS.ProcessEnv, sdkMode?: boolean, configPath: string, fallbackConfigPath?: string}} options
- * @returns {string[]}
+ * Read the finalized AWF network config. The compiler copies it after expanding
+ * network_allowed, so it is read at startup, not at compilation. Returns undefined
+ * without the AWF sandbox (no API-proxy reflection) or without a network section.
+ * @param {{env?: NodeJS.ProcessEnv, configPath: string, fallbackConfigPath?: string}} options
+ * @returns {{allowDomains?: unknown, blockDomains?: unknown} | undefined}
  */
-function addCopilotURLPermissions(args, { env = process.env, sdkMode = false, configPath, fallbackConfigPath }) {
-  if (sdkMode || env.AWF_REFLECT_ENABLED !== "1") return args;
+function readAWFNetworkConfig({ env = process.env, configPath, fallbackConfigPath }) {
+  if (env.AWF_REFLECT_ENABLED !== "1") return undefined;
   let configContents;
   try {
     configContents = fs.readFileSync(configPath, "utf8");
@@ -96,8 +96,21 @@ function addCopilotURLPermissions(args, { env = process.env, sdkMode = false, co
   }
   if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("Invalid AWF config for Copilot URL approvals");
   const network = config.network;
-  if (network === undefined) return args;
+  if (network === undefined) return undefined;
   if (!network || typeof network !== "object" || Array.isArray(network)) throw new Error("Invalid AWF network config for Copilot URL approvals");
+  return network;
+}
+
+/**
+ * Add Copilot CLI --allow-url/--deny-url flags for the AWF network rules.
+ * @param {string[]} args
+ * @param {{env?: NodeJS.ProcessEnv, sdkMode?: boolean, configPath: string, fallbackConfigPath?: string}} options
+ * @returns {string[]}
+ */
+function addCopilotURLPermissions(args, { env = process.env, sdkMode = false, configPath, fallbackConfigPath }) {
+  if (sdkMode) return args;
+  const network = readAWFNetworkConfig({ env, configPath, fallbackConfigPath });
+  if (!network) return args;
   const permissions = [];
   for (const pattern of domainURLPatterns(network.allowDomains)) permissions.push("--allow-url", pattern);
   for (const pattern of domainURLPatterns(network.blockDomains, { block: true })) permissions.push("--deny-url", pattern);
@@ -107,4 +120,48 @@ function addCopilotURLPermissions(args, { env = process.env, sdkMode = false, co
   return [...args.slice(0, split), ...permissions, ...args.slice(split)];
 }
 
-module.exports = { domainURLPatterns, addCopilotURLPermissions };
+/**
+ * Whether a Copilot URL pattern from domainURLPatterns matches a parsed URL. A pattern
+ * without a port matches any port, like AWF domain rules, which never restrict ports.
+ * @param {string} pattern
+ * @param {URL} url
+ */
+function urlPatternMatches(pattern, url) {
+  const separator = pattern.indexOf("://");
+  if (pattern.slice(0, separator + 1) !== url.protocol) return false;
+  const authority = pattern.slice(separator + 3);
+  // Hosts are bracketed IPv6 literals or colon-free names, so a port follows the last ':' after any ']'.
+  const portIndex = authority.lastIndexOf(":");
+  const hasPort = portIndex > authority.lastIndexOf("]");
+  const host = hasPort ? authority.slice(0, portIndex) : authority;
+  if (hasPort && authority.slice(portIndex + 1) !== (url.port || (url.protocol === "https:" ? "443" : "80"))) return false;
+  if (host.startsWith("*.")) return url.hostname.endsWith(host.slice(1));
+  return url.hostname === host;
+}
+
+/**
+ * Build a URL approval check for Copilot SDK `url` permission requests from the AWF
+ * network rules: the same scope the CLI engine receives as --allow-url/--deny-url.
+ * Block rules take precedence; anything unparseable or outside http(s) is denied.
+ * @param {{allowDomains?: unknown, blockDomains?: unknown} | undefined} network
+ * @returns {(url: unknown) => boolean}
+ */
+function createURLPermissionCheck(network) {
+  if (!network) return () => false;
+  const allow = domainURLPatterns(network.allowDomains);
+  const block = domainURLPatterns(network.blockDomains, { block: true });
+  return value => {
+    if (typeof value !== "string") return false;
+    let url;
+    try {
+      url = new URL(value);
+    } catch {
+      return false;
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    if (block.some(pattern => urlPatternMatches(pattern, url))) return false;
+    return allow.some(pattern => urlPatternMatches(pattern, url));
+  };
+}
+
+module.exports = { domainURLPatterns, addCopilotURLPermissions, readAWFNetworkConfig, createURLPermissionCheck };
