@@ -572,7 +572,13 @@ async function main() {
         if (parsePullRequestNumber(target) === prNumber) {
           pullRequest = { number: prNumber, state: "open" };
           core.info(`Detected workflow_dispatch event for PR #${prNumber} via pull_request_number, will fetch PR ref`);
+        } else {
+          core.info("Skipping direct PR checkout: configured target does not match the dispatch PR number");
         }
+      } else {
+        core.info(
+          `Skipping direct PR checkout: target configured=${Boolean(target)}, target repository matches=${targetRepo === currentRepo}, checkout repository matches=${checkoutRepo === currentRepo}, multiple repositories=${process.env.GH_AW_DIRECT_PR_MULTIPLE_REPOS === "true"}`
+        );
       }
     }
   }

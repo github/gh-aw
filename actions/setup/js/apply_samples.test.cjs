@@ -442,10 +442,13 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
     delete require.cache[modulePath];
     vi.stubEnv("GH_AW_CUSTOM_BASE_BRANCH", "main");
     const { preStagePatch: stagePatch } = require("./apply_samples.cjs");
+    const debugSpy = vi.spyOn(core, "debug");
     try {
       const patch = "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-# existing PR change\n+# sample update\n";
       await stagePatch({ tool: "push_to_pull_request_branch", arguments: { message: "Sample update" }, sidecars: { patch } }, 0, workspace);
 
+      expect(debugSpy).toHaveBeenCalledWith(baselineSource === "checked-out PR" ? "apply_samples: sample[0] using prepared local PR-head branch" : "apply_samples: sample[0] creating PR-head branch from origin tracking ref");
+      expect(debugSpy).toHaveBeenCalledWith("apply_samples: sample[0] committing indexed patch without staging other workspace changes");
       expect(git(["rev-parse", "HEAD^"], workspace).trim()).toBe(baselineSha);
       expect(git(["symbolic-ref", "HEAD"], workspace).trim()).toBe(`refs/heads/${headRef}`);
       expect(require("./get_current_branch.cjs").getCurrentBranch(workspace)).toBe(headRef);
@@ -469,6 +472,7 @@ describe("apply_samples.cjs preStagePatch (create_pull_request / push_to_pull_re
       expect(git(["bundle", "list-heads", bundle.bundlePath], workspace)).toContain(`refs/heads/${headRef}`);
     } finally {
       require.cache[modulePath] = cachedModule;
+      debugSpy.mockRestore();
       fetchSpy.mockRestore();
       vi.unstubAllEnvs();
       fs.rmSync(eventPath, { force: true });

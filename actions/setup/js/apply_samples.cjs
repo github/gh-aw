@@ -515,12 +515,15 @@ async function preStagePatch(entry, index, workspace) {
   } else {
     try {
       runGit(["show-ref", "--verify", "--quiet", `refs/heads/${branch}`], repoCwd);
+      core.debug(`apply_samples: sample[${index}] using prepared local PR-head branch`);
     } catch {
       try {
         runGit(["show-ref", "--verify", "--quiet", `refs/remotes/origin/${branch}`], repoCwd);
       } catch {
+        core.debug(`apply_samples: sample[${index}] has no prepared local branch or origin tracking ref`);
         throw new Error(`${ERR_VALIDATION}: apply_samples: missing prepared PR-head branch '${branch}'. Configure checkout to provide the PR head or its origin tracking ref before replaying samples.`);
       }
+      core.debug(`apply_samples: sample[${index}] creating PR-head branch from origin tracking ref`);
       runGit(["checkout", "-b", branch, `refs/remotes/origin/${branch}`], repoCwd);
     }
     runGit(["switch", "--", branch], repoCwd);
@@ -543,11 +546,14 @@ async function preStagePatch(entry, index, workspace) {
   } catch (err) {
     // Fall back to --3way for patches that don't apply cleanly on top of an
     // empty working tree (uncommon but possible for synthetic samples).
+    core.debug(`apply_samples: sample[${index}] patch did not apply directly; trying three-way application`);
     runGit(["apply", "--3way", "--whitespace=nowarn", tmpPatch], repoCwd);
   }
 
   if (entry.tool !== "push_to_pull_request_branch") {
     runGit(["add", "-A"], repoCwd);
+  } else {
+    core.debug(`apply_samples: sample[${index}] committing indexed patch without staging other workspace changes`);
   }
   runGit(["commit", "-m", `gh-aw sample ${index + 1}: ${entry.tool}`, "--allow-empty"], repoCwd);
 }

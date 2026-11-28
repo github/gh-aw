@@ -120,6 +120,7 @@ function resolvePRHeadBaselineForPush(branchName, repoSlug, prNumber, server) {
   const headRepo = (process.env.GH_AW_PR_HEAD_REPO || "").trim();
 
   if (!baselineBranch || baselineBranch !== branchName || (!baselineRef && !baselineSha)) {
+    server.debug(`Ignoring PR-head baseline: recorded branch present=${Boolean(baselineBranch)}, branch matches=${Boolean(baselineBranch) && baselineBranch === branchName}, ref or SHA present=${Boolean(baselineRef || baselineSha)}`);
     return null;
   }
 

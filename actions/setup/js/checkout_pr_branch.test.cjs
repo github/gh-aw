@@ -1716,6 +1716,7 @@ If the pull request is still open, verify that:
       await runScript();
       expect(mockGithub.rest.pulls.get).not.toHaveBeenCalled();
       expect(mockExec.exec).not.toHaveBeenCalled();
+      expect(mockCore.info).toHaveBeenCalledWith(expect.stringContaining("Skipping direct PR checkout:"));
       expect(mockCore.info).toHaveBeenCalledWith("No pull request context available, skipping checkout");
     });
 
