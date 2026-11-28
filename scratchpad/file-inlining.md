@@ -37,7 +37,7 @@ The feature reuses and extends the existing `runtime_import.cjs` infrastructure:
 
 ### Processing Order
 
-```
+```text
 Workflow Source (.md)
         ↓
     Compilation
@@ -231,7 +231,7 @@ Use this Terraform template:
 ## Performance Considerations
 
 ### File Processing
-- ✅ Fast - reads local files from `GITHUB_WORKSPACE`
+- ✅ Reads local files from `GITHUB_WORKSPACE` with no network requests (no timing measured)
 - ✅ No network overhead
 - ✅ Line range extraction is O(n) where n = file lines
 
@@ -242,8 +242,8 @@ Use this Terraform template:
 - ⚠️ Cache stored in `/tmp/gh-aw/url-cache/` (ephemeral, per workflow run)
 
 ### Content Sanitization
-- ✅ Minimal overhead for front matter and XML comment removal
-- ✅ Regex-based GitHub Actions macro detection is fast
+- ✅ Front matter and XML comment removal each add one regex pass per inlined file
+- ✅ Regex-based GitHub Actions macro detection adds one regex pass per inlined content block
 
 ## Security Considerations
 
@@ -286,18 +286,18 @@ Potential improvements for future versions:
 
 ## Conclusion
 
-The runtime import feature provides a mechanism to include external content in workflow prompts. It uses the `{{#runtime-import}}` macro syntax for consistent and predictable behavior.
+The runtime import feature provides a mechanism to include external content in workflow prompts. It uses the `{{#runtime-import}}` macro syntax; the processing order is described in the Processing Order section.
 
 ### Key Benefits
-- ✅ **Clear syntax** with `{{#runtime-import}}`
+- ✅ **`{{#runtime-import}}` syntax** for including files and URLs
 - ✅ **Line range support** for targeted content
 - ✅ **URL fetching** with automatic caching
-- ✅ **Security built-in** with macro detection
+- ✅ **Macro detection** rejects inlined content that contains GitHub Actions `${{ ... }}` expressions
 - ✅ **Testing** with unit tests
 
-### Implementation Quality
+### Implementation Status
 - ✅ All tests passing
 - ✅ Documentation
 - ✅ Example workflows provided
 - ✅ No breaking changes to existing features
-- ✅ Clean integration with existing codebase
+- ✅ Extends the existing `runtime_import.cjs` infrastructure

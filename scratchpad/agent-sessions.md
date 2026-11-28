@@ -90,8 +90,8 @@ The terminology for starting an agent is changing from "New Agent Task" to "New 
 - `GITHUB_AW_AGENT_TASK_BASE` → `GITHUB_AW_AGENT_SESSION_BASE`
 
 **Go Type Names**:
-- `CreateAgentSessionConfig` → `CreateAgentSessionConfig`
-- `CreateAgentSessions` → `CreateAgentSessions`
+- `CreateAgentTaskConfig` → `CreateAgentSessionConfig`
+- `CreateAgentTasks` → `CreateAgentSessions`
 - `parseAgentTaskConfig` → `parseAgentSessionConfig`
 - `buildCreateOutputAgentTaskJob` → `buildCreateOutputAgentSessionJob`
 - `createAgentTaskLog` → `createAgentSessionLog`
@@ -145,14 +145,14 @@ Since the configuration key `create-agent-session` is changing to `create-agent-
 ### Phase 2: Go Code Migration
 
 1. **Rename Core Files**
-   ```
+   ```text
    pkg/workflow/create_agent_task.go → create_agent_session.go
    pkg/workflow/create_agent_task_test.go → create_agent_session_test.go
    pkg/workflow/create_agent_task_integration_test.go → create_agent_session_integration_test.go
    ```
 
 2. **Update Type Names**
-   - `CreateAgentSessionConfig` → `CreateAgentSessionConfig`
+   - `CreateAgentTaskConfig` → `CreateAgentSessionConfig`
    - Update all references in dependent files
 
 3. **Update Function Names**
@@ -161,7 +161,7 @@ Since the configuration key `create-agent-session` is changing to `create-agent-
 
 4. **Update Variable Names**
    - `agentTaskConfig` → `agentSessionConfig`
-   - `CreateAgentSessions` → `CreateAgentSessions`
+   - `CreateAgentTasks` → `CreateAgentSessions`
 
 5. **Update Logger Names**
    - `createAgentTaskLog` → `createAgentSessionLog`
@@ -173,7 +173,7 @@ Since the configuration key `create-agent-session` is changing to `create-agent-
 ### Phase 3: JavaScript Migration
 
 1. **Rename Files**
-   ```
+   ```text
    actions/setup/js/create_agent_task.cjs → create_agent_session.cjs
    actions/setup/js/create_agent_task.test.cjs → create_agent_session.test.cjs
    ```
@@ -267,7 +267,7 @@ During transition period:
   - [ ] `create_agent_task_integration_test.go` → `create_agent_session_integration_test.go`
   
 - [ ] Update type definitions
-  - [ ] `CreateAgentSessionConfig` → `CreateAgentSessionConfig`
+  - [ ] `CreateAgentTaskConfig` → `CreateAgentSessionConfig`
   - [ ] Update all struct field names in `SafeOutputsConfig`
   
 - [ ] Update function names
@@ -276,7 +276,7 @@ During transition period:
   
 - [ ] Update variable names
   - [ ] All local variables: `agentTaskConfig` → `agentSessionConfig`
-  - [ ] All references to `CreateAgentSessions` → `CreateAgentSessions`
+  - [ ] All references to `CreateAgentTasks` → `CreateAgentSessions`
   
 - [ ] Update logger
   - [ ] `createAgentTaskLog` → `createAgentSessionLog`
@@ -395,7 +395,7 @@ The `gh agent-task` CLI extension is **external** to gh-aw (repository: `github/
 This is a **breaking change** for users with existing workflows using `create-agent-session`. Communication plan:
 
 1. **Changeset**: Create changeset with `BREAKING CHANGE` prefix
-2. **Release Notes**: Clearly document the migration path
+2. **Release Notes**: Document the migration path
 3. **Migration Guide**: Link to codemod usage in docs
 4. **Deprecation Warning**: Emit an explicit warning when the old key is used
 
