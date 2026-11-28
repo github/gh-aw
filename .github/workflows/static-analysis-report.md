@@ -34,6 +34,11 @@ tools:
   cache-memory: true
   timeout: 600
 safe-outputs:
+  create-issue:
+    title-prefix: "[static-analysis] "
+    labels: [automation, cookie]
+    max: 3
+    deduplicate-by-title: true
   create-pull-request:
     exclude-lock-yml: true
     expires: 7d
@@ -403,9 +408,33 @@ Use the cache memory folder `/tmp/gh-aw/cache-memory/` to build persistent knowl
    ```
    ```
 
-### Phase 5: Implement Fixes and Publish the Scan Report
+### Phase 5: Track Findings, Implement Fixes, and Publish the Scan Report
 
 **Always publish the comprehensive scan report with `create_discussion`**, including clean scans. For actionable findings, implement focused fixes and validate with the affected scanner and relevant tests before staging `create_pull_request`. Do not create report-only pull requests.
+
+After evaluating and staging any fixes in Phase 6, for up to three verified,
+actionable findings or related finding clusters that
+need follow-up and are not already covered by a staged fix, create separate
+issues with `create_issue`. Prioritize security impact and then recurring
+problems affecting multiple workflows. Include findings requiring a design or
+triage decision, not just those with an obvious fix; do not treat scanner
+warnings as proven vulnerabilities. Do not create issues for inventory-only
+syft output, incomplete scans, false positives, or findings without a concrete
+next action.
+
+- Use a stable title identifying the tool, rule or vulnerability, and affected
+  component or image. Group findings sharing one root cause and remediation;
+  do not create an issue per generated lock file.
+- Before creating an issue, search open and closed issues and open pull requests
+  for the same underlying problem, including equivalent titles without the
+  `[static-analysis]` prefix. Skip work covered by a staged or open pull request
+  or an open or previously closed issue. If the
+  search is incomplete or a match is uncertain, do not create an issue.
+- Include the scanner, severity, evidence and affected paths or images, impact
+  or uncertainty, a bounded remediation or investigation, acceptance checks,
+  and the current workflow run link. For generated lock files, identify the
+  source or compiler as the place to investigate rather than editing locks.
+- The safe output applies the `cookie` label; do not create report-only issues.
 
 Create a discussion with:
 - **Summary**: Overview of static analysis findings from all eight tools
@@ -694,7 +723,7 @@ Organize your persistent data in `/tmp/gh-aw/cache-memory/`:
 
 ## Output Requirements
 
-Your output must be well-structured and actionable. Publish a discussion for every scan with findings from all eight tools, and pull requests only for implemented and validated fixes.
+Your output must be well-structured and actionable. Publish a discussion for every scan with findings from all eight tools, issues for qualifying follow-up work, and pull requests only for implemented and validated fixes.
 
 Update cache memory with today's scan data for future reference and trend analysis.
 
@@ -706,6 +735,7 @@ A successful static analysis scan:
 - ✅ Generates a detailed fix prompt for at least one issue type
 - ✅ Updates cache memory with findings from all tools
 - ✅ Creates a comprehensive discussion report with findings
+- ✅ Creates up to 3 deduplicated cookie-labeled issues for actionable follow-up when needed
 - ✅ Provides actionable recommendations
 - ✅ Maintains historical context for trend analysis
 - ✅ Reads and analyzes runner-guard source-to-sink findings
