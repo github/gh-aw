@@ -206,7 +206,7 @@ func TestLegacyConnectorImportsCodemodPreservesReviewedInputs(t *testing.T) {
 			provider: "jira",
 			applied:  true,
 			check: func(t *testing.T, inputs map[string]any) {
-				assert.Equal(t, "", inputs["site"])
+				assert.Empty(t, inputs["site"])
 				assert.Equal(t, []any{}, inputs["issue-types"])
 			},
 		},
@@ -218,9 +218,9 @@ func TestLegacyConnectorImportsCodemodPreservesReviewedInputs(t *testing.T) {
 			check: func(t *testing.T, inputs map[string]any) {
 				assert.Equal(t, "reviewed-org", inputs["organization"])
 				assert.Equal(t, "11111111-1111-4111-8111-111111111111", inputs["project"])
-				assert.Equal(t, "", inputs["project-name"])
-				assert.Equal(t, "", inputs["work-item"])
-				assert.Equal(t, "", inputs["related-work-item"])
+				assert.Empty(t, inputs["project-name"])
+				assert.Empty(t, inputs["work-item"])
+				assert.Empty(t, inputs["related-work-item"])
 			},
 		},
 	} {

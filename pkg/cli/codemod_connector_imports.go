@@ -64,43 +64,15 @@ func getLegacyConnectorImportsCodemod() Codemod {
 }
 
 func migrateLegacyConnector(f *codemod.Frontmatter, provider string, selected []string) error {
-	path, entries, err := legacyConnectorImportEntries(f)
+	path, entries, index, entry, err := findOrCreateConnectorImport(f, provider)
 	if err != nil {
 		return err
 	}
-	indexes := make([]int, 0, 1)
-	for index, entry := range entries {
-		if isConnectorImport(entry, provider) {
-			indexes = append(indexes, index)
-		}
-	}
-	if len(indexes) > 1 {
-		return fmt.Errorf("cannot migrate %s: multiple connector imports are already registered; keep one before running gh aw fix", provider)
-	}
-	index := -1
-	if len(indexes) == 1 {
-		index = indexes[0]
-	} else if _, found := f.Lookup("connectors", provider); found {
-		return fmt.Errorf("cannot migrate %s: an inline connector registration already exists; bind its inputs manually before running gh aw fix", provider)
-	}
-
-	importPath := repositoryConnectorDirectory + provider + ".md"
-	var entry any = importPath
-	if index >= 0 {
-		entry = entries[index]
-	}
 	inputField := ""
 	requiredInputs := requiredConnectorInputs(provider, selected)
-	token, hasToken := f.Lookup("safe-outputs", "linear-token")
-	if provider == "linear" && hasToken {
-		if token == nil {
-			return errors.New("cannot migrate linear-token: value is null; bind a single secrets.NAME reference manually")
-		}
-		secretReference, ok := token.(string)
-		if !ok || !connectorSecretReference.MatchString(secretReference) {
-			return errors.New("cannot migrate linear-token: use a single secrets.NAME reference, then bind its name through the Linear import writer-secret")
-		}
-		requiredInputs["writer-secret"] = connectorSecretReference.ReplaceAllString(secretReference, "$1")
+	hasToken, err := addLegacyLinearTokenInput(f, provider, requiredInputs)
+	if err != nil {
+		return err
 	}
 	if len(requiredInputs) > 0 {
 		entry, inputField, err = ensureConnectorInputs(entry, requiredInputs)
@@ -108,29 +80,24 @@ func migrateLegacyConnector(f *codemod.Frontmatter, provider string, selected []
 			return err
 		}
 	}
+	entryIndex := index
 	if index >= 0 {
-		entries[index] = entry
+		entries = slices.Replace(entries, index, index+1, entry)
 	} else {
+		entryIndex = len(entries)
 		entries = append(entries, entry)
 	}
 	if err := f.Set(path, entries); err != nil {
 		return err
 	}
 	if provider == "linear" && hasToken {
-		destination := []any{path[0]}
-		if len(path) == 2 {
-			destination = append(destination, path[1])
-		}
-		entryIndex := index
-		if index < 0 {
-			entryIndex = len(entries) - 1
+		destination := make([]any, 0, len(path)+3)
+		for _, key := range path {
+			destination = append(destination, key)
 		}
 		destination = append(destination, entryIndex)
 		destination = append(destination, inputField, "writer-secret")
-		if err := f.TransferInlineComment([]string{"safe-outputs", "linear-token"}, destination); err != nil {
-			return err
-		}
-		if err := f.Remove("safe-outputs", "linear-token"); err != nil {
+		if err := transferLegacyLinearToken(f, destination); err != nil {
 			return err
 		}
 	}
@@ -138,6 +105,57 @@ func migrateLegacyConnector(f *codemod.Frontmatter, provider string, selected []
 		return renameLegacyADOOutputs(f, selected)
 	}
 	return nil
+}
+
+func findOrCreateConnectorImport(f *codemod.Frontmatter, provider string) ([]string, []any, int, any, error) {
+	path, entries, err := legacyConnectorImportEntries(f)
+	if err != nil {
+		return nil, nil, -1, nil, err
+	}
+	index, count := -1, 0
+	var entry any
+	for candidateIndex, candidate := range entries {
+		if isConnectorImport(candidate, provider) {
+			index, entry = candidateIndex, candidate
+			count++
+		}
+	}
+	if count > 1 {
+		return nil, nil, -1, nil, fmt.Errorf("cannot migrate %s: multiple connector imports are already registered; keep one before running gh aw fix", provider)
+	}
+	if count == 0 {
+		if _, found := f.Lookup("connectors", provider); found {
+			return nil, nil, -1, nil, fmt.Errorf("cannot migrate %s: an inline connector registration already exists; bind its inputs manually before running gh aw fix", provider)
+		}
+		entry = repositoryConnectorDirectory + provider + ".md"
+	}
+	return path, entries, index, entry, nil
+}
+
+func addLegacyLinearTokenInput(f *codemod.Frontmatter, provider string, inputs map[string]any) (bool, error) {
+	if provider != "linear" {
+		return false, nil
+	}
+	token, exists := f.Lookup("safe-outputs", "linear-token")
+	if !exists {
+		return false, nil
+	}
+	if token == nil {
+		return false, errors.New("cannot migrate linear-token: value is null; bind a single secrets.NAME reference manually")
+	}
+	secretReference, ok := token.(string)
+	if !ok || !connectorSecretReference.MatchString(secretReference) {
+		return false, errors.New("cannot migrate linear-token: use a single secrets.NAME reference, then bind its name through the Linear import writer-secret")
+	}
+	inputs["writer-secret"] = connectorSecretReference.ReplaceAllString(secretReference, "$1")
+	return true, nil
+}
+
+func transferLegacyLinearToken(f *codemod.Frontmatter, destination []any) error {
+	if err := f.TransferInlineComment([]string{"safe-outputs", "linear-token"}, destination); err != nil {
+		return err
+	}
+	return f.Remove("safe-outputs", "linear-token")
 }
 
 func requiredConnectorInputs(provider string, selected []string) map[string]any {
@@ -230,9 +248,8 @@ func isConnectorImport(entry any, provider string) bool {
 	}
 
 	source = strings.TrimSpace(source)
-	remotePrefix := "github/gh-aw/"
-	if strings.HasPrefix(source, remotePrefix) {
-		source = strings.TrimPrefix(source, remotePrefix)
+	if remotePath, found := strings.CutPrefix(source, "github/gh-aw/"); found {
+		source = remotePath
 		if at := strings.IndexByte(source, '@'); at >= 0 {
 			source = source[:at]
 		}
