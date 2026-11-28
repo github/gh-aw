@@ -625,6 +625,7 @@ gh aw run workflow --json                   # Output triggered workflow results 
 **Options:** `--repeat`, `--push` (see [--push flag](#the---push-flag)), `--ref`, `--enable-if-needed`, `--json/-j`, `--auto-merge-prs`, `--dry-run`, `--engine/-e`, `--raw-field`, `--repo/-r`, `--approve`
 
 When `--json` is set, a JSON array of triggered workflow results is written to stdout.
+Each result includes `run_identity`, which is `known` when the dispatch returns a run URL and `unknown` otherwise. For a known identity, `run_id` and `run_url` identify that dispatch; for an unknown identity, those fields are omitted. An unknown identity does not mean dispatch failed. Dry runs and errors also report an unknown identity unless a run was already dispatched. JSON mode does not infer an identity from the latest workflow run; if the identity is unknown, it cannot wait for that run or auto-merge its pull requests. A batch error retains the existing behavior of marking every result as `error`, including any run dispatched before the error. With `--repeat`, each iteration writes a separate JSON array to stdout.
 
 When `--push` is used, automatically recompiles outdated `.lock.yml` files, stages all transitive imports, and triggers workflow run after successful push. Without `--push`, warnings are displayed for missing or outdated lock files.
 `--approve` applies to safe-update checks during compilation with `--push`; it has no effect without `--push`. `--dry-run` skips dispatch, but preparation may still compile, enable, or push workflows.
