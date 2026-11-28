@@ -15,6 +15,7 @@ The `azure-oidc` connector credential route was limited to inference. The select
 Forces:
 
 - Credentials must stay outside the agent sandbox. Reads through the MCP adapter run outside the sandbox.
+- A broker socket is a bearer capability; `RUNNER_TEMP` is not inherently private from agent-visible mounts on self-hosted runners.
 - Tokens should be short-lived and renewed before expiry.
 - A failed exchange must not fall back to a stored secret.
 - Reader and writer identities should be separate, and staged writes should acquire no token.
@@ -27,9 +28,9 @@ Unknown from the PR evidence: the rollout plan beyond Azure Monitor and inferenc
 Move the Entra token exchange for these routes into a trusted runner-side component and expose only a bearer token over a private socket to the agent-side runtime:
 
 1. **Exchange** (`actions/setup/js/connector_azure_oidc.cjs`). The component exchanges a GitHub OIDC assertion (audience `api://AzureADTokenExchange` by default) for an Entra access token. The token is requested for an explicit resource scope ending in `/.default`, at the authority for the selected cloud (public, usgovernment, or china). Tenant and client IDs must be GUIDs. Redirects are refused, responses are size-bounded, and failures are reported generically.
-2. **Broker** (`actions/setup/js/connector_credential_broker.cjs`). The broker caches the token in memory and renews it before expiry, coalescing concurrent renewals. It serves one bearer per connection over a Unix socket in a per-job `0700` directory under `RUNNER_TEMP`. It exits at its deadline or when its socket is removed.
+2. **Broker** (`actions/setup/js/connector_credential_broker.cjs`). The broker caches the token in memory and renews it before expiry, coalescing concurrent renewals. It serves one bearer per connection over a Unix socket in a per-job `0700` directory under `RUNNER_TEMP`. It exits at its deadline or when its socket is removed. For federated readers, the compiler supplies the broker's actual host directory to AWF's `filesystem.privateHostSocketDirs`; AWF verifies it against effective agent-visible mounts and fails closed if isolation cannot be established. A read-only mount is not sufficient socket isolation.
 3. **Runtime** (`actions/setup/js/connector_runtime.cjs`). When a broker route is configured, the runtime reads the bearer from the socket and never falls back to a stored secret. Each retry re-resolves the credential.
-4. **Compiler** (`pkg/workflow/connector_azure_broker.go`, `connector_oidc.go`). `id-token: write` is added only to jobs that select an Azure credential needing it. Live writes require a separate writer client ID and a literal `safe-outputs.environment` reserved for the writer job. Staged writes acquire no token.
+4. **Compiler** (`pkg/workflow/connector_azure_broker.go`, `connector_oidc.go`). `id-token: write` is added only to jobs that select an Azure credential needing it. Federated readers require an enabled built-in AWF sandbox, AWF v0.29.21 or newer, and a supported privileged local Linux Docker/runc runtime; the compiler rejects configurations that could expose runner credentials or bypass the selected MCP surface, and does not guess the broker directory. Live writes require a separate writer client ID and a literal `safe-outputs.environment` reserved for the writer job. Staged writes acquire no token.
 5. **Azure Monitor**. An opt-in `federated-reader` credential sits alongside the stored `reader` credential. No Azure writer is added. Inference keeps its existing exchange path.
 
 ## Alternatives Considered
@@ -45,12 +46,14 @@ Move the Entra token exchange for these routes into a trusted runner-side compon
 
 - Connector reads, remote MCP servers, and safe outputs can use short-lived Entra tokens without storing a client secret.
 - No fallback path exists. A failed exchange fails the call rather than downgrading to a stored secret.
+- Federated readers fail closed unless AWF can verify the actual broker socket directory is private from the agent's effective mounts.
 - Reader and writer identities and environments are separated, and staged writes acquire no token.
 - Existing stored-token routes and the inference exchange are unchanged. Federation is opt-in, so current Azure Monitor users are not broken.
 
 **Negative**
 
 - The new trusted broker adds a process lifecycle to maintain: a socket, a deadline, and cleanup logic. It depends on Unix domain sockets, and its tests are skipped on Windows (`skipIf(win32)`).
+- Reader isolation depends on AWF's effective-mount verification and is available only on supported privileged local Linux Docker/runc configurations; unsupported runners cannot use federated readers.
 - Operators must provision federated credentials for each trust subject and a dedicated writer environment, which adds setup cost. The connector specification documents this work.
 - Jobs that select these routes gain `id-token: write`, which widens the OIDC token surface of those jobs.
 - Rollout beyond Azure Monitor and inference is not described in the PR evidence.
