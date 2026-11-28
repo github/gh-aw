@@ -50,7 +50,7 @@ const { createTokenBrokerGitHubClient, isTokenBrokerEnabled } = require("./token
 const { ensureFullHistoryForBundle, importLocalBundle, offlineGitOptions, getBundlePrerequisites, linearizeRangeAsCommit } = require("./git_helpers.cjs");
 const { parseDiffGitHeader: parseDiffGitHeaderPaths, extractDiffGitHeaderEntries } = require("./patch_path_helpers.cjs");
 const { resolveTransportPaths } = require("./resolve_transport_paths.cjs");
-const { recoverObjectPack, isObjectPack, recoveryToken } = require("./object_pack_transport.cjs");
+const { OBJECT_PACK_PREVIEW_HEADER, recoverObjectPack, isObjectPack, recoveryToken } = require("./object_pack_transport.cjs");
 const { withTransportIntegrity } = require("./transport_integrity.cjs");
 const { withExecutionTrace } = require("./safe_output_trace.cjs");
 const { resolveDefaultMentions, resolveMentionsForItem } = require("./resolve_mentions_from_payload.cjs");
@@ -1324,6 +1324,9 @@ async function main(config = {}) {
           patchContent = transport.read(patchFilePath).toString("utf8");
         } catch (err) {
           throw new Error(`Failed to read file ${patchFilePath}: ${getErrorMessage(err)}`, { cause: err });
+        }
+        if (!hasBundleFile && patchContent.startsWith(`${OBJECT_PACK_PREVIEW_HEADER}\n`)) {
+          return { success: false, error: "Object-pack recovery envelope is missing. The preview changed after packaging, so the pull request cannot be created." };
         }
         isEmpty = !patchContent || !patchContent.trim();
       }
