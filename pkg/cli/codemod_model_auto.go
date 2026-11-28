@@ -51,13 +51,19 @@ func applyModelAutoToRouter(content string, frontmatter map[string]any, filePath
 		return content, false, nil
 	}
 
+	if outcome.AlreadyConfiguredRouting {
+		warnModelAutoUnchanged(filePath, fmt.Sprintf(
+			"left model: %s unchanged because model routing is already configured and overrides it. Remove model: %s (or migrate engine.model-routing to model: router while preserving your configured mode and shortlist). See https://github.github.com/gh-aw/reference/model-routing/",
+			outcome.AuthoredModel, outcome.AuthoredModel))
+		return content, false, nil
+	}
 	if !outcome.Routed {
 		warnModelAutoUnchanged(filePath, fmt.Sprintf(
 			"left model: %s unchanged because %s. To migrate, remove the blocker and switch to model: router, or pin a concrete model. See https://github.github.com/gh-aw/reference/model-routing/",
 			outcome.AuthoredModel, outcome.Reason))
 		return content, false, nil
 	}
-	if outcome.AddedGitHubProvider && !canPinEngineGitHubProviderLocally(frontmatter) {
+	if outcome.AddedGitHubProvider && !workflow.CanPinEngineGitHubProviderLocally(frontmatter) {
 		warnModelAutoUnchanged(filePath, fmt.Sprintf(
 			"left model: %s unchanged because engine %q is inherited from an import and adding engine.model-provider: github locally would conflict with or invalidate the engine config. Set engine.model-provider: github alongside the imported engine (or define engine locally) and switch to model: router. See https://github.github.com/gh-aw/reference/model-routing/",
 			outcome.AuthoredModel, outcome.EngineID))
@@ -96,22 +102,6 @@ func warnModelAutoUnchanged(filePath, message string) {
 		prefix = filepath.Base(filePath) + ": "
 	}
 	fmt.Fprintln(os.Stderr, console.FormatWarningMessage(prefix+message))
-}
-
-// canPinEngineGitHubProviderLocally reports whether frontmatter declares an
-// explicit local engine ID (string form `engine: claude` or map form with
-// `engine.id`) so `engine.model-provider: github` can be added safely without
-// conflicting with an imported engine or violating the engine object schema.
-func canPinEngineGitHubProviderLocally(frontmatter map[string]any) bool {
-	switch engineVal := frontmatter["engine"].(type) {
-	case string:
-		return strings.TrimSpace(engineVal) != ""
-	case map[string]any:
-		id, ok := engineVal["id"].(string)
-		return ok && strings.TrimSpace(id) != ""
-	default:
-		return false
-	}
 }
 
 // setEngineGitHubModelProvider ensures `engine.model-provider: github` is set,

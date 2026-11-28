@@ -475,3 +475,91 @@ Do work.
 		})
 	}
 }
+
+func TestModelAutoCodemod_AlreadyConfiguredRoutingPreservesConfigWithAccurateGuidance(t *testing.T) {
+	input := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+  copilot-requests: write
+engine:
+  id: copilot
+  model-routing:
+    goal: cost
+    mode: economy
+    allowed-models: [gpt-5.6-luna]
+model: auto
+---
+Do work.
+`
+	updated, applied, stderr, err := applyModelAutoCodemodForTest(t, input, "")
+	require.NoError(t, err)
+	require.False(t, applied)
+	require.Equal(t, input, updated)
+	require.Contains(t, stderr, "model routing is already configured and overrides it")
+	require.Contains(t, stderr, "preserving your configured mode and shortlist")
+	require.NotContains(t, stderr, "remove the blocker")
+}
+
+func TestModelAutoCodemod_PreservesCommentsIndentationAndMarkdownBody(t *testing.T) {
+	t.Run("string-to-map engine expansion preserves surrounding comments, unrelated keys, and body", func(t *testing.T) {
+		input := `---
+# Keep top-level workflow comment
+on: workflow_dispatch
+permissions:
+  contents: read # keep inline permissions comment
+  copilot-requests: write
+timeout-minutes: 15
+engine: claude
+model: copilot/auto
+---
+
+# Workflow Heading
+
+Keep every paragraph and **formatting** intact.
+
+- Bullet one
+- Bullet two
+`
+		updated, applied, stderr, err := applyModelAutoCodemodForTest(t, input, "")
+		require.NoError(t, err)
+		require.True(t, applied)
+		require.Empty(t, stderr)
+		require.Contains(t, updated, "# Keep top-level workflow comment")
+		require.Contains(t, updated, "contents: read # keep inline permissions comment")
+		require.Contains(t, updated, "timeout-minutes: 15")
+		require.Contains(t, updated, "id: claude")
+		require.Contains(t, updated, "model-provider: github")
+		require.Contains(t, updated, "model: router")
+		require.Contains(t, updated, "\n# Workflow Heading\n\nKeep every paragraph and **formatting** intact.\n\n- Bullet one\n- Bullet two\n")
+	})
+
+	t.Run("nested engine.model copilot/auto rewrite preserves inline comments, indentation, unrelated keys, and body", func(t *testing.T) {
+		input := `---
+on: workflow_dispatch
+permissions:
+  contents: read
+  copilot-requests: write
+# Keep engine block comment
+engine:
+  id: codex # keep engine id comment
+  model: copilot/auto
+  max-turns: 12 # keep max-turns comment
+---
+
+# Nested Engine Body
+
+Preserve this exact Markdown body.
+`
+		updated, applied, stderr, err := applyModelAutoCodemodForTest(t, input, "")
+		require.NoError(t, err)
+		require.True(t, applied)
+		require.Empty(t, stderr)
+		require.Contains(t, updated, "# Keep engine block comment")
+		require.Contains(t, updated, "  id: codex # keep engine id comment")
+		require.Contains(t, updated, "  model: router")
+		require.Contains(t, updated, "  model-provider: github")
+		require.Contains(t, updated, "  max-turns: 12 # keep max-turns comment")
+		require.Contains(t, updated, "\n# Nested Engine Body\n\nPreserve this exact Markdown body.\n")
+	})
+}

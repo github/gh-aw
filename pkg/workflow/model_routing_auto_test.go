@@ -465,7 +465,7 @@ func TestAutoModelRouting_ImportedAutoUsesImportSpecificWarning(t *testing.T) {
 		require.True(t, compiled.data.AutoModelRouting.FromImport)
 		require.True(t, compiled.data.AutoModelRouting.Routed)
 		require.Contains(t, compiled.stderr, "imported model: auto is deprecated and now routes as model: router")
-		require.Contains(t, compiled.stderr, "Update the imported workflow")
+		require.Contains(t, compiled.stderr, "Set model: router in this workflow (or check all consumers before updating the imported workflow)")
 		require.NotContains(t, compiled.stderr, "gh aw fix --write")
 	})
 
@@ -480,9 +480,45 @@ func TestAutoModelRouting_ImportedAutoUsesImportSpecificWarning(t *testing.T) {
 		require.NotNil(t, compiled.data.AutoModelRouting)
 		require.True(t, compiled.data.AutoModelRouting.FromImport)
 		require.True(t, compiled.data.AutoModelRouting.AddedGitHubProvider)
-		require.Contains(t, compiled.stderr, "set engine.model-provider: github on the engine declaration")
-		require.NotContains(t, compiled.stderr, "Update the imported workflow to use model: router with engine.model-provider: github")
+		require.Contains(t, compiled.stderr, "engine.model-provider: github on the engine declaration (or check all consumers before updating the imported workflow)")
+		require.NotContains(t, compiled.stderr, "gh aw fix --write")
 	})
+
+	t.Run("local copilot/auto with imported claude engine omits gh aw fix recommendation", func(t *testing.T) {
+		compiled := compileDefaultRoutingFiles(t, map[string]string{
+			"shared/claude.md": "---\nengine: claude\n---\n",
+			"main.md":          "---\non: workflow_dispatch\npermissions:\n  contents: read\n  copilot-requests: write\nimports:\n  - shared/claude.md\nmodel: copilot/auto\n---\nInspect the repository.\n",
+		})
+		require.NoError(t, compiled.err)
+		require.True(t, isModelRoutingEnabled(compiled.data))
+		require.Equal(t, LLMProviderGitHub, compiled.data.EngineConfig.LLMProvider)
+		require.NotNil(t, compiled.data.AutoModelRouting)
+		require.False(t, compiled.data.AutoModelRouting.FromImport)
+		require.True(t, compiled.data.AutoModelRouting.AddedGitHubProvider)
+		require.False(t, compiled.data.AutoModelRouting.CanAutoFix)
+		require.Contains(t, compiled.stderr, "inherited from an import")
+		require.Contains(t, compiled.stderr, "switch to model: router manually")
+		require.NotContains(t, compiled.stderr, "gh aw fix --write")
+	})
+}
+
+func TestAutoModelRouting_AlreadyConfiguredRoutingPreservedAndReported(t *testing.T) {
+	src := autoModelFixture(
+		"engine:\n  id: copilot\n  model-routing:\n    goal: cost\n    mode: economy\n    allowed-models: [gpt-5.6-luna]",
+		"model: auto",
+		"",
+	)
+	compiled := compileDefaultRoutingSource(t, src)
+	require.NoError(t, compiled.err)
+	require.True(t, isModelRoutingEnabled(compiled.data))
+	require.Equal(t, "economy", compiled.data.EngineConfig.ModelRouting.Mode, "existing configured mode must be preserved")
+	require.Equal(t, []string{"gpt-5.6-luna"}, compiled.data.EngineConfig.ModelRouting.AllowedModels, "existing shortlist must be preserved")
+	require.NotNil(t, compiled.data.AutoModelRouting)
+	require.True(t, compiled.data.AutoModelRouting.AlreadyConfiguredRouting)
+	require.False(t, compiled.data.AutoModelRouting.Routed)
+	require.Contains(t, compiled.stderr, "is overridden by the existing model-routing configuration")
+	require.Contains(t, compiled.stderr, "preserving your configured mode and shortlist")
+	require.NotContains(t, compiled.stderr, "kept existing auto behavior")
 }
 
 func TestAutoModelRouting_CompileToYAMLReportsStructuredDiagnostic(t *testing.T) {

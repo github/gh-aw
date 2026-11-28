@@ -37,11 +37,32 @@ type AutoModelRoutingOutcome struct {
 	// Routed is true when the workflow passed both eligibility stages and was
 	// normalized to model: router.
 	Routed bool
+	// AlreadyConfiguredRouting is true when an explicit model-routing block was
+	// already configured alongside `model: auto` and continues to take effect.
+	AlreadyConfiguredRouting bool
 	// AddedGitHubProvider is true when copilot/auto on claude or codex inferred
 	// engine.model-provider: github so routing stays on GitHub Copilot.
 	AddedGitHubProvider bool
+	// CanAutoFix is true when `gh aw fix` can safely rewrite the workflow in place.
+	CanAutoFix bool
 	// Reason explains why routing did not apply when Routed is false.
 	Reason string
+}
+
+// CanPinEngineGitHubProviderLocally reports whether frontmatter declares an
+// explicit local engine ID (string form `engine: claude` or map form with
+// `engine.id`) so `engine.model-provider: github` can be added safely without
+// conflicting with an imported engine or violating the engine object schema.
+func CanPinEngineGitHubProviderLocally(frontmatter map[string]any) bool {
+	switch engineVal := frontmatter["engine"].(type) {
+	case string:
+		return strings.TrimSpace(engineVal) != ""
+	case map[string]any:
+		id, ok := engineVal["id"].(string)
+		return ok && strings.TrimSpace(id) != ""
+	default:
+		return false
+	}
 }
 
 // AuthoredAutoModelPath returns the YAML mapping path and value when frontmatter
@@ -123,14 +144,25 @@ func (c *Compiler) applyAutoModelRouting(ctx *workflowBuildContext) {
 	}
 	_, _, authoredLocally := AuthoredAutoModelPath(ctx.frontmatter.Frontmatter)
 	fromImport := !authoredLocally
+	canPinLocalProvider := CanPinEngineGitHubProviderLocally(ctx.frontmatter.Frontmatter)
 	if data.EngineConfig == nil {
 		data.AutoModelRouting = keepAutoModelOutcome(authored, "", fromImport, "no engine configuration")
 		return
 	}
-	data.AutoModelRouting = c.resolveAutoModelRouting(data, authored, fromImport, filepath.Base(ctx.cleanPath))
+	if data.EngineConfig.ModelRouting != nil {
+		data.AutoModelRouting = &AutoModelRoutingOutcome{
+			AuthoredModel:            authored,
+			EngineID:                 data.EngineConfig.ID,
+			FromImport:               fromImport,
+			AlreadyConfiguredRouting: true,
+		}
+		modelRoutingAutoLog.Printf("Model %q is overridden by existing model-routing config in %s", authored, filepath.Base(ctx.cleanPath))
+		return
+	}
+	data.AutoModelRouting = c.resolveAutoModelRouting(data, authored, fromImport, canPinLocalProvider, filepath.Base(ctx.cleanPath))
 }
 
-func (c *Compiler) resolveAutoModelRouting(data *WorkflowData, authored string, fromImport bool, workflowFile string) *AutoModelRoutingOutcome {
+func (c *Compiler) resolveAutoModelRouting(data *WorkflowData, authored string, fromImport, canPinLocalProvider bool, workflowFile string) *AutoModelRoutingOutcome {
 	prevModel := data.Model
 	prevProvider := data.EngineConfig.LLMProvider
 	addedGitHubProvider := false
@@ -175,6 +207,7 @@ func (c *Compiler) resolveAutoModelRouting(data *WorkflowData, authored string, 
 		FromImport:          fromImport,
 		Routed:              true,
 		AddedGitHubProvider: addedGitHubProvider,
+		CanAutoFix:          !fromImport && (!addedGitHubProvider || canPinLocalProvider),
 	}
 }
 
@@ -241,23 +274,26 @@ func FormatAutoModelRoutingWarning(outcome *AutoModelRoutingOutcome) string {
 	if outcome == nil {
 		return ""
 	}
-	if outcome.FromImport {
-		if outcome.Routed {
-			if outcome.AddedGitHubProvider {
-				return fmt.Sprintf("imported model: %s is deprecated and now routes as model: router on GitHub Copilot. "+
-					"Switch to model: router and set engine.model-provider: github on the engine declaration. "+
-					"See https://github.github.com/gh-aw/reference/model-routing/", outcome.AuthoredModel)
-			}
-			return fmt.Sprintf("imported model: %s is deprecated and now routes as model: router. "+
-				"Update the imported workflow to use model: router. "+
-				"See https://github.github.com/gh-aw/reference/model-routing/", outcome.AuthoredModel)
+	if outcome.AlreadyConfiguredRouting {
+		if outcome.FromImport {
+			return fmt.Sprintf("imported model: %s is deprecated and is overridden by the existing model-routing configuration. "+
+				"Override model in this workflow (or check all consumers before removing model: %s from the imported workflow) while keeping your configured routing mode and shortlist. "+
+				"See https://github.github.com/gh-aw/reference/model-routing/", outcome.AuthoredModel, outcome.AuthoredModel)
 		}
-		return fmt.Sprintf("imported model: %s is deprecated; kept existing auto behavior because %s. "+
-			"Update the imported workflow to remove the blocker and switch to model: router, or pin a concrete model. "+
-			"See https://github.github.com/gh-aw/reference/model-routing/", outcome.AuthoredModel, outcome.Reason)
+		return fmt.Sprintf("model: %s is deprecated and is overridden by the existing model-routing configuration. "+
+			"Remove model: %s (or migrate engine.model-routing to model: router while preserving your configured mode and shortlist). "+
+			"See https://github.github.com/gh-aw/reference/model-routing/", outcome.AuthoredModel, outcome.AuthoredModel)
+	}
+	if outcome.FromImport {
+		return formatImportedAutoModelRoutingWarning(outcome)
 	}
 	if outcome.Routed {
 		if outcome.AddedGitHubProvider {
+			if !outcome.CanAutoFix {
+				return fmt.Sprintf("model: %s is deprecated and now routes as model: router on GitHub Copilot. "+
+					"Because engine %q is inherited from an import, set engine.model-provider: github alongside the imported engine (or define engine locally) and switch to model: router manually. "+
+					"See https://github.github.com/gh-aw/reference/model-routing/", outcome.AuthoredModel, outcome.EngineID)
+			}
 			return fmt.Sprintf("model: %s is deprecated and now routes as model: router on GitHub Copilot. "+
 				"Run 'gh aw fix --write' to rewrite it to model: router with engine.model-provider: github. "+
 				"See https://github.github.com/gh-aw/reference/model-routing/", outcome.AuthoredModel)
@@ -268,6 +304,22 @@ func FormatAutoModelRoutingWarning(outcome *AutoModelRoutingOutcome) string {
 	}
 	return fmt.Sprintf("model: %s is deprecated; kept existing auto behavior because %s. "+
 		"To migrate, remove the blocker and switch to model: router, or pin a concrete model. "+
+		"See https://github.github.com/gh-aw/reference/model-routing/", outcome.AuthoredModel, outcome.Reason)
+}
+
+func formatImportedAutoModelRoutingWarning(outcome *AutoModelRoutingOutcome) string {
+	if outcome.Routed {
+		if outcome.AddedGitHubProvider {
+			return fmt.Sprintf("imported model: %s is deprecated and now routes as model: router on GitHub Copilot. "+
+				"Set model: router in this workflow and engine.model-provider: github on the engine declaration (or check all consumers before updating the imported workflow). "+
+				"See https://github.github.com/gh-aw/reference/model-routing/", outcome.AuthoredModel)
+		}
+		return fmt.Sprintf("imported model: %s is deprecated and now routes as model: router. "+
+			"Set model: router in this workflow (or check all consumers before updating the imported workflow). "+
+			"See https://github.github.com/gh-aw/reference/model-routing/", outcome.AuthoredModel)
+	}
+	return fmt.Sprintf("imported model: %s is deprecated; kept existing auto behavior because %s. "+
+		"Override model in this workflow (or check all consumers before updating the imported workflow) to switch to model: router once the blocker is removed, or pin a concrete model. "+
 		"See https://github.github.com/gh-aw/reference/model-routing/", outcome.AuthoredModel, outcome.Reason)
 }
 
